@@ -1,0 +1,12 @@
+{
+  "version": "3.94.7",
+  "source_sha256": "4a8959bbe41c5201e749e86c0a2f3db7f634695d9d5ae732600ecd83dd49605b",
+  "compressed_sha256": "02457611223ca5db66ec975905e338c83a190f6a9a5897e0f051107111639461",
+  "compressed_bytes": 273408,
+  "base64_chars": 364544,
+  "parts": 21,
+  "part_chars": 18000,
+  "small_archive_sha256": "83fa2db190a8138e3ee8c1ba4af6e012cdff46a845698c665179883f501d48e1",
+  "small_archive_bytes": 21512,
+  "small_archive_base64_chars": 28684
+}
