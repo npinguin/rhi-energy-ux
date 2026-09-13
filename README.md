@@ -1,5 +1,7 @@
 # Robotix Home Intelligence Energy UX
 
+![Robotix Home Intelligence Energy UX](dist/assets/overview-hero.webp)
+
 Public Home Assistant dashboard package for **Robotix Home Intelligence Energy**.
 
 - UX release: **3.94.7**
