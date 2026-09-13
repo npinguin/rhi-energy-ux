@@ -1,0 +1,10 @@
+const fs=require('fs');
+const src=fs.readFileSync('source/homebrain-energy-card.js','utf8');
+for (const token of ['site_consumption.power_kw','home_consumption.power_kw','flexible_loads.power_kw','buildPhysicalFlowViewModel','createMeteringStatusModel','Available for Flexible Loads','sensor.energy_connection_property_index']) if(!src.includes(token)) throw new Error('missing '+token);
+for (const forbidden of ['home_base_load.power_kw','total_non_storage_demand','total_site_demand','sensor.energy_connection_fact_registry','energy_intelligence.usable_surplus_kw']) if(src.includes(forbidden)) throw new Error('forbidden '+forbidden);
+if (!/ATTRIBUTION_PENDING:\s*'Waiting for trusted meter attribution'/.test(src)) throw new Error('pending mapping missing');
+if (!/NOT_APPLICABLE:\s*'Not applicable'/.test(src)) throw new Error('NA mapping missing');
+if (!/Unassigned charging energy/.test(src)) throw new Error('unattributed label missing');
+if (!/applicable_remediations_json/.test(src)) throw new Error('canonical remediation contract missing');
+if (!/row\.ux_visible/.test(src) || !/row\.ux_enabled/.test(src)) throw new Error('backend-owned command presentation missing');
+console.log('PASS R1.89.39 consumption, physical Flow, Metering and command UX contracts');

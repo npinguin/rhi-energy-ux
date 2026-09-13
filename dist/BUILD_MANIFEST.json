@@ -1,0 +1,58 @@
+{
+  "assets": {
+    "consumers-hero.webp": {
+      "bytes": 95406,
+      "sha256": "02851d45a117f6663c46839adf913b28d86fbb2154ddf96eee2c866497210f5f"
+    },
+    "flow-hero.webp": {
+      "bytes": 95406,
+      "sha256": "02851d45a117f6663c46839adf913b28d86fbb2154ddf96eee2c866497210f5f"
+    },
+    "intelligence-hero.webp": {
+      "bytes": 94328,
+      "sha256": "811f8a77fba3e327496b6c28be5de259791707571827c1018e6a8d9348ba7ac2"
+    },
+    "metering-hero.webp": {
+      "bytes": 91812,
+      "sha256": "3851695bfa9c8e7c6b412966c232901cff54485d80c27aaed95ed2599c5b3e50"
+    },
+    "outlook-hero.webp": {
+      "bytes": 91812,
+      "sha256": "3851695bfa9c8e7c6b412966c232901cff54485d80c27aaed95ed2599c5b3e50"
+    },
+    "overview-hero.webp": {
+      "bytes": 74338,
+      "sha256": "38bb385fb3423596841e4d2dff7294f8b62b6bff655389716d98ea027d192dea"
+    },
+    "solar-hero.webp": {
+      "bytes": 120678,
+      "sha256": "3751878f5a4f2664b8174c793ff760d6daedd96a9f1d0d6f74b2e922ba5fe554"
+    },
+    "strategies-hero.webp": {
+      "bytes": 94328,
+      "sha256": "811f8a77fba3e327496b6c28be5de259791707571827c1018e6a8d9348ba7ac2"
+    },
+    "value-hero.webp": {
+      "bytes": 91812,
+      "sha256": "3851695bfa9c8e7c6b412966c232901cff54485d80c27aaed95ed2599c5b3e50"
+    }
+  },
+  "bundle": {
+    "bytes": 690907,
+    "path": "dist/rhi-energy-ux.js",
+    "sha256": "6c69317125f4285049931454ebf4a37b951f9044a9d2f2c2651b52d8b0238bdb"
+  },
+  "distribution_transform": {
+    "hacs_asset_prefix": "/hacsfiles/rhi-energy-ux/assets/",
+    "legacy_asset_prefix": "/local/homebrain/infrastructure/energy/"
+  },
+  "license": "GPL-3.0-only",
+  "product": "Robotix Home Intelligence Energy UX",
+  "schema_version": 1,
+  "source": {
+    "bytes": 690991,
+    "path": "source/homebrain-energy-card.js",
+    "sha256": "41bf42aaa2afb2a163b35a9142e1f38e8cb67e959a7e4e746ecad2ab99ebdb69"
+  },
+  "version": "3.94.7"
+}

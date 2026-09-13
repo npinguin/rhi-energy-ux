@@ -1,0 +1,51 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version without v prefix
+        required: true
+permissions:
+  contents: write
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run validate
+      - run: git diff --exit-code -- dist
+      - name: Validate requested version
+        shell: bash
+        run: |
+          ACTUAL=$(node -p "require('./package.json').version")
+          test "$ACTUAL" = "${{ inputs.version }}"
+          if git rev-parse "v${ACTUAL}" >/dev/null 2>&1; then
+            echo "Tag v${ACTUAL} already exists" >&2
+            exit 1
+          fi
+          if gh release view "v${ACTUAL}" >/dev/null 2>&1; then
+            echo "Release v${ACTUAL} already exists" >&2
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Create immutable GitHub release
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          git tag "v${VERSION}" "$GITHUB_SHA"
+          git push origin "v${VERSION}"
+          gh release create "v${VERSION}" --target "$GITHUB_SHA" --title "RHI Energy UX v${VERSION}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
