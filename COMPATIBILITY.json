@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "ux_version": "3.94.7",
+  "energy_contract": {
+    "minimum": "R1.89.44_CONTRACT",
+    "tested_backend_releases": [
+      "R1.89.44"
+    ]
+  },
+  "deployment": {
+    "hacs_category": "plugin",
+    "artifact": "dist/rhi-energy-ux.js",
+    "rollback": "immutable_github_release"
+  }
+}

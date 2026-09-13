@@ -1,0 +1,77 @@
+# Home Intelligence Energy UX Architecture — R3.91.4
+
+## Canonical dependency direction
+
+```text
+page
+→ reusable component
+→ normalized view model
+→ contract-family module
+→ Energy Contract Gateway
+→ canonical public backend owner
+```
+
+Reverse dependencies are forbidden.
+
+## Responsibilities
+
+### Public Interface Registry
+
+Owns exact interface identity. It does not infer aliases, scan suffixes or use internal/diagnostic entities for product truth.
+
+### Energy Contract Gateway
+
+Owns Home Assistant state access, contract envelopes, availability, version metadata and bounded caching/invalidation.
+
+### Contract-family module
+
+Owns parsing, validation, schema-shape normalization, zero/null preservation and the meaning of one contract family.
+
+### Normalized view model
+
+Combines canonical meanings into a stable renderer input. It does not expose backend paths or create a new business owner.
+
+### Reusable component and renderer
+
+Owns layout, formatting, visual filtering, accessibility and explicit user interaction. It does not parse contracts, infer readiness or calculate business truth.
+
+## Current modules
+
+- `runtime/public-interface-registry.js`
+- `runtime/energy-contract-gateway.js`
+- `planning/planning-contract.js`
+- `planning/planning-view-model.js`
+- `runtime/command-contract.js`
+- `runtime/command-action-model.js`
+- `runtime/consumption-contract.js`
+- `runtime/physical-flow-view-model.js`
+- `runtime/metering-status-model.js`
+
+Physical Flow still needs a relation-owned model rather than independent vehicle and connection rows. Property and Retrospective modules should be added only when closing proven drift—not as a big-bang rewrite.
+
+## Semantic projections
+
+- Planning: advisory horizons, commitments, totals and current operational intent.
+- Physical Flow: measured relation power and topology only.
+- Consumption: canonical Site Consumption, Home Consumption and Flexible Loads.
+- Commands: published actions and literal invoke.
+- Control state: mode, physical state, origin and participation separated.
+- Metering: periodized measured energy and measurement lifecycle.
+- Configuration: editable public properties and authoritative readback.
+- Retrospective: backend-owned outcome review.
+- Value: backend-owned financial interpretation.
+
+## Forbidden dependencies
+
+- pages/components reading `sensor.energy_*` directly;
+- widgets parsing raw backend rows;
+- screen-local command or property routes;
+- Planning totals sourced from another interface;
+- Flow values sourced from need/request/plan semantics;
+- action applicability used as control mode;
+- direct edits to generated distribution;
+- local compatibility fallback without a documented owner and expiry.
+
+## Performance boundary
+
+The gateway and model layer must prevent repeated whole-contract parsing per cell/render. Updates should invalidate only affected models. Re-renders must preserve user tab, selection, disclosure, scroll and draft state.
