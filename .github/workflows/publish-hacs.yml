@@ -1,0 +1,137 @@
+name: Publish HACS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'source/**'
+      - 'dist/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'hacs.json'
+      - 'COMPATIBILITY.json'
+      - 'RELEASE_MANIFEST.json'
+      - 'CHANGELOG.md'
+      - 'release/RELEASE_NOTES.md'
+      - 'validation/**'
+      - '.github/workflows/publish-hacs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.repository }}-publish-candidate
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate candidate source and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact main candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Reject immutable version republish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Refusing to republish immutable HACS candidate ${TAG}; create the next UX version." >&2
+            exit 1
+          fi
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "Refusing to republish immutable GitHub Release ${TAG}; create the next UX version." >&2
+            exit 1
+          fi
+      - name: Full validation
+        run: npm run validate
+      - name: Verify reproducible dist
+        run: git diff --exit-code -- dist
+      - name: HACS validation
+        uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa
+        with:
+          category: plugin
+
+  publish:
+    name: Publish immutable TEST CANDIDATE
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - name: Rebuild exact runtime
+        run: |
+          npm run build
+          git diff --exit-code -- dist
+      - name: Publish immutable version and rollback assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "Immutable candidate ${TAG} already exists; refusing republish." >&2
+            exit 1
+          fi
+          sha256sum dist/rhi-energy-ux.js > /tmp/rhi-energy-ux.js.sha256
+          git tag "${TAG}" "$GITHUB_SHA"
+          git push origin "${TAG}"
+          gh release create "${TAG}" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "RHI Energy UX ${TAG} — TEST CANDIDATE" \
+            --notes-file release/RELEASE_NOTES.md \
+            dist/rhi-energy-ux.js \
+            /tmp/rhi-energy-ux.js.sha256 \
+            dist/BUILD_MANIFEST.json \
+            COMPATIBILITY.json \
+            RELEASE_MANIFEST.json \
+            release/QUALIFICATION.json
+          test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = true
+      - name: Summary
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          {
+            echo '## RHI Energy UX HACS publication'
+            echo "- Version: v${VERSION}"
+            echo "- Source/package/tests: PASS"
+            echo "- Reproducible dist: PASS"
+            echo "- HACS validation: PASS"
+            echo "- Immutable TEST CANDIDATE: PUBLISHED"
+            echo "- Stable promotion: BLOCKED until target HA qualification passes"
+          } >> "$GITHUB_STEP_SUMMARY"
