@@ -43,9 +43,21 @@ for forbidden in [
 print("PASS command contract architecture")
 
 
-# R3.94.9: product runtime may not select owners by probing public entity literals.
+# R3.94.10: product runtime must resolve each meaning through one registry owner only.
 if "publicUxEntities().includes('sensor.energy_" in main:
     failures.append("direct_public_entity_owner_selection")
+if "return this.allRows().get(String(key))" in main:
+    failures.append("cross_owner_row_fallback")
+if "consumerFallbackRows(" in main or "publishedRows.length ? publishedRows" in main:
+    failures.append("consumer_cross_owner_fallback")
+
+diagnostic_start = main.find("    diagnosticSpec(tab) {")
+diagnostic_end = main.find("    diagnosticEntity(rt, entityId, label, purpose) {", diagnostic_start)
+diagnostic_spec = main[diagnostic_start:diagnostic_end]
+if "sensor.energy_" in diagnostic_spec:
+    failures.append("diagnostic_spec_direct_entity_literal")
+if "sensor.energy_metering_property_index" in main:
+    failures.append("legacy_metering_owner_reference")
 
 registry = (root/'source/modules/runtime/public-interface-registry.js').read_text(encoding='utf-8')
 if "metering: 'sensor.energy_asset_metering_index'" not in registry:
