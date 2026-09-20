@@ -1,3 +1,12 @@
+## 3.94.9 — audit closure
+
+- centralizes product entity identity in the Public Interface Registry;
+- removes direct public-entity owner selection from runtime product paths;
+- fixes Metering to use the canonical registry owner only;
+- adds engineer handover and stronger documentation-governance checks;
+- adds executable bundle-load smoke coverage;
+- removes stale release labels and Home Base Load terminology from evergreen documentation.
+
 # Changelog
 
 ## 3.94.8
