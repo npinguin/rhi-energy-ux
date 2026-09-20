@@ -18,7 +18,7 @@ No Energy business semantics are implemented or inferred by the UX.
 ## Compatibility
 
 - Energy UX: 3.94.8
-- Minimum backend: E0.15.11
+- Minimum backend: E0.15.12
 - Existing public compatibility surface: R1.89.44_CONTRACT
 - Previous rollback release: v3.94.7
 
