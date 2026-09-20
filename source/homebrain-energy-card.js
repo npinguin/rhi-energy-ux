@@ -2017,6 +2017,7 @@
       this.selectedPlanningHorizonId = 'D0';
       this.selectedMeteringHorizonId = 'D0';
       this.selectedMeteringPeriodId = 'today';
+      this._meteringPeriodHydrated = false;
       this.meteringSort = 'default';
       this.consumerSort = 'power';
       this.consumerFilter = 'all';
@@ -2098,13 +2099,18 @@
       const row = this.runtime().row('metering.selected_period');
       if (!row || row.missing) return;
       const value = String(rowValue(row, '') || '').toLowerCase();
-      if (['hour','today','day','week','month','year'].includes(value)) this.selectedMeteringPeriodId = value === 'day' ? 'today' : value;
+      if (!['hour','today','day','week','month','year'].includes(value)) return;
+      if (!this._meteringPeriodHydrated) {
+        this.selectedMeteringPeriodId = value === 'day' ? 'today' : value;
+        this._meteringPeriodHydrated = true;
+      }
     }
     selectMeteringPeriod(value, source) {
       const normalized = String(value || 'today').toLowerCase();
       const period = normalized === 'day' ? 'today' : normalized;
       if (!['hour','today','week','month','year'].includes(period)) return;
       this.selectedMeteringPeriodId = period;
+      this._meteringPeriodHydrated = true;
       this.requestPropertyWrite('metering.selected_period', period, { source });
     }
     runtime() { return new EnergyRuntime(this._hass || {}); }
