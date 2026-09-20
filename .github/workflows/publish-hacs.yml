@@ -13,7 +13,6 @@ on:
       - 'RELEASE_MANIFEST.json'
       - 'CHANGELOG.md'
       - 'release/RELEASE_NOTES.md'
-      - 'validation/**'
   workflow_dispatch:
 
 permissions:
