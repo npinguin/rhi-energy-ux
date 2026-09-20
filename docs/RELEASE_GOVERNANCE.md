@@ -1,48 +1,36 @@
 # Release Governance
 
-RHI Energy UX follows the same fail-closed release discipline as the backend, without backend-specific runtime complexity.
+RHI Energy UX uses the same release discipline as the RHI backend, kept intentionally simple.
 
 ## Release path
 
 ```text
 branch
-  → tests + deterministic build
-  → pull request
-  → Validate green
-  → squash merge to main
-  → main Validate green
-  → immutable GitHub release/tag
-  → HACS install/update
-  → target Home Assistant runtime proof
+→ PR
+→ Validate green
+→ squash merge to main
+→ main Validate green
+→ automatic Publish HACS
+→ immutable TEST CANDIDATE prerelease
+→ target Home Assistant qualification
+→ manual stable promotion
 ```
 
-## Release rules
+## Rules
 
-1. `source/homebrain-energy-card.js` is canonical source.
-2. `dist/rhi-energy-ux.js` is generated and must be reproducible.
-3. `package.json`, `package-lock.json`, `COMPATIBILITY.json`, source identity and build manifest must agree on the UX version.
-4. The UX reads the backend version only from `sensor.energy_release_contract.backend_release`.
-5. No frontend backend-version mapping or fallback is allowed.
-6. PR validation must be green before merge.
-7. Main must validate again after merge.
-8. A version/tag is immutable. Never overwrite a published version.
-9. A bad release is fixed by a new patch release.
-10. Rollback uses the previous immutable HACS release.
-
-## Runtime proof
-
-Static CI proves package consistency; it does not prove the target browser/Home Assistant runtime.
-
-Before retiring the previous deployment, verify:
-- HACS resource loaded;
-- dashboard renders;
-- desktop and iPad;
-- footer version identity;
-- no duplicate legacy resource;
-- update and rollback path understood.
+1. `validate.yml` is side-effect free.
+2. `publish-hacs.yml` runs automatically for relevant changes on `main`.
+3. Candidate publication re-runs source/package tests, reproducible-dist proof and HACS validation.
+4. A published `vX.Y.Z` tag/release is immutable. Never republish it; fix forward with the next version.
+5. `release/QUALIFICATION.json` records target runtime evidence and does not trigger a new candidate publication.
+6. Stable promotion remains manual and fail-closed.
+7. Stable promotion requires runtime proof, rollback proof, zero accepted technical debt and zero accepted feature debt.
+8. Stable promotion verifies that the current runtime bytes exactly match the immutable candidate asset.
+9. Previous immutable HACS releases remain the rollback path.
+10. UX owns only its own package version. Backend version comes only from `sensor.energy_release_contract.backend_release`; the UX never guesses or maps it.
 
 ## Current release
 
 - candidate: `v3.94.8`
-- backend minimum: `E0.15.12`
+- minimum backend: `E0.15.12`
 - rollback target: `v3.94.7`
