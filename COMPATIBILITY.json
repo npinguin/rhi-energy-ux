@@ -4,9 +4,9 @@
   "energy_contract": {
     "contract": "ENERGY_PUBLIC_RUNTIME_V1",
     "compatibility_minimum": "R1.89.44_CONTRACT",
-    "minimum_backend": "E0.15.7",
+    "minimum_backend": "E0.15.9",
     "tested_backend_releases": [
-      "E0.15.7"
+      "E0.15.9"
     ]
   },
   "deployment": {
