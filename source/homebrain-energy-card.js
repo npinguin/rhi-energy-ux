@@ -4315,7 +4315,10 @@
         : fallbackProfile;
       if (selected && !this.selectedStrategyProfileId) this.selectedStrategyProfileId = selected.profile_id;
       const selectedId = selected?.profile_id || '';
-      const profilePicker = profiles.length ? `<section class="panel strategyProfilePicker compact"><div><h2>Strategy profile</h2><p>Choose the policy set you want to review or adjust.</p></div><label class="strategyProfileSelect"><span>Profile</span><select data-strategy-profile-select>${profiles.map(profile => `<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>${selected ? `<small>${escapeHtml(this.profileUserDescription(selected))}</small>` : ''}</section>` : '';
+      const unavailableSelectedProfile = this.selectedStrategyProfileId && !selected
+        ? `<option value="${escapeHtml(this.selectedStrategyProfileId)}" selected disabled>Selected profile temporarily unavailable</option>`
+        : '';
+      const profilePicker = profiles.length ? `<section class="panel strategyProfilePicker compact"><div><h2>Strategy profile</h2><p>Choose the policy set you want to review or adjust.</p></div><label class="strategyProfileSelect"><span>Profile</span><select data-strategy-profile-select>${unavailableSelectedProfile}${profiles.map(profile => `<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>${selected ? `<small>${escapeHtml(this.profileUserDescription(selected))}</small>` : `<small>The selected profile is temporarily unavailable. Your selection is preserved.</small>`}</section>` : '';
       const effectiveRowsForProfile = selectedId
         ? effectiveStrategies.filter(strategy => {
             const text = `${strategy.profile_id || ''} ${strategy.strategy_profile_id || ''} ${strategy.profile_type || ''} ${strategy.asset_type || ''} ${strategy.policy_profile || ''}`.toLowerCase();
