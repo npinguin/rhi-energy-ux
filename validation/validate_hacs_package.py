@@ -11,7 +11,9 @@ checks={
 'bundle_exists':bundle.is_file(),
 'license':pkg.get('license')=='GPL-3.0-only',
 'version_match':compat.get('ux_version')==pkg.get('version'),
-'contract_minimum':compat.get('energy_contract',{}).get('minimum')=='R1.89.44_CONTRACT',
+'contract_identity':compat.get('energy_contract',{}).get('contract')=='ENERGY_PUBLIC_RUNTIME_V1',
+'compatibility_minimum':compat.get('energy_contract',{}).get('compatibility_minimum')=='R1.89.44_CONTRACT',
+'minimum_backend':compat.get('energy_contract',{}).get('minimum_backend')=='E0.15.9',
 'no_legacy_local': '/local/homebrain/infrastructure/energy/' not in bundle.read_text(encoding='utf-8'),
 'hacs_asset_prefix':'/hacsfiles/rhi-energy-ux/assets/' in bundle.read_text(encoding='utf-8'),
 }
