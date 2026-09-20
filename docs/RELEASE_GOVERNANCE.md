@@ -19,7 +19,7 @@ branch
 ## Rules
 
 1. `validate.yml` is side-effect free.
-2. `publish-hacs.yml` runs automatically for relevant changes on `main`.
+2. `publish-hacs.yml` runs automatically for runtime/package changes on `main`. Workflow-only governance changes are validated but do not republish an existing candidate.
 3. Candidate publication re-runs source/package tests, reproducible-dist proof and HACS validation.
 4. A published `vX.Y.Z` tag/release is immutable. Never republish it; fix forward with the next version.
 5. `release/QUALIFICATION.json` records target runtime evidence and does not trigger a new candidate publication.
