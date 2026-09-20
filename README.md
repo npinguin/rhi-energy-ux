@@ -13,15 +13,92 @@ The Energy backend owns discovery, normalization, bindings, topology, planning, 
 
 ## HACS installation
 
-Add `npinguin/rhi-energy-ux` to HACS as a custom repository of type **Dashboard**, then install a published GitHub Release. HACS installs the contents of `dist/` and manages the Lovelace module resource.
+Add `npinguin/rhi-energy-ux` to HACS as a custom repository of type **Dashboard**, then install a published GitHub Release.
 
-Use the card as:
+For the initial migration, install **v3.94.7**.
+
+### 1. Install through HACS
+
+1. Open **HACS**.
+2. Open **Custom repositories**.
+3. Add `https://github.com/npinguin/rhi-energy-ux`.
+4. Select repository type **Dashboard**.
+5. Install **Robotix Home Intelligence Energy UX**.
+6. Select release **v3.94.7**.
+
+HACS deploys the runtime from `dist/`. The expected Lovelace resource is:
+
+```text
+/hacsfiles/rhi-energy-ux/rhi-energy-ux.js
+```
+
+Normally HACS manages this resource automatically. Verify it under **Settings → Dashboards → Resources**.
+
+### 2. Remove the legacy manual resource
+
+Remove the old manually deployed Energy UX resource, for example:
+
+```text
+/local/homebrain/cards/homebrain-energy.bundle.js?v=R3.94.7
+```
+
+or any older `/local/homebrain/cards/homebrain-energy.bundle.js?v=...` entry.
+
+Do not load both the legacy and HACS resources at the same time.
+
+Do **not** delete the old files from `/config/www` until the HACS deployment has been verified on the target Home Assistant instance.
+
+### 3. Dashboard YAML
+
+Use the canonical card declaration:
 
 ```yaml
 type: custom:homebrain-energy-card
 ```
 
-Do not manually copy JavaScript or artwork to `/config/www`.
+A complete dedicated Energy view can be defined as:
+
+```yaml
+title: Energy
+path: energy
+icon: mdi:flash
+type: panel
+cards:
+  - type: custom:homebrain-energy-card
+```
+
+If the existing dashboard already has the Energy card inside another view/layout, keep the surrounding dashboard YAML and replace only the card declaration with:
+
+```yaml
+type: custom:homebrain-energy-card
+```
+
+The compatibility alias `custom:homebrain-energy-domain-card` is still registered by v3.94.7, but new dashboard configuration should use `custom:homebrain-energy-card`.
+
+### 4. YAML-managed Lovelace resources only
+
+Most installations should let HACS manage the resource. If Lovelace resources are explicitly managed in YAML, use:
+
+```yaml
+lovelace:
+  resources:
+    - url: /hacsfiles/rhi-energy-ux/rhi-energy-ux.js
+      type: module
+```
+
+and remove the old `/local/homebrain/cards/homebrain-energy.bundle.js?...` resource entry.
+
+### 5. Verify after migration
+
+After installing:
+
+1. Reload or hard-refresh the Home Assistant frontend.
+2. Confirm the Energy dashboard renders.
+3. Confirm **Settings → Dashboards → Resources** contains only the HACS Energy UX resource, not the legacy resource.
+4. Verify on desktop and iPad before removing the old manual files.
+5. Keep the prior deployment files until runtime verification is complete.
+
+Do not manually copy JavaScript or artwork to `/config/www` for new installations.
 
 ## Update and rollback
 
