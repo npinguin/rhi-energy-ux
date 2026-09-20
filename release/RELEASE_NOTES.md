@@ -1,23 +1,24 @@
-# RHI Energy UX v3.94.10 — TEST CANDIDATE
+# RHI Energy UX v3.94.11 — TEST CANDIDATE
 
 ## Scope
 
-Canonical-owner closure over v3.94.9 without architecture or feature expansion.
+Interaction-state stability closure over v3.94.10 without architecture or feature expansion.
 
-- makes product property reads fail closed on the Public Interface Registry owner;
-- removes cross-owner fallback scanning through all public UX entities;
-- removes Consumer Mix reconstruction from Flexible Assets;
-- resolves product diagnostic interface identity through the Public Interface Registry;
-- aligns Metering diagnostics with the canonical `sensor.energy_asset_metering_index` owner;
-- adds regression gates for each ownership invariant.
+- runtime updates refresh data without changing the active tab or viewport position;
+- Metering and Value period selectors use one canonical selection/write path;
+- backend Metering period hydrates the UX once and no longer takes over the user's local context on every HA update;
+- Hour is supported consistently as a Metering period;
+- Outlook keeps the requested horizon when data is temporarily unavailable instead of silently falling back to another horizon;
+- Strategy keeps the requested profile when it is temporarily unavailable instead of silently showing another profile;
+- regression gates protect these interaction-state invariants.
 
-No Energy business semantics, screen scope, command behavior or visual design is added or reinterpreted.
+No Energy semantics, command ownership, screen structure or visual design is expanded.
 
 ## Compatibility
 
-- Energy UX: 3.94.10
+- Energy UX: 3.94.11
 - Minimum backend: E0.15.12
 - Public compatibility surface: R1.89.44_CONTRACT
-- Rollback release: v3.94.9
+- Rollback release: v3.94.10
 
 Stable promotion remains blocked until target Home Assistant runtime and rollback proof are PASS.
