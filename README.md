@@ -4,9 +4,10 @@
 
 Public Home Assistant dashboard package for **Robotix Home Intelligence Energy**.
 
-- UX release: **3.94.7**
-- Minimum tested Energy contract: **R1.89.44_CONTRACT**
-- Tested Energy backend: **R1.89.44**
+- UX release: **3.94.8**
+- Public runtime contract: **ENERGY_PUBLIC_RUNTIME_V1**
+- Compatibility facade: **R1.89.44_CONTRACT**
+- Tested Energy backend: **E0.15.7**
 - License: **GPL-3.0-only**
 
 The Energy backend owns discovery, normalization, bindings, topology, planning, intelligence and command semantics. This UX consumes only backend-owned public runtime contracts.
@@ -15,7 +16,7 @@ The Energy backend owns discovery, normalization, bindings, topology, planning, 
 
 Add `npinguin/rhi-energy-ux` to HACS as a custom repository of type **Dashboard**, then install a published GitHub Release.
 
-For the initial migration, install **v3.94.7**.
+For the migration, install the latest published release (currently **v3.94.8** once published).
 
 ### 1. Install through HACS
 
@@ -130,3 +131,42 @@ npm run validate
 `dist/` is deployable runtime. A clean build must leave committed `dist/` unchanged.
 
 See `COMPATIBILITY.json`, `BUILDING.md` and `docs/CONTRACT.md`.
+
+## Foolproof migration checklist
+
+Use this exact order:
+
+1. **Install first, do not edit dashboard YAML yet.** In HACS add `npinguin/rhi-energy-ux` as a **Dashboard** repository and install the published release.
+2. Go to **Settings → Dashboards → Resources**. Confirm exactly one Energy UX HACS resource: `/hacsfiles/rhi-energy-ux/rhi-energy-ux.js` as **JavaScript Module**.
+3. Remove the old `/local/homebrain/cards/homebrain-energy.bundle.js?...` resource. Do not load old and new resources together.
+4. Open the Energy dashboard raw configuration. The dashboard editor must start with `views:`; never paste a top-level `lovelace:` block there.
+5. For a dedicated Energy dashboard, paste:
+
+```yaml
+views:
+  - title: Energy
+    path: energy
+    icon: mdi:flash
+    type: panel
+    cards:
+      - type: custom:homebrain-energy-card
+```
+
+6. Save, hard-refresh the frontend and verify desktop and iPad.
+7. Check the small footer. Healthy state is intentionally quiet and gray: `RHI Energy UX <version> · Backend <release>`. Contract/runtime details are available on hover; warnings/errors appear in color only when a problem exists.
+8. Only after runtime proof, retire the old files under `/config/www/homebrain/...`.
+
+### If Home Assistant says "views -- Expected an array"
+
+You are in the **dashboard raw configuration editor**. Use the `views:` YAML above. The following block belongs only in `configuration.yaml` when resources are explicitly YAML-managed and must **not** be pasted into the dashboard editor:
+
+```yaml
+lovelace:
+  resources:
+    - url: /hacsfiles/rhi-energy-ux/rhi-energy-ux.js
+      type: module
+```
+
+### Rollback
+
+HACS → Robotix Home Intelligence Energy UX → **Redownload / Need a different version?** → choose the prior immutable release. Keep old manual files only as a temporary migration safety net; they must not remain active as a Lovelace resource.
