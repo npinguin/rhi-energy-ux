@@ -1,0 +1,18 @@
+{
+  "version": "3.94.8",
+  "previous_release": "3.94.7",
+  "known_accepted_technical_debt": 0,
+  "known_accepted_feature_debt": 0,
+  "hacs_install": "NOT_EXECUTED",
+  "dashboard_render": "NOT_EXECUTED",
+  "desktop_render": "NOT_EXECUTED",
+  "ipad_render": "NOT_EXECUTED",
+  "backend_release_identity": "NOT_EXECUTED",
+  "resource_path": "NOT_EXECUTED",
+  "browser_refresh": "NOT_EXECUTED",
+  "upgrade_from_previous": "NOT_EXECUTED",
+  "rollback_to_previous": "NOT_EXECUTED",
+  "runtime_proof": "PENDING",
+  "rollback_proof": "PENDING",
+  "release_decision": "BLOCKED"
+}
