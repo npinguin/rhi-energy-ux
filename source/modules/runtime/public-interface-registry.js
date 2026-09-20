@@ -3,6 +3,7 @@
   // aliases, internal resolution indexes, or diagnostics indexes.
   const UX_INTERFACES = Object.freeze({
     release: RELEASE_ENTITY,
+    pilotReadiness: 'sensor.energy_pilot_readiness',
     assets: 'sensor.energy_asset_index',
     relationships: 'sensor.energy_relationship_index',
     commands: 'sensor.energy_command_index',
