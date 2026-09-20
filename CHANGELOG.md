@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.94.8
+
+Compact, uniform RHI release identity and safer HACS migration guidance.
+
+- shows only UX and backend release information while healthy;
+- hides contract/diagnostic detail in a tooltip and shows colored issue text only when a problem exists;
+- reads backend identity only from the Energy release contract;
+- aligns the public runtime identity with `ENERGY_PUBLIC_RUNTIME_V1`;
+- documents HACS installation, dashboard YAML, legacy resource removal, validation and rollback step by step.
+
 ## 3.94.7
 
 Initial public HACS migration baseline of the existing R3.94.7 Energy UX.
