@@ -2649,18 +2649,14 @@
     selectedHorizon(horizons = [], wanted = 'D0') {
       const list = Array.isArray(horizons) ? horizons : [];
       if (!list.length) return null;
-      const w = String(wanted || '').toLowerCase();
-      return list.find(h => String(h.horizon_id || '').toLowerCase() === w)
-        || list.find(h => String(h.horizon_id || '').toUpperCase() === 'D0')
-        || list[0];
+      const w = String(wanted || 'D0').toLowerCase();
+      return list.find(h => String(h.horizon_id || '').toLowerCase() === w) || null;
     }
     selectedPeriod(periods = [], wanted = 'today') {
       const list = Array.isArray(periods) ? periods : [];
       if (!list.length) return null;
-      const w = String(wanted || '').toLowerCase();
-      return list.find(p => String(p.period_id || '').toLowerCase() === w)
-        || list.find(p => String(p.period_id || '').toLowerCase() === 'today')
-        || list[0];
+      const w = String(wanted || 'today').toLowerCase();
+      return list.find(p => String(p.period_id || '').toLowerCase() === w) || null;
     }
     horizonValue(horizon, group, key, fallback = null) {
       const summary = objectFrom(horizon?.summary || {});
@@ -3798,6 +3794,7 @@
       const horizons = rt.outlookHorizons();
       if (!horizons.length) return `${this.tabExperienceHeader(rt,'outlook',pageVm)}<div class="outlookPage">${this.contractGap('Outlook unavailable','The canonical Outlook contract is not published.')}</div>`;
       const horizon = this.selectedHorizon(horizons, this.selectedOutlookHorizonId);
+      if (!horizon) return `${this.tabExperienceHeader(rt,'outlook',pageVm)}<div class="outlookPage">${this.contractGap('Selected horizon temporarily unavailable', `The requested ${this.selectedOutlookHorizonId || 'D0'} horizon is not currently published. Your selection is preserved.`)}</div>`;
       const isTomorrow = this.isFutureHorizon(horizon);
       const supply = objectFrom(horizon.summary?.supply || {});
       const demand = objectFrom(horizon.summary?.demand || {});
