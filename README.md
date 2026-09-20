@@ -7,7 +7,7 @@ Public Home Assistant dashboard package for **Robotix Home Intelligence Energy**
 - UX release: **3.94.8**
 - Public runtime contract: **ENERGY_PUBLIC_RUNTIME_V1**
 - Compatibility facade: **R1.89.44_CONTRACT**
-- Tested Energy backend: **E0.15.7**
+- Tested Energy backend: **E0.15.9**
 - License: **GPL-3.0-only**
 
 The Energy backend owns discovery, normalization, bindings, topology, planning, intelligence and command semantics. This UX consumes only backend-owned public runtime contracts.
