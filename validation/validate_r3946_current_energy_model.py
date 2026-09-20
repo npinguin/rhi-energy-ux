@@ -4,7 +4,7 @@ source = Path('source/homebrain-energy-card.js').read_text(encoding='utf-8')
 module = Path('source/modules/runtime/current-energy-view-model.js').read_text(encoding='utf-8')
 class_source = source[source.index('class HomeBrainEnergyCard'):]
 checks = {
-    'release_identity': "const UX_VERSION = 'R3.94.8'" in source,
+    'release_identity': "const UX_VERSION = 'R3.94.9'" in source,
     'canonical_module_present': 'function createCurrentEnergyViewModel(gateway)' in module,
     'battery_model_present': 'function createBatteryCurrentFlowViewModel(gateway)' in module,
     'screen_helper_present': 'currentEnergyModel(rt) { return createCurrentEnergyViewModel(rt.contractGateway()); }' in source,
@@ -23,4 +23,4 @@ failed = [name for name, ok in checks.items() if not ok]
 for name, ok in checks.items():
     print(f"{'PASS' if ok else 'FAIL'} {name}")
 if failed:
-    raise SystemExit('R3.94.8 current-energy validation failed: ' + ', '.join(failed))
+    raise SystemExit('R3.94.9 current-energy validation failed: ' + ', '.join(failed))
