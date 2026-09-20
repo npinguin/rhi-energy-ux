@@ -1,3 +1,11 @@
+## 3.94.10 — canonical owner closure
+
+- makes runtime property lookup fail closed on the Public Interface Registry owner;
+- removes Consumer Mix reconstruction from Flexible Assets;
+- routes product diagnostic interface identity through the registry;
+- aligns Metering diagnostics with the canonical asset metering interface;
+- adds architecture gates preventing cross-owner fallback drift.
+
 ## 3.94.9 — audit closure
 
 - centralizes product entity identity in the Public Interface Registry;
