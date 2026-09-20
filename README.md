@@ -75,9 +75,13 @@ type: custom:homebrain-energy-card
 
 The compatibility alias `custom:homebrain-energy-domain-card` is still registered by v3.94.7, but new dashboard configuration should use `custom:homebrain-energy-card`.
 
-### 4. YAML-managed Lovelace resources only
+### 4. Resource management
 
-Most installations should let HACS manage the resource. If Lovelace resources are explicitly managed in YAML, use:
+Most installations should let HACS manage the resource automatically. Verify it under **Settings → Dashboards → Resources**.
+
+Do **not** paste a top-level `lovelace:` / `resources:` block into the dashboard raw configuration editor. That editor expects dashboard YAML with a top-level `views:` array.
+
+If your Home Assistant instance explicitly manages Lovelace resources in `configuration.yaml`, use this there:
 
 ```yaml
 lovelace:
@@ -86,7 +90,19 @@ lovelace:
       type: module
 ```
 
-and remove the old `/local/homebrain/cards/homebrain-energy.bundle.js?...` resource entry.
+For a dashboard managed through the raw configuration editor, use dashboard YAML such as:
+
+```yaml
+views:
+  - title: Energy
+    path: energy
+    icon: mdi:flash
+    type: panel
+    cards:
+      - type: custom:homebrain-energy-card
+```
+
+Remove the old `/local/homebrain/cards/homebrain-energy.bundle.js?...` resource entry from **Settings → Dashboards → Resources** once the HACS resource is present.
 
 ### 5. Verify after migration
 
