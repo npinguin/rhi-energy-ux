@@ -7,7 +7,7 @@
   "scripts": {
     "build": "python source/build-energy-bundle.py",
     "check:syntax": "node --check source/homebrain-energy-card.js && node --check dist/rhi-energy-ux.js",
-    "test:contracts": "node validation/test_command_contract.js && node validation/test_current_energy_view_model.js && node validation/test_energy_contract_gateway.js && node validation/test_live_consumption_flow_metering.js && node validation/test_planning_contract.js",
+    "test:contracts": "node validation/test_command_contract.js && node validation/test_current_energy_view_model.js && node validation/test_energy_contract_gateway.js && node validation/test_live_consumption_flow_metering.js && node validation/test_planning_contract.js && node validation/test_bundle_load.mjs",
     "test:architecture": "python validation/validate_contract_gateway_architecture.py && python validation/validate_r3941_runtime_contracts.py && python validation/validate_r3941_runtime_regressions.py && python validation/validate_r3942_flow_contract.py && python validation/validate_r3943_consumption_truth.py && python validation/validate_r3944_stable_refresh.py && python validation/validate_r3945_contract_clarity.py && python validation/validate_r3946_current_energy_model.py && python validation/validate_r3947_footer_runtime_guard.py && python validation/validate_release_governance.py && python validation/validate_renderer_reference_integrity.py",
     "validate:package": "python validation/validate_hacs_package.py",
     "validate:public": "python validation/validate_public_repository.py",
