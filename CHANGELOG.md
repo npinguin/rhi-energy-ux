@@ -1,3 +1,11 @@
+## 3.94.11 — interaction-state stability
+
+- preserves active view and viewport across runtime updates;
+- unifies Metering and Value period selection/write behavior;
+- prevents recurring backend refresh from taking over the locally selected period;
+- prevents silent Outlook horizon fallback and Strategy profile substitution;
+- adds regression gates for interaction-state stability.
+
 ## 3.94.10 — canonical owner closure
 
 - makes runtime property lookup fail closed on the Public Interface Registry owner;

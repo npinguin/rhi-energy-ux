@@ -44,7 +44,7 @@ checks = {
     "stable_verifies_candidate_bytes": "cmp dist/rhi-energy-ux.js" in release,
     "hacs_resource_documented": "/hacsfiles/rhi-energy-ux/rhi-energy-ux.js" in readme,
     "dashboard_views_documented": "views:" in readme and "custom:homebrain-energy-card" in readme,
-    "rollback_documented": "v3.94.9" in readme and "Previous immutable HACS releases remain the rollback path." in governance,
+    "rollback_documented": "v3.94.10" in readme and "Previous immutable HACS releases remain the rollback path." in governance,
     "handover_current": f"Source candidate: **v{version}**" in handover and minimum_backend in handover,
     "evergreen_docs": "R3.91.4" not in architecture and "R3.94.7" not in maintainability,
     "canonical_consumption_terms": "Home Base Load" not in drift,
