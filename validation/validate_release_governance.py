@@ -17,6 +17,8 @@ handover = (ROOT / "docs" / "ENGINEER_HANDOVER.md").read_text(encoding="utf-8")
 architecture = (ROOT / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
 maintainability = (ROOT / "docs" / "MAINTAINABILITY.md").read_text(encoding="utf-8")
 drift = (ROOT / "docs" / "DRIFT_PREVENTION.md").read_text(encoding="utf-8")
+maintainability = (ROOT / "docs" / "MAINTAINABILITY.md").read_text(encoding="utf-8")
+workflow_text = "\n".join((ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8") for name in ("validate.yml","publish-hacs.yml","release.yml"))
 
 version = pkg["version"]
 minimum_backend = compat["energy_contract"]["minimum_backend"]
@@ -47,6 +49,8 @@ checks = {
     "evergreen_docs": "R3.91.4" not in architecture and "R3.94.7" not in maintainability,
     "canonical_consumption_terms": "Home Base Load" not in drift,
     "handover_release_path": "automatic Publish HACS" in handover and "manual stable promotion" in handover,
+    "source_authority_documented": "source/homebrain-energy-card.js" in maintainability and "not a second runtime publication path" in maintainability,
+    "actions_pinned": "actions/checkout@v" not in workflow_text and "actions/setup-node@v" not in workflow_text and "actions/setup-python@v" not in workflow_text,
 }
 
 failed = [name for name, ok in checks.items() if not ok]
