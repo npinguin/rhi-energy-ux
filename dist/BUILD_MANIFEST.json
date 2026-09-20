@@ -38,9 +38,9 @@
     }
   },
   "bundle": {
-    "bytes": 687861,
+    "bytes": 689106,
     "path": "dist/rhi-energy-ux.js",
-    "sha256": "ac59df8124258828035e04abb9c451e06acaf6edafea7920bae3c8e8c68e3f2f"
+    "sha256": "a1bf786ec91ef090096bd04ed51f598592da07b6629212bd711e1fa18ed2fc12"
   },
   "distribution_transform": {
     "hacs_asset_prefix": "/hacsfiles/rhi-energy-ux/assets/",
@@ -50,9 +50,9 @@
   "product": "Robotix Home Intelligence Energy UX",
   "schema_version": 1,
   "source": {
-    "bytes": 687945,
+    "bytes": 689190,
     "path": "source/homebrain-energy-card.js",
-    "sha256": "a3d0365151d1507b8ed32dda8b855e108568d6af2658fb0f9160b32a09074c75"
+    "sha256": "3e0bff187a0d2084c3d44110e13372b92c88499526315a484f0645d5134b8aa8"
   },
-  "version": "3.94.10"
+  "version": "3.94.11"
 }
