@@ -51,7 +51,7 @@ checks = {
     "handover_release_path": "automatic Publish HACS" in handover and "manual stable promotion" in handover,
     "source_authority_documented": "source/homebrain-energy-card.js" in maintainability and "not a second runtime publication path" in maintainability,
     "actions_pinned": "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09" in workflow_text and "actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444" in workflow_text and "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1" in workflow_text,
-    "workflow_only_no_republish": ".github/workflows/publish-hacs.yml" not in publish.split("permissions:", 1)[0],
+    "workflow_only_no_republish": ".github/workflows/publish-hacs.yml" not in publish.split("permissions:", 1)[0] and "validation/**" not in publish.split("permissions:", 1)[0],
 }
 
 failed = [name for name, ok in checks.items() if not ok]
