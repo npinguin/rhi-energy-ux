@@ -41,3 +41,18 @@ for forbidden in [
     if forbidden in source:
         raise SystemExit(f"Fixed Flexible Load command composition remains: {forbidden}")
 print("PASS command contract architecture")
+
+
+# R3.94.9: product runtime may not select owners by probing public entity literals.
+if "publicUxEntities().includes('sensor.energy_" in main:
+    failures.append("direct_public_entity_owner_selection")
+
+registry = (root/'source/modules/runtime/public-interface-registry.js').read_text(encoding='utf-8')
+if "metering: 'sensor.energy_asset_metering_index'" not in registry:
+    failures.append("canonical_metering_owner_missing")
+if "pilotReadiness: 'sensor.energy_pilot_readiness'" not in registry:
+    failures.append("pilot_readiness_not_centralized")
+
+if failures:
+    print('FAIL', ','.join(failures)); sys.exit(1)
+print('PASS public interface ownership')

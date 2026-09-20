@@ -13,6 +13,12 @@ readme = (ROOT / "README.md").read_text(encoding="utf-8")
 publish = (ROOT / ".github" / "workflows" / "publish-hacs.yml").read_text(encoding="utf-8")
 release = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 governance = (ROOT / "docs" / "RELEASE_GOVERNANCE.md").read_text(encoding="utf-8")
+handover = (ROOT / "docs" / "ENGINEER_HANDOVER.md").read_text(encoding="utf-8")
+architecture = (ROOT / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+maintainability = (ROOT / "docs" / "MAINTAINABILITY.md").read_text(encoding="utf-8")
+drift = (ROOT / "docs" / "DRIFT_PREVENTION.md").read_text(encoding="utf-8")
+maintainability = (ROOT / "docs" / "MAINTAINABILITY.md").read_text(encoding="utf-8")
+workflow_text = "\n".join((ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8") for name in ("validate.yml","publish-hacs.yml","release.yml"))
 
 version = pkg["version"]
 minimum_backend = compat["energy_contract"]["minimum_backend"]
@@ -38,7 +44,13 @@ checks = {
     "stable_verifies_candidate_bytes": "cmp dist/rhi-energy-ux.js" in release,
     "hacs_resource_documented": "/hacsfiles/rhi-energy-ux/rhi-energy-ux.js" in readme,
     "dashboard_views_documented": "views:" in readme and "custom:homebrain-energy-card" in readme,
-    "rollback_documented": "v3.94.7" in readme and "Previous immutable HACS releases remain the rollback path." in governance,
+    "rollback_documented": "v3.94.8" in readme and "Previous immutable HACS releases remain the rollback path." in governance,
+    "handover_current": f"Source candidate: **v{version}**" in handover and minimum_backend in handover,
+    "evergreen_docs": "R3.91.4" not in architecture and "R3.94.7" not in maintainability,
+    "canonical_consumption_terms": "Home Base Load" not in drift,
+    "handover_release_path": "automatic Publish HACS" in handover and "manual stable promotion" in handover,
+    "source_authority_documented": "source/homebrain-energy-card.js" in maintainability and "not a second runtime publication path" in maintainability,
+    "actions_pinned": "actions/checkout@v" not in workflow_text and "actions/setup-node@v" not in workflow_text and "actions/setup-python@v" not in workflow_text,
 }
 
 failed = [name for name, ok in checks.items() if not ok]

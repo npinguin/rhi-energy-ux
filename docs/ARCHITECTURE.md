@@ -1,4 +1,4 @@
-# Home Intelligence Energy UX Architecture — R3.91.4
+# Home Intelligence Energy UX Architecture
 
 ## Canonical dependency direction
 
@@ -47,7 +47,7 @@ Owns layout, formatting, visual filtering, accessibility and explicit user inter
 - `runtime/physical-flow-view-model.js`
 - `runtime/metering-status-model.js`
 
-Physical Flow still needs a relation-owned model rather than independent vehicle and connection rows. Property and Retrospective modules should be added only when closing proven drift—not as a big-bang rewrite.
+Physical Flow uses the relation-owned view-model boundary. Add further modules only when closing proven ownership drift—not as a big-bang rewrite.
 
 ## Semantic projections
 

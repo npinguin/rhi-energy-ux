@@ -1,4 +1,4 @@
-# Maintainability Standard — R3.94.7
+# Maintainability Standard
 
 ## Objective
 
@@ -67,10 +67,17 @@ A release is zero-tech-debt only when:
 - no known P0/P1 maintainability defect remains undocumented;
 - generated and distribution artifacts are reproducible from source.
 
-## Runtime rendering rule — R3.94.7
+## Runtime rendering rule
 
 A Home Assistant `hass` assignment is not itself a reason to rebuild the card. Rendering is limited to changes in entities used by the active tab. Same-view updates use incremental DOM reconciliation; full markup replacement is reserved for an actual view change. This prevents image reload flicker, preserves interaction context and reduces iPad repaint pressure.
 
-## Canonical current-energy rule — R3.94.7
+## Canonical current-energy rule
 
 Literal aggregate current-energy contract keys are allowed only in `runtime/current-energy-view-model.js`. Screen renderers consume immutable view-model fields. They may format values but may not infer Battery direction, apply local deadbands, choose between charge/discharge properties or change zero/null semantics.
+
+
+## Source authority
+
+`source/homebrain-energy-card.js` is the canonical runtime source for the current legacy bundle generation. Files under `source/modules/` are synchronized contract/view-model mirrors used for isolated tests and drift checks; they are not a second runtime publication path. The build fails when a mirrored generated block differs from the canonical source.
+
+Do not create a second hand-maintained bundle or parallel compatibility implementation. True module bundling is a separate future refactor and must not be mixed into release-fix work.

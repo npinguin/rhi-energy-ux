@@ -31,6 +31,6 @@ branch
 
 ## Current release
 
-- candidate: `v3.94.8`
+- candidate: `v3.94.9`
 - minimum backend: `E0.15.12`
-- rollback target: `v3.94.7`
+- rollback target: `v3.94.8`
