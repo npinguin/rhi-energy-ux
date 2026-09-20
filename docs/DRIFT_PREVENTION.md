@@ -11,7 +11,7 @@ Prevent every backend or UX change from forcing scattered screen edits.
 | Concrete interface identity | Public Interface Registry / Energy Contract Gateway |
 | Planning parsing and totals | Planning Contract Module |
 | Commands and invoke validation | Command Contract Module |
-| Live Home Base Load | Consumption Contract Module |
+| Live Home Consumption | Consumption Contract Module |
 | Physical relation power | Physical Flow Relation Model |
 | Metering state translation | Metering Status Model |
 | Property write metadata | Property Contract Module / shared editor model |
