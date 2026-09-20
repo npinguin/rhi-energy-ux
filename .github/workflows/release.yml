@@ -1,51 +1,90 @@
 name: Release
+
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: Version without v prefix
-        required: true
+
 permissions:
   contents: write
+
+concurrency:
+  group: ${{ github.repository }}-stable-release
+  cancel-in-progress: false
+
 jobs:
   release:
+    name: Qualified stable promotion
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout current main
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: npm ci
-      - run: npm run validate
-      - run: git diff --exit-code -- dist
-      - name: Validate requested version
+      - name: Full source/package validation
+        run: npm run validate
+      - name: Require completed target runtime qualification
         shell: bash
         run: |
-          ACTUAL=$(node -p "require('./package.json').version")
-          test "$ACTUAL" = "${{ inputs.version }}"
-          if git rev-parse "v${ACTUAL}" >/dev/null 2>&1; then
-            echo "Tag v${ACTUAL} already exists" >&2
-            exit 1
-          fi
-          if gh release view "v${ACTUAL}" >/dev/null 2>&1; then
-            echo "Release v${ACTUAL} already exists" >&2
-            exit 1
-          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          q=json.loads(Path("release/QUALIFICATION.json").read_text(encoding="utf-8"))
+          assert q["release_decision"] == "PASS", "target HA qualification is not PASS"
+          assert q["runtime_proof"] == "PASS", "runtime proof is not PASS"
+          assert q["rollback_proof"] == "PASS", "rollback proof is not PASS"
+          assert q["known_accepted_technical_debt"] == 0
+          assert q["known_accepted_feature_debt"] == 0
+          PY
+      - name: Verify exact immutable candidate payload
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-      - name: Create immutable GitHub release
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          git fetch --tags --force
+          test -n "$(git rev-list -n 1 "${TAG}" 2>/dev/null || true)"
+          test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = true
+          rm -rf /tmp/rhi-energy-ux-release
+          mkdir -p /tmp/rhi-energy-ux-release
+          gh release download "${TAG}" --pattern 'rhi-energy-ux.js' --dir /tmp/rhi-energy-ux-release
+          gh release download "${TAG}" --pattern 'rhi-energy-ux.js.sha256' --dir /tmp/rhi-energy-ux-release
+          cmp dist/rhi-energy-ux.js /tmp/rhi-energy-ux-release/rhi-energy-ux.js
+          (cd /tmp/rhi-energy-ux-release && sha256sum -c rhi-energy-ux.js.sha256)
+      - name: Promote exact candidate to stable
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          gh release edit "${TAG}" \
+            --prerelease=false \
+            --title "RHI Energy UX ${TAG}" \
+            --notes-file release/RELEASE_NOTES.md
+          test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = false
+      - name: Summary
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          git tag "v${VERSION}" "$GITHUB_SHA"
-          git push origin "v${VERSION}"
-          gh release create "v${VERSION}" --target "$GITHUB_SHA" --title "RHI Energy UX v${VERSION}" --generate-notes
-        env:
-          GH_TOKEN: ${{ github.token }}
+          {
+            echo '## RHI Energy UX stable promotion'
+            echo "- Version: v${VERSION}"
+            echo "- Source/package/tests: PASS"
+            echo "- Target HA qualification: PASS"
+            echo "- Published candidate runtime: EXACT MATCH"
+            echo "- Stable promotion: COMPLETE"
+            echo "- Rollback: previous immutable HACS releases remain selectable"
+          } >> "$GITHUB_STEP_SUMMARY"
