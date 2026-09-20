@@ -5,7 +5,7 @@
 Public GPL-3.0-only Home Assistant dashboard package for **Robotix Home Intelligence Energy**.
 
 - UX release: **3.94.8**
-- Backend minimum for this release: **E0.15.11**
+- Backend minimum for this release: **E0.15.12**
 - Legacy UX contract compatibility: **R1.89.44_CONTRACT**
 - HACS category: **Dashboard**
 - Runtime artifact: `dist/rhi-energy-ux.js`
@@ -85,7 +85,7 @@ After install or update:
 3. Verify desktop and iPad.
 4. Confirm only the HACS Energy UX resource is active.
 5. Check the footer:
-   - healthy: quiet gray `RHI Energy UX 3.94.8 · Backend E0.15.11`;
+   - healthy: quiet gray `RHI Energy UX 3.94.8 · Backend E0.15.12`;
    - problem: only the short issue text becomes amber/red;
    - hover the issue text for technical details.
 6. Only after this proof, remove obsolete files under `/config/www/homebrain/...`.
