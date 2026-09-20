@@ -3,9 +3,9 @@
   "ux_version": "3.94.8",
   "energy_contract": {
     "minimum": "R1.89.44_CONTRACT",
-    "minimum_backend": "E0.15.11",
+    "minimum_backend": "E0.15.12",
     "tested_backend_releases": [
-      "E0.15.11"
+      "E0.15.12"
     ]
   },
   "deployment": {
