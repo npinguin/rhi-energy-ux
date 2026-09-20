@@ -21,7 +21,7 @@ failed = [name for name, ok in checks.items() if not ok]
 for name, ok in checks.items():
     print(('PASS' if ok else 'FAIL') + ' ' + name)
 if failed:
-    raise SystemExit('R3.94.7 footer runtime guard validation failed: ' + ', '.join(failed))
+    raise SystemExit('R3.94.8 footer runtime guard validation failed: ' + ', '.join(failed))
 
 
 assert 'RHI Energy UX ${escapeHtml(footer.uxVersion || UX_VERSION)}' in source
