@@ -44,5 +44,5 @@ Before retiring the previous deployment, verify:
 ## Current release
 
 - candidate: `v3.94.8`
-- backend minimum: `E0.15.11`
+- backend minimum: `E0.15.12`
 - rollback target: `v3.94.7`
