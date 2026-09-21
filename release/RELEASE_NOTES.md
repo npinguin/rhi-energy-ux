@@ -1,8 +1,8 @@
-# RHI Energy UX v3.94.17 — TEST CANDIDATE
+# RHI Energy UX v3.94.18 — TEST CANDIDATE
 
 ## Scope
 
-Premium header/branding refinement over v3.94.16. No Energy backend semantics, routes, planning logic or command ownership change.
+Premium header/branding refinement over v3.94.17. No Energy backend semantics, routes, planning logic or command ownership change.
 
 - aligns the left product identity vertically with the primary navigation;
 - presents the hierarchy as Home Intelligence → ENERGIE;
@@ -18,6 +18,6 @@ Premium header/branding refinement over v3.94.16. No Energy backend semantics, r
 - Energy UX: 3.94.17
 - Minimum backend: E0.15.25
 - Public compatibility surface: R1.89.44_CONTRACT
-- Rollback release: v3.94.16
+- Rollback release: v3.94.17
 
 Stable promotion remains blocked until target Home Assistant runtime and rollback proof are PASS.
