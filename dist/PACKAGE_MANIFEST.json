@@ -10,7 +10,7 @@
     "branding",
     "heroes"
   ],
-  "runtime_sha256": "6711728860e7793a7bf8417c3d5545ecdaa440fc69ff23eb823bd8b14bf5cea1",
+  "runtime_sha256": "6f4b5361eb0c079df46b6f61036e194b4b6e2c94fb8368207f6ab59531d9a1da",
   "files": [
     {
       "path": "assets/branding/company-logo.svg",
