@@ -4,7 +4,7 @@
 
 Public GPL-3.0-only Home Assistant dashboard package for **Robotix Home Intelligence Energy**.
 
-- UX release: **3.94.13**
+- UX release: **3.94.14**
 - Backend minimum for this release: **E0.15.24**
 - Legacy UX contract compatibility: **R1.89.44_CONTRACT**
 - HACS category: **Dashboard**
@@ -19,7 +19,7 @@ The backend owns Energy semantics. The UX renders backend-owned public contracts
 1. Open **HACS** → **Custom repositories**.
 2. Add `https://github.com/npinguin/rhi-energy-ux`.
 3. Select **Dashboard**.
-4. Install **v3.94.13** for this TEST CANDIDATE qualification.
+4. Install **v3.94.14** for this TEST CANDIDATE qualification.
 5. Go to **Settings → Dashboards → Resources**.
 6. Confirm this resource exists as **JavaScript Module**:
 
@@ -85,7 +85,7 @@ After install or update:
 3. Verify desktop and iPad.
 4. Confirm only the HACS Energy UX resource is active.
 5. Check the footer:
-   - healthy: quiet gray `RHI Energy UX 3.94.13 · Backend E0.15.24`;
+   - healthy: quiet gray `RHI Energy UX 3.94.14 · Backend E0.15.24`;
    - problem: only the short issue text becomes amber/red;
    - hover the issue text for technical details.
 6. Only after this proof, remove obsolete files under `/config/www/homebrain/...`.
@@ -100,7 +100,7 @@ To rollback:
 
 **HACS → Robotix Home Intelligence Energy UX → Redownload / Need a different version? → select the previous release.**
 
-For the 3.94.13 rollout, select **v3.94.13** while qualifying the TEST CANDIDATE. The rollback target is **v3.94.12**.
+For the 3.94.14 rollout, select **v3.94.14** while qualifying the TEST CANDIDATE. The rollback target is **v3.94.13**.
 
 ## Development
 
