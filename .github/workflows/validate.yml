@@ -64,6 +64,7 @@ jobs:
 
   hacs:
     name: HACS
+    needs: source
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

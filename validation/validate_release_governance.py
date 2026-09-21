@@ -30,6 +30,7 @@ release = read(".github/workflows/release.yml")
 governance = read("docs/RELEASE_GOVERNANCE.md")
 test_governance = read("docs/TEST_GOVERNANCE.md")
 shared_release = read("docs/UX_RELEASE_STANDARD.md")
+ux_repository_standard = read("docs/UX_REPOSITORY_STANDARD.md")
 maintainability = read("docs/MAINTAINABILITY.md")
 architecture = read("docs/ARCHITECTURE.md")
 drift = read("docs/DRIFT_PREVENTION.md")
@@ -64,6 +65,8 @@ checks = {
     "validate_pr_only": "pull_request:" in validate and "push:\n    branches: [main]" not in validate,
     "validate_has_two_build_proof": "Deterministic two-build proof" in validate,
     "validate_has_immutable_package_gate": "Protect immutable published package" in validate,
+    "hacs_after_source": "hacs:\n    name: HACS\n    needs: source" in validate,
+    "shared_repository_standard": "Normal candidate build budget: two builds total" in ux_repository_standard and "One source concern, one owner." in ux_repository_standard,
     "publish_exact_package": "Publish or verify immutable TEST CANDIDATE" in publish and "npm run build" not in publish and "npm run validate" not in publish and "npm ci" not in publish,
     "publish_idempotent": "Existing immutable tag package matches current dist." in publish and "verifying without mutation" in publish,
     "publish_evidence_only": "dist/PACKAGE_MANIFEST.json" in publish and "dist/rhi-energy-ux.js \\\\" not in publish,
