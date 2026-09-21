@@ -1,23 +1,22 @@
-# RHI Energy UX v3.94.18 — TEST CANDIDATE
+# RHI Energy UX v3.94.19 — TEST CANDIDATE
 
 ## Scope
 
-Premium header/branding refinement over v3.94.17. No Energy backend semantics, routes, planning logic or command ownership change.
+Structural company-brand ownership correction over v3.94.18. No Energy backend semantics, routes, planning logic or command ownership change.
 
-- aligns the left product identity vertically with the primary navigation;
-- presents the hierarchy as Home Intelligence → ENERGIE;
-- keeps Energy / Intelligence / Insights as the primary functional navigation;
-- keeps contextual tabs as the quieter second navigation layer;
-- adds the Robotix.be company mark in dark blue with the exact slogan “DomotiX · Network · Security”;
-- isolates the company mark as the single replaceable asset `dist/assets/company-logo.svg`;
-- preserves the shared outer frame, routing, session persistence and omni-device behaviour;
-- upgrades the section glyphs to lightweight vector icons while retaining section-specific active accents.
+- replaces the synthetic company-logo artwork with a vector trace derived from the approved Robotix artwork supplied for this release;
+- makes `source/assets/company-logo.svg` the single canonical company-brand source;
+- makes the build synchronize canonical source assets byte-for-byte into `dist/assets`;
+- keeps runtime branding as an external HACS-owned asset instead of drawing or reconstructing it in component code;
+- removes CSS colour filtering/reinterpretation from the company mark;
+- adds a branding governance gate that pins the approved asset hash and verifies source/distribution parity;
+- preserves the approved premium header composition and compact secondary-navigation icons.
 
 ## Compatibility
 
-- Energy UX: 3.94.17
+- Energy UX: 3.94.19
 - Minimum backend: E0.15.25
 - Public compatibility surface: R1.89.44_CONTRACT
-- Rollback release: v3.94.17
+- Rollback release: v3.94.18
 
 Stable promotion remains blocked until target Home Assistant runtime and rollback proof are PASS.
