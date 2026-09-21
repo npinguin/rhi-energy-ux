@@ -35,8 +35,9 @@ Do not duplicate generated runtime/assets at repository root. Do not set `conten
 - `dist/` is generated and committed before publication.
 - The immutable tag contains the exact validated `dist/` tree.
 - Publication does not rebuild.
-- The main JS file is not attached as a standalone GitHub Release asset when the package also requires nested assets; doing so can switch HACS into single-file delivery and omit package assets.
-- GitHub Release assets are evidence only.
+- GitHub Releases for tagged HACS plugins carry **zero assets**. This is mandatory: current HACS prefers release assets for tagged plugin installs whenever any release assets exist, even when those files are only intended as evidence.
+- The normal GitHub Release remains the version/discovery surface and contains release notes only. The immutable Git tag owns the installable `dist/` tree.
+- Qualification evidence remains in the governed repository record and release notes; it is never uploaded as a GitHub Release asset.
 
 ## Required validation
 
@@ -53,7 +54,8 @@ Every RHI UX repository must prove all of the following before publication:
 5. The generated JS passes syntax validation.
 6. The installed/generated JS executes in the bundle-load smoke test and registers the expected custom element(s).
 7. Nested asset references resolve to installed files.
-8. HACS validation passes.
+8. Publication and stable-promotion workflows create/upload **zero GitHub Release assets**.
+9. HACS validation passes.
 
 A green source/build test without points 3 and 6 is not sufficient installation proof.
 
