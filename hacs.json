@@ -1,5 +1,6 @@
 {
   "name": "Robotix Home Intelligence Energy UX",
   "filename": "rhi-energy-ux.js",
-  "hide_default_branch": true
+  "hide_default_branch": true,
+  "content_in_root": false
 }
