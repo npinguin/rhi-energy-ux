@@ -44,7 +44,7 @@
   "bundle": {
     "bytes": 709926,
     "path": "dist/rhi-energy-ux.js",
-    "sha256": "07a8ff3409b049dab69ba6221c3772a9510a490b4c3e56aa754e5dedd476828d"
+    "sha256": "d77de8a561464fad31a611569faeaea5b70dd384193575a600986c6b7e687f7a"
   },
   "distribution_transform": {
     "hacs_asset_prefix": "/hacsfiles/rhi-energy-ux/assets/",
@@ -56,7 +56,7 @@
   "source": {
     "bytes": 710031,
     "path": "source/homebrain-energy-card.js",
-    "sha256": "acec24f7bed7117de03a35260a22a349e00c14ca5483f33d653625e37bd7ee45"
+    "sha256": "ec01ae8510ebf3691ba004234d471829797b518434076b8428ef79d5e2977e06"
   },
-  "version": "3.94.17"
+  "version": "3.94.18"
 }
