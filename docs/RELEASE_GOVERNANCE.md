@@ -34,7 +34,7 @@ branch
 → squash merge
 → Publish HACS verifies complete committed dist package
 → create or verify immutable tag
-→ normal GitHub Release contains evidence only
+→ normal GitHub Release contains notes only and zero assets
 → immutable HACS-visible TEST CANDIDATE
 → target HA qualification + rollback
 → manual stable promotion of exact immutable candidate
@@ -79,9 +79,9 @@ Stable promotion: **0 builds**.
 
 ## HACS nested-asset delivery
 
-Energy contains nested package assets. Therefore a GitHub Release asset named `rhi-energy-ux.js` is forbidden: HACS would select single-file mode and omit the nested asset tree.
+Energy contains nested package assets. Tagged HACS plugin releases therefore contain **zero GitHub Release assets**. Current HACS prefers any tagged release assets as the install payload, so even checksum or qualification attachments can suppress installation of the immutable `dist/` subtree.
 
-The immutable tag owns the installable `dist/` subtree. GitHub Release assets are evidence only.
+The immutable tag owns the installable `dist/` subtree. The GitHub Release carries notes/version visibility only.
 
 Publication is idempotent: an existing tag/release is accepted only if its complete `dist/` package matches the current candidate byte-for-byte and the release targets that immutable tag. It is then verified without mutation.
 
