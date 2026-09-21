@@ -68,7 +68,7 @@ checks = {
     "hacs_after_source": "hacs:\n    name: HACS\n    needs: source" in validate,
     "shared_repository_standard": "Normal candidate build budget: two builds total" in ux_repository_standard and "One source concern, one owner." in ux_repository_standard,
     "publish_exact_package": "Publish or verify immutable TEST CANDIDATE" in publish and "npm run build" not in publish and "npm run validate" not in publish and "npm ci" not in publish,
-    "publish_idempotent": "Existing immutable tag package matches current dist." in publish and "verifying without mutation" in publish,
+    "publish_idempotent": "Existing immutable tag package and HACS metadata match current candidate." in publish and "verifying without mutation" in publish,
     "publish_evidence_only": "dist/PACKAGE_MANIFEST.json" in publish and "dist/rhi-energy-ux.js \\\\" not in publish,
     "stable_no_rebuild": "npm run build" not in release and "npm run validate" not in release and "npm ci" not in release,
     "candidate_is_normal_release": "--prerelease" not in publish and "isPrerelease --jq '.isPrerelease'" in publish,
