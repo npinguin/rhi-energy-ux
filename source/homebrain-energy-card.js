@@ -1866,6 +1866,7 @@
     const planningAssets = planningRows(firstDefined(attrs.planning_assets_json, attrs.planning_assets));
     const planningAssetsById = planningById(firstDefined(attrs.planning_assets_by_id, attrs.planning_assets_json));
     const planningTodayTotals = planningObject(firstDefined(attrs.planning_today_totals_json, attrs.planning_today_totals));
+    const planningTomorrowTotals = planningObject(firstDefined(attrs.planning_tomorrow_totals_json, attrs.planning_tomorrow_totals));
     const planningCombinedTotals = planningObject(firstDefined(attrs.planning_combined_totals_json, attrs.planning_combined_totals));
     const horizonsById = planningById(firstDefined(
       attrs.planning_horizons_by_id,
@@ -1909,6 +1910,7 @@
       planningAssets,
       planningAssetsById,
       planningTodayTotals,
+      planningTomorrowTotals,
       planningCombinedTotals,
       horizonsById,
       horizonId: normalized,
@@ -1988,6 +1990,7 @@
       planningAssets: contract.planningAssets,
       planningAssetsById: contract.planningAssetsById,
       todayTotals: contract.planningTodayTotals,
+      tomorrowTotals: contract.planningTomorrowTotals,
       combinedTotals: contract.planningCombinedTotals,
       storage,
       rows,
@@ -5049,16 +5052,21 @@
       const assetTotalCells = assetTotals.map(item => `<td class="planningTotalAsset"><b>${item.plannedEnergy===null?'—':item.plannedEnergy.toFixed(1)+' kWh'}</b><small>${item.need===null?'Need unavailable':`of ${item.need.toFixed(1)} kWh needed`}</small></td>`).join('');
       const boundaryTotalCells = systemLanes.filter(l => l.group === 'boundary').map(lane => totalCell(lane.total,'Planning total',{showZero:true})).join('');
 
-      const canonicalTotals = vm.horizonId === 'D0' ? objectFrom(vm.todayTotals) : objectFrom(vm.combinedTotals);
+      const canonicalTotals = vm.horizonId === 'D0'
+        ? objectFrom(vm.todayTotals)
+        : objectFrom(vm.tomorrowTotals);
       const totalNeed = asNumber(canonicalTotals.flexible_total_need_kwh);
-      const totalPlanned = asNumber(firstDefined(canonicalTotals.planned_flexible_energy_kwh, canonicalTotals.planned_today_kwh));
+      const totalPlanned = asNumber(firstDefined(
+        canonicalTotals.planned_flexible_energy_kwh,
+        vm.horizonId === 'D1' ? canonicalTotals.planned_tomorrow_kwh : canonicalTotals.planned_today_kwh
+      ));
       const remainingNeed = asNumber(firstDefined(canonicalTotals.still_unresolved_kwh, canonicalTotals.unresolved_horizon_kwh));
       const planStatus = String(firstDefined(vm.currentActionIntent.action_state, vm.currentActionIntent.state, vm.summary.plan_status, vm.horizon.status, vm.horizon.state, vm.complete?'available':'unavailable'));
       const confidence = firstDefined(vm.quality.confidence, vm.horizon.confidence, 'Limited');
       const statusLabel = /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
       const plannedTotals = assetTotals.map(item => `<span class="planningFooterAsset">${this.planningIconBadge(this.planningAssetIcon(item.asset),this.planningAssetTone(item.asset),'mini')}<b>${escapeHtml(this.planningAssetName(item.asset))}</b> ${item.plannedEnergy===null?'—':item.plannedEnergy.toFixed(1)+' kWh'}</span>`).join('');
       const summaryItems = [
-        ['Total flexible need',totalNeed],['Planned today',totalPlanned],['Still to plan',remainingNeed]
+        ['Total flexible need',totalNeed],[vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today',totalPlanned],['Still to plan',remainingNeed]
       ];
       const summaryTotals = `<div class="planningAggregateTotals">${summaryItems.map(([label,value])=>`<span><small>${label}</small><b>${value===null?'—':value.toFixed(1)+' kWh'}</b></span>`).join('')}</div>`;
       const disclosure = firstDefined(vm.rows.find(row=>row.disclosure)?.disclosure, vm.quality.basis ? `Planning basis: ${human(vm.quality.basis)}. Actual execution follows the current operational intent.` : 'Future buckets are advisory. Actual execution follows the current operational intent.');
@@ -5075,8 +5083,8 @@
         return `<article class="planningLoadRow"><div class="planningLoadIdentity">${this.planningIconBadge(this.planningAssetIcon(item.asset),this.planningAssetTone(item.asset),'asset')}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(item.asset))}</b><span class="priorityBadge">${escapeHtml(priority)}</span></div><small><i class="dot ${/connected/i.test(String(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'')))?'green':'gray'}"></i>${escapeHtml(human(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'Connection unavailable')))}</small></div></div><div><small>Next action</small><b class="nextActionBadge">${escapeHtml(next)}</b></div><div><small>Requested power</small><b>${fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')}</b></div><div><small>Planned today</small><b>${fmtKwh(item.plannedEnergy,'—')}</b></div><div><small>Why / reason</small><b>${escapeHtml(why)}</b></div><div><small>Plan status</small><b class="planStatusBadge ${/at.?risk|blocked|failed/i.test(String(firstDefined(canonical.exception_state,canonical.risk_state,canonical.today_status,'')))?'exception':'unknown'}">${escapeHtml(firstDefined(canonical.plan_conformance_label,canonical.exception_label,canonical.risk_label,'Status unavailable'))}</b></div></article>`;
       }).join('');
       return `<section class="planningHero"><div class="planningHeroLead">${this.planningIconBadge('▣','purple','hero')}<div><small>PLANNING</small><h2>${horizonLabel}'s planned flexible energy</h2><div class="planningHeroValue">${heroValue}<span>${totalNeed===null?'need unavailable':`of ${totalNeed.toFixed(1)} kWh needed`}</span></div><p>${remainingNeed===null?'Remaining need is unavailable.':remainingNeed.toFixed(1)+' kWh still needs a suitable opportunity.'}</p></div></div><span class="planningStatus ${vm.complete?'ok':'warn'}">${escapeHtml(statusLabel)} · ${escapeHtml(this.productStateLabel(confidence,'Limited'))}</span></section>
-      <section class="planningKpiStrip"><article><small>Total flexible need</small><b>${fmtKwh(totalNeed,'—')}</b></article><article><small>Planned today</small><b>${fmtKwh(totalPlanned,'—')}</b></article><article><small>Still to plan</small><b>${fmtKwh(remainingNeed,'—')}</b></article><article><small>Participating loads</small><b>${participatingCount}</b></article></section>
-      <section class="panel planningOverview"><h2>Planning overview</h2><div class="operationalSummaryGrid"><article class="operationalSummaryCard planned"><span class="summaryIcon">▥</span><div><small>Planned today</small><b>${fmtKwh(totalPlanned,'—')}</b></div></article><article class="operationalSummaryCard next"><span class="summaryIcon">▣</span><div><small>Planned loads</small><b>${participatingCount}</b><p>${nextLines||'No planned load'}</p></div></article><article class="operationalSummaryCard charging"><span class="summaryIcon">◷</span><div><small>Still to plan</small><b>${fmtKwh(remainingNeed,'—')}</b><p>${remainingNeed===0?'All planned':'Planning remains'}</p></div></article><article class="operationalSummaryCard exceptional"><span class="summaryIcon">♢</span><div><small>Exceptions</small><b>—</b><p>Use published per-load status</p></div></article></div></section>
+      <section class="planningKpiStrip"><article><small>Total flexible need</small><b>${fmtKwh(totalNeed,'—')}</b></article><article><small>${vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today'}</small><b>${fmtKwh(totalPlanned,'—')}</b></article><article><small>Still to plan</small><b>${fmtKwh(remainingNeed,'—')}</b></article><article><small>Participating loads</small><b>${participatingCount}</b></article></section>
+      <section class="panel planningOverview"><h2>Planning overview</h2><div class="operationalSummaryGrid"><article class="operationalSummaryCard planned"><span class="summaryIcon">▥</span><div><small>${vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today'}</small><b>${fmtKwh(totalPlanned,'—')}</b></div></article><article class="operationalSummaryCard next"><span class="summaryIcon">▣</span><div><small>Planned loads</small><b>${participatingCount}</b><p>${nextLines||'No planned load'}</p></div></article><article class="operationalSummaryCard charging"><span class="summaryIcon">◷</span><div><small>Still to plan</small><b>${fmtKwh(remainingNeed,'—')}</b><p>${remainingNeed===0?'All planned':'Planning remains'}</p></div></article><article class="operationalSummaryCard exceptional"><span class="summaryIcon">♢</span><div><small>Exceptions</small><b>—</b><p>Use published per-load status</p></div></article></div></section>
       <div class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>${vm.buckets.length} published bucket${vm.buckets.length===1?'':'s'} · backend timestamps preserved · no interpolation · zero values hidden · Grid out fixed at table end</p></div><span>All primary values are kWh per bucket</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>published by Planning</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="r3260SectionHead"><div><h2>Planned flexible loads</h2><p>Canonical Tactical plan projected without frontend recalculation.</p></div></div><div class="planningLoadList">${planningLoadRows||'<div class="empty"><b>No planned flexible loads</b></div>'}</div></section>`;
     }
 
