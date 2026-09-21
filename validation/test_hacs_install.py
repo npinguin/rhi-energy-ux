@@ -16,8 +16,11 @@ install = tmp / "www" / "community" / "rhi-energy-ux"
 try:
     if product.get("release_asset_policy") != "none":
         raise SystemExit("tagged HACS plugin release must have release_asset_policy=none")
-    if re.search(r"gh release create[\s\S]*?(?:dist/|COMPATIBILITY\.json|RELEASE_MANIFEST\.json|QUALIFICATION\.json)", publish):
-        raise SystemExit("publish workflow attaches HACS-diverting GitHub Release assets")
+    create_match = re.search(r"gh release create[\s\S]*?^\s*fi", publish, re.MULTILINE)
+    create_block = create_match.group(0) if create_match else ""
+    for forbidden in ("dist/","COMPATIBILITY.json","RELEASE_MANIFEST.json","QUALIFICATION.json","PACKAGE_MANIFEST.json",".sha256"):
+        if forbidden in create_block:
+            raise SystemExit(f"publish workflow attaches HACS-diverting GitHub Release asset: {forbidden}")
     if "gh release upload" in publish:
         raise SystemExit("publish workflow must not upload GitHub Release assets")
     if "gh release upload" in stable:
