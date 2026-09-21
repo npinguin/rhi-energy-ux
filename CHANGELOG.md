@@ -1,3 +1,11 @@
+## 3.94.16 — approved premium navigation alignment
+
+- moves Home Intelligence identity into the shared two-layer navigation card;
+- gives the primary row more premium spacing, scale and hierarchy;
+- adds restrained section icons without adding mockup-only product controls;
+- keeps contextual tabs as a quieter second row inside the same frame;
+- preserves routing, persistence, omni-device behaviour and backend contracts.
+
 ## 3.94.15 — lighter shared navigation frame
 
 - places both navigation layers inside one premium low-contrast frame;

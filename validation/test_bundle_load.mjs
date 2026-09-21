@@ -110,6 +110,8 @@ if (recreated.resolveNavigation('', '', 'planning').item !== 'tactical-planning'
 if (recreated.resolveNavigation('', '', 'intelligence').item !== 'strategy') throw new Error('legacy Intelligence must migrate to Strategy');
 const navMarkup = recreated.nav();
 if (!/navSections/.test(navMarkup) || !/navItems/.test(navMarkup)) throw new Error('two navigation layers not rendered');
+if (!/navBrand/.test(navMarkup) || !/Home Intelligence/.test(navMarkup)) throw new Error('premium navigation brand not rendered inside shared frame');
+if (!/navSectionIcon/.test(navMarkup)) throw new Error('primary navigation icons not rendered');
 
 const unavailableSelector = recreated.componentScopeSelector({
   context: 'outlook',
