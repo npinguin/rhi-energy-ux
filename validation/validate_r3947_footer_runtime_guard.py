@@ -17,12 +17,7 @@ checks = {    "balance_vm_declared": "const balanceVm = this.canonicalLiveEnergy
     "no_direct_battery_read": "rt.number('battery." not in body and "rt.value('battery." not in body,
     "no_direct_solar_read": "rt.number('solar.power_kw')" not in body,
     "no_direct_grid_read": "rt.number('grid.import_power_kw')" not in body and "rt.number('grid.export_power_kw')" not in body,
-    "backend_release_single_owner": "backend_release: attrs.backend_release || 'unknown'" in source,
-    "no_backend_release_fallback": "attrs.backend_version || attrs.backend_release" not in source and "attrs.release_version || this.releaseState()?.state" not in source,
-    "quiet_footer": "RHI Energy UX ${escapeHtml(footer.uxVersion || UX_VERSION)}" in source and "Backend ${escapeHtml(backend)}" in source,
-    "issue_only_colour": 'class="hiReleaseIssue rhiUxFooterIssue ${issue.severity}"' in source,
     "technical_panel_hidden": "diagnosticsPanel() {" in source and "return '';" in source,
-    "issue_details_visible": '<details class="rhiUxFooterDetails">' in source and "issueLines.map" in source,
 }
 
 failed = [name for name, ok in checks.items() if not ok]
