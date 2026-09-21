@@ -131,4 +131,5 @@
       homeBatteryNeedKwh: value('home_battery_need_kwh','battery_reserve_need_kwh')
     });
   }
+  if (typeof module !== 'undefined' && module.exports) module.exports = { readPlanningContract, normalizePlanningLaneTotals };
 // END GENERATED MODULE: planning/planning-contract.js
