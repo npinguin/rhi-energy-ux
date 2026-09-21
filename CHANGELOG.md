@@ -1,3 +1,11 @@
+## 3.94.24 — HACS full-tree delivery correction
+
+- Removes all GitHub Release assets from tagged HACS plugin releases.
+- Fixes clean-install behavior where evidence-only attachments displaced the immutable tag `dist/` package.
+- Makes zero release assets a hard publication and stable-promotion invariant.
+- Makes HACS install simulation model actual tagged-release selection before installing `dist/`.
+- Preserves 3.94.23 Energy runtime behavior and R1.89.44_CONTRACT.
+
 ## 3.94.23 — canonical source ownership and structured HACS package
 
 - Removes duplicated generated module blocks from the Energy app source.
