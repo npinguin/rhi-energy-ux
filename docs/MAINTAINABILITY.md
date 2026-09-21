@@ -54,7 +54,8 @@ Every change must include:
 4. fixture proving zero, null, visible, disabled and missing states;
 5. desktop/tablet/mobile render check;
 6. documentation and usage-model update;
-7. immutable release version.
+7. owning regression test(s) only;
+8. immutable release version when runtime bytes change.
 
 ## Definition of zero technical debt
 
@@ -81,3 +82,9 @@ Literal aggregate current-energy contract keys are allowed only in `runtime/curr
 `source/homebrain-energy-card.js` is the canonical runtime source for the current legacy bundle generation. Files under `source/modules/` are synchronized contract/view-model mirrors used for isolated tests and drift checks; they are not a second runtime publication path. The build fails when a mirrored generated block differs from the canonical source.
 
 Do not create a second hand-maintained bundle or parallel compatibility implementation. True module bundling is a separate future refactor and must not be mixed into release-fix work.
+
+## Test maintainability rule
+
+The one-owner rule applies to tests as strongly as it applies to runtime code. A test suite owns an invariant, not a historical implementation. Release/version checks belong to release governance; branding transport belongs to branding validation; footer rendering belongs to footer validation; navigation behavior belongs to its UX owner.
+
+Governance-only or test-only changes do not require fake version churn when the deterministic build proves runtime bytes are identical to the published tag.

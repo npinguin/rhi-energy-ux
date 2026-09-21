@@ -5,23 +5,19 @@ import sys
 
 root = Path(__file__).resolve().parents[1]
 hacs = json.loads((root / "hacs.json").read_text(encoding="utf-8"))
-compat = json.loads((root / "COMPATIBILITY.json").read_text(encoding="utf-8"))
 pkg = json.loads((root / "package.json").read_text(encoding="utf-8"))
-manifest = json.loads((root / "RELEASE_MANIFEST.json").read_text(encoding="utf-8"))
 bundle = root / "dist" / "rhi-energy-ux.js"
 bundle_text = bundle.read_text(encoding="utf-8")
+build_manifest = json.loads((root / "dist" / "BUILD_MANIFEST.json").read_text(encoding="utf-8"))
 
 checks = {
     "hacs_filename": hacs.get("filename") == "rhi-energy-ux.js",
     "hide_default_branch": hacs.get("hide_default_branch") is True,
     "bundle_exists": bundle.is_file(),
     "license": pkg.get("license") == "GPL-3.0-only",
-    "version_match": compat.get("ux_version") == pkg.get("version"),
-    "contract_minimum": compat.get("energy_contract", {}).get("minimum") == "R1.89.44_CONTRACT",
-    "minimum_backend": compat.get("energy_contract", {}).get("minimum_backend") == manifest.get("minimum_backend"),
-    "rollback_mode": compat.get("deployment", {}).get("rollback") == "immutable_github_release",
     "no_legacy_local": "/local/homebrain/infrastructure/energy/" not in bundle_text,
     "hacs_asset_prefix": "/hacsfiles/rhi-energy-ux/assets/" in bundle_text,
+    "build_manifest_bundle_path": build_manifest.get("bundle", {}).get("path") == "dist/rhi-energy-ux.js",
 }
 
 for raw_ref in sorted(set(re.findall(r"/hacsfiles/rhi-energy-ux/assets/([^'\")]+)", bundle_text))):

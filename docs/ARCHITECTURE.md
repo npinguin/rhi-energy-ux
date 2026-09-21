@@ -75,3 +75,23 @@ Physical Flow uses the relation-owned view-model boundary. Add further modules o
 ## Performance boundary
 
 The gateway and model layer must prevent repeated whole-contract parsing per cell/render. Updates should invalidate only affected models. Re-renders must preserve user tab, selection, disclosure, scroll and draft state.
+
+## Test architecture
+
+Test ownership mirrors runtime ownership.
+
+```text
+contract/domain owners
+        ↓
+UX behavior owners
+        ↓
+shared shell owners
+        ↓
+package verification
+        ↓
+release/qualification gates
+```
+
+An invariant is asserted by exactly one owner. Other suites may rely on it but may not freeze its implementation. The normative map is `validation/OWNERSHIP.json`; see `docs/TEST_GOVERNANCE.md`.
+
+Cross-owner assertions are test technical debt because they make unrelated changes fail together and recreate the same drift this architecture is designed to prevent.

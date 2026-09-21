@@ -43,7 +43,9 @@ Desktop, tablet and mobile may override the shared slot tokens. They must not ed
 - Brand asset ownership: shared RHI UX convention
 - Module ownership: header placement and responsive slot sizing
 - Build ownership: source asset → distribution asset synchronization
-- Validation ownership: canonical hash, source/dist parity, approved copy/colours, no runtime redraw/filter
+- Branding validation ownership: canonical hash, source/dist parity, approved copy/colours, cache-safe runtime delivery and no runtime redraw/filter
+- Layout/navigation validation owns brand-slot geometry; branding tests do not own responsive sizing
+- Footer tests must not assert logo transport or artwork details
 
 ## Transfer to another module
 

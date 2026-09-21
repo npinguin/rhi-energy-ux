@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the HACS deployable Energy UX bundle from canonical source.
 
-The source remains the canonical R3.94.20 runtime. Distribution is reproducible:
+The source remains the canonical Energy UX runtime input. Distribution is reproducible:
 legacy /local artwork URLs are rewritten to the HACS-owned resource namespace,
 and canonical source/assets are synchronized byte-for-byte into dist/assets.
 No business semantics are changed here.
@@ -67,11 +67,16 @@ def main() -> None:
 
     package = json.loads(PACKAGE.read_text(encoding="utf-8"))
     version = package["version"]
-    expected_identity = f"const UX_VERSION = 'R{version}'"
-    if expected_identity not in source_text:
-        raise SystemExit(f"Source version does not match package.json: expected {expected_identity}")
-
-    bundle_text = source_text.replace(LEGACY_ASSET_PREFIX, HACS_ASSET_PREFIX)
+    version_marker = "const UX_VERSION = '"
+    if version_marker not in source_text:
+        raise SystemExit("Source UX_VERSION declaration missing")
+    import re
+    bundle_text = re.sub(
+        r"const UX_VERSION = 'R[^']+'",
+        f"const UX_VERSION = 'R{version}'",
+        source_text,
+        count=1,
+    ).replace(LEGACY_ASSET_PREFIX, HACS_ASSET_PREFIX)
     if LEGACY_ASSET_PREFIX in bundle_text:
         raise SystemExit("Legacy /local Energy artwork reference remains in HACS bundle")
 

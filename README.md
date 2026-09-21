@@ -4,15 +4,14 @@
 
 Public GPL-3.0-only Home Assistant dashboard package for **Robotix Home Intelligence Energy**.
 
-- UX release: **3.94.22**
-- Backend minimum for this release: **E0.15.25**
-- Legacy UX contract compatibility: **R1.89.44_CONTRACT**
+- UX release: see `package.json` (authoritative)
+- Contract/backend/stage/rollback context: see `release/product.json` (authoritative)
 - HACS category: **Dashboard**
 - Runtime artifact: `dist/rhi-energy-ux.js`
 
 The backend owns Energy semantics. The UX renders backend-owned public contracts and never invents the backend version.
 
-Company branding is source-owned at `source/assets/company-logo.svg`. The build copies this canonical transparent vector asset byte-for-byte to `dist/assets`; runtime code must not redraw, recolour, filter or synthesize the company mark. The browser-facing logo URL is versioned with the UX package version so an already-open Chrome profile cannot keep serving an older cached logo after an update. Shared sizing is controlled only through the `--rhi-company-*` header tokens so the same asset and slot contract can be reused by other RHI modules.
+Company branding is source-owned at `source/assets/company-logo.svg`. Branding tests own artwork and cache-safe delivery; layout/navigation owns header-slot geometry. Footer tests do not assert logo transport. The build copies the canonical transparent vector asset byte-for-byte to `dist/assets`; runtime code must not redraw, recolour, filter or synthesize the mark.
 
 ## Install with HACS
 
@@ -21,7 +20,7 @@ Company branding is source-owned at `source/assets/company-logo.svg`. The build 
 1. Open **HACS** → **Custom repositories**.
 2. Add `https://github.com/npinguin/rhi-energy-ux`.
 3. Select **Dashboard**.
-4. Install **v3.94.22** for this TEST CANDIDATE qualification.
+4. Install the intended published TEST CANDIDATE version shown in GitHub Releases / HACS.
 5. Go to **Settings → Dashboards → Resources**.
 6. Confirm this resource exists as **JavaScript Module**:
 
@@ -87,7 +86,7 @@ After install or update:
 3. Verify desktop and iPad.
 4. Confirm only the HACS Energy UX resource is active.
 5. Check the footer:
-   - healthy: quiet gray `RHI Energy UX 3.94.22 · Backend E0.15.25`;
+   - healthy: quiet gray `RHI Energy UX <version> · Backend <version>`;
    - problem: the short issue summary becomes amber/red;
    - click `issues · details` to expand the concrete runtime/backend conditions and verification guidance.
 6. Only after this proof, remove obsolete files under `/config/www/homebrain/...`.
@@ -102,7 +101,7 @@ To rollback:
 
 **HACS → Robotix Home Intelligence Energy UX → Redownload / Need a different version? → select the previous release.**
 
-For the 3.94.22 rollout, select **v3.94.22** while qualifying the TEST CANDIDATE. The rollback target is **v3.94.21**.
+Use the candidate and rollback versions recorded in `package.json`, `release/product.json` and GitHub Releases; do not treat this README as release identity.
 
 ## Development
 
@@ -111,6 +110,6 @@ npm ci
 npm run validate
 ```
 
-A release is valid only when validation is green and rebuilding leaves committed `dist/` unchanged.
+A candidate is valid only when the PR validation is green, the deterministic second build matches the first, committed `dist/` matches that build, and HACS validation passes. Publication then publishes those exact committed bytes without rebuilding.
 
-See `BUILDING.md`, `docs/CONTRACT.md`, `docs/BRANDING.md`, `docs/UX_RELEASE_STANDARD.md`, `docs/UX_FOOTER_STANDARD.md` and `docs/RELEASE_GOVERNANCE.md`.
+See `BUILDING.md`, `docs/CONTRACT.md`, `docs/BRANDING.md`, `docs/TEST_GOVERNANCE.md`, `validation/OWNERSHIP.json`, `docs/UX_RELEASE_STANDARD.md`, `docs/UX_FOOTER_STANDARD.md` and `docs/RELEASE_GOVERNANCE.md`.

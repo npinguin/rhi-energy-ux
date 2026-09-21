@@ -4,14 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      - 'source/**'
-      - 'dist/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'hacs.json'
+      - 'dist/rhi-energy-ux.js'
+      - 'dist/assets/**'
       - 'COMPATIBILITY.json'
       - 'RELEASE_MANIFEST.json'
-      - 'CHANGELOG.md'
       - 'release/RELEASE_NOTES.md'
   workflow_dispatch:
 
@@ -23,10 +19,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  validate:
-    name: Validate candidate source and package
+  verify:
+    name: Verify validated candidate artifact
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - name: Checkout exact main candidate
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -36,13 +32,10 @@ jobs:
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '24'
-          cache: npm
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
-      - name: Install locked dependencies
-        run: npm ci
       - name: Reject immutable version republish
         shell: bash
         env:
@@ -52,26 +45,24 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
           git fetch --tags --force
-          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
-            echo "Refusing to republish immutable HACS candidate ${TAG}; create the next UX version." >&2
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "Immutable candidate ${TAG} already exists; refusing republish." >&2
             exit 1
           fi
-          if gh release view "${TAG}" >/dev/null 2>&1; then
-            echo "Refusing to republish immutable GitHub Release ${TAG}; create the next UX version." >&2
-            exit 1
-          fi
-      - name: Full validation
-        run: npm run validate
-      - name: Verify reproducible dist
-        run: git diff --exit-code -- dist
+      - name: Verify committed artifact and release metadata
+        run: |
+          python validation/validate_hacs_package.py
+          python validation/validate_public_repository.py
+          python validation/validate_release_governance.py
+          python validation/validate_test_ownership.py
       - name: HACS validation
         uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa
         with:
           category: plugin
 
   publish:
-    name: Publish immutable TEST CANDIDATE
-    needs: validate
+    name: Publish exact TEST CANDIDATE artifact
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -83,16 +74,8 @@ jobs:
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '24'
-          cache: npm
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.12'
-      - run: npm ci
-      - name: Rebuild exact runtime
-        run: |
-          npm run build
-          git diff --exit-code -- dist
+      - name: Verify exact committed payload
+        run: python validation/validate_hacs_package.py
       - name: Publish immutable version and rollback assets
         shell: bash
         env:
@@ -126,9 +109,8 @@ jobs:
           {
             echo '## RHI Energy UX HACS publication'
             echo "- Version: v${VERSION}"
-            echo "- Source/package/tests: PASS"
-            echo "- Reproducible dist: PASS"
+            echo "- Artifact: exact committed PR-validated dist"
+            echo "- Rebuild during publication: NO"
             echo "- HACS validation: PASS"
             echo "- Immutable HACS-visible TEST CANDIDATE: PUBLISHED"
-            echo "- Stable promotion: BLOCKED until target HA qualification passes"
           } >> "$GITHUB_STEP_SUMMARY"

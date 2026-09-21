@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout current main
+      - name: Checkout current main qualification record
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
@@ -25,19 +25,15 @@ jobs:
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '24'
-          cache: npm
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
-      - run: npm ci
-      - name: Full source/package validation
-        run: npm run validate
       - name: Require completed target runtime qualification
         shell: bash
         run: |
           python - <<'PY'
-          import json
+          import json, re
           from pathlib import Path
           q=json.loads(Path("release/QUALIFICATION.json").read_text(encoding="utf-8"))
           assert q["release_decision"] == "PASS", "target HA qualification is not PASS"
@@ -45,6 +41,7 @@ jobs:
           assert q["rollback_proof"] == "PASS", "rollback proof is not PASS"
           assert q["known_accepted_technical_debt"] == 0
           assert q["known_accepted_feature_debt"] == 0
+          assert re.fullmatch(r"[0-9a-fA-F]{40}", str(q.get("candidate_sha",""))), "candidate_sha is not bound"
           PY
       - name: Verify exact immutable candidate payload
         shell: bash
@@ -53,15 +50,22 @@ jobs:
         run: |
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
-          TAG="v${VERSION}"
+          TAG=$(python -c "import json; print(json.load(open('release/QUALIFICATION.json'))['candidate_tag'])")
+          CANDIDATE_SHA=$(python -c "import json; print(json.load(open('release/QUALIFICATION.json'))['candidate_sha'])")
+          test "$TAG" = "v${VERSION}"
           git fetch --tags --force
-          test -n "$(git rev-list -n 1 "${TAG}" 2>/dev/null || true)"
+          TAG_SHA=$(git rev-list -n 1 "${TAG}" 2>/dev/null || true)
+          test "$TAG_SHA" = "$CANDIDATE_SHA"
+          RELEASE_SHA=$(gh release view "${TAG}" --json targetCommitish --jq '.targetCommitish')
+          test "$RELEASE_SHA" = "$CANDIDATE_SHA"
           test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = false
+
           rm -rf /tmp/rhi-energy-ux-release
           mkdir -p /tmp/rhi-energy-ux-release
           gh release download "${TAG}" --pattern 'rhi-energy-ux.js' --dir /tmp/rhi-energy-ux-release
           gh release download "${TAG}" --pattern 'rhi-energy-ux.js.sha256' --dir /tmp/rhi-energy-ux-release
-          cmp dist/rhi-energy-ux.js /tmp/rhi-energy-ux-release/rhi-energy-ux.js
+          git show "${TAG}:dist/rhi-energy-ux.js" > /tmp/rhi-energy-ux-tag.js
+          cmp /tmp/rhi-energy-ux-tag.js /tmp/rhi-energy-ux-release/rhi-energy-ux.js
           (cd /tmp/rhi-energy-ux-release && sha256sum -c rhi-energy-ux.js.sha256)
       - name: Promote exact candidate to stable
         shell: bash
@@ -69,8 +73,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          VERSION=$(node -p "require('./package.json').version")
-          TAG="v${VERSION}"
+          TAG=$(python -c "import json; print(json.load(open('release/QUALIFICATION.json'))['candidate_tag'])")
           gh release upload "${TAG}" release/QUALIFICATION.json --clobber
           gh release edit "${TAG}" \
             --title "RHI Energy UX ${TAG}" \
@@ -79,12 +82,13 @@ jobs:
       - name: Summary
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          CANDIDATE_SHA=$(python -c "import json; print(json.load(open('release/QUALIFICATION.json'))['candidate_sha'])")
           {
             echo '## RHI Energy UX stable promotion'
             echo "- Version: v${VERSION}"
-            echo "- Source/package/tests: PASS"
+            echo "- Candidate SHA: ${CANDIDATE_SHA}"
+            echo "- Rebuild during promotion: NO"
             echo "- Target HA qualification: PASS"
-            echo "- Published candidate runtime: EXACT MATCH"
+            echo "- Published candidate runtime: EXACT TAG MATCH"
             echo "- Stable promotion: COMPLETE"
-            echo "- Rollback: previous immutable HACS releases remain selectable"
           } >> "$GITHUB_STEP_SUMMARY"

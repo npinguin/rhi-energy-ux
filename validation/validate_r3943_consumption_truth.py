@@ -1,12 +1,8 @@
 from pathlib import Path
-import json
 
 root = Path(__file__).resolve().parents[1]
-version = json.loads((root / 'package.json').read_text(encoding="utf-8"))["version"]
 source = (root / 'source/homebrain-energy-card.js').read_text(encoding="utf-8")
-checks = {
-    'release_identity': f"const UX_VERSION = 'R{version}'" in source,
-    'home_consumption_not_reconstructed': "value:fmtKw(balanceVm.homeConsumptionKw,'—')" in source,
+checks = {    'home_consumption_not_reconstructed': "value:fmtKw(balanceVm.homeConsumptionKw,'—')" in source,
     'flexible_load_null_not_zero': "value:fmtKw(balanceVm.flexibleLoadsKw,'—')" in source,
     'incomplete_explanation': 'Unavailable · Flexible Load power incomplete' in source,
     'flow_connection_class_scoped': 'class="flowConnectionCard"' in source,

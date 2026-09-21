@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "principle": "one invariant, one test owner",
+  "owners": {
+    "release_identity": {
+      "owner": "validation/validate_release_governance.py",
+      "owns": ["package version", "release descriptor alignment", "publication lifecycle"],
+      "forbidden_in": {
+        "validation/validate_r3942_flow_contract.py": ["UX_VERSION", "package.json"],
+        "validation/validate_r3943_consumption_truth.py": ["UX_VERSION", "package.json"],
+        "validation/validate_r3944_stable_refresh.py": ["UX_VERSION", "package.json"],
+        "validation/validate_r3945_contract_clarity.py": ["UX_VERSION", "package.json"],
+        "validation/validate_r3946_current_energy_model.py": ["UX_VERSION", "package.json"],
+        "validation/validate_r3947_footer_runtime_guard.py": ["UX_VERSION", "package.json"]
+      }
+    },
+    "branding": {
+      "owner": "validation/validate_branding_assets.py",
+      "owns": ["canonical artwork", "brand delivery", "source/dist parity"],
+      "forbidden_in": {
+        "validation/validate_shared_ux_footer.py": ["company-logo.svg", "COMPANY_LOGO", "package-versioned URL"]
+      }
+    },
+    "footer_presentation": {
+      "owner": "validation/validate_shared_ux_footer.py",
+      "owns": ["footer geometry", "issue disclosure", "visible release identity"]
+    },
+    "footer_runtime_data": {
+      "owner": "validation/validate_r3947_footer_runtime_guard.py",
+      "owns": ["canonical footer runtime inputs", "backend release ownership", "diagnostic source safety"]
+    },
+    "navigation_and_stability": {
+      "owner": "validation/validate_r3944_stable_refresh.py",
+      "owns": ["navigation structure", "interaction persistence", "stable render behavior"]
+    },
+    "flow": {
+      "owner": "validation/validate_r3942_flow_contract.py",
+      "owns": ["physical flow projection and connection ownership"]
+    },
+    "consumption": {
+      "owner": "validation/validate_r3943_consumption_truth.py",
+      "owns": ["home consumption and flexible-load truth"]
+    },
+    "current_energy_model": {
+      "owner": "validation/validate_r3946_current_energy_model.py",
+      "owns": ["canonical current-energy and battery view model"]
+    }
+  }
+}

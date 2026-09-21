@@ -25,8 +25,9 @@ Prevent every backend or UX change from forcing scattered screen edits.
 4. Change or extend one normalized view model.
 5. Keep renderers free of backend paths and fallback logic.
 6. Add complete, zero, null, degraded and recovering fixtures.
-7. Run source, generated bundle and package verification.
-8. Deploy and record runtime evidence.
+7. Update the single owning test for each changed invariant; do not duplicate assertions into neighboring suites.
+8. Run source, generated bundle, ownership and package verification.
+9. Deploy and record runtime evidence.
 
 ## Release-blocking gates
 
@@ -48,3 +49,9 @@ Fail the release when:
 ## Scope control
 
 Use small domain-specific modules. Do not build an abstract universal metadata/reflection framework. Add a module only where ownership and repeated drift justify it.
+
+## Test drift prevention
+
+Test ownership is defined in `validation/OWNERSHIP.json`.
+
+A domain test must not assert release identity. Footer presentation must not assert branding delivery. Branding must not own responsive layout. If one local change breaks several unrelated owners, investigate ownership leakage before changing all tests.

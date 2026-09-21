@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 from pathlib import Path
-import json
 import sys
 root=Path(__file__).resolve().parents[1]
 source=(root/'source/homebrain-energy-card.js').read_text(encoding="utf-8")
-version=json.loads((root/'package.json').read_text(encoding="utf-8"))["version"]
 checks={
- 'version': f"const UX_VERSION = 'R{version}'" in source,
  'canonical_connection_owner': "connection: 'sensor.energy_connection_property_index'" in source,
  'connection_rows_only': 'parseMaybeJson(attrs.connections_json, null)' in source and 'row.ux_visible' in source,
  'canonical_interface_public_visibility': 'isCanonicalUxInterface(entityId)' in source and "visibility === 'ux_safe'" in source,
