@@ -1970,6 +1970,7 @@
       homeBatteryNeedKwh: value('home_battery_need_kwh','battery_reserve_need_kwh')
     });
   }
+  if (typeof module !== 'undefined' && module.exports) module.exports = { readPlanningContract, normalizePlanningLaneTotals };
 // END GENERATED MODULE: planning/planning-contract.js
 // BEGIN GENERATED MODULE: planning/planning-view-model.js
 // Stable UX model builder for Planning. Renderers receive meaning, never backend paths.
