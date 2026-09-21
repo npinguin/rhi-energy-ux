@@ -85,7 +85,7 @@ Candidate publication must:
 - run HACS package validation;
 - publish the exact committed package through the immutable tag.
 
-For HACS Dashboard/plugin packages that contain nested assets, do not attach the plugin JS filename itself as a GitHub Release asset. HACS treats a matching release asset as single-file delivery. Keep release assets evidence-only so HACS installs the repository `dist/` subtree with its nested assets.
+For HACS Dashboard/plugin packages published as tagged releases, attach **no GitHub Release assets**. HACS prefers release assets as the install payload whenever a tagged plugin release has any assets; evidence-only attachments therefore break full-tree installation just as surely as an incomplete runtime package. The normal GitHub Release carries notes/version visibility only, while the immutable tag owns the complete `dist/` subtree.
 
 Publication must be idempotent. If the tag/release already exists, verify complete package-byte identity, release target identity and release-asset policy, then finish green without mutation.
 
@@ -109,7 +109,7 @@ Stable promotion must prove:
 - technical debt = 0;
 - feature debt = 0.
 
-Stable promotion updates evidence/title only and does not rebuild or mutate package bytes.
+Stable promotion updates title/notes only and does not upload release assets, rebuild, or mutate package bytes.
 
 ## Workflow ownership
 
@@ -117,6 +117,6 @@ Exactly three workflows are allowed:
 
 - `validate.yml` — full PR validation and reproducibility proof;
 - `publish-hacs.yml` — verify and publish exact committed candidate;
-- `release.yml` — evidence-only stable promotion.
+- `release.yml` — qualification-gated stable promotion with zero release assets.
 
 Package-specific release governance may strengthen these rules but may not weaken them.
