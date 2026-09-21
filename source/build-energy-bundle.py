@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Build the HACS deployable Energy UX bundle from canonical source.
 
-The source remains the canonical R3.94.18 runtime. The only distribution-time
-transformation is rewriting legacy /local artwork URLs to the HACS-owned
-resource namespace. No business semantics are changed here.
+The source remains the canonical R3.94.19 runtime. Distribution is reproducible:
+legacy /local artwork URLs are rewritten to the HACS-owned resource namespace,
+and canonical source/assets are synchronized byte-for-byte into dist/assets.
+No business semantics are changed here.
 """
 from __future__ import annotations
 
@@ -16,6 +17,8 @@ MAIN = ROOT / "source" / "homebrain-energy-card.js"
 DIST_DIR = ROOT / "dist"
 DIST = DIST_DIR / "rhi-energy-ux.js"
 BUILD_MANIFEST = DIST_DIR / "BUILD_MANIFEST.json"
+SOURCE_ASSET_DIR = ROOT / "source" / "assets"
+DIST_ASSET_DIR = DIST_DIR / "assets"
 PACKAGE = ROOT / "package.json"
 
 MODULES = [
@@ -75,8 +78,17 @@ def main() -> None:
     DIST_DIR.mkdir(parents=True, exist_ok=True)
     DIST.write_text(bundle_text, encoding="utf-8", newline="\n")
 
+    company_logo = SOURCE_ASSET_DIR / "company-logo.svg"
+    if not company_logo.is_file():
+        raise SystemExit("Missing canonical company logo asset: source/assets/company-logo.svg")
+
+    DIST_ASSET_DIR.mkdir(parents=True, exist_ok=True)
+    for source_asset in sorted(SOURCE_ASSET_DIR.iterdir()):
+        if source_asset.is_file():
+            (DIST_ASSET_DIR / source_asset.name).write_bytes(source_asset.read_bytes())
+
     assets = {}
-    for asset in sorted((DIST_DIR / "assets").glob("*")):
+    for asset in sorted(DIST_ASSET_DIR.glob("*")):
         if asset.is_file():
             assets[asset.name] = {
                 "bytes": asset.stat().st_size,
