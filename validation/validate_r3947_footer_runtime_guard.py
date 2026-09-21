@@ -8,7 +8,7 @@ if not match:
 body = match.group("body")
 
 checks = {
-    "release_identity": "const UX_VERSION = 'R3.94.11'" in source,
+    "release_identity": "const UX_VERSION = 'R3.94.12'" in source,
     "balance_vm_declared": "const balanceVm = this.canonicalLiveEnergyBalance(rt);" in body,
     "balance_vm_declared_before_use": body.find("const balanceVm = this.canonicalLiveEnergyBalance(rt);") >= 0 and body.find("const balanceVm = this.canonicalLiveEnergyBalance(rt);") < body.find("balanceVm.battery.socPct"),
     "canonical_solar": "const solar = balanceVm.solarKw;" in body,
