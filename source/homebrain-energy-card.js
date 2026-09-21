@@ -2284,7 +2284,7 @@
           <nav class="tabs navItems" aria-label="${escapeHtml(currentSection.label)}">${itemNav}</nav>
         </div>
         <div class="navCompany" aria-label="Robotix.be · DomotiX · Network · Security">
-          <img class="navCompanyLogo" src="/local/homebrain/infrastructure/energy/company-logo.webp" alt="Robotix.be — DomotiX · Network · Security">
+          <img class="navCompanyLogo" src="/local/homebrain/infrastructure/energy/company-logo.svg" alt="Robotix.be — DomotiX · Network · Security">
         </div>
       </div>`;
     }
