@@ -1,28 +1,28 @@
-# RHI Energy UX v3.94.23 — TEST CANDIDATE
+# RHI Energy UX v3.94.24 — HACS full-tree delivery correction TEST CANDIDATE
 
 ## Scope
 
-Structural source/package release over v3.94.22. Energy product semantics, backend contracts, routes, planning meaning and user actions are intentionally unchanged.
+Release-governance/package-delivery correction over v3.94.23. Energy product semantics, backend contracts, routes, planning meaning and user actions are unchanged.
 
-- removes duplicated generated module code from the app source;
-- establishes explicit source ownership under `src/app`, `src/runtime`, `src/domain` and `src/assets`;
-- preserves historical module insertion points through `src/manifest.json`;
-- makes `src/assets/` the single canonical artwork tree;
-- promotes the previously dist-only hero artwork into canonical `src/assets/heroes/`;
-- makes the build recreate `dist/` from scratch so stale generated assets cannot survive;
-- creates structured asset categories `branding/` and `heroes/`;
-- replaces `BUILD_MANIFEST.json` with a lean generated `PACKAGE_MANIFEST.json`;
-- adds a committed runtime checksum;
-- makes the immutable tag's complete `dist/` tree the HACS install package;
-- makes GitHub Release assets evidence-only so HACS does not fall back to single-file plugin delivery;
-- adds source ownership, asset policy, full package and HACS-install simulation gates;
-- makes candidate publication idempotent.
+## Root cause
+
+Current HACS tagged-plugin installation prefers GitHub Release assets whenever a tagged release has any assets. The previous RHI UX model attached checksum/manifest/qualification files as “evidence-only” assets. On a clean install HACS therefore installed those attachments instead of materializing the immutable tag's complete `dist/` package, so runtime JS and nested assets could disappear.
+
+## Correction
+
+- GitHub Release remains HACS-visible but contains **zero assets**.
+- The immutable Git tag owns the complete `dist/` package.
+- `content_in_root: false` retains the standard nested `dist/` plugin layout.
+- Candidate publication and stable promotion fail if any GitHub Release asset exists.
+- HACS install simulation now models actual tagged-release selection before installing the `dist/` tree.
+- Qualification remains repository-governed and is never uploaded as a release asset.
+- No Energy runtime/product behavior is changed.
 
 ## Compatibility
 
-- Energy UX: 3.94.23
+- Energy UX: 3.94.24
 - Minimum backend: E0.15.25
 - Public compatibility surface: R1.89.44_CONTRACT
-- Rollback release: v3.94.22
+- Rollback release: v3.94.23
 
-Stable promotion remains blocked until target Home Assistant runtime and rollback proof are PASS.
+Target Home Assistant qualification must use a clean HACS install and prove that `www/community/rhi-energy-ux/` contains `rhi-energy-ux.js` and the complete packaged `assets/` tree before runtime promotion.
