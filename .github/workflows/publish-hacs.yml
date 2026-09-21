@@ -110,7 +110,6 @@ jobs:
           git tag "${TAG}" "$GITHUB_SHA"
           git push origin "${TAG}"
           gh release create "${TAG}" \
-            --prerelease \
             --target "$GITHUB_SHA" \
             --title "RHI Energy UX ${TAG} — TEST CANDIDATE" \
             --notes-file release/RELEASE_NOTES.md \
@@ -120,7 +119,7 @@ jobs:
             COMPATIBILITY.json \
             RELEASE_MANIFEST.json \
             release/QUALIFICATION.json
-          test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = true
+          test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = false
       - name: Summary
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -130,6 +129,6 @@ jobs:
             echo "- Source/package/tests: PASS"
             echo "- Reproducible dist: PASS"
             echo "- HACS validation: PASS"
-            echo "- Immutable TEST CANDIDATE: PUBLISHED"
+            echo "- Immutable HACS-visible TEST CANDIDATE: PUBLISHED"
             echo "- Stable promotion: BLOCKED until target HA qualification passes"
           } >> "$GITHUB_STEP_SUMMARY"

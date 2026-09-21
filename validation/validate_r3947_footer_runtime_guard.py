@@ -24,7 +24,7 @@ checks = {
     "backend_release_single_owner": "backend_release: attrs.backend_release || 'unknown'" in source,
     "no_backend_release_fallback": "attrs.backend_version || attrs.backend_release" not in source and "attrs.release_version || this.releaseState()?.state" not in source,
     "quiet_footer": "RHI Energy UX ${escapeHtml(footer.uxVersion || UX_VERSION)}" in source and "Backend ${escapeHtml(backend)}" in source,
-    "issue_only_colour": 'class="hiReleaseIssue ${issue.severity}"' in source,
+    "issue_only_colour": 'class="hiReleaseIssue rhiUxFooterIssue ${issue.severity}"' in source,
     "technical_panel_hidden": "diagnosticsPanel() {" in source and "return '';" in source,
     "issue_tooltip": "title=\"${escapeHtml(issueDetails)}\"" in source,
 }
@@ -33,4 +33,4 @@ failed = [name for name, ok in checks.items() if not ok]
 for name, ok in checks.items():
     print(("PASS" if ok else "FAIL") + " " + name)
 if failed:
-    raise SystemExit("R3.94.9 footer runtime guard validation failed: " + ", ".join(failed))
+    raise SystemExit("footer runtime guard validation failed: " + ", ".join(failed))

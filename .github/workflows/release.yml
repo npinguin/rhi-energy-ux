@@ -56,7 +56,7 @@ jobs:
           TAG="v${VERSION}"
           git fetch --tags --force
           test -n "$(git rev-list -n 1 "${TAG}" 2>/dev/null || true)"
-          test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = true
+          test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = false
           rm -rf /tmp/rhi-energy-ux-release
           mkdir -p /tmp/rhi-energy-ux-release
           gh release download "${TAG}" --pattern 'rhi-energy-ux.js' --dir /tmp/rhi-energy-ux-release
@@ -71,8 +71,8 @@ jobs:
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
+          gh release upload "${TAG}" release/QUALIFICATION.json --clobber
           gh release edit "${TAG}" \
-            --prerelease=false \
             --title "RHI Energy UX ${TAG}" \
             --notes-file release/RELEASE_NOTES.md
           test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = false

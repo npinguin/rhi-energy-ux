@@ -1,9 +1,9 @@
 {
   "product": "rhi-energy-ux",
-  "version": "3.94.20",
+  "version": "3.94.21",
   "stage": "test_candidate",
   "publication_authority": "github_releases",
-  "publication_status": "candidate_until_tagged",
+  "publication_status": "installable_candidate_until_qualified",
   "license": "GPL-3.0-only",
   "energy_contract": "R1.89.44_CONTRACT",
   "minimum_backend": "E0.15.25",
@@ -16,5 +16,6 @@
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "target_runtime_proof": "pending",
-  "rollback_proof": "pending"
+  "rollback_proof": "pending",
+  "github_release_prerelease": false
 }

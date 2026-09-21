@@ -4,7 +4,7 @@
 
 Public GPL-3.0-only Home Assistant dashboard package for **Robotix Home Intelligence Energy**.
 
-- UX release: **3.94.20**
+- UX release: **3.94.21**
 - Backend minimum for this release: **E0.15.25**
 - Legacy UX contract compatibility: **R1.89.44_CONTRACT**
 - HACS category: **Dashboard**
@@ -21,7 +21,7 @@ Company branding is source-owned at `source/assets/company-logo.svg`. The build 
 1. Open **HACS** → **Custom repositories**.
 2. Add `https://github.com/npinguin/rhi-energy-ux`.
 3. Select **Dashboard**.
-4. Install **v3.94.20** for this TEST CANDIDATE qualification.
+4. Install **v3.94.21** for this TEST CANDIDATE qualification.
 5. Go to **Settings → Dashboards → Resources**.
 6. Confirm this resource exists as **JavaScript Module**:
 
@@ -87,7 +87,7 @@ After install or update:
 3. Verify desktop and iPad.
 4. Confirm only the HACS Energy UX resource is active.
 5. Check the footer:
-   - healthy: quiet gray `RHI Energy UX 3.94.20 · Backend E0.15.25`;
+   - healthy: quiet gray `RHI Energy UX 3.94.21 · Backend E0.15.25`;
    - problem: only the short issue text becomes amber/red;
    - hover the issue text for technical details.
 6. Only after this proof, remove obsolete files under `/config/www/homebrain/...`.
@@ -96,13 +96,13 @@ The backend version comes only from `sensor.energy_release_contract.backend_rele
 
 ## Update and rollback
 
-Published GitHub releases are immutable.
+Published GitHub releases are immutable. TEST CANDIDATE releases are normal GitHub Releases so HACS exposes them without enabling beta/prerelease versions; qualification status is tracked separately.
 
 To rollback:
 
 **HACS → Robotix Home Intelligence Energy UX → Redownload / Need a different version? → select the previous release.**
 
-For the 3.94.20 rollout, select **v3.94.20** while qualifying the TEST CANDIDATE. The rollback target is **v3.94.19**.
+For the 3.94.21 rollout, select **v3.94.21** while qualifying the TEST CANDIDATE. The rollback target is **v3.94.20**.
 
 ## Development
 
@@ -113,4 +113,4 @@ npm run validate
 
 A release is valid only when validation is green and rebuilding leaves committed `dist/` unchanged.
 
-See `BUILDING.md`, `docs/CONTRACT.md`, `docs/BRANDING.md` and `docs/RELEASE_GOVERNANCE.md`.
+See `BUILDING.md`, `docs/CONTRACT.md`, `docs/BRANDING.md`, `docs/UX_RELEASE_STANDARD.md`, `docs/UX_FOOTER_STANDARD.md` and `docs/RELEASE_GOVERNANCE.md`.
