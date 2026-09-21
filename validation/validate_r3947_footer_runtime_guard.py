@@ -26,7 +26,7 @@ checks = {
     "quiet_footer": "RHI Energy UX ${escapeHtml(footer.uxVersion || UX_VERSION)}" in source and "Backend ${escapeHtml(backend)}" in source,
     "issue_only_colour": 'class="hiReleaseIssue rhiUxFooterIssue ${issue.severity}"' in source,
     "technical_panel_hidden": "diagnosticsPanel() {" in source and "return '';" in source,
-    "issue_tooltip": "title=\"${escapeHtml(issueDetails)}\"" in source,
+    "issue_details_visible": '<details class="rhiUxFooterDetails">' in source and "issueLines.map" in source,
 }
 
 failed = [name for name, ok in checks.items() if not ok]
