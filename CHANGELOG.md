@@ -1,3 +1,12 @@
+## 3.94.19 — canonical company branding
+
+- replaces the synthetic Robotix logo with the approved supplied artwork geometry;
+- establishes `source/assets/company-logo.svg` as the single brand authority;
+- synchronizes source branding assets to distribution during the reproducible build;
+- pins the approved brand hash and source/dist parity in validation;
+- prevents runtime recolouring or synthetic redraws of the company mark;
+- preserves the premium header and compact secondary navigation.
+
 ## 3.94.17 — product contract coherence
 
 - renders physical Home Battery contributors from explicit backend-owned state and health;
