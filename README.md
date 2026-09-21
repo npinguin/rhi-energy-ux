@@ -4,7 +4,7 @@
 
 Public GPL-3.0-only Home Assistant dashboard package for **Robotix Home Intelligence Energy**.
 
-- UX release: **3.94.19**
+- UX release: **3.94.20**
 - Backend minimum for this release: **E0.15.25**
 - Legacy UX contract compatibility: **R1.89.44_CONTRACT**
 - HACS category: **Dashboard**
@@ -12,7 +12,7 @@ Public GPL-3.0-only Home Assistant dashboard package for **Robotix Home Intellig
 
 The backend owns Energy semantics. The UX renders backend-owned public contracts and never invents the backend version.
 
-Company branding is source-owned at `source/assets/company-logo.svg`. The build copies this canonical asset byte-for-byte to `dist/assets`; runtime code must not redraw, recolour or synthesize the company mark.
+Company branding is source-owned at `source/assets/company-logo.svg`. The build copies this canonical transparent vector asset byte-for-byte to `dist/assets`; runtime code must not redraw, recolour, filter or synthesize the company mark. Shared sizing is controlled only through the `--rhi-company-*` header tokens so the same asset and slot contract can be reused by other RHI modules.
 
 ## Install with HACS
 
@@ -21,7 +21,7 @@ Company branding is source-owned at `source/assets/company-logo.svg`. The build 
 1. Open **HACS** → **Custom repositories**.
 2. Add `https://github.com/npinguin/rhi-energy-ux`.
 3. Select **Dashboard**.
-4. Install **v3.94.19** for this TEST CANDIDATE qualification.
+4. Install **v3.94.20** for this TEST CANDIDATE qualification.
 5. Go to **Settings → Dashboards → Resources**.
 6. Confirm this resource exists as **JavaScript Module**:
 
@@ -87,7 +87,7 @@ After install or update:
 3. Verify desktop and iPad.
 4. Confirm only the HACS Energy UX resource is active.
 5. Check the footer:
-   - healthy: quiet gray `RHI Energy UX 3.94.19 · Backend E0.15.25`;
+   - healthy: quiet gray `RHI Energy UX 3.94.20 · Backend E0.15.25`;
    - problem: only the short issue text becomes amber/red;
    - hover the issue text for technical details.
 6. Only after this proof, remove obsolete files under `/config/www/homebrain/...`.
@@ -102,7 +102,7 @@ To rollback:
 
 **HACS → Robotix Home Intelligence Energy UX → Redownload / Need a different version? → select the previous release.**
 
-For the 3.94.19 rollout, select **v3.94.19** while qualifying the TEST CANDIDATE. The rollback target is **v3.94.18**.
+For the 3.94.20 rollout, select **v3.94.20** while qualifying the TEST CANDIDATE. The rollback target is **v3.94.19**.
 
 ## Development
 
@@ -113,4 +113,4 @@ npm run validate
 
 A release is valid only when validation is green and rebuilding leaves committed `dist/` unchanged.
 
-See `BUILDING.md`, `docs/CONTRACT.md` and `docs/RELEASE_GOVERNANCE.md`.
+See `BUILDING.md`, `docs/CONTRACT.md`, `docs/BRANDING.md` and `docs/RELEASE_GOVERNANCE.md`.
