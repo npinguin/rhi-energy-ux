@@ -1,8 +1,8 @@
 {
-  "version": "3.94.22",
-  "candidate_tag": "v3.94.22",
+  "version": "3.94.23",
+  "candidate_tag": "v3.94.23",
   "candidate_sha": "pending",
-  "previous_release": "3.94.21",
+  "previous_release": "3.94.22",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -24,5 +24,7 @@
   "battery_signed_flow_rendering": "NOT_EXECUTED",
   "planning_horizon_local_totals": "NOT_EXECUTED",
   "pricing_edit_save_readback": "NOT_EXECUTED",
-  "strategy_profile_edit_save_readback": "NOT_EXECUTED"
+  "strategy_profile_edit_save_readback": "NOT_EXECUTED",
+  "hacs_package_tree": "NOT_EXECUTED",
+  "asset_tree_delivery": "NOT_EXECUTED"
 }
