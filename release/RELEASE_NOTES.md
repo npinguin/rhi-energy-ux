@@ -1,22 +1,23 @@
-# RHI Energy UX v3.94.19 — TEST CANDIDATE
+# RHI Energy UX v3.94.20 — TEST CANDIDATE
 
 ## Scope
 
-Structural company-brand ownership correction over v3.94.18. No Energy backend semantics, routes, planning logic or command ownership change.
+Shared company-brand package and header-slot cleanup over v3.94.19. No Energy backend semantics, routes, planning logic or command ownership change.
 
-- replaces the synthetic company-logo artwork with a vector trace derived from the approved Robotix artwork supplied for this release;
-- makes `source/assets/company-logo.svg` the single canonical company-brand source;
-- makes the build synchronize canonical source assets byte-for-byte into `dist/assets`;
-- keeps runtime branding as an external HACS-owned asset instead of drawing or reconstructing it in component code;
-- removes CSS colour filtering/reinterpretation from the company mark;
-- adds a branding governance gate that pins the approved asset hash and verifies source/distribution parity;
-- preserves the approved premium header composition and compact secondary-navigation icons.
+- replaces the prior traced company mark with the approved transparent Robotix logo used for the shared module direction;
+- keeps dark-blue Robotix.be and building artwork while rendering “DomotiX · Network · Security” in the approved lighter blue;
+- keeps `source/assets/company-logo.svg` as the single canonical company-brand source;
+- keeps build-time source → dist byte parity and immutable brand hash validation;
+- binds the runtime through one `COMPANY_LOGO_ASSET` constant instead of scattering asset paths;
+- introduces portable `--rhi-company-*` header tokens for slot width, height, padding and divider styling;
+- keeps the company logo unfiltered and transparent so the same asset can be reused unchanged by Energy, Mobility and future modules;
+- preserves the approved two-level navigation, compact gray second-line icons and responsive behaviour.
 
 ## Compatibility
 
-- Energy UX: 3.94.19
+- Energy UX: 3.94.20
 - Minimum backend: E0.15.25
 - Public compatibility surface: R1.89.44_CONTRACT
-- Rollback release: v3.94.18
+- Rollback release: v3.94.19
 
 Stable promotion remains blocked until target Home Assistant runtime and rollback proof are PASS.
