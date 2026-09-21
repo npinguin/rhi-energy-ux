@@ -1,14 +1,18 @@
 from pathlib import Path
+import json
 import re
 
-source = (Path(__file__).resolve().parents[1] / "source" / "homebrain-energy-card.js").read_text(encoding="utf-8")
+ROOT = Path(__file__).resolve().parents[1]
+version = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["version"]
+
+source = (ROOT / "source" / "homebrain-energy-card.js").read_text(encoding="utf-8")
 match = re.search(r"understandingFooter\(rt, tab\) \{(?P<body>.*?)\n    \}\n", source, re.S)
 if not match:
     raise SystemExit("understandingFooter not found")
 body = match.group("body")
 
 checks = {
-    "release_identity": "const UX_VERSION = 'R3.94.12'" in source,
+    "release_identity": f"const UX_VERSION = 'R{version}'" in source,
     "balance_vm_declared": "const balanceVm = this.canonicalLiveEnergyBalance(rt);" in body,
     "balance_vm_declared_before_use": body.find("const balanceVm = this.canonicalLiveEnergyBalance(rt);") >= 0 and body.find("const balanceVm = this.canonicalLiveEnergyBalance(rt);") < body.find("balanceVm.battery.socPct"),
     "canonical_solar": "const solar = balanceVm.solarKw;" in body,
