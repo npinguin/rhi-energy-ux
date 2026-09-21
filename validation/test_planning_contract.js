@@ -8,7 +8,7 @@ global.parseMaybeJson = (value, fallback) => {
 };
 global.objectFrom = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 
-const { adaptPlanningBucket } = require('../source/modules/planning/contract-adapter.js');
+const { adaptPlanningBucket } = require('../src/domain/planning/contract-adapter.js');
 const assert = require('node:assert/strict');
 
 const canonical = adaptPlanningBucket({
@@ -83,7 +83,7 @@ assert.equal(unsupported.contractSupported, false);
 assert.equal(unsupported.sources.length, 0);
 assert.equal(unsupported.reason, 'unsupported_planning_contract');
 
-const { readPlanningContract, normalizePlanningLaneTotals } = require('../source/modules/planning/planning-contract.js');
+const { readPlanningContract, normalizePlanningLaneTotals } = require('../src/domain/planning/planning-contract.js');
 
 const planningGateway = {
   contract: () => ({
