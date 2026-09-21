@@ -1,5 +1,9 @@
 {
   "assets": {
+    "company-logo.svg": {
+      "bytes": 911,
+      "sha256": "e78b12c2bb0b3c3c4a0a7e96b9725a478dc9c745e634e98c27623763fbead909"
+    },
     "consumers-hero.webp": {
       "bytes": 95406,
       "sha256": "02851d45a117f6663c46839adf913b28d86fbb2154ddf96eee2c866497210f5f"
@@ -38,9 +42,9 @@
     }
   },
   "bundle": {
-    "bytes": 708288,
+    "bytes": 712069,
     "path": "dist/rhi-energy-ux.js",
-    "sha256": "22336f5be9068551ee54d768ab0985e63254d4484dd8b6af6f6a2ab64f99f155"
+    "sha256": "f6bb0c96ae1c985623e6fd5195eeaf56e5d5f01b05b5f0e779bb68a7b5f2dbca"
   },
   "distribution_transform": {
     "hacs_asset_prefix": "/hacsfiles/rhi-energy-ux/assets/",
@@ -50,9 +54,9 @@
   "product": "Robotix Home Intelligence Energy UX",
   "schema_version": 1,
   "source": {
-    "bytes": 708386,
+    "bytes": 712174,
     "path": "source/homebrain-energy-card.js",
-    "sha256": "7e69a7dee86968e0ee17e42e753de7420bb9762d383601017c8669a4856a4990"
+    "sha256": "fd1376641419b2c8752e4758b8d879f1c84bda5864a40fa2bd76d2329d022c71"
   },
-  "version": "3.94.17"
+  "version": "3.94.18"
 }
