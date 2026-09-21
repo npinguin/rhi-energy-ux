@@ -1,4 +1,3 @@
-// BEGIN GENERATED MODULE: planning/planning-contract.js
 // Authoritative Planning contract reader. No cross-domain fallback and no business recalculation.
   function planningObject(value) {
     const parsed = parseMaybeJson(value, value);
@@ -132,4 +131,3 @@
     });
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = { readPlanningContract, normalizePlanningLaneTotals };
-// END GENERATED MODULE: planning/planning-contract.js

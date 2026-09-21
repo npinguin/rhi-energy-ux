@@ -1,12 +1,12 @@
 {
   "name": "rhi-energy-ux",
-  "version": "3.94.22",
+  "version": "3.94.23",
   "private": false,
   "description": "Robotix Home Intelligence Energy UX - HACS Dashboard plugin",
   "license": "GPL-3.0-only",
   "scripts": {
-    "build": "python source/build-energy-bundle.py",
-    "check:syntax": "node --check source/homebrain-energy-card.js && node --check dist/rhi-energy-ux.js",
+    "build": "python tools/build.py",
+    "check:syntax": "node --check dist/rhi-energy-ux.js",
     "validate:package": "python validation/validate_hacs_package.py",
     "validate:public": "python validation/validate_public_repository.py",
     "validate": "npm run build && npm run test:contract && npm run test:ux && npm run test:package && npm run test:release",
@@ -15,8 +15,13 @@
     "check:test-ownership": "python validation/validate_test_ownership.py",
     "test:contract": "node validation/test_command_contract.js && node validation/test_current_energy_view_model.js && node validation/test_energy_contract_gateway.js && node validation/test_live_consumption_flow_metering.js && node validation/test_planning_contract.js && python validation/validate_contract_gateway_architecture.py && python validation/validate_r3941_runtime_contracts.py && python validation/validate_r3941_runtime_regressions.py && python validation/validate_r3942_flow_contract.py && python validation/validate_r3943_consumption_truth.py && python validation/validate_r3945_contract_clarity.py && python validation/validate_r3946_current_energy_model.py",
     "test:ux": "python validation/validate_r3944_stable_refresh.py && python validation/validate_r3947_footer_runtime_guard.py && python validation/validate_branding_assets.py && python validation/validate_shared_ux_footer.py && python validation/validate_renderer_reference_integrity.py",
-    "test:package": "npm run check:syntax && node validation/test_bundle_load.mjs && npm run validate:package && npm run validate:public",
-    "test:release": "python validation/validate_release_governance.py && npm run check:test-ownership"
+    "test:package": "npm run check:syntax && node validation/test_bundle_load.mjs && npm run check:source-ownership && npm run check:asset-policy && npm run check:hacs-package && npm run test:hacs-install && npm run validate:public",
+    "test:release": "python validation/validate_release_governance.py && npm run check:test-ownership && npm run check:documentation-drift",
+    "check:source-ownership": "python validation/validate_source_ownership.py",
+    "check:asset-policy": "python validation/validate_asset_policy.py",
+    "check:hacs-package": "python validation/validate_hacs_package.py",
+    "check:documentation-drift": "python validation/validate_documentation_drift.py",
+    "test:hacs-install": "python validation/test_hacs_install.py"
   },
   "engines": {
     "node": ">=20"

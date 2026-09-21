@@ -2,11 +2,11 @@
 from pathlib import Path
 import sys
 root = Path(__file__).resolve().parents[1]
-main = (root/'source/homebrain-energy-card.js').read_text(encoding='utf-8')
+main = (root/'dist/rhi-energy-ux.js').read_text(encoding='utf-8')
 required = [
-    root/'source/modules/runtime/energy-contract-gateway.js',
-    root/'source/modules/planning/planning-contract.js',
-    root/'source/modules/planning/planning-view-model.js',
+    root/'src/runtime/energy-contract-gateway.js',
+    root/'src/domain/planning/planning-contract.js',
+    root/'src/domain/planning/planning-view-model.js',
 ]
 failures=[]
 for path in required:
@@ -23,7 +23,7 @@ if failures:
 print('PASS contract gateway architecture')
 
 # R3.90.5: Flexible Load cards consume normalized backend-owned actions.
-source = (root / "source" / "homebrain-energy-card.js").read_text(encoding="utf-8")
+source = (root / "dist" / "rhi-energy-ux.js").read_text(encoding="utf-8")
 required_command_tokens = [
     "readEnergyCommandContract",
     "createCommandActionModel",
@@ -63,7 +63,7 @@ if "sensor.energy_" in diagnostic_spec:
 if "sensor.energy_metering_property_index" in main:
     failures.append("legacy_metering_owner_reference")
 
-registry = (root/'source/modules/runtime/public-interface-registry.js').read_text(encoding='utf-8')
+registry = (root/'src/runtime/public-interface-registry.js').read_text(encoding='utf-8')
 if "metering: 'sensor.energy_asset_metering_index'" not in registry:
     failures.append("canonical_metering_owner_missing")
 if "pilotReadiness: 'sensor.energy_pilot_readiness'" not in registry:

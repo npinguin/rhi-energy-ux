@@ -1,7 +1,7 @@
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-source = (root / 'source' / 'homebrain-energy-card.js').read_text(encoding="utf-8")
+source = (root / 'dist' / 'rhi-energy-ux.js').read_text(encoding="utf-8")
 checks = {    'hour_period_first_class': "{ period_id: 'hour', label: 'This hour', selector_order: 0 }" in source,
     'canonical_home_consumption_property': "canonicalValue('home_consumption.power_kw', 'home_consumption')" in source,
     'canonical_home_consumption_breakdown': "withBreakdown(canonicalValue('home_consumption.power_kw', 'home_consumption'),'home_consumption')" in source,

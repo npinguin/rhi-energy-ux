@@ -1,4 +1,3 @@
-// BEGIN GENERATED MODULE: planning/planning-view-model.js
 // Stable UX model builder for Planning. Renderers receive meaning, never backend paths.
   function createPlanningViewModel({ gateway, horizonId, flexibleAssets = [], storage = null }) {
     const contract = readPlanningContract(gateway, horizonId);
@@ -32,4 +31,3 @@
       complete: contractSupported && !/incomplete|partial|unavailable/.test(stateText)
     });
   }
-// END GENERATED MODULE: planning/planning-view-model.js

@@ -1,4 +1,3 @@
-  // BEGIN GENERATED MODULE: flexible-assets/domain-model.js
   class FlexibleAssetDomainModel {
     constructor(runtime) {
       this.runtime = runtime;
@@ -114,5 +113,3 @@
       });
     }
   }
-
-  // END GENERATED MODULE: flexible-assets/domain-model.js

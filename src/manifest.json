@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "template": "app/energy-card.js",
+  "module_groups": [
+    {
+      "placeholder": "// __RHI_RUNTIME_MODULES__",
+      "modules": [
+        "runtime/public-interface-registry.js",
+        "runtime/energy-contract-gateway.js",
+        "runtime/consumption-contract.js",
+        "domain/models/current-energy-view-model.js",
+        "domain/models/physical-flow-view-model.js",
+        "domain/models/metering-status-model.js",
+        "runtime/command-contract.js",
+        "runtime/command-action-model.js"
+      ]
+    },
+    {
+      "placeholder": "// __RHI_FLEXIBLE_ASSET_MODULES__",
+      "modules": [
+        "domain/models/flexible-asset-model.js"
+      ]
+    },
+    {
+      "placeholder": "// __RHI_PLANNING_MODULES__",
+      "modules": [
+        "domain/planning/contract-adapter.js",
+        "domain/planning/planning-contract.js",
+        "domain/planning/planning-view-model.js"
+      ]
+    }
+  ],
+  "assets_root": "assets"
+}

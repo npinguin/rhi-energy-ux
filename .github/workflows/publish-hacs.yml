@@ -4,11 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - 'dist/rhi-energy-ux.js'
-      - 'dist/assets/**'
+      - 'dist/**'
+      - 'hacs.json'
       - 'COMPATIBILITY.json'
       - 'RELEASE_MANIFEST.json'
       - 'release/RELEASE_NOTES.md'
+      - '.github/workflows/publish-hacs.yml'
   workflow_dispatch:
 
 permissions:
@@ -20,7 +21,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Verify validated candidate artifact
+    name: Verify validated HACS package
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -36,7 +37,15 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
-      - name: Reject immutable version republish
+      - name: Verify committed package and release metadata
+        run: |
+          python validation/validate_hacs_package.py
+          python validation/test_hacs_install.py
+          python validation/validate_public_repository.py
+          python validation/validate_release_governance.py
+          python validation/validate_test_ownership.py
+          python validation/validate_documentation_drift.py
+      - name: Verify immutable candidate state
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -45,23 +54,42 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
           git fetch --tags --force
-          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || gh release view "${TAG}" >/dev/null 2>&1; then
-            echo "Immutable candidate ${TAG} already exists; refusing republish." >&2
+
+          TAG_EXISTS=false
+          RELEASE_EXISTS=false
+          git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null && TAG_EXISTS=true
+          gh release view "${TAG}" >/dev/null 2>&1 && RELEASE_EXISTS=true
+
+          if [ "$RELEASE_EXISTS" = true ] && [ "$TAG_EXISTS" != true ]; then
+            echo "Release ${TAG} exists without immutable tag." >&2
             exit 1
           fi
-      - name: Verify committed artifact and release metadata
-        run: |
-          python validation/validate_hacs_package.py
-          python validation/validate_public_repository.py
-          python validation/validate_release_governance.py
-          python validation/validate_test_ownership.py
+
+          if [ "$TAG_EXISTS" = true ]; then
+            rm -rf /tmp/rhi-energy-existing-tag
+            mkdir -p /tmp/rhi-energy-existing-tag
+            git archive "${TAG}" dist | tar -x -C /tmp/rhi-energy-existing-tag
+            diff -qr /tmp/rhi-energy-existing-tag/dist dist
+            echo "Existing immutable tag package matches current dist."
+          fi
+
+          if [ "$RELEASE_EXISTS" = true ]; then
+            TAG_SHA=$(git rev-list -n 1 "${TAG}")
+            RELEASE_SHA=$(gh release view "${TAG}" --json targetCommitish --jq '.targetCommitish')
+            test "$RELEASE_SHA" = "$TAG_SHA"
+            test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = false
+            if gh release view "${TAG}" --json assets --jq '.assets[].name' | grep -Fxq 'rhi-energy-ux.js'; then
+              echo "Forbidden JS release asset present; HACS would use single-file mode." >&2
+              exit 1
+            fi
+          fi
       - name: HACS validation
-        uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa
+        uses: hacs/action@885037da508419fd08c13515967aec868dfdee2d
         with:
           category: plugin
 
   publish:
-    name: Publish exact TEST CANDIDATE artifact
+    name: Publish or verify immutable TEST CANDIDATE
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -74,9 +102,15 @@ jobs:
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '24'
-      - name: Verify exact committed payload
-        run: python validation/validate_hacs_package.py
-      - name: Publish immutable version and rollback assets
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Verify exact committed HACS package
+        run: |
+          python validation/validate_hacs_package.py
+          python validation/test_hacs_install.py
+      - name: Publish or verify immutable tag and evidence-only release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -85,32 +119,56 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
           git fetch --tags --force
-          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null || gh release view "${TAG}" >/dev/null 2>&1; then
-            echo "Immutable candidate ${TAG} already exists; refusing republish." >&2
+
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            TAG_SHA=$(git rev-list -n 1 "${TAG}")
+            rm -rf /tmp/rhi-energy-existing-tag
+            mkdir -p /tmp/rhi-energy-existing-tag
+            git archive "${TAG}" dist | tar -x -C /tmp/rhi-energy-existing-tag
+            diff -qr /tmp/rhi-energy-existing-tag/dist dist
+            echo "Immutable tag ${TAG} already exists with identical package bytes."
+          else
+            TAG_SHA="$GITHUB_SHA"
+            git tag "${TAG}" "$TAG_SHA"
+            git push origin "${TAG}"
+          fi
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            RELEASE_SHA=$(gh release view "${TAG}" --json targetCommitish --jq '.targetCommitish')
+            test "$RELEASE_SHA" = "$TAG_SHA"
+            echo "GitHub Release ${TAG} already exists; verifying without mutation."
+          else
+            gh release create "${TAG}" \
+              --target "$TAG_SHA" \
+              --title "RHI Energy UX ${TAG} — TEST CANDIDATE" \
+              --notes-file release/RELEASE_NOTES.md \
+              dist/rhi-energy-ux.js.sha256 \
+              dist/PACKAGE_MANIFEST.json \
+              COMPATIBILITY.json \
+              RELEASE_MANIFEST.json \
+              release/QUALIFICATION.json
+          fi
+
+          test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = false
+
+          if gh release view "${TAG}" --json assets --jq '.assets[].name' | grep -Fxq 'rhi-energy-ux.js'; then
+            echo "Forbidden JS release asset present; HACS would use single-file mode." >&2
             exit 1
           fi
-          sha256sum dist/rhi-energy-ux.js > /tmp/rhi-energy-ux.js.sha256
-          git tag "${TAG}" "$GITHUB_SHA"
-          git push origin "${TAG}"
-          gh release create "${TAG}" \
-            --target "$GITHUB_SHA" \
-            --title "RHI Energy UX ${TAG} — TEST CANDIDATE" \
-            --notes-file release/RELEASE_NOTES.md \
-            dist/rhi-energy-ux.js \
-            /tmp/rhi-energy-ux.js.sha256 \
-            dist/BUILD_MANIFEST.json \
-            COMPATIBILITY.json \
-            RELEASE_MANIFEST.json \
-            release/QUALIFICATION.json
-          test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = false
+
+          for REQUIRED in rhi-energy-ux.js.sha256 PACKAGE_MANIFEST.json COMPATIBILITY.json RELEASE_MANIFEST.json QUALIFICATION.json; do
+            gh release view "${TAG}" --json assets --jq '.assets[].name' | grep -Fxq "$REQUIRED"
+          done
       - name: Summary
         run: |
           VERSION=$(node -p "require('./package.json').version")
           {
             echo '## RHI Energy UX HACS publication'
             echo "- Version: v${VERSION}"
-            echo "- Artifact: exact committed PR-validated dist"
+            echo "- HACS install source: immutable tag dist/ tree"
+            echo "- GitHub Release assets: evidence only"
+            echo "- JS release asset: NOT PRESENT"
+            echo "- Existing identical candidate: verified idempotently"
             echo "- Rebuild during publication: NO"
-            echo "- HACS validation: PASS"
-            echo "- Immutable HACS-visible TEST CANDIDATE: PUBLISHED"
+            echo "- Immutable HACS-visible TEST CANDIDATE: READY"
           } >> "$GITHUB_STEP_SUMMARY"

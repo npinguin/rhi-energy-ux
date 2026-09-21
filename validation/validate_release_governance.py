@@ -19,8 +19,8 @@ qualification = load("release/QUALIFICATION.json")
 status = load("release/RELEASE_STATUS.json")
 ownership = load("validation/OWNERSHIP.json")
 
-source = read("source/homebrain-energy-card.js")
-build = read("source/build-energy-bundle.py")
+source = read("src/app/energy-card.js")
+build = read("tools/build.py")
 readme = read("README.md")
 notes = read("release/RELEASE_NOTES.md")
 changelog = read("CHANGELOG.md")
@@ -50,30 +50,35 @@ checks = {
     "minimum_backend_from_descriptor": compat["energy_contract"]["minimum_backend"] == product["minimum_backend"] and manifest["minimum_backend"] == product["minimum_backend"] and status["minimum_backend"] == product["minimum_backend"],
     "tested_backend_from_descriptor": compat["energy_contract"]["tested_backend_releases"] == [product["tested_backend"]],
     "stage_from_descriptor": manifest["stage"] == product["stage"] and status["stage"] == product["stage"],
-    "artifact_from_descriptor": manifest["runtime_artifact"] == product["runtime_artifact"] and manifest["build_manifest"] == product["build_manifest"],
+    "artifact_from_descriptor": manifest["runtime_artifact"] == product["runtime_artifact"] and manifest["runtime_checksum_artifact"] == product["runtime_checksum_artifact"] and manifest["package_manifest"] == product["package_manifest"],
+    "package_delivery_from_descriptor": manifest["hacs_package_root"] == product["hacs_package_root"] and manifest["hacs_delivery_mode"] == product["hacs_delivery_mode"] and manifest["release_asset_policy"] == product["release_asset_policy"],
     "hacs_metadata_from_descriptor": manifest["hacs_repository_type"] == product["hacs_repository_type"] and manifest["hacs_validation_category"] == product["hacs_validation_category"],
     "rollback_from_descriptor": qualification["previous_release"] == product["rollback_release"].removeprefix("v"),
-    "runtime_version_build_owned": "re.sub(" in build and "const UX_VERSION = 'R" in build and 'package["version"]' in build,
+    "runtime_version_build_owned": "__RHI_UX_VERSION__" in source and 'pkg["version"]' in build and '.replace("__RHI_UX_VERSION__"' in build,
     "backend_version_single_owner": "backend_release: attrs.backend_release || 'unknown'" in source,
     "no_backend_version_fallback": "attrs.backend_version || attrs.backend_release" not in source and "attrs.release_version || this.releaseState()?.state" not in source,
     "release_notes_current": notes.startswith(f"# v{version} ") or notes.startswith(f"# RHI Energy UX v{version} "),
     "changelog_current": any(line.startswith(f"## {version} ") for line in changelog.splitlines()[:8]),
     "test_ownership_principle": ownership.get("principle") == "one invariant, one test owner" and "One invariant has exactly one test owner" in test_governance,
-    "owned_suite_scripts": all(name in pkg.get("scripts", {}) for name in ("test:contract","test:ux","test:package","test:release","check:test-ownership","release:sync")),
+    "owned_suite_scripts": all(name in pkg.get("scripts", {}) for name in ("test:contract","test:ux","test:package","test:release","check:test-ownership","check:source-ownership","check:asset-policy","check:hacs-package","check:documentation-drift","test:hacs-install","release:sync")),
     "validate_pr_only": "pull_request:" in validate and "push:\n    branches: [main]" not in validate,
     "validate_has_two_build_proof": "Deterministic two-build proof" in validate,
-    "validate_has_immutable_runtime_gate": "Protect immutable published runtime" in validate,
-    "publish_exact_artifact": "Publish exact TEST CANDIDATE artifact" in publish and "npm run build" not in publish and "npm run validate" not in publish and "npm ci" not in publish,
+    "validate_has_immutable_package_gate": "Protect immutable published package" in validate,
+    "publish_exact_package": "Publish or verify immutable TEST CANDIDATE" in publish and "npm run build" not in publish and "npm run validate" not in publish and "npm ci" not in publish,
+    "publish_idempotent": "Existing immutable tag package matches current dist." in publish and "verifying without mutation" in publish,
+    "publish_evidence_only": "dist/PACKAGE_MANIFEST.json" in publish and "dist/rhi-energy-ux.js \\\\" not in publish,
     "stable_no_rebuild": "npm run build" not in release and "npm run validate" not in release and "npm ci" not in release,
     "candidate_is_normal_release": "--prerelease" not in publish and "isPrerelease --jq '.isPrerelease'" in publish,
     "qualification_does_not_publish": "release/QUALIFICATION.json" not in publish.split("permissions:", 1)[0],
-    "shared_exact_artifact_standard": "publish the exact committed artifact" in shared_release,
-    "governance_no_rebuild": "publication does not rebuild" in governance,
+    "shared_full_package_standard": "Published package bytes are immutable" in shared_release and "Publication must be idempotent" in shared_release,
+    "governance_no_rebuild": "Candidate publication does not rebuild" in governance,
     "hacs_resource_documented": "/hacsfiles/rhi-energy-ux/rhi-energy-ux.js" in readme,
     "dashboard_views_documented": "views:" in readme and "custom:homebrain-energy-card" in readme,
     "evergreen_docs": "R3.91.4" not in architecture and "R3.94.7" not in maintainability,
     "canonical_consumption_terms": "Home Base Load" not in drift,
-    "source_authority_documented": "source/homebrain-energy-card.js" in maintainability and "not a second runtime publication path" in maintainability,
+    "source_authority_documented": "`src/` is the only runtime source authority." in maintainability,
+    "legacy_source_tree_absent": not (ROOT / "source").exists(),
+    "legacy_build_manifest_absent": not (ROOT / "dist" / "BUILD_MANIFEST.json").exists(),
     "zero_accepted_debt": manifest.get("known_accepted_technical_debt") == 0 and manifest.get("known_accepted_feature_debt") == 0,
 }
 

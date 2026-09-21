@@ -1,4 +1,3 @@
-// BEGIN GENERATED MODULE: runtime/energy-contract-gateway.js
 // Single backend-access owner for Energy UX public product contracts.
   function createEnergyContractGateway(host) {
     const cache = new Map();
@@ -29,4 +28,3 @@
     };
     return Object.freeze({ entityId, state, attrs, contract });
   }
-// END GENERATED MODULE: runtime/energy-contract-gateway.js

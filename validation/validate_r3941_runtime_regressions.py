@@ -2,7 +2,7 @@
 from pathlib import Path
 import sys
 root=Path(__file__).resolve().parents[1]
-source=(root/'source/homebrain-energy-card.js').read_text(encoding='utf-8')
+source=(root/'dist/rhi-energy-ux.js').read_text(encoding='utf-8')
 checks={
   'metering_screen_owner': "metering: 'sensor.energy_asset_metering_index'" in source and "metering: 'sensor.energy_metering_property_resolution_index'" not in source,
   'consumer_power_text_scoped': 'consumerCard(rt, consumer)' in source and 'flowPhysicalConsumerCard' in source and 'escapeHtml(powerText)' in source,

@@ -1,4 +1,3 @@
-// BEGIN GENERATED MODULE: runtime/metering-status-model.js
 // R1.89.43 end-user mapping. status_label is authoritative when published;
 // null energy is never interpreted without measurement state and measured zero remains visible.
   function createMeteringStatusModel(row = {}) {
@@ -25,4 +24,3 @@
       visible: explicitlyVisible && applicable && (!unattributed || (value !== null && value > 0.0001) || degraded)
     });
   }
-// END GENERATED MODULE: runtime/metering-status-model.js

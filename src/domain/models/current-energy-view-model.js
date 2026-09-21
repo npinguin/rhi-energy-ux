@@ -1,4 +1,3 @@
-// BEGIN GENERATED MODULE: runtime/current-energy-view-model.js
 // Canonical current-energy view model. Literal contract keys and direction
 // semantics are confined to this adapter so screen renderers cannot drift.
   function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
@@ -125,4 +124,3 @@
       consumption:readLiveConsumptionContract(gateway)
     });
   }
-// END GENERATED MODULE: runtime/current-energy-view-model.js

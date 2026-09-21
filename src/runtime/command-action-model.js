@@ -1,4 +1,3 @@
-// BEGIN GENERATED MODULE: runtime/command-action-model.js
 // Stable R1.89.39 UX action model. Labels, visibility, enablement and blocked
 // guidance are published by the command owner and are not reconstructed.
   function createCommandActionModel(command) {
@@ -30,4 +29,3 @@
       .filter(Boolean)
       .sort((a, b) => (order[a.role] || 99) - (order[b.role] || 99));
   }
-// END GENERATED MODULE: runtime/command-action-model.js

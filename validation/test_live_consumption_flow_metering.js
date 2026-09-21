@@ -1,5 +1,5 @@
 const fs=require('fs');
-const src=fs.readFileSync('source/homebrain-energy-card.js','utf8');
+const src=fs.readFileSync('dist/rhi-energy-ux.js','utf8');
 for (const token of ['site_consumption.power_kw','home_consumption.power_kw','flexible_loads.power_kw','buildPhysicalFlowViewModel','createMeteringStatusModel','Available for Flexible Loads','sensor.energy_connection_property_index']) if(!src.includes(token)) throw new Error('missing '+token);
 for (const forbidden of ['home_base_load.power_kw','total_non_storage_demand','total_site_demand','sensor.energy_connection_fact_registry','energy_intelligence.usable_surplus_kw']) if(src.includes(forbidden)) throw new Error('forbidden '+forbidden);
 if (!/ATTRIBUTION_PENDING:\s*'Waiting for trusted meter attribution'/.test(src)) throw new Error('pending mapping missing');

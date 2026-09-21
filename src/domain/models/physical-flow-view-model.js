@@ -1,4 +1,3 @@
-// BEGIN GENERATED MODULE: runtime/physical-flow-view-model.js
 // R1.89.39 physical-flow model. Consumers and physical connections are
 // separate semantic views and may show the same measured kW. They are never
 // summed together. Connection totals and rows come only from one coherent
@@ -34,4 +33,3 @@
       connectionHealth:connectionSnapshot.available ? 'OK' : 'UNAVAILABLE'
     });
   }
-// END GENERATED MODULE: runtime/physical-flow-view-model.js

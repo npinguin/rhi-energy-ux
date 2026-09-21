@@ -1,4 +1,3 @@
-// BEGIN GENERATED MODULE: planning/contract-adapter.js
 // Canonical support is capability-based. R1.79.3 compatibility is deliberately bounded to the
 // published bucket fields and must not become a second planning owner.
   function planningArray(value) {
@@ -88,4 +87,3 @@
     };
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = { adaptPlanningBucket, signedPlanningGrid, planningEnergyFromPower };
-// END GENERATED MODULE: planning/contract-adapter.js

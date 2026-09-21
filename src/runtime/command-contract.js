@@ -1,4 +1,3 @@
-// BEGIN GENERATED MODULE: runtime/command-contract.js
 // R1.89.39 canonical reader for sensor.energy_command_index. UX visibility and
 // enablement are backend-owned. The frontend does not infer readiness from
 // command state, physical state, applicability or resolved bindings.
@@ -34,4 +33,3 @@
     });
     return Object.freeze({ envelope, rows });
   }
-// END GENERATED MODULE: runtime/command-contract.js

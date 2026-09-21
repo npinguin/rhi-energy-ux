@@ -1,6 +1,6 @@
 # Robotix Home Intelligence Energy UX
 
-![Robotix Home Intelligence Energy UX](dist/assets/overview-hero.webp)
+![Robotix Home Intelligence Energy UX](dist/assets/heroes/overview-hero.webp)
 
 Public GPL-3.0-only Home Assistant dashboard package for **Robotix Home Intelligence Energy**.
 
@@ -11,7 +11,7 @@ Public GPL-3.0-only Home Assistant dashboard package for **Robotix Home Intellig
 
 The backend owns Energy semantics. The UX renders backend-owned public contracts and never invents the backend version.
 
-Company branding is source-owned at `source/assets/company-logo.svg`. Branding tests own artwork and cache-safe delivery; layout/navigation owns header-slot geometry. Footer tests do not assert logo transport. The build copies the canonical transparent vector asset byte-for-byte to `dist/assets`; runtime code must not redraw, recolour, filter or synthesize the mark.
+Company branding is source-owned at `src/assets/branding/company-logo.svg`. Branding tests own artwork and cache-safe delivery; layout/navigation owns header-slot geometry. Footer tests do not assert logo transport. The build mirrors the canonical asset tree byte-for-byte to `dist/assets`; runtime code must not redraw, recolour, filter or synthesize the mark.
 
 ## Install with HACS
 
@@ -110,6 +110,12 @@ npm ci
 npm run validate
 ```
 
-A candidate is valid only when the PR validation is green, the deterministic second build matches the first, committed `dist/` matches that build, and HACS validation passes. Publication then publishes those exact committed bytes without rebuilding.
+A candidate is valid only when the PR validation is green, the deterministic second build matches the first, committed `dist/` matches that build, and HACS validation passes. Publication then tags those exact committed package bytes without rebuilding.
 
 See `BUILDING.md`, `docs/CONTRACT.md`, `docs/BRANDING.md`, `docs/TEST_GOVERNANCE.md`, `validation/OWNERSHIP.json`, `docs/UX_RELEASE_STANDARD.md`, `docs/UX_FOOTER_STANDARD.md` and `docs/RELEASE_GOVERNANCE.md`.
+
+## Source and package structure
+
+`src/OWNERSHIP.json` and `src/manifest.json` define source ownership and build insertion order. Canonical assets live only under `src/assets/<category>/`; the build mirrors that tree under `dist/assets/<category>/`. `dist/PACKAGE_MANIFEST.json` inventories the complete generated HACS package.
+
+For nested assets the GitHub Release intentionally does not attach `rhi-energy-ux.js`; HACS therefore installs the immutable tag's complete `dist/` subtree instead of switching to single-file mode. See `docs/SOURCE_PACKAGE_GOVERNANCE.md`.

@@ -1,4 +1,3 @@
-// BEGIN GENERATED MODULE: runtime/consumption-contract.js
 // R1.89.39 canonical live consumption contract. Public concepts are exactly:
 // Site Consumption, Home Consumption, Flexible Loads and Home Battery.
 // Retired pre-R1.89.39 consumption aliases are
@@ -52,4 +51,3 @@
       available:site.value !== null || home.value !== null || flexible.value !== null
     });
   }
-// END GENERATED MODULE: runtime/consumption-contract.js

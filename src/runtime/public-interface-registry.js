@@ -1,4 +1,3 @@
-// BEGIN GENERATED MODULE: runtime/public-interface-registry.js
 // Canonical public UX interface registry. Product code never probes suffixes,
   // aliases, internal resolution indexes, or diagnostics indexes.
   const UX_INTERFACES = Object.freeze({
@@ -30,4 +29,3 @@
     value: 'sensor.energy_value_accounting_index',
     editableProperties: 'sensor.energy_public_editable_property_index'
   });
-// END GENERATED MODULE: runtime/public-interface-registry.js
