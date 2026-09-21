@@ -4,7 +4,7 @@ import json, re, sys
 import tinycss2
 
 root = Path(__file__).resolve().parents[1]
-source = (root/'source/homebrain-energy-card.js').read_text(encoding='utf-8')
+source = (root/'dist/rhi-energy-ux.js').read_text(encoding='utf-8')
 manifest = json.loads((root/'MANIFEST.json').read_text(encoding='utf-8'))
 evidence = json.loads((root/'RELEASE_EVIDENCE.json').read_text(encoding='utf-8'))
 
