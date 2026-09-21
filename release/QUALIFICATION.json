@@ -1,6 +1,6 @@
 {
-  "version": "3.94.16",
-  "previous_release": "3.94.15",
+  "version": "3.94.17",
+  "previous_release": "3.94.16",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -17,5 +17,10 @@
   "release_decision": "BLOCKED",
   "planning_d1_totals": "NOT_EXECUTED",
   "planning_flexible_load_aggregate": "NOT_EXECUTED",
-  "value_net_financial_result": "NOT_EXECUTED"
+  "value_net_financial_result": "NOT_EXECUTED",
+  "battery_child_state_health": "NOT_EXECUTED",
+  "battery_signed_flow_rendering": "NOT_EXECUTED",
+  "planning_horizon_local_totals": "NOT_EXECUTED",
+  "pricing_edit_save_readback": "NOT_EXECUTED",
+  "strategy_profile_edit_save_readback": "NOT_EXECUTED"
 }
