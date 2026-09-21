@@ -34,6 +34,16 @@ checks = {
     'scope_selector_has_no_first_item_fallback': '|| normalized[0]' not in source,
     'consumer_sort_default_consistent': "consumerSortSelect.value || 'power'" in source and "consumerSort.dataset.consumerSort || 'power'" in source,
     'local_interaction_state_part_of_render_signature': '${this.loadSort}|${this.meteringSort}|${this.consumerSort}|${this.consumerFilter}' in source,
+    'two_level_navigation_sections': "id: 'energy'" in source and "id: 'intelligence'" in source and "id: 'insights'" in source,
+    'energy_navigation_order': "{ id:'overview', label:'Overview'" in source and "{ id:'flow', label:'Flow'" in source and "{ id:'solar', label:'Solar', view:'solar-generation'" in source,
+    'operational_planning_reuses_solar_renderer': "{ id:'operational-planning', label:'Operational Planning', view:'solar'" in source,
+    'tactical_planning_reuses_planning_renderer': "{ id:'tactical-planning', label:'Tactical Planning', view:'planning'" in source,
+    'strategic_planning_structural_route': "{ id:'strategic-planning', label:'Strategic Planning', view:'strategic-planning'" in source,
+    'navigation_context_persisted': 'navSection: this.navSection' in source and 'navItem: this.navItem' in source and 'navSelectionBySection: this.navSelectionBySection' in source,
+    'premium_header_owned_by_navigation': 'const semanticTitle = navItem?.title || p.title;' in source and 'hiTabPurpose' in source,
+    'legacy_single_row_nav_removed': "['overview','Overview'],['outlook','Outlook']" not in source,
+    'old_large_top_header_removed': '<header class="top">' not in source,
+    'mobile_navigation_is_scroll_safe': '.navItems.tabs{display:flex!important' in source and '.navSections{width:100%;box-sizing:border-box;display:grid;grid-template-columns:repeat(3' in source,
 }
 for name, ok in checks.items():
     print(f"{'PASS' if ok else 'FAIL'} {name}")
