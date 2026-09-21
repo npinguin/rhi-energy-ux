@@ -2,7 +2,7 @@
 from pathlib import Path
 import sys
 root=Path(__file__).resolve().parents[1]
-s=(root/"source/homebrain-energy-card.js").read_text(encoding="utf-8")
+s=(root/"dist/rhi-energy-ux.js").read_text(encoding="utf-8")
 consumer=s[s.find("consumerCard(rt, consumer)"):s.find("flowConsumers(rt)")]
 checks={
   "metering_owner": "metering: 'sensor.energy_asset_metering_index'" in s,
