@@ -591,9 +591,15 @@
     }
     entityForKey(key) {
       const prefix = String(key || '').split('.')[0];
+      // Dynamic logical-object ownership is backend-published in the Asset Index.
+      // This is the authoritative route for physical battery units, inverters,
+      // phases and producer-domain assets; the UX must not guess from asset IDs.
+      const asset = this.asset(prefix);
+      const publishedOwner = String(asset?.property_index || '').trim();
+      if (publishedOwner && this.isAllowed(publishedOwner)) return publishedOwner;
       const mapped = {
         solar: 'solar', grid: 'grid', grid_import: 'grid', grid_export: 'grid',
-        battery: 'battery', battery_1: 'battery', battery_2: 'battery',
+        battery: 'battery',
         consumption: 'consumption', home_consumption: 'consumption', site_consumption: 'consumption',
         forecast: 'forecast', forecast_zone_1: 'forecast', forecast_zone_2: 'forecast',
         pricing: 'pricing', metering: 'metering', consumer: 'consumer', connection: 'connection',
