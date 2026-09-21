@@ -2,77 +2,116 @@
 
 This document is normative for every public Robotix Home Intelligence UX package.
 
-## Release invariants
+## Core principles
 
-1. Source, generated runtime, documentation, governance metadata, tests and release evidence must describe one identical candidate version and contract.
-2. Runtime/publication-impacting changes always require the next package version. Published tags and runtime assets are immutable.
-3. Pull requests are side-effect free. Candidate publication happens only from validated `main`.
-4. A TEST CANDIDATE is published as a normal GitHub Release, not as a GitHub prerelease. This makes the version visible in HACS without enabling beta/prerelease versions.
-5. TEST CANDIDATE state is carried by package metadata, release title/notes and qualification evidence, never by the GitHub prerelease flag.
-6. Candidate publication requires the complete source/package test suite, deterministic/reproducible build proof, HACS validation and committed-dist equality.
-7. Target Home Assistant qualification occurs after candidate publication and may update evidence only. It must never modify the immutable tag or runtime payload.
-8. Stable promotion is evidence finalization of the exact published candidate. It requires runtime proof, rollback proof and zero accepted technical and feature debt.
-9. Stable promotion verifies the immutable tag SHA and published runtime bytes before updating release evidence/title.
-10. Rollback is always a previous immutable GitHub/HACS version.
-11. Workflow-only, documentation-only and qualification-only changes must not republish an already published runtime version.
-12. The repository has exactly three release workflows: validate, publish candidate, stable promotion.
+1. **One source of truth per release concern.**
+   - package version: `package.json`;
+   - product/release context: `release/product.json`;
+   - runtime version: generated from package version during build;
+   - qualification evidence: `release/QUALIFICATION.json`;
+   - published runtime authority: immutable GitHub Release/tag.
+
+2. **One invariant, one test owner.** Test ownership follows code ownership. Package-specific test governance must define owners and prevent foreign assertions.
+
+3. **Validate once, publish exact bytes.** The full candidate is built and tested on the pull request. Publication verifies and publishes the exact committed distribution artifact; it does not rebuild the runtime.
+
+4. **Published runtime bytes are immutable.** Governance/test/documentation refactors may continue under an already published version only when the deterministic build proves the runtime bytes are identical to the published tag.
+
+5. **Target runtime qualification is evidence, not a rebuild.** Runtime and rollback proof qualify the exact immutable candidate.
 
 ## Required lifecycle
 
 ```text
 branch
+→ structural change + owned regression tests
 → PR
-→ Validate green
+→ candidate build
+→ complete contract / UX / package / release tests
+→ deterministic second-build proof
+→ committed-dist equality
+→ HACS validation
 → squash merge to main
-→ main Validate green
-→ Publish HACS validation green
-→ immutable normal GitHub Release tagged vX.Y.Z / vX.Y.Z-rc.N
-   titled TEST CANDIDATE
-→ HACS install/update on target Home Assistant
-→ runtime proof + rollback proof
-→ qualification record bound to exact candidate version/tag/SHA
-→ manual stable promotion of that exact immutable candidate
+→ verify committed candidate artifact
+→ publish the exact committed artifact as immutable TEST CANDIDATE
+→ target Home Assistant runtime + rollback proof
+→ qualification bound to exact tag/SHA
+→ stable promotion of that exact immutable candidate
 ```
+
+There is no second full build on main, no publication rebuild and no stable-promotion rebuild.
+
+## Build budget
+
+A normal candidate uses exactly two builds:
+
+1. candidate build used by the complete PR test suite;
+2. deterministic reproducibility build compared byte-for-byte with the first.
+
+Publication and stable promotion use zero builds.
+
+A third build requires an explicit engineering reason and must not be part of the normal release workflow.
 
 ## Required release identity
 
-Every package must keep these identities aligned:
+Release identity is derived, not independently maintained:
 
-- package version;
-- source runtime version constant;
-- compatibility manifest;
-- release manifest;
-- release status;
-- qualification record;
-- current release notes;
-- first changelog entry;
-- engineer handover;
-- generated runtime artifact.
+- `package.json` owns the version;
+- `release/product.json` owns contract, backend baseline, stage, rollback context and artifact identity;
+- build injects the package version into the runtime;
+- compatibility/manifest/status metadata must agree with those owners;
+- qualification owns runtime evidence for the same candidate;
+- release notes and changelog provide human-readable history but do not become competing runtime authorities.
+
+Use `npm run release:sync` when preparing the next candidate.
+
+## Test ownership
+
+Every package must document and machine-check test ownership.
+
+A test may consume another owner's result but may not duplicate its invariant. For example, a footer test may assert footer behavior but may not assert branding transport. A screen-preservation test may assert that a screen exists but may not freeze navigation internals.
+
+When one implementation change breaks several unrelated test owners, classify that as test ownership drift unless multiple product contracts genuinely changed.
 
 ## Candidate publication semantics
 
-GitHub Releases are the HACS version authority. A TEST CANDIDATE is intentionally installable and selectable through normal HACS version selection. Therefore candidate publication must not use `--prerelease`.
+GitHub Releases are the HACS version authority. A TEST CANDIDATE is a normal GitHub Release so HACS exposes it without a beta/prerelease toggle.
 
-The release remains a TEST CANDIDATE until target runtime qualification passes. HACS visibility and qualification status are separate concerns.
+Candidate publication must:
+
+- reject an existing immutable tag/release;
+- verify the committed runtime and checksum;
+- verify release metadata/qualification identity;
+- run HACS package validation;
+- publish the exact committed runtime artifact.
+
+Candidate publication must not run `npm test`, `npm run build` or `npm run clean`.
 
 ## Qualification semantics
 
-Qualification records must fail closed. Unknown, pending or not-executed evidence never counts as PASS.
+Qualification records fail closed. Unknown, pending or not-executed evidence never counts as PASS.
 
 Stable promotion must prove:
 
 - exact candidate tag exists;
-- recorded candidate identity matches the current package;
+- recorded candidate identity matches the immutable candidate;
 - published runtime bytes equal the immutable tag runtime;
 - HACS install/update passes;
 - core screens render;
 - browser refresh/reload passes;
 - backend release identity is correct;
 - write/readback behavior passes where applicable;
-- rollback to the previous immutable version passes;
+- rollback passes;
 - technical debt = 0;
 - feature debt = 0.
 
-## Package-specific implementation
+Stable promotion updates evidence/title only and does not rebuild or mutate runtime bytes.
 
-Packages may use different build languages or tests, but may not weaken these invariants. Package-specific release governance documents extend this standard; they do not replace it.
+## Workflow ownership
+
+Exactly three workflows are allowed:
+
+- `validate.yml` — full PR validation and reproducibility proof;
+- `publish-hacs.yml` — verify and publish exact committed candidate;
+- `release.yml` — evidence-only stable promotion.
+
+Package-specific release governance may strengthen these rules but may not weaken them.
