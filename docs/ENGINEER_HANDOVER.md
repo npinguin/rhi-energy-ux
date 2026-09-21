@@ -1,66 +1,88 @@
 # Engineer handover — RHI Energy UX
 
-## Current candidate
+## Start here
 
-- Source candidate: **v3.94.22**
-- Minimum backend: **E0.15.25**
-- Backend version owner: `sensor.energy_release_contract.backend_release`
-- Public compatibility surface: **R1.89.44_CONTRACT**
-- Runtime artifact: `dist/rhi-energy-ux.js`
-- Rollback target: **v3.94.21**
+Do not copy current release identity from this document. Authoritative sources are:
 
-## Asset refresh authority
+- package version: `package.json`;
+- contract/backend/stage/rollback context: `release/product.json`;
+- runtime qualification: `release/QUALIFICATION.json`;
+- published versions: GitHub Releases.
 
-- External company-logo requests carry `?v=<UX_VERSION>` so browser cache identity changes with every UX package release.
-- Never use a timeless external brand URL for an asset that can change between packages.
+Read in this order:
 
-## Brand authority
-
-- Canonical company mark: `source/assets/company-logo.svg`
-- Distribution copy: `dist/assets/company-logo.svg`
-- Build owns source → dist synchronization.
-- Branding validation pins the approved asset hash and source/dist byte parity.
-- Runtime must not redraw, reinterpret, recolour, filter or synthesize the Robotix company mark.
-- The company slot uses shared `--rhi-company-*` CSS tokens; module-specific code may size the slot only by overriding those tokens, never by editing the logo asset.
+1. `README.md`
+2. `docs/ARCHITECTURE.md`
+3. `docs/RELEASE_GOVERNANCE.md`
+4. `docs/TEST_GOVERNANCE.md`
+5. `validation/OWNERSHIP.json`
+6. `docs/DRIFT_PREVENTION.md`
+7. `docs/BRANDING.md`
+8. `docs/UX_FOOTER_STANDARD.md`
+9. `release/product.json`
+10. `release/QUALIFICATION.json`
 
 ## Product boundary
 
 ```text
 Energy backend
 → public Energy contracts
-→ Public Interface Registry / gateway
+→ Public Interface Registry / Energy Contract Gateway
 → normalized view models
 → renderers
 ```
 
 UX owns presentation only. Backend semantics and backend release identity are never inferred or remapped in the frontend.
 
+## Testing ownership
+
+Testing mirrors code ownership: **one invariant, one test owner**.
+
+Do not make:
+- a domain test own release version;
+- a footer test own branding delivery;
+- a branding test own responsive header geometry;
+- a package test own contract compatibility semantics.
+
+If one local change breaks several unrelated suites, classify test-ownership drift before teaching all suites the new implementation.
+
+## Brand authority
+
+- Canonical company mark: `source/assets/company-logo.svg`.
+- Distribution copy: `dist/assets/company-logo.svg`.
+- Branding validation owns artwork, source/dist parity and cache-safe delivery.
+- Navigation/layout owns header-slot geometry separately.
+- Footer tests do not assert brand transport.
+
 ## Footer authority
 
 - Healthy footer is readable at 11px desktop / 10.5px phone.
 - Issues are expandable in-page; hover-only diagnostics are forbidden.
-- Expanded details must expose concrete runtime/backend conditions and verification guidance.
-
-## Shared UX standards
-
-- `docs/UX_RELEASE_STANDARD.md` is normative for release lifecycle across all RHI UX packages.
-- `docs/UX_FOOTER_STANDARD.md` is normative for footer layout, data ownership and diagnostics presentation.
+- Footer presentation and footer runtime-data safety have separate explicit owners in `validation/OWNERSHIP.json`.
 
 ## Release path
 
 ```text
 branch
+→ owned change + owned regression tests
 → PR
-→ Validate green
+→ one full Validate gate
+   → candidate build
+   → complete tests
+   → deterministic second build
+   → committed-dist equality
+   → HACS validation
 → squash merge
-→ main Validate green
-→ automatic Publish HACS
+→ exact committed artifact publication (no rebuild)
 → immutable HACS-visible TEST CANDIDATE
 → target HA runtime + rollback proof
-→ manual stable promotion
+→ qualification bound to exact tag/SHA
+→ stable promotion (no rebuild)
 ```
 
-Any runtime-impacting correction after publication requires the next version.
+Normal build budget: **2 builds**.
+
+Any runtime-impacting correction after publication requires the next version. Governance/test/documentation changes may stay on an existing published version only when runtime bytes remain identical to that tag.
 
 ## Validation
 
@@ -69,13 +91,14 @@ Run:
 ```text
 npm ci
 npm run validate
+npm run check:test-ownership
 ```
 
-Validation covers syntax, contract/view-model tests, architecture drift, bundle-load smoke, HACS package checks, public-repository hygiene and reproducible dist.
+Use `npm run release:sync` only when preparing a new candidate.
 
 ## Pending qualification
 
-Stable promotion remains blocked until `release/QUALIFICATION.json` records HACS install, desktop/iPad render, refresh, backend release identity, upgrade and rollback proof as PASS.
+Stable promotion remains blocked until `release/QUALIFICATION.json` records the required target Home Assistant and rollback evidence as PASS and binds that evidence to the exact immutable candidate SHA.
 
 ## HACS migration
 
