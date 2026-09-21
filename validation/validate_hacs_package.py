@@ -1,30 +1,50 @@
 from pathlib import Path
 import json
 import re
-import sys
 
-root = Path(__file__).resolve().parents[1]
-hacs = json.loads((root / "hacs.json").read_text(encoding="utf-8"))
-pkg = json.loads((root / "package.json").read_text(encoding="utf-8"))
-bundle = root / "dist" / "rhi-energy-ux.js"
-bundle_text = bundle.read_text(encoding="utf-8")
-build_manifest = json.loads((root / "dist" / "BUILD_MANIFEST.json").read_text(encoding="utf-8"))
+ROOT = Path(__file__).resolve().parents[1]
+DIST = ROOT / "dist"
+pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+hacs = json.loads((ROOT / "hacs.json").read_text(encoding="utf-8"))
+manifest = json.loads((DIST / "PACKAGE_MANIFEST.json").read_text(encoding="utf-8"))
+publish = (ROOT / ".github/workflows/publish-hacs.yml").read_text(encoding="utf-8")
 
-checks = {
-    "hacs_filename": hacs.get("filename") == "rhi-energy-ux.js",
-    "hide_default_branch": hacs.get("hide_default_branch") is True,
-    "bundle_exists": bundle.is_file(),
-    "license": pkg.get("license") == "GPL-3.0-only",
-    "no_legacy_local": "/local/homebrain/infrastructure/energy/" not in bundle_text,
-    "hacs_asset_prefix": "/hacsfiles/rhi-energy-ux/assets/" in bundle_text,
-    "build_manifest_bundle_path": build_manifest.get("bundle", {}).get("path") == "dist/rhi-energy-ux.js",
-}
+if hacs.get("filename") != "rhi-energy-ux.js":
+    raise SystemExit("HACS filename drift")
+if hacs.get("zip_release") is True:
+    raise SystemExit("zip_release is outside the supported plugin package model")
+if manifest.get("version") != pkg.get("version"):
+    raise SystemExit("package manifest version drift")
+if manifest.get("hacs_package_root") != "dist":
+    raise SystemExit("HACS package root must be dist")
+if manifest.get("hacs_filename") != hacs.get("filename"):
+    raise SystemExit("package manifest/HACS filename drift")
 
-for raw_ref in sorted(set(re.findall(r"/hacsfiles/rhi-energy-ux/assets/([^'\")]+)", bundle_text))):
-    ref = raw_ref.split("?", 1)[0]
-    checks[f"asset:{ref}"] = (root / "dist" / "assets" / ref).is_file()
+allowed_top = {"rhi-energy-ux.js", "rhi-energy-ux.js.sha256", "PACKAGE_MANIFEST.json", "assets"}
+for entry in DIST.iterdir():
+    if entry.name not in allowed_top:
+        raise SystemExit(f"unexpected dist top-level entry: {entry.name}")
 
-for key, ok in checks.items():
-    print(("PASS" if ok else "FAIL"), key)
-if not all(checks.values()):
-    sys.exit(1)
+for category in ("branding", "heroes"):
+    if category not in manifest.get("asset_categories", []):
+        raise SystemExit(f"package asset category missing: {category}")
+    if not (DIST / "assets" / category).is_dir():
+        raise SystemExit(f"dist asset category missing: {category}")
+
+for row in manifest.get("files", []):
+    path = DIST / row["path"]
+    if not path.is_file():
+        raise SystemExit(f"package manifest file missing: {row['path']}")
+    if path.stat().st_size != row["bytes"]:
+        raise SystemExit(f"package manifest size drift: {row['path']}")
+
+checksum = (DIST / "rhi-energy-ux.js.sha256").read_text(encoding="utf-8").strip().split()[0]
+if manifest.get("runtime_sha256") != checksum:
+    raise SystemExit("package manifest runtime checksum drift")
+
+if re.search(r"gh release create[\s\S]*dist/rhi-energy-ux\.js(?:\s|\\)", publish):
+    raise SystemExit("JS release asset would force HACS single-file mode and drop nested assets")
+if "dist/PACKAGE_MANIFEST.json" not in publish:
+    raise SystemExit("release must attach package manifest evidence")
+
+print("PASS HACS package: immutable tag dist tree contains runtime + structured assets; release assets are evidence-only")
