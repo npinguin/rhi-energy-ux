@@ -3,9 +3,9 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "source" / "assets" / "company-logo.svg"
-DIST = ROOT / "dist" / "assets" / "company-logo.svg"
-RUNTIME = (ROOT / "source" / "homebrain-energy-card.js").read_text(encoding="utf-8")
+SOURCE = ROOT / "src" / "assets" / "branding" / "company-logo.svg"
+DIST = ROOT / "dist" / "assets" / "branding" / "company-logo.svg"
+RUNTIME = (ROOT / "dist" / "rhi-energy-ux.js").read_text(encoding="utf-8")
 EXPECTED_SHA256 = "264f0d86798a2a53e30b8beb5cae366e4b0916adbb3716b3deb23b5ddbed053d"
 
 source_text = SOURCE.read_text(encoding="utf-8") if SOURCE.is_file() else ""
