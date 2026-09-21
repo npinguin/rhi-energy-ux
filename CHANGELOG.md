@@ -1,3 +1,11 @@
+## 3.94.21 — shared UX release and footer governance
+
+- Publishes TEST CANDIDATE versions as HACS-visible normal GitHub Releases rather than GitHub prereleases.
+- Adds explicit release status and a cross-package UX release standard.
+- Makes stable promotion evidence-only against the exact immutable candidate.
+- Standardizes the compact footer contract across Energy and Mobility.
+- Adds fail-closed release/footer drift validation.
+
 ## 3.94.20 — shared company-brand package
 
 - applies the approved transparent Robotix logo with dark-blue company/building artwork and lighter-blue slogan;
