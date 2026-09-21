@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the HACS deployable Energy UX bundle from canonical source.
 
-The source remains the canonical R3.94.20 runtime. Distribution is reproducible:
+The source remains the canonical Energy UX runtime input. Distribution is reproducible:
 legacy /local artwork URLs are rewritten to the HACS-owned resource namespace,
 and canonical source/assets are synchronized byte-for-byte into dist/assets.
 No business semantics are changed here.
