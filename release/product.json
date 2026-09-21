@@ -4,7 +4,7 @@
   "minimum_backend": "E0.15.25",
   "tested_backend": "E0.15.25",
   "stage": "test_candidate",
-  "rollback_release": "v3.94.22",
+  "rollback_release": "v3.94.23",
   "runtime_artifact": "dist/rhi-energy-ux.js",
   "hacs_repository_type": "dashboard",
   "hacs_validation_category": "plugin",
@@ -12,5 +12,5 @@
   "package_manifest": "dist/PACKAGE_MANIFEST.json",
   "hacs_package_root": "dist",
   "hacs_delivery_mode": "immutable_tag_dist_tree",
-  "release_asset_policy": "evidence_only"
+  "release_asset_policy": "none"
 }

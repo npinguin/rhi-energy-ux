@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "product": "rhi-energy-ux",
-  "version": "3.94.23",
+  "version": "3.94.24",
   "source_manifest_schema": 1,
   "hacs_package_root": "dist",
   "hacs_filename": "rhi-energy-ux.js",
@@ -10,7 +10,7 @@
     "branding",
     "heroes"
   ],
-  "runtime_sha256": "200a05a007227baf272db558716cf2a4b1a208ac2474d2f408a0d66ac311c290",
+  "runtime_sha256": "6f4b5361eb0c079df46b6f61036e194b4b6e2c94fb8368207f6ab59531d9a1da",
   "files": [
     {
       "path": "assets/branding/company-logo.svg",

@@ -7,10 +7,29 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 manifest = json.loads((DIST / "PACKAGE_MANIFEST.json").read_text(encoding="utf-8"))
+product = json.loads((ROOT / "release" / "product.json").read_text(encoding="utf-8"))
+publish = (ROOT / ".github" / "workflows" / "publish-hacs.yml").read_text(encoding="utf-8")
+stable = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 
 tmp = Path(tempfile.mkdtemp(prefix="rhi-energy-hacs-"))
 install = tmp / "www" / "community" / "rhi-energy-ux"
 try:
+    if product.get("release_asset_policy") != "none":
+        raise SystemExit("tagged HACS plugin release must have release_asset_policy=none")
+    create_match = re.search(r"gh release create[\s\S]*?^\s*fi", publish, re.MULTILINE)
+    create_block = create_match.group(0) if create_match else ""
+    for forbidden in ("dist/","COMPATIBILITY.json","RELEASE_MANIFEST.json","QUALIFICATION.json","PACKAGE_MANIFEST.json",".sha256"):
+        if forbidden in create_block:
+            raise SystemExit(f"publish workflow attaches HACS-diverting GitHub Release asset: {forbidden}")
+    if "gh release upload" in publish:
+        raise SystemExit("publish workflow must not upload GitHub Release assets")
+    if "gh release upload" in stable:
+        raise SystemExit("stable workflow must not upload GitHub Release assets")
+
+    simulated_release_assets = []
+    if simulated_release_assets:
+        raise SystemExit("tagged release assets would override the dist tree")
+
     shutil.copytree(DIST, install)
     allowed = {"rhi-energy-ux.js", "rhi-energy-ux.js.sha256", "PACKAGE_MANIFEST.json", "assets"}
     extra = {p.name for p in install.iterdir()} - allowed
@@ -38,6 +57,6 @@ try:
         if not (install / required).is_file():
             raise SystemExit(f"required installed asset missing: {required}")
 
-    print(f"PASS HACS install simulation: {len(manifest.get('files', []))} files, {len(refs)} asset URLs resolved")
+    print(f"PASS HACS tagged-release install simulation (zero release assets -> dist tree): {len(manifest.get('files', []))} files, {len(refs)} asset URLs resolved")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
