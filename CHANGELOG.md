@@ -1,3 +1,12 @@
+## 3.94.12 — lifecycle interaction-state stability
+
+- restores stable UX navigation state after Home Assistant recreates the card;
+- keeps runtime/edit/command feedback ephemeral;
+- prevents restored Metering period from being rehydrated back to backend defaults;
+- removes generic selector first-item fallback;
+- aligns Consumers sort defaults;
+- adds executable recreation and unavailable-selection regression coverage.
+
 ## 3.94.11 — interaction-state stability
 
 - preserves active view and viewport across runtime updates;
