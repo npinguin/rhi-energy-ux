@@ -69,7 +69,7 @@ checks = {
     "shared_repository_standard": "Normal candidate build budget: two builds total" in ux_repository_standard and "One source concern, one owner." in ux_repository_standard,
     "publish_exact_package": "Publish or verify immutable TEST CANDIDATE" in publish and "npm run build" not in publish and "npm run validate" not in publish and "npm ci" not in publish,
     "publish_idempotent": "Existing immutable tag package and HACS metadata match current candidate." in publish and "verifying without mutation" in publish,
-    "publish_zero_assets": product.get("release_asset_policy") == "none" and not re.search(r"gh release create[\\s\\S]*?(?:dist/|COMPATIBILITY\\.json|RELEASE_MANIFEST\\.json|QUALIFICATION\\.json)", publish) and "gh release upload" not in publish,
+    "publish_zero_assets": product.get("release_asset_policy") == "none" and all(token not in ((re.search(r"gh release create[\\s\\S]*?^\\s*fi", publish, re.MULTILINE) or [""])[0]) for token in ("dist/","COMPATIBILITY.json","RELEASE_MANIFEST.json","QUALIFICATION.json","PACKAGE_MANIFEST.json",".sha256")) and "gh release upload" not in publish,
     "stable_no_rebuild": "npm run build" not in release and "npm run validate" not in release and "npm ci" not in release,
     "stable_zero_assets": "gh release upload" not in release and "'.assets | length'" in release,
     "candidate_is_normal_release": "--prerelease" not in publish and "isPrerelease --jq '.isPrerelease'" in publish,
