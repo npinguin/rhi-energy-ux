@@ -68,9 +68,11 @@ jobs:
           if [ "$TAG_EXISTS" = true ]; then
             rm -rf /tmp/rhi-energy-existing-tag
             mkdir -p /tmp/rhi-energy-existing-tag
-            git archive "${TAG}" dist | tar -x -C /tmp/rhi-energy-existing-tag
+            git archive "${TAG}" dist hacs.json package.json | tar -x -C /tmp/rhi-energy-existing-tag
             diff -qr /tmp/rhi-energy-existing-tag/dist dist
-            echo "Existing immutable tag package matches current dist."
+            cmp /tmp/rhi-energy-existing-tag/hacs.json hacs.json
+            cmp /tmp/rhi-energy-existing-tag/package.json package.json
+            echo "Existing immutable tag package and HACS metadata match current candidate."
           fi
 
           if [ "$RELEASE_EXISTS" = true ]; then
@@ -124,9 +126,11 @@ jobs:
             TAG_SHA=$(git rev-list -n 1 "${TAG}")
             rm -rf /tmp/rhi-energy-existing-tag
             mkdir -p /tmp/rhi-energy-existing-tag
-            git archive "${TAG}" dist | tar -x -C /tmp/rhi-energy-existing-tag
+            git archive "${TAG}" dist hacs.json package.json | tar -x -C /tmp/rhi-energy-existing-tag
             diff -qr /tmp/rhi-energy-existing-tag/dist dist
-            echo "Immutable tag ${TAG} already exists with identical package bytes."
+            cmp /tmp/rhi-energy-existing-tag/hacs.json hacs.json
+            cmp /tmp/rhi-energy-existing-tag/package.json package.json
+            echo "Immutable tag ${TAG} already exists with identical package bytes and HACS metadata."
           else
             TAG_SHA="$GITHUB_SHA"
             git tag "${TAG}" "$TAG_SHA"
