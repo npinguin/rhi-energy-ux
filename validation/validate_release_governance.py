@@ -64,6 +64,8 @@ checks = {
     "validate_pr_only": "pull_request:" in validate and "push:\n    branches: [main]" not in validate,
     "validate_has_two_build_proof": "Deterministic two-build proof" in validate,
     "validate_has_immutable_package_gate": "Protect immutable published package" in validate,
+    "hacs_after_source": bool(re.search(r"hacs:\\n\\s+name: HACS\\n\\s+needs: source", validate)),
+    "shared_repository_standard": "Normal candidate build budget: two builds total" in ux_repository_standard and "One source concern, one owner." in ux_repository_standard,
     "publish_exact_package": "Publish or verify immutable TEST CANDIDATE" in publish and "npm run build" not in publish and "npm run validate" not in publish and "npm ci" not in publish,
     "publish_idempotent": "Existing immutable tag package matches current dist." in publish and "verifying without mutation" in publish,
     "publish_evidence_only": "dist/PACKAGE_MANIFEST.json" in publish and "dist/rhi-energy-ux.js \\\\" not in publish,
