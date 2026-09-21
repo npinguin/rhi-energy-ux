@@ -3,7 +3,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 source = (root / 'source/homebrain-energy-card.js').read_text(encoding="utf-8")
 checks = {
-    'release_identity': "const UX_VERSION = 'R3.94.11'" in source,
+    'release_identity': "const UX_VERSION = 'R3.94.12'" in source,
     'home_consumption_not_reconstructed': "value:fmtKw(balanceVm.homeConsumptionKw,'—')" in source,
     'flexible_load_null_not_zero': "value:fmtKw(balanceVm.flexibleLoadsKw,'—')" in source,
     'incomplete_explanation': 'Unavailable · Flexible Load power incomplete' in source,
