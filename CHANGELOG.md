@@ -1,3 +1,10 @@
+## 3.94.13 — Planning D1 totals contract closure
+
+- consumes the dedicated backend Tomorrow/D1 planning totals instead of the combined D0+D1 summary;
+- labels D1 aggregate planning values as Planned tomorrow;
+- keeps canonical lane totals backend-owned and does not recompute flexible-load energy;
+- requires Energy E0.15.24 for the dedicated D1 totals contract.
+
 ## 3.94.12 — lifecycle interaction-state stability
 
 - restores stable UX navigation state after Home Assistant recreates the card;
