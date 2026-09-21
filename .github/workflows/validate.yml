@@ -35,7 +35,7 @@ jobs:
         run: npm ci
       - name: Full validation
         run: npm run validate
-      - name: Protect immutable published runtime
+      - name: Protect immutable published package
         shell: bash
         run: |
           set -euo pipefail
@@ -43,14 +43,13 @@ jobs:
           TAG="v${VERSION}"
           if git ls-remote --exit-code --tags "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${TAG}" >/dev/null 2>&1; then
             git fetch --tags --force
-            rm -rf /tmp/published-energy-runtime
-            mkdir -p /tmp/published-energy-runtime
-            git archive "${TAG}" dist/rhi-energy-ux.js dist/assets | tar -x -C /tmp/published-energy-runtime
-            cmp /tmp/published-energy-runtime/dist/rhi-energy-ux.js dist/rhi-energy-ux.js
-            diff -qr /tmp/published-energy-runtime/dist/assets dist/assets
-            echo "${TAG} already exists; runtime bytes/assets are unchanged, so governance/test/documentation refactoring is allowed."
+            rm -rf /tmp/published-rhi-energy
+            mkdir -p /tmp/published-rhi-energy
+            git archive "${TAG}" dist | tar -x -C /tmp/published-rhi-energy
+            diff -qr /tmp/published-rhi-energy/dist dist
+            echo "${TAG} already exists; complete HACS package bytes are unchanged."
           else
-            echo "${TAG} is not published yet; candidate runtime may advance before first publication."
+            echo "${TAG} is not published yet; candidate package may advance before first publication."
           fi
       - name: Deterministic two-build proof
         shell: bash
@@ -60,7 +59,7 @@ jobs:
           cp -a dist /tmp/rhi-energy-first-dist
           npm run build
           diff -qr /tmp/rhi-energy-first-dist dist
-      - name: Verify committed dist matches clean build
+      - name: Verify committed package matches clean build
         run: git diff --exit-code -- dist
 
   hacs:
@@ -71,7 +70,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - name: HACS validation
-        uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa
+        uses: hacs/action@885037da508419fd08c13515967aec868dfdee2d
         with:
           category: plugin
 
@@ -98,8 +97,9 @@ jobs:
           {
             echo '## RHI Energy UX validation'
             echo "- Commit: ${GITHUB_SHA}"
-            echo "- Candidate build + owned tests: ${SOURCE}"
-            echo "- Deterministic rebuild proof: included in source gate"
-            echo "- HACS: ${HACS}"
+            echo "- Complete dist package + owned tests: ${SOURCE}"
+            echo "- Deterministic second-build proof: included"
+            echo "- HACS repository validation: ${HACS}"
+            echo "- Simulated HACS full-tree install: included in package tests"
             echo "- Publication rebuilds: none"
           } >> "$GITHUB_STEP_SUMMARY"
