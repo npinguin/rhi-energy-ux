@@ -44,8 +44,11 @@ checksum = (DIST / "rhi-energy-ux.js.sha256").read_text(encoding="utf-8").strip(
 if manifest.get("runtime_sha256") != checksum:
     raise SystemExit("package manifest runtime checksum drift")
 
-if re.search(r"gh release create[\s\S]*?(?:dist/|COMPATIBILITY\.json|RELEASE_MANIFEST\.json|QUALIFICATION\.json)", publish):
-    raise SystemExit("tagged HACS plugin release must not attach any GitHub Release assets")
+create_match = re.search(r"gh release create[\s\S]*?^\s*fi", publish, re.MULTILINE)
+create_block = create_match.group(0) if create_match else ""
+for forbidden in ("dist/","COMPATIBILITY.json","RELEASE_MANIFEST.json","QUALIFICATION.json","PACKAGE_MANIFEST.json",".sha256"):
+    if forbidden in create_block:
+        raise SystemExit(f"tagged HACS plugin release must not attach GitHub Release asset: {forbidden}")
 if "gh release upload" in publish:
     raise SystemExit("publication must not upload GitHub Release assets")
 
