@@ -3,7 +3,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 
-source = (ROOT / "source" / "homebrain-energy-card.js").read_text(encoding="utf-8")
+source = (ROOT / "dist" / "rhi-energy-ux.js").read_text(encoding="utf-8")
 match = re.search(r"understandingFooter\(rt, tab\) \{(?P<body>.*?)\n    \}\n", source, re.S)
 if not match:
     raise SystemExit("understandingFooter not found")
