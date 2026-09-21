@@ -1,7 +1,7 @@
 from pathlib import Path
 
-source = Path('source/homebrain-energy-card.js').read_text(encoding='utf-8')
-module = Path('source/modules/runtime/current-energy-view-model.js').read_text(encoding='utf-8')
+source = Path('dist/rhi-energy-ux.js').read_text(encoding='utf-8')
+module = Path('src/domain/models/current-energy-view-model.js').read_text(encoding='utf-8')
 class_source = source[source.index('class HomeBrainEnergyCard'):]
 checks = {    'canonical_module_present': 'function createCurrentEnergyViewModel(gateway)' in module,
     'battery_model_present': 'function createBatteryCurrentFlowViewModel(gateway)' in module,
