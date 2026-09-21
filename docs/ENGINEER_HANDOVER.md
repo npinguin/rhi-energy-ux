@@ -2,12 +2,12 @@
 
 ## Current candidate
 
-- Source candidate: **v3.94.20**
+- Source candidate: **v3.94.21**
 - Minimum backend: **E0.15.25**
 - Backend version owner: `sensor.energy_release_contract.backend_release`
 - Public compatibility surface: **R1.89.44_CONTRACT**
 - Runtime artifact: `dist/rhi-energy-ux.js`
-- Rollback target: **v3.94.19**
+- Rollback target: **v3.94.20**
 
 ## Brand authority
 
@@ -30,6 +30,11 @@ Energy backend
 
 UX owns presentation only. Backend semantics and backend release identity are never inferred or remapped in the frontend.
 
+## Shared UX standards
+
+- `docs/UX_RELEASE_STANDARD.md` is normative for release lifecycle across all RHI UX packages.
+- `docs/UX_FOOTER_STANDARD.md` is normative for footer layout, data ownership and diagnostics presentation.
+
 ## Release path
 
 ```text
@@ -39,7 +44,7 @@ branch
 → squash merge
 → main Validate green
 → automatic Publish HACS
-→ immutable TEST CANDIDATE
+→ immutable HACS-visible TEST CANDIDATE
 → target HA runtime + rollback proof
 → manual stable promotion
 ```
