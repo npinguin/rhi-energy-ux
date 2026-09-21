@@ -37,15 +37,15 @@ Owns layout, formatting, visual filtering, accessibility and explicit user inter
 
 ## Current modules
 
-- `runtime/public-interface-registry.js`
-- `runtime/energy-contract-gateway.js`
-- `planning/planning-contract.js`
-- `planning/planning-view-model.js`
-- `runtime/command-contract.js`
-- `runtime/command-action-model.js`
-- `runtime/consumption-contract.js`
-- `runtime/physical-flow-view-model.js`
-- `runtime/metering-status-model.js`
+- `src/runtime/public-interface-registry.js`
+- `src/runtime/energy-contract-gateway.js`
+- `src/domain/planning/planning-contract.js`
+- `src/domain/planning/planning-view-model.js`
+- `src/runtime/command-contract.js`
+- `src/runtime/command-action-model.js`
+- `src/runtime/consumption-contract.js`
+- `src/domain/models/physical-flow-view-model.js`
+- `src/domain/models/metering-status-model.js`
 
 Physical Flow uses the relation-owned view-model boundary. Add further modules only when closing proven ownership drift—not as a big-bang rewrite.
 
@@ -95,3 +95,7 @@ release/qualification gates
 An invariant is asserted by exactly one owner. Other suites may rely on it but may not freeze its implementation. The normative map is `validation/OWNERSHIP.json`; see `docs/TEST_GOVERNANCE.md`.
 
 Cross-owner assertions are test technical debt because they make unrelated changes fail together and recreate the same drift this architecture is designed to prevent.
+
+## Physical source/package architecture
+
+The repository structure is part of the architecture contract: `src/app`, `src/runtime`, `src/domain`, and `src/assets` have explicit ownership. `src/manifest.json` owns build composition. `dist/` is generated and is the complete HACS install package; it is never edited as source.
