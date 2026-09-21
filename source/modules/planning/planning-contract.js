@@ -27,6 +27,7 @@
     const planningAssets = planningRows(firstDefined(attrs.planning_assets_json, attrs.planning_assets));
     const planningAssetsById = planningById(firstDefined(attrs.planning_assets_by_id, attrs.planning_assets_json));
     const planningTodayTotals = planningObject(firstDefined(attrs.planning_today_totals_json, attrs.planning_today_totals));
+    const planningTomorrowTotals = planningObject(firstDefined(attrs.planning_tomorrow_totals_json, attrs.planning_tomorrow_totals));
     const planningCombinedTotals = planningObject(firstDefined(attrs.planning_combined_totals_json, attrs.planning_combined_totals));
     const horizonsById = planningById(firstDefined(
       attrs.planning_horizons_by_id,
@@ -70,6 +71,7 @@
       planningAssets,
       planningAssetsById,
       planningTodayTotals,
+      planningTomorrowTotals,
       planningCombinedTotals,
       horizonsById,
       horizonId: normalized,
@@ -129,4 +131,5 @@
       homeBatteryNeedKwh: value('home_battery_need_kwh','battery_reserve_need_kwh')
     });
   }
+  if (typeof module !== 'undefined' && module.exports) module.exports = { readPlanningContract, normalizePlanningLaneTotals };
 // END GENERATED MODULE: planning/planning-contract.js

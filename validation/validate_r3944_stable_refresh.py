@@ -1,9 +1,11 @@
 from pathlib import Path
+import json
 
 root = Path(__file__).resolve().parents[1]
+version = json.loads((root / 'package.json').read_text(encoding="utf-8"))["version"]
 source = (root / 'source' / 'homebrain-energy-card.js').read_text(encoding='utf-8')
 checks = {
-    'release_identity': "const UX_VERSION = 'R3.94.12'" in source,
+    'release_identity': f"const UX_VERSION = 'R{version}'" in source,
     'metering_records_owner': "const recordRows = this.meteringRowsFromRecords(rt, periodId);" in source,
     'metering_summary_quality_only': "summary:{ quality:selectedSummary }" in source,
     'metering_no_summary_measured_projection': "firstDefined(selectedSummary.measured,selectedSummary.values" not in source,

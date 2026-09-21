@@ -1,6 +1,6 @@
 {
-  "version": "3.94.12",
-  "previous_release": "3.94.11",
+  "version": "3.94.13",
+  "previous_release": "3.94.12",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -14,5 +14,8 @@
   "rollback_to_previous": "NOT_EXECUTED",
   "runtime_proof": "PENDING",
   "rollback_proof": "PENDING",
-  "release_decision": "BLOCKED"
+  "release_decision": "BLOCKED",
+  "planning_d1_totals": "NOT_EXECUTED",
+  "planning_flexible_load_aggregate": "NOT_EXECUTED",
+  "value_net_financial_result": "NOT_EXECUTED"
 }

@@ -82,4 +82,29 @@ const unsupported = adaptPlanningBucket({solar_forecast_kwh:99}, 'R1.80.0_UNKNOW
 assert.equal(unsupported.contractSupported, false);
 assert.equal(unsupported.sources.length, 0);
 assert.equal(unsupported.reason, 'unsupported_planning_contract');
+
+const { readPlanningContract, normalizePlanningLaneTotals } = require('../source/modules/planning/planning-contract.js');
+
+const planningGateway = {
+  contract: () => ({
+    entityId:'sensor.energy_planning_index',
+    contractVersion:'R1.89.44_CONTRACT',
+    available:true,
+    attributes:{
+      planning_today_totals_json: JSON.stringify({ planned_today_kwh: 3.2 }),
+      planning_tomorrow_totals_json: JSON.stringify({ planned_tomorrow_kwh: 4.7 }),
+      planning_combined_totals_json: JSON.stringify({ planned_horizon_kwh: 7.9 }),
+      planning_horizons_by_id: JSON.stringify({
+        D0:{ horizon_id:'D0', summary:{ lane_totals:{ consumers:{ flexible_loads_kwh:3.2, flexible_assets:[] } } }, buckets:[] },
+        D1:{ horizon_id:'D1', summary:{ lane_totals:{ consumers:{ flexible_loads_kwh:4.7, flexible_assets:[] } } }, buckets:[] }
+      })
+    }
+  })
+};
+const d1Contract = readPlanningContract(planningGateway, 'D1');
+assert.equal(d1Contract.planningTodayTotals.planned_today_kwh, 3.2);
+assert.equal(d1Contract.planningTomorrowTotals.planned_tomorrow_kwh, 4.7);
+assert.equal(d1Contract.planningCombinedTotals.planned_horizon_kwh, 7.9);
+assert.equal(normalizePlanningLaneTotals(d1Contract.laneTotals).flexibleLoadsKwh, 4.7);
+
 console.log('PASS capability-based canonical lanes and bounded R1.79.3 compatibility');

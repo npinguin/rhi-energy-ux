@@ -2,12 +2,12 @@
 
 ## Current candidate
 
-- Source candidate: **v3.94.12**
-- Minimum backend: **E0.15.12**
+- Source candidate: **v3.94.13**
+- Minimum backend: **E0.15.24**
 - Backend version owner: `sensor.energy_release_contract.backend_release`
 - Public compatibility surface: **R1.89.44_CONTRACT**
 - Runtime artifact: `dist/rhi-energy-ux.js`
-- Rollback target: **v3.94.11**
+- Rollback target: **v3.94.12**
 
 ## Product boundary
 
