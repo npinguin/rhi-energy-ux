@@ -60,24 +60,21 @@ jobs:
           RELEASE_SHA=$(gh release view "${TAG}" --json targetCommitish --jq '.targetCommitish')
           test "$RELEASE_SHA" = "$CANDIDATE_SHA"
           test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = false
-          if gh release view "${TAG}" --json assets --jq '.assets[].name' | grep -Fxq 'rhi-energy-ux.js'; then
-            echo "Forbidden JS release asset present." >&2
-            exit 1
-          fi
+          test "$(gh release view "${TAG}" --json assets --jq '.assets | length')" = 0
 
           rm -rf /tmp/rhi-energy-tag
           mkdir -p /tmp/rhi-energy-tag
           git archive "${TAG}" dist | tar -x -C /tmp/rhi-energy-tag
           diff -qr /tmp/rhi-energy-tag/dist dist
           (cd /tmp/rhi-energy-tag/dist && sha256sum -c rhi-energy-ux.js.sha256)
-      - name: Attach final qualification and promote exact candidate
+      - name: Promote exact candidate without release assets
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           TAG=$(python -c "import json; print(json.load(open('release/QUALIFICATION.json'))['candidate_tag'])")
-          gh release upload "${TAG}" release/QUALIFICATION.json --clobber
+          test "$(gh release view "${TAG}" --json assets --jq '.assets | length')" = 0
           gh release edit "${TAG}" \
             --title "RHI Energy UX ${TAG}" \
             --notes-file release/RELEASE_NOTES.md
