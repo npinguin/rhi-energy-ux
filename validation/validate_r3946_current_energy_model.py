@@ -1,10 +1,12 @@
 from pathlib import Path
+import json
 
+version = json.loads(Path('package.json').read_text(encoding='utf-8'))['version']
 source = Path('source/homebrain-energy-card.js').read_text(encoding='utf-8')
 module = Path('source/modules/runtime/current-energy-view-model.js').read_text(encoding='utf-8')
 class_source = source[source.index('class HomeBrainEnergyCard'):]
 checks = {
-    'release_identity': "const UX_VERSION = 'R3.94.12'" in source,
+    'release_identity': f"const UX_VERSION = 'R{version}'" in source,
     'canonical_module_present': 'function createCurrentEnergyViewModel(gateway)' in module,
     'battery_model_present': 'function createBatteryCurrentFlowViewModel(gateway)' in module,
     'screen_helper_present': 'currentEnergyModel(rt) { return createCurrentEnergyViewModel(rt.contractGateway()); }' in source,
@@ -23,4 +25,4 @@ failed = [name for name, ok in checks.items() if not ok]
 for name, ok in checks.items():
     print(f"{'PASS' if ok else 'FAIL'} {name}")
 if failed:
-    raise SystemExit('R3.94.12 current-energy validation failed: ' + ', '.join(failed))
+    raise SystemExit(f'R{version} current-energy validation failed: ' + ', '.join(failed))
