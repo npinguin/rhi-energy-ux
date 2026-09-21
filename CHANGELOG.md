@@ -1,3 +1,11 @@
+## 3.94.15 — lighter shared navigation frame
+
+- places both navigation layers inside one premium low-contrast frame;
+- removes separate nested navigation containers and their duplicate visual weight;
+- keeps primary navigation quieter than contextual navigation;
+- adds restrained Energy, Intelligence and Insights accent states;
+- preserves the same two-layer information architecture and omni-device behaviour.
+
 ## 3.94.14 — two-level navigation and premium headers
 
 - introduces Energy / Intelligence / Insights as the first navigation layer;

@@ -44,6 +44,9 @@ checks = {
     'legacy_single_row_nav_removed': "['overview','Overview'],['outlook','Outlook']" not in source,
     'old_large_top_header_removed': '<header class="top">' not in source,
     'mobile_navigation_is_scroll_safe': '.navItems.tabs{display:flex!important' in source and '.navSections{width:100%;box-sizing:border-box;display:grid;grid-template-columns:repeat(3' in source,
+    'navigation_uses_single_shared_frame': '.navigationShell{--nav-active-bg:' in source and 'border-radius:18px' in source and 'overflow:hidden' in source,
+    'navigation_inner_layers_are_light': '.navSections{gap:3px;padding:7px 10px 6px;background:transparent;border:0' in source and 'background:transparent!important;box-shadow:none!important' in source,
+    'navigation_section_accents_present': '.navigationShell.nav-intelligence' in source and '.navigationShell.nav-insights' in source,
 }
 for name, ok in checks.items():
     print(f"{'PASS' if ok else 'FAIL'} {name}")
