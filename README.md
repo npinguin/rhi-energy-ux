@@ -100,7 +100,7 @@ To rollback:
 
 **HACS → Robotix Home Intelligence Energy UX → Redownload / Need a different version? → select the previous release.**
 
-For the 3.94.17 rollout, select **v3.94.17** while qualifying the TEST CANDIDATE. The rollback target is **v3.94.16**.
+For the 3.94.17 rollout, select **v3.94.17** while qualifying the TEST CANDIDATE. The rollback target is **v3.94.17**.
 
 ## Development
 
