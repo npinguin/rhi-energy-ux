@@ -2120,7 +2120,7 @@
         const state = states[id];
         return `${id}:${state?.state ?? ''}:${state?.last_updated ?? ''}`;
       }).join('|');
-      return `${this.view}|${this.selectedMeteringPeriodId}|${this.selectedOutlookHorizonId}|${this.selectedPlanningHorizonId}|${entities}`;
+      return `${this.view}|${this.selectedMeteringPeriodId}|${this.selectedOutlookHorizonId}|${this.selectedPlanningHorizonId}|${this.selectedMeteringHorizonId}|${this.selectedStrategyProfileId}|${this.loadSort}|${this.meteringSort}|${this.consumerSort}|${this.consumerFilter}|${entities}`;
     }
 
     syncMeteringPeriodFromRuntime() {
@@ -2330,7 +2330,7 @@
       const details = event.target.closest('details');
       if (!details) return;
       const key = details.dataset.persistKey || details.querySelector('summary')?.dataset.detailId || '';
-      if (key) this.disclosureOpen[key] = details.open;
+      if (key) { this.disclosureOpen[key] = details.open; this.persistInteractionContext(); }
     }
     restoreInteractionState() {
       const details = [...this.shadowRoot.querySelectorAll('details')];
@@ -5509,8 +5509,9 @@
       @media(max-width:650px){.hiQuickActionBar{align-items:flex-start!important;gap:8px!important}.hiQuickActionItems{width:100%!important}.quickAutomation{width:100%!important;justify-content:space-between!important;flex-wrap:wrap!important}.quickAutomationLabel{font-size:11px!important}.quickAutomation .hiSegmented{width:100%!important}.quickAutomation .hiSegment{min-width:0!important;flex:1 1 0!important;padding:7px 8px!important;font-size:11px!important}.operationalSummaryGrid,.planningKpiStrip{grid-template-columns:1fr 1fr!important}.solarLoadSummary{grid-template-columns:1fr 1fr!important}.solarLoadIdentity,.solarLoadWhy{grid-column:1/-1!important}.solarLoadControls .requestedSlot{grid-template-columns:1fr!important}.planningLoadRow{grid-template-columns:1fr 1fr!important}.planningLoadIdentity{grid-column:1/-1!important}}
 
 .flexibleMeteringTable .meteringTotalRow td{border-top:2px solid var(--line)!important;background:#f8fafc!important;font-weight:700!important}.flexibleMeteringTable .meteringTotalRow td:first-child b{font-size:12px!important}</style><main class="energy"><header class="top"><div><div class="eyebrow">HOME INTELLIGENCE / ENERGY</div><h1>${escapeHtml(this.title())}</h1><p>${escapeHtml(this.subtitle())}</p></div></header><nav class="tabs">${this.nav()}</nav>${this.renderMainWarning(footer)}<section>${this.productLanguage(content)}</section>${this.propertyDraftBar()}${this.productLanguage(this.renderFooter(rt,this.view,footer))}</main>`;
-      if (markup === this._lastMarkup) return;
+      if (markup === this._lastMarkup) { this.persistInteractionContext(); return; }
       this._lastMarkup = markup;
+      this.persistInteractionContext();
       const canPatch = this._renderedView === this.view && !!this.shadowRoot.querySelector('main');
       if (canPatch) {
         this.patchMarkup(markup);
@@ -5524,7 +5525,7 @@
       const tabs = this.shadowRoot.querySelector('.tabs');
       if (tabs) {
         tabs.scrollLeft = this.navScrollLeft || 0;
-        tabs.addEventListener('scroll', () => { this.navScrollLeft = tabs.scrollLeft; }, { passive: true });
+        tabs.addEventListener('scroll', () => { this.navScrollLeft = tabs.scrollLeft; this.persistInteractionContext(); }, { passive: true });
       }
       const main = this.shadowRoot.querySelector('main');
       main?.addEventListener('click', this.onClick.bind(this));
@@ -5535,6 +5536,7 @@
         planningWrap.addEventListener('scroll', () => {
           this.planningScrollLeft = planningWrap.scrollLeft;
           this.planningScrollTop = planningWrap.scrollTop;
+          this.persistInteractionContext();
         }, { passive: true });
       }
       main?.addEventListener('input', this.onInput.bind(this));
