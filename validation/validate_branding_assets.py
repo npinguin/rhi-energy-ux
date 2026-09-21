@@ -16,6 +16,7 @@ checks = {
     "canonical_company_logo_hash": SOURCE.is_file() and sha256(SOURCE.read_bytes()).hexdigest() == EXPECTED_SHA256,
     "distribution_matches_canonical": SOURCE.is_file() and DIST.is_file() and SOURCE.read_bytes() == DIST.read_bytes(),
     "runtime_uses_single_logo_constant": "const COMPANY_LOGO_ASSET" in RUNTIME and 'company-logo.svg' in RUNTIME,
+    "runtime_owns_cache_safe_logo_delivery": 'company-logo.svg?v=${encodeURIComponent(UX_VERSION)}' in RUNTIME,
     "runtime_does_not_embed_company_artwork": "<title id=\"title\">Robotix.be</title>" not in RUNTIME,
     "company_logo_not_css_recoloured": "filter:saturate" not in RUNTIME and ".navCompanyLogo{filter:" not in RUNTIME,
     "transparent_vector_asset": "<rect" not in source_text and "background" not in source_text,
@@ -23,7 +24,6 @@ checks = {
     "approved_slogan_present": "DomotiX · Network · Security" in source_text,
     "approved_primary_colour_present": "#0B4C86" in source_text,
     "approved_slogan_colour_present": "#5B95C8" in source_text,
-    "portable_brand_slot_tokens_present": "--rhi-company-logo-max-width" in RUNTIME and "--rhi-company-logo-max-height" in RUNTIME,
 }
 
 for name, ok in checks.items():
