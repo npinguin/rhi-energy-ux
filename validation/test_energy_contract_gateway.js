@@ -3,9 +3,9 @@ const vm = require('vm');
 const path = require('path');
 const root = path.resolve(__dirname, '..');
 const files = [
-  'source/modules/runtime/public-interface-registry.js',
-  'source/modules/runtime/energy-contract-gateway.js',
-  'source/modules/planning/planning-contract.js'
+  'src/runtime/public-interface-registry.js',
+  'src/runtime/energy-contract-gateway.js',
+  'src/domain/planning/planning-contract.js'
 ];
 const context = {
   RELEASE_ENTITY: 'sensor.energy_release_contract',
