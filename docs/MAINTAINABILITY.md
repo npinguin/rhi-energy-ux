@@ -79,9 +79,17 @@ Literal aggregate current-energy contract keys are allowed only in `runtime/curr
 
 ## Source authority
 
-`source/homebrain-energy-card.js` is the canonical runtime source for the current legacy bundle generation. Files under `source/modules/` are synchronized contract/view-model mirrors used for isolated tests and drift checks; they are not a second runtime publication path. The build fails when a mirrored generated block differs from the canonical source.
+`src/` is the only runtime source authority.
 
-Do not create a second hand-maintained bundle or parallel compatibility implementation. True module bundling is a separate future refactor and must not be mixed into release-fix work.
+- `src/app/energy-card.js` owns the app/shell/rendering template.
+- `src/runtime/` owns Home Assistant/public-contract access and command boundaries.
+- `src/domain/models/` owns canonical view models.
+- `src/domain/planning/` owns planning adaptation/model logic.
+- `src/assets/` owns package artwork by category.
+- `src/manifest.json` owns module insertion points and order.
+- `tools/build.py` owns deterministic package generation.
+
+The app template does not contain copied canonical module implementations. Generated `dist/` is never a source authority.
 
 ## Test maintainability rule
 
