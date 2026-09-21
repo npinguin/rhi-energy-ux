@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "product": "rhi-energy-ux",
+  "version": "3.94.23",
+  "source_manifest_schema": 1,
+  "hacs_package_root": "dist",
+  "hacs_filename": "rhi-energy-ux.js",
+  "assets_root": "assets",
+  "asset_categories": [
+    "branding",
+    "heroes"
+  ],
+  "runtime_sha256": "200a05a007227baf272db558716cf2a4b1a208ac2474d2f408a0d66ac311c290",
+  "files": [
+    {
+      "path": "assets/branding/company-logo.svg",
+      "bytes": 17019
+    },
+    {
+      "path": "assets/heroes/consumers-hero.webp",
+      "bytes": 95406
+    },
+    {
+      "path": "assets/heroes/flow-hero.webp",
+      "bytes": 95406
+    },
+    {
+      "path": "assets/heroes/intelligence-hero.webp",
+      "bytes": 94328
+    },
+    {
+      "path": "assets/heroes/metering-hero.webp",
+      "bytes": 91812
+    },
+    {
+      "path": "assets/heroes/outlook-hero.webp",
+      "bytes": 91812
+    },
+    {
+      "path": "assets/heroes/overview-hero.webp",
+      "bytes": 74338
+    },
+    {
+      "path": "assets/heroes/solar-hero.webp",
+      "bytes": 120678
+    },
+    {
+      "path": "assets/heroes/strategies-hero.webp",
+      "bytes": 94328
+    },
+    {
+      "path": "assets/heroes/value-hero.webp",
+      "bytes": 91812
+    },
+    {
+      "path": "rhi-energy-ux.js",
+      "bytes": 714907
+    },
+    {
+      "path": "rhi-energy-ux.js.sha256",
+      "bytes": 83
+    }
+  ]
+}
