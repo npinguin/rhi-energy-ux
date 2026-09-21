@@ -2,7 +2,7 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = (ROOT / 'source' / 'homebrain-energy-card.js').read_text(encoding='utf-8')
+SOURCE = (ROOT / 'dist' / 'rhi-energy-ux.js').read_text(encoding='utf-8')
 DOC = (ROOT / 'docs' / 'UX_FOOTER_STANDARD.md').read_text(encoding='utf-8')
 
 checks = {
