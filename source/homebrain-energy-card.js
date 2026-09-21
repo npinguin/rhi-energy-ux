@@ -2013,7 +2013,15 @@
       super();
       this.attachShadow({ mode: 'open' });
       const interaction = this.restoreInteractionContext();
-      this.view = interaction.view || this.restoreView();
+      const restoredView = interaction.view || this.restoreView();
+      const navigation = this.resolveNavigation(interaction.navSection, interaction.navItem, restoredView);
+      this.navSection = navigation.section;
+      this.navItem = navigation.item;
+      this.view = navigation.view;
+      this.navSelectionBySection = interaction.navSelectionBySection && typeof interaction.navSelectionBySection === 'object'
+        ? interaction.navSelectionBySection
+        : { [this.navSection]: this.navItem };
+      this.navSelectionBySection[this.navSection] = this.navItem;
       this.loadSort = interaction.loadSort || 'priority';
       this.detailOpen = {};
       this.selectedStrategyProfileId = interaction.selectedStrategyProfileId || '';
@@ -2061,6 +2069,9 @@
       try {
         const context = {
           view: this.view,
+          navSection: this.navSection,
+          navItem: this.navItem,
+          navSelectionBySection: this.navSelectionBySection,
           loadSort: this.loadSort,
           selectedStrategyProfileId: this.selectedStrategyProfileId,
           selectedOutlookHorizonId: this.selectedOutlookHorizonId,
@@ -2124,7 +2135,7 @@
         const state = states[id];
         return `${id}:${state?.state ?? ''}:${state?.last_updated ?? ''}`;
       }).join('|');
-      return `${this.view}|${this.selectedMeteringPeriodId}|${this.selectedOutlookHorizonId}|${this.selectedPlanningHorizonId}|${this.selectedMeteringHorizonId}|${this.selectedStrategyProfileId}|${this.loadSort}|${this.meteringSort}|${this.consumerSort}|${this.consumerFilter}|${entities}`;
+      return `${this.navSection}|${this.navItem}|${this.view}|${this.selectedMeteringPeriodId}|${this.selectedOutlookHorizonId}|${this.selectedPlanningHorizonId}|${this.selectedMeteringHorizonId}|${this.selectedStrategyProfileId}|${this.loadSort}|${this.meteringSort}|${this.consumerSort}|${this.consumerFilter}|${entities}`;
     }
 
     syncMeteringPeriodFromRuntime() {
@@ -2149,28 +2160,93 @@
       this.requestPropertyWrite('metering.selected_period', period, { source });
     }
     runtime() { return new EnergyRuntime(this._hass || {}); }
-    title() {
-      return ({ overview:'Energy Overview', outlook:'Energy Outlook', flow:'Flow', solar:'Solar', battery:'Home Battery', consumers:'Consumers', strategies:'Strategies', metering:'Metering', intelligence:'Intelligence', value:'Value', planning:'Planning', retrospective:'Retrospective' })[this.view] || 'Energy';
+    navigationModel() {
+      return [
+        {
+          id: 'energy',
+          label: 'Energy',
+          items: [
+            { id:'overview', label:'Overview', view:'overview', title:'Energy Overview', description:'Your home energy system at a glance.' },
+            { id:'flow', label:'Flow', view:'flow', title:'Energy Flow', description:'See where energy is flowing right now.' },
+            { id:'solar', label:'Solar', view:'solar-generation', title:'Solar', description:'Solar generation, inverters and the relationship with storage.' },
+            { id:'battery', label:'Home Battery', view:'battery', title:'Home Battery', description:'Storage state, capacity and contribution to the home.' },
+            { id:'consumers', label:'Consumers', view:'consumers', title:'Consumers', description:'Where energy is used and which loads are controllable.' }
+          ]
+        },
+        {
+          id: 'intelligence',
+          label: 'Intelligence',
+          items: [
+            { id:'strategy', label:'Strategy', view:'strategies', title:'Strategy', description:'Strategy overview, effective policy and current runtime state.' },
+            { id:'operational-planning', label:'Operational Planning', view:'solar', title:'Operational Planning', description:'What should happen now and in the next hours.' },
+            { id:'tactical-planning', label:'Tactical Planning', view:'planning', title:'Tactical Planning', description:'How energy is allocated across today and tomorrow.' },
+            { id:'strategic-planning', label:'Strategic Planning', view:'strategic-planning', title:'Strategic Planning', description:'Longer-term energy goals, constraints and optimisation.' }
+          ]
+        },
+        {
+          id: 'insights',
+          label: 'Insights',
+          items: [
+            { id:'metering', label:'Metering', view:'metering', title:'Metering', description:'Measured energy for the selected period.' },
+            { id:'value', label:'Value', view:'value', title:'Value', description:'Financial impact of your energy system.' },
+            { id:'retrospective', label:'Retrospective', view:'retrospective', title:'Retrospective', description:'How Home Intelligence performed and what can improve.' }
+          ]
+        }
+      ];
     }
-    subtitle() {
-      return ({
-        overview:'Live overview of your energy ecosystem',
-        outlook:'Today and tomorrow horizon outlook from the canonical Outlook contract',
-        flow:'How your home is powered right now',
-        solar:'Make the most of your solar energy',
-        battery:'Manage and optimise your home energy storage',
-        consumers:'Understand where energy goes and what you can control',
-        strategies:'Type-level Energy strategy profiles and applied policy context',
-        metering:'Measured energy flows by period',
-        intelligence:'Recommendations and explanations for your home',
-        value:'Measured financial value by Metering period',
-        planning:'Planned solar use and flexible charging over time',
-        retrospective:'A clear review of how well Energy Intelligence achieved its goals'
-      })[this.view] || '';
+    resolveNavigation(sectionId = '', itemId = '', legacyView = '') {
+      const sections = this.navigationModel();
+      const bySection = sections.find(section => section.id === String(sectionId || ''));
+      const byItem = bySection?.items.find(item => item.id === String(itemId || ''));
+      if (bySection && byItem) return { section:bySection.id, item:byItem.id, view:byItem.view };
+      const legacy = {
+        overview:['energy','overview'], flow:['energy','flow'], battery:['energy','battery'], consumers:['energy','consumers'],
+        strategies:['intelligence','strategy'], intelligence:['intelligence','strategy'], solar:['intelligence','operational-planning'],
+        planning:['intelligence','tactical-planning'], outlook:['intelligence','tactical-planning'],
+        metering:['insights','metering'], value:['insights','value'], retrospective:['insights','retrospective'],
+        'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','strategic-planning']
+      };
+      const [fallbackSection,fallbackItem] = legacy[String(legacyView || '')] || ['energy','overview'];
+      const section = sections.find(row => row.id === fallbackSection) || sections[0];
+      const item = section.items.find(row => row.id === fallbackItem) || section.items[0];
+      return { section:section.id, item:item.id, view:item.view };
     }
+    activeNavigation() {
+      return this.resolveNavigation(this.navSection, this.navItem, this.view);
+    }
+    activeNavigationItem() {
+      const active = this.activeNavigation();
+      return this.navigationModel().find(section => section.id === active.section)?.items.find(item => item.id === active.item)
+        || this.navigationModel()[0].items[0];
+    }
+    selectNavigation(sectionId, itemId = '') {
+      const sections = this.navigationModel();
+      const section = sections.find(row => row.id === sectionId) || sections[0];
+      const remembered = this.navSelectionBySection?.[section.id];
+      const item = section.items.find(row => row.id === itemId)
+        || section.items.find(row => row.id === remembered)
+        || section.items[0];
+      this.navSection = section.id;
+      this.navItem = item.id;
+      this.view = item.view;
+      this.navSelectionBySection = { ...(this.navSelectionBySection || {}), [section.id]:item.id };
+      this.persistView();
+      this._forceRender = true;
+      this.render();
+    }
+    navigateToView(view) {
+      const target = this.resolveNavigation('', '', view);
+      this.selectNavigation(target.section, target.item);
+    }
+    title() { return this.activeNavigationItem().title || 'Energy'; }
+    subtitle() { return this.activeNavigationItem().description || ''; }
     nav() {
-      return [['overview','Overview'],['outlook','Outlook'],['flow','Flow'],['solar','Solar'],['battery','Home Battery'],['consumers','Consumers'],['strategies','Strategies'],['metering','Metering'],['intelligence','Intelligence'],['value','Value'],['planning','Planning'],['retrospective','Retrospective']]
-        .map(([id,label]) => `<button class="tab ${this.view === id ? 'active' : ''}" data-view="${id}">${escapeHtml(label)}</button>`).join('');
+      const sections = this.navigationModel();
+      const active = this.activeNavigation();
+      const sectionNav = sections.map(section => `<button class="navSectionTab ${active.section === section.id ? 'active' : ''}" data-nav-section="${escapeHtml(section.id)}">${escapeHtml(section.label)}</button>`).join('');
+      const currentSection = sections.find(section => section.id === active.section) || sections[0];
+      const itemNav = currentSection.items.map(item => `<button class="navItemTab ${active.item === item.id ? 'active' : ''}" data-nav-section="${escapeHtml(currentSection.id)}" data-nav-item="${escapeHtml(item.id)}">${escapeHtml(item.label)}</button>`).join('');
+      return `<div class="navigationShell"><nav class="navSections" aria-label="Energy sections">${sectionNav}</nav><nav class="tabs navItems" aria-label="${escapeHtml(currentSection.label)}">${itemNav}</nav></div>`;
     }
     onClick(event) {
       const strategyEdit = event.target.closest('[data-strategy-edit]');
@@ -2196,20 +2272,19 @@
       const tabTarget = event.target.closest('[data-tab-target]');
       if (tabTarget) {
         event.preventDefault();
-        this.view = tabTarget.dataset.tabTarget || this.view;
-        this.persistView();
-        this._forceRender = true;
-        this.render();
+        this.navigateToView(tabTarget.dataset.tabTarget || this.view);
         return;
       }
-      const tab = event.target.closest('[data-view]');
-      if (tab) {
-        const tabs = this.shadowRoot.querySelector('.tabs');
+      const sectionTab = event.target.closest('[data-nav-section]:not([data-nav-item])');
+      if (sectionTab) {
+        this.selectNavigation(sectionTab.dataset.navSection || 'energy');
+        return;
+      }
+      const itemTab = event.target.closest('[data-nav-item]');
+      if (itemTab) {
+        const tabs = this.shadowRoot.querySelector('.navItems');
         if (tabs) this.navScrollLeft = tabs.scrollLeft;
-        this.view = tab.dataset.view;
-        this.persistView();
-        this._forceRender = true;
-        this.render();
+        this.selectNavigation(itemTab.dataset.navSection || this.navSection, itemTab.dataset.navItem || '');
         return;
       }
       const scrollTarget = event.target.closest('[data-scroll-target]');
@@ -5235,7 +5310,7 @@
       return `<section class="panel"><h2>${escapeHtml(human(view))} unavailable</h2><p>The screen failed to render. This is a frontend defect guard; other Energy tabs remain available.</p><div class="softBox"><b>Error</b><span>${escapeHtml(message)}</span></div>${stack ? `<pre class="decisionDump">${escapeHtml(stack)}</pre>` : ''}</section>`;
     }
     viewContent(rt) {
-      const body = this.view === 'overview' ? this.overview(rt) : this.view === 'outlook' ? this.outlook(rt) : this.view === 'flow' ? this.flow(rt) : this.view === 'solar' ? this.solar(rt) : this.view === 'battery' ? this.battery(rt) : this.view === 'consumers' ? this.consumers(rt) : this.view === 'strategies' ? this.strategies(rt) : this.view === 'metering' ? this.metering(rt) : this.view === 'intelligence' ? this.intelligence(rt) : this.view === 'retrospective' ? this.retrospective(rt) : this.view === 'value' ? this.value(rt) : this.view === 'planning' ? this.planning(rt) : this.placeholder(rt);
+      const body = this.view === 'overview' ? this.overview(rt) : this.view === 'outlook' ? this.outlook(rt) : this.view === 'flow' ? this.flow(rt) : this.view === 'solar' ? this.solar(rt) : this.view === 'solar-generation' ? this.navigationPlaceholder(rt, 'solar-generation') : this.view === 'battery' ? this.battery(rt) : this.view === 'consumers' ? this.consumers(rt) : this.view === 'strategies' ? this.strategies(rt) : this.view === 'metering' ? this.metering(rt) : this.view === 'intelligence' ? this.intelligence(rt) : this.view === 'retrospective' ? this.retrospective(rt) : this.view === 'value' ? this.value(rt) : this.view === 'planning' ? this.planning(rt) : this.view === 'strategic-planning' ? this.navigationPlaceholder(rt, 'strategic-planning') : this.placeholder(rt);
       const marker = '</section>';
       const headerEnd = body.indexOf(marker);
       if (headerEnd < 0) return body;
@@ -5517,11 +5592,11 @@
       @media(max-width:900px){.operationalSummaryGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.solarLoadSummary{grid-template-columns:1.4fr repeat(3,minmax(0,1fr))!important}.solarLoadWhy{grid-column:2/4!important}.solarLoadControls{grid-template-columns:1fr!important}.solarLoadControls .loadActions{border-left:0!important;padding-left:0!important}.planningLoadRow{grid-template-columns:1.4fr repeat(2,minmax(0,1fr))!important}.planningLoadRow>div:nth-child(n+5){margin-top:6px!important}}
       @media(max-width:650px){.hiQuickActionBar{align-items:flex-start!important;gap:8px!important}.hiQuickActionItems{width:100%!important}.quickAutomation{width:100%!important;justify-content:space-between!important;flex-wrap:wrap!important}.quickAutomationLabel{font-size:11px!important}.quickAutomation .hiSegmented{width:100%!important}.quickAutomation .hiSegment{min-width:0!important;flex:1 1 0!important;padding:7px 8px!important;font-size:11px!important}.operationalSummaryGrid,.planningKpiStrip{grid-template-columns:1fr 1fr!important}.solarLoadSummary{grid-template-columns:1fr 1fr!important}.solarLoadIdentity,.solarLoadWhy{grid-column:1/-1!important}.solarLoadControls .requestedSlot{grid-template-columns:1fr!important}.planningLoadRow{grid-template-columns:1fr 1fr!important}.planningLoadIdentity{grid-column:1/-1!important}}
 
-.flexibleMeteringTable .meteringTotalRow td{border-top:2px solid var(--line)!important;background:#f8fafc!important;font-weight:700!important}.flexibleMeteringTable .meteringTotalRow td:first-child b{font-size:12px!important}</style><main class="energy"><header class="top"><div><div class="eyebrow">HOME INTELLIGENCE / ENERGY</div><h1>${escapeHtml(this.title())}</h1><p>${escapeHtml(this.subtitle())}</p></div></header><nav class="tabs">${this.nav()}</nav>${this.renderMainWarning(footer)}<section>${this.productLanguage(content)}</section>${this.propertyDraftBar()}${this.productLanguage(this.renderFooter(rt,this.view,footer))}</main>`;
+.flexibleMeteringTable .meteringTotalRow td{border-top:2px solid var(--line)!important;background:#f8fafc!important;font-weight:700!important}.flexibleMeteringTable .meteringTotalRow td:first-child b{font-size:12px!important}</style><main class="energy"><div class="productBrand"><span>HOME INTELLIGENCE</span><b>${escapeHtml(this.navigationModel().find(section => section.id === this.navSection)?.label || 'Energy')}</b></div>${this.nav()}${this.renderMainWarning(footer)}<section>${this.productLanguage(content)}</section>${this.propertyDraftBar()}${this.productLanguage(this.renderFooter(rt,this.view,footer))}</main>`;
       if (markup === this._lastMarkup) { this.persistInteractionContext(); return; }
       this._lastMarkup = markup;
       this.persistInteractionContext();
-      const canPatch = this._renderedView === this.view && !!this.shadowRoot.querySelector('main');
+      const canPatch = this._renderedView === this.view && this._renderedNavSection === this.navSection && this._renderedNavItem === this.navItem && !!this.shadowRoot.querySelector('main');
       if (canPatch) {
         this.patchMarkup(markup);
         this.restoreInteractionState();
@@ -5530,8 +5605,10 @@
       }
       this.shadowRoot.innerHTML = markup;
       this._renderedView = this.view;
+      this._renderedNavSection = this.navSection;
+      this._renderedNavItem = this.navItem;
       this.restoreInteractionState();
-      const tabs = this.shadowRoot.querySelector('.tabs');
+      const tabs = this.shadowRoot.querySelector('.navItems');
       if (tabs) {
         tabs.scrollLeft = this.navScrollLeft || 0;
         tabs.addEventListener('scroll', () => { this.navScrollLeft = tabs.scrollLeft; this.persistInteractionContext(); }, { passive: true });
