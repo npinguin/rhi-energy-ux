@@ -1,28 +1,105 @@
 name: Validate
+
 on:
   pull_request:
-  push:
     branches: [main]
+  workflow_dispatch:
+
 permissions:
   contents: read
-  pull-requests: write
+
+concurrency:
+  group: ${{ github.repository }}-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  validate:
+  source:
+    name: Source / package
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '24'
           cache: npm
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
-      - run: npm ci
-      - run: npm run validate
-      - name: Verify reproducible dist
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Full validation
+        run: npm run validate
+      - name: Protect immutable published runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          if git ls-remote --exit-code --tags "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${TAG}" >/dev/null 2>&1; then
+            git fetch --tags --force
+            rm -rf /tmp/published-energy-runtime
+            mkdir -p /tmp/published-energy-runtime
+            git archive "${TAG}" dist/rhi-energy-ux.js dist/assets | tar -x -C /tmp/published-energy-runtime
+            cmp /tmp/published-energy-runtime/dist/rhi-energy-ux.js dist/rhi-energy-ux.js
+            diff -qr /tmp/published-energy-runtime/dist/assets dist/assets
+            echo "${TAG} already exists; runtime bytes/assets are unchanged, so governance/test/documentation refactoring is allowed."
+          else
+            echo "${TAG} is not published yet; candidate runtime may advance before first publication."
+          fi
+      - name: Deterministic two-build proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/rhi-energy-first-dist
+          cp -a dist /tmp/rhi-energy-first-dist
+          npm run build
+          diff -qr /tmp/rhi-energy-first-dist dist
+      - name: Verify committed dist matches clean build
         run: git diff --exit-code -- dist
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - name: HACS validation
         uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa
         with:
           category: plugin
+
+  gate:
+    name: RHI UX / Validate
+    if: always()
+    needs: [source, hacs]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all gates
+        env:
+          SOURCE: ${{ needs.source.result }}
+          HACS: ${{ needs.hacs.result }}
+        run: |
+          set -euo pipefail
+          test "$SOURCE" = success
+          test "$HACS" = success
+      - name: Summary
+        if: always()
+        env:
+          SOURCE: ${{ needs.source.result }}
+          HACS: ${{ needs.hacs.result }}
+        run: |
+          {
+            echo '## RHI Energy UX validation'
+            echo "- Commit: ${GITHUB_SHA}"
+            echo "- Candidate build + owned tests: ${SOURCE}"
+            echo "- Deterministic rebuild proof: included in source gate"
+            echo "- HACS: ${HACS}"
+            echo "- Publication rebuilds: none"
+          } >> "$GITHUB_STEP_SUMMARY"
