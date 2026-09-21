@@ -1,24 +1,25 @@
-# RHI Energy UX v3.94.11 — TEST CANDIDATE
+# RHI Energy UX v3.94.12 — TEST CANDIDATE
 
 ## Scope
 
-Interaction-state stability closure over v3.94.10 without architecture or feature expansion.
+Lifecycle interaction-state closure over v3.94.11 without architecture or feature expansion.
 
-- runtime updates refresh data without changing the active tab or viewport position;
-- Metering and Value period selectors use one canonical selection/write path;
-- backend Metering period hydrates the UX once and no longer takes over the user's local context on every HA update;
-- Hour is supported consistently as a Metering period;
-- Outlook keeps the requested horizon when data is temporarily unavailable instead of silently falling back to another horizon;
-- Strategy keeps the requested profile when it is temporarily unavailable instead of silently showing another profile;
-- regression gates protect these interaction-state invariants.
+- persists only stable user navigation context across Home Assistant card recreation;
+- restores active view, Metering/Value period, Outlook/Planning/Metering horizons, sorts, filters, selected Strategy profile and card-local scroll/disclosure state;
+- excludes drafts, command/write feedback and other runtime-ephemeral state from persistence;
+- prevents restored Metering period from being overwritten by fresh backend hydration after card recreation;
+- removes silent first-item fallback from the generic scope selector;
+- makes Consumers sort defaults consistent;
+- includes local interaction state in the render signature so user sort/filter/profile changes cannot be skipped;
+- adds executable card-recreation regression proof in the bundle-load test.
 
 No Energy semantics, command ownership, screen structure or visual design is expanded.
 
 ## Compatibility
 
-- Energy UX: 3.94.11
+- Energy UX: 3.94.12
 - Minimum backend: E0.15.12
 - Public compatibility surface: R1.89.44_CONTRACT
-- Rollback release: v3.94.10
+- Rollback release: v3.94.11
 
 Stable promotion remains blocked until target Home Assistant runtime and rollback proof are PASS.
