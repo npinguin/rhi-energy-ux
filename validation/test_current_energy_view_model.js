@@ -1,7 +1,7 @@
 const fs = require('fs');
 const vm = require('vm');
 
-const source = fs.readFileSync('source/modules/runtime/current-energy-view-model.js', 'utf8');
+const source = fs.readFileSync('src/domain/models/current-energy-view-model.js', 'utf8');
 const context = {
   console,
   Object,
