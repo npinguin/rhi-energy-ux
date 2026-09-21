@@ -1,5 +1,7 @@
 {
   "version": "3.94.22",
+  "candidate_tag": "v3.94.22",
+  "candidate_sha": "pending",
   "previous_release": "3.94.21",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
