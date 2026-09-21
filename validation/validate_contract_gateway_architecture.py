@@ -50,6 +50,10 @@ if "return this.allRows().get(String(key))" in main:
     failures.append("cross_owner_row_fallback")
 if "consumerFallbackRows(" in main or "publishedRows.length ? publishedRows" in main:
     failures.append("consumer_cross_owner_fallback")
+if "const publishedOwner = String(asset?.property_index || '').trim();" not in main:
+    failures.append("dynamic_asset_property_owner_missing")
+if "battery_1: 'battery'" in main or "battery_2: 'battery'" in main:
+    failures.append("hardcoded_battery_child_owner")
 
 diagnostic_start = main.find("    diagnosticSpec(tab) {")
 diagnostic_end = main.find("    diagnosticEntity(rt, entityId, label, purpose) {", diagnostic_start)
