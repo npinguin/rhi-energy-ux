@@ -14,6 +14,7 @@ Read in this order:
 1. `README.md`
 2. `docs/ARCHITECTURE.md`
 3. `docs/RELEASE_GOVERNANCE.md`
+- `docs/UX_REPOSITORY_STANDARD.md`
 4. `docs/SOURCE_PACKAGE_GOVERNANCE.md`
 5. `src/OWNERSHIP.json`
 6. `src/manifest.json`
