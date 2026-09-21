@@ -1,21 +1,30 @@
-# RHI Energy UX v3.94.13 — TEST CANDIDATE
+# RHI Energy UX v3.94.14 — TEST CANDIDATE
 
 ## Scope
 
-Planning contract closure over v3.94.12, aligned to Energy E0.15.24.
+Navigation and premium-header refactor over v3.94.13. No backend semantics or product-control behavior is moved in this release.
 
-- consumes `planning_tomorrow_totals_json` as the authoritative D1/Tomorrow aggregate;
-- no longer presents the combined D0+D1 planning total as Tomorrow;
-- labels D0 aggregate values as **Planned today** and D1 aggregate values as **Planned tomorrow**;
-- continues to read flexible-load aggregate energy from backend-owned planning lane totals; no frontend summation is introduced;
-- retains the existing Value reader for `net_financial_result_eur`, which E0.15.24 now publishes from measured accounting;
-- preserves interaction-state stability from v3.94.12.
+- introduces the two-level information architecture:
+  - Energy → Overview, Flow, Solar, Home Battery, Consumers;
+  - Intelligence → Strategy, Operational Planning, Tactical Planning, Strategic Planning;
+  - Insights → Metering, Value, Retrospective;
+- maps the existing Solar renderer to Intelligence / Operational Planning;
+- maps the existing Planning renderer to Intelligence / Tactical Planning;
+- maps the existing Strategies renderer to Intelligence / Strategy;
+- adds structural placeholder routes for the new Energy / Solar and Intelligence / Strategic Planning screens without inventing content;
+- preserves legacy Outlook and Intelligence route intent by migrating them into the new Intelligence navigation rather than deleting their code;
+- makes navigation section + item part of lifecycle-persistent interaction context;
+- keeps per-section last location and card recreation stability;
+- places one premium semantic banner directly below the two navigation layers;
+- removes the old oversized top page title from the active layout;
+- keeps the navigation omni-device: fixed three-section layer and horizontally scrollable contextual second layer on narrow screens;
+- keeps Tactical Planning on the same premium header contract as the other visible tabs.
 
 ## Compatibility
 
-- Energy UX: 3.94.13
+- Energy UX: 3.94.14
 - Minimum backend: E0.15.24
 - Public compatibility surface: R1.89.44_CONTRACT
-- Rollback release: v3.94.12
+- Rollback release: v3.94.13
 
 Stable promotion remains blocked until target Home Assistant runtime and rollback proof are PASS.

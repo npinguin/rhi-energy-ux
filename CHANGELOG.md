@@ -1,3 +1,13 @@
+## 3.94.14 — two-level navigation and premium headers
+
+- introduces Energy / Intelligence / Insights as the first navigation layer;
+- introduces contextual second-layer tabs for each product area;
+- reclassifies the existing Solar screen as Operational Planning and current Planning as Tactical Planning;
+- adds structural Solar and Strategic Planning destinations without moving or inventing domain semantics;
+- persists section/item navigation across card recreation and remembers the last location per section;
+- standardises the visible premium banner directly under navigation across desktop, tablet and phone;
+- removes the old large top title from the active page layout.
+
 ## 3.94.13 — Planning D1 totals contract closure
 
 - consumes the dedicated backend Tomorrow/D1 planning totals instead of the combined D0+D1 summary;

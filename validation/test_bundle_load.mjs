@@ -45,6 +45,9 @@ if (!bundle.includes(`const UX_VERSION = 'R${pkg.version}'`)) {
 }
 const EnergyCard = registry.get('homebrain-energy-card');
 const first = new EnergyCard();
+first.navSection = 'insights';
+first.navItem = 'metering';
+first.navSelectionBySection = { energy:'overview', intelligence:'operational-planning', insights:'metering' };
 first.view = 'metering';
 first.selectedMeteringPeriodId = 'hour';
 first._meteringPeriodHydrated = true;
@@ -71,6 +74,8 @@ if ('editDrafts' in stored || 'writeFeedback' in stored || 'remediationFeedback'
 
 const recreated = new EnergyCard();
 const expected = {
+  navSection: 'insights',
+  navItem: 'metering',
   view: 'metering',
   selectedMeteringPeriodId: 'hour',
   selectedOutlookHorizonId: 'D1',
@@ -90,6 +95,21 @@ for (const [key, value] of Object.entries(expected)) {
 }
 if (!recreated._meteringPeriodHydrated) throw new Error('restored Metering period must not be overwritten by backend hydration');
 if (!recreated.disclosureOpen['metering:details']) throw new Error('disclosure state not restored');
+if (recreated.navSelectionBySection.intelligence !== 'operational-planning') throw new Error('per-section navigation memory not restored');
+
+const model = recreated.navigationModel();
+if (model.map(section => section.id).join('|') !== 'energy|intelligence|insights') throw new Error('two-level navigation sections drifted');
+const energy = model.find(section => section.id === 'energy');
+const intelligence = model.find(section => section.id === 'intelligence');
+const insights = model.find(section => section.id === 'insights');
+if (energy.items.map(item => item.id).join('|') !== 'overview|flow|solar|battery|consumers') throw new Error('Energy navigation order drifted');
+if (intelligence.items.map(item => item.id).join('|') !== 'strategy|operational-planning|tactical-planning|strategic-planning') throw new Error('Intelligence navigation order drifted');
+if (insights.items.map(item => item.id).join('|') !== 'metering|value|retrospective') throw new Error('Insights navigation order drifted');
+if (recreated.resolveNavigation('', '', 'solar').item !== 'operational-planning') throw new Error('legacy Solar must migrate to Operational Planning');
+if (recreated.resolveNavigation('', '', 'planning').item !== 'tactical-planning') throw new Error('legacy Planning must migrate to Tactical Planning');
+if (recreated.resolveNavigation('', '', 'intelligence').item !== 'strategy') throw new Error('legacy Intelligence must migrate to Strategy');
+const navMarkup = recreated.nav();
+if (!/navSections/.test(navMarkup) || !/navItems/.test(navMarkup)) throw new Error('two navigation layers not rendered');
 
 const unavailableSelector = recreated.componentScopeSelector({
   context: 'outlook',
@@ -102,4 +122,4 @@ const unavailableSelector = recreated.componentScopeSelector({
 if (/scopeOption active/.test(unavailableSelector)) throw new Error('missing requested selector silently activated another option');
 if (!/Selected horizon temporarily unavailable/.test(unavailableSelector)) throw new Error('missing requested selector does not expose unavailable state');
 
-console.log('PASS bundle load, lifecycle interaction-state recreation and custom-element registration smoke');
+console.log('PASS bundle load, two-level navigation, lifecycle recreation and custom-element registration smoke');
