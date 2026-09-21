@@ -1,3 +1,13 @@
+## 3.94.17 — product contract coherence
+
+- renders physical Home Battery contributors from explicit backend-owned state and health;
+- preserves signed battery flow semantics and never treats missing power as zero or Ready;
+- labels Tactical Planning need and residuals by the selected D0/D1 horizon;
+- consumes the E0.15.25 horizon-local Planning totals without frontend recomputation;
+- activates existing Pricing edit/save/readback controls through the canonical public property-write contract;
+- activates semantic Strategy profile editing for Home, Home Battery, Solar, Grid, Flexible Loads and Resilience;
+- keeps UX presentation-only: all Energy semantics and writes remain backend-owned.
+
 ## 3.94.16 — approved premium navigation alignment
 
 - moves Home Intelligence identity into the shared two-layer navigation card;
