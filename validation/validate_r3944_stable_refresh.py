@@ -12,7 +12,7 @@ checks = {
     'active_view_persisted': "window.sessionStorage.setItem('homebrain.energy.active_view', this.view)" in source,
     'render_coalesced': 'scheduleRender(immediate = false)' in source and '}, immediate ? 0 : 350);' in source,
     'active_tab_entity_signature': 'relevantEntityIds()' in source and 'runtimeSignature()' in source,
-    'identical_markup_not_replaced': 'if (markup === this._lastMarkup) return;' in source,
+    'identical_markup_not_replaced': 'if (markup === this._lastMarkup) { this.persistInteractionContext(); return; }' in source,
     'incremental_same_view_patch': 'patchMarkup(markup)' in source and 'this._renderedView === this.view' in source,
     'canonical_home_consumption_breakdown': "attrs.demand_export_breakdown_json" in source and "breakdownFor(rowId)" in source,
     'legacy_home_base_absent': 'home_base_load' not in source and "'home_base'" not in source,
