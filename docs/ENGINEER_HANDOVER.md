@@ -2,12 +2,20 @@
 
 ## Current candidate
 
-- Source candidate: **v3.94.18**
+- Source candidate: **v3.94.19**
 - Minimum backend: **E0.15.25**
 - Backend version owner: `sensor.energy_release_contract.backend_release`
 - Public compatibility surface: **R1.89.44_CONTRACT**
 - Runtime artifact: `dist/rhi-energy-ux.js`
-- Rollback target: **v3.94.17**
+- Rollback target: **v3.94.18**
+
+## Brand authority
+
+- Canonical company mark: `source/assets/company-logo.svg`
+- Distribution copy: `dist/assets/company-logo.svg`
+- Build owns source → dist synchronization.
+- Branding validation pins the approved asset hash and source/dist byte parity.
+- Runtime must not redraw, reinterpret, recolour or synthesize the Robotix company mark.
 
 ## Product boundary
 
