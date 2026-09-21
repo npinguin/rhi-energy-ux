@@ -47,6 +47,6 @@ The following must agree with `package.json`:
 
 ## Current release
 
-- candidate: `v3.94.21`
+- candidate: `v3.94.22`
 - minimum backend: `E0.15.25`
-- rollback target: `v3.94.20`
+- rollback target: `v3.94.21`

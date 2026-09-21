@@ -8,7 +8,11 @@ Healthy state:
 
 `RHI <Module> UX <version> · Backend <version>`
 
-When there is an issue, one additional short issue label may appear in amber/red. Technical detail belongs in the tooltip, not as extra footer rows.
+The footer must remain readable at normal desktop/tablet distance. Canonical text size is 11px desktop and 10.5px phone; opacity must remain 1.
+
+When there is an issue, the footer shows one amber/red summary such as `2 issues · details`. It must be directly expandable/clickable. Hover-only disclosure is not sufficient.
+
+Expanded issue details must show the concrete runtime/backend conditions that triggered the summary, plus enough backend/contract context to act on the problem. The footer must not hide actionable information in a title attribute only.
 
 ## Shared styling
 
@@ -16,42 +20,25 @@ Every package must expose the same structural classes:
 
 - `.rhiUxFooter`
 - `.rhiUxFooterIssue`
+- `.rhiUxFooterDetails`
+- `.rhiUxFooterPanel`
+- `.rhiUxFooterProblem`
+- `.rhiUxFooterAction`
 
-Canonical style tokens:
-
-```css
-.rhiUxFooter{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  flex-wrap:wrap;
-  gap:4px 9px;
-  margin:7px 3px 0;
-  padding:4px 2px;
-  border:0;
-  background:transparent;
-  color:#94a3b8;
-  font-size:9px;
-  font-weight:500;
-  line-height:1.2;
-  opacity:.82;
-}
-.rhiUxFooter span+span:before{content:"·";margin-right:9px;color:#cbd5e1}
-.rhiUxFooterIssue{font-weight:650}
-.rhiUxFooterIssue.warning{color:#b7791f}
-.rhiUxFooterIssue.error{color:#b42318}
-```
-
-At phone width the footer may reduce to 8.5px and 7px separator spacing, but the information model must remain identical.
+Healthy footer styling is quiet but readable: `#64748b`, 11px, weight 520, opacity 1. Warning is `#9a6700`; error is `#b42318`.
 
 ## Data ownership
 
 - UX version comes from the UX package version/runtime constant.
 - Backend version comes only from the module's canonical backend release contract.
-- Healthy footer stays quiet gray.
-- Diagnostics, runtime acceptance and technical details may influence the single issue label/tooltip but must not create module-specific visible footer structures.
-- Missing backend identity must render `Unknown`; the UX must not invent or map a backend release.
+- Missing backend identity renders `Unknown`; UX never invents or maps a backend version.
+- Issue summary is presentation-only; concrete issue content must come from runtime/backend diagnostics already owned by that module.
+- Expanded details may add a generic verification instruction, but must not fabricate a remediation specific to a backend fault that is not known.
+
+## Asset refresh contract
+
+Externally loaded shared brand assets must use a package-versioned URL, for example `company-logo.svg?v=<UX_VERSION>`. This prevents an already-open browser profile from reusing a stale immutable-looking asset URL after a HACS package update/reload. The underlying canonical asset remains unchanged and cacheable within one package version.
 
 ## Drift rule
 
-Module packages may change the module name only. They may not change footer geometry, colors, typography, separator behavior or healthy information structure without updating this shared standard across every UX package in the same release cycle.
+Module packages may change the module name and module-owned issue text only. Footer geometry, colors, typography, disclosure behavior and asset-versioning behavior must change across every UX package in the same release cycle.

@@ -2,12 +2,17 @@
 
 ## Current candidate
 
-- Source candidate: **v3.94.21**
+- Source candidate: **v3.94.22**
 - Minimum backend: **E0.15.25**
 - Backend version owner: `sensor.energy_release_contract.backend_release`
 - Public compatibility surface: **R1.89.44_CONTRACT**
 - Runtime artifact: `dist/rhi-energy-ux.js`
-- Rollback target: **v3.94.20**
+- Rollback target: **v3.94.21**
+
+## Asset refresh authority
+
+- External company-logo requests carry `?v=<UX_VERSION>` so browser cache identity changes with every UX package release.
+- Never use a timeless external brand URL for an asset that can change between packages.
 
 ## Brand authority
 
@@ -29,6 +34,12 @@ Energy backend
 ```
 
 UX owns presentation only. Backend semantics and backend release identity are never inferred or remapped in the frontend.
+
+## Footer authority
+
+- Healthy footer is readable at 11px desktop / 10.5px phone.
+- Issues are expandable in-page; hover-only diagnostics are forbidden.
+- Expanded details must expose concrete runtime/backend conditions and verification guidance.
 
 ## Shared UX standards
 

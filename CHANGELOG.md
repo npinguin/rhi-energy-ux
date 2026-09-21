@@ -1,3 +1,11 @@
+## 3.94.22 — readable footer and cache-safe shared assets
+
+- Makes the shared UX footer readable at 11px desktop / 10.5px phone with full opacity.
+- Replaces hover-only errors with expandable issue details containing concrete runtime/backend conditions.
+- Adds backend release/contract context and a verification action in the expanded footer.
+- Adds package-version cache busting to the external company-logo URL to prevent stale Chrome logo rendering after HACS updates.
+- Updates the shared footer/asset-refresh standard for parity with Mobility.
+
 ## 3.94.21 — shared UX release and footer governance
 
 - Publishes TEST CANDIDATE versions as HACS-visible normal GitHub Releases rather than GitHub prereleases.
