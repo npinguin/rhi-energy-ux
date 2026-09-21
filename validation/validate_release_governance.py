@@ -56,7 +56,7 @@ checks = {
     "runtime_version_build_owned": "re.sub(" in build and "const UX_VERSION = 'R" in build and 'package["version"]' in build,
     "backend_version_single_owner": "backend_release: attrs.backend_release || 'unknown'" in source,
     "no_backend_version_fallback": "attrs.backend_version || attrs.backend_release" not in source and "attrs.release_version || this.releaseState()?.state" not in source,
-    "release_notes_current": notes.startswith(f"# v{version} "),
+    "release_notes_current": notes.startswith(f"# v{version} ") or notes.startswith(f"# RHI Energy UX v{version} "),
     "changelog_current": any(line.startswith(f"## {version} ") for line in changelog.splitlines()[:8]),
     "test_ownership_principle": ownership.get("principle") == "one invariant, one test owner" and "One invariant has exactly one test owner" in test_governance,
     "owned_suite_scripts": all(name in pkg.get("scripts", {}) for name in ("test:contract","test:ux","test:package","test:release","check:test-ownership","release:sync")),
