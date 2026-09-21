@@ -11,6 +11,8 @@ publish = (ROOT / ".github/workflows/publish-hacs.yml").read_text(encoding="utf-
 
 if hacs.get("filename") != "rhi-energy-ux.js":
     raise SystemExit("HACS filename drift")
+if hacs.get("content_in_root") is not False:
+    raise SystemExit("HACS plugin must use standard dist/ package semantics (content_in_root=false)")
 if hacs.get("zip_release") is True:
     raise SystemExit("zip_release is outside the supported plugin package model")
 if manifest.get("version") != pkg.get("version"):
@@ -47,4 +49,4 @@ if re.search(r"gh release create[\s\S]*dist/rhi-energy-ux\.js(?:\s|\\)", publish
 if "dist/PACKAGE_MANIFEST.json" not in publish:
     raise SystemExit("release must attach package manifest evidence")
 
-print("PASS HACS package: immutable tag dist tree contains runtime + structured assets; release assets are evidence-only")
+print("PASS HACS package: standard HACS plugin dist/ layout is explicit; immutable tag dist tree contains runtime + structured assets; release assets are evidence-only")
