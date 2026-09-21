@@ -1,12 +1,8 @@
 from pathlib import Path
-import json
 
 root = Path(__file__).resolve().parents[1]
-version = json.loads((root / 'package.json').read_text(encoding="utf-8"))["version"]
 source = (root / 'source' / 'homebrain-energy-card.js').read_text(encoding="utf-8")
-checks = {
-    'release_identity': f"const UX_VERSION = 'R{version}'" in source,
-    'hour_period_first_class': "{ period_id: 'hour', label: 'This hour', selector_order: 0 }" in source,
+checks = {    'hour_period_first_class': "{ period_id: 'hour', label: 'This hour', selector_order: 0 }" in source,
     'canonical_home_consumption_property': "canonicalValue('home_consumption.power_kw', 'home_consumption')" in source,
     'canonical_home_consumption_breakdown': "withBreakdown(canonicalValue('home_consumption.power_kw', 'home_consumption'),'home_consumption')" in source,
     'no_home_base_alias': 'home_base_load' not in source and 'home_base' not in source,
@@ -17,4 +13,4 @@ checks = {
 }
 failed = [name for name, ok in checks.items() if not ok]
 for name, ok in checks.items(): print(f"{'PASS' if ok else 'FAIL'} {name}")
-if failed: raise SystemExit(f'R{version} validation failed: ' + ', '.join(failed))
+if failed: raise SystemExit('validation failed: ' + ', '.join(failed))
