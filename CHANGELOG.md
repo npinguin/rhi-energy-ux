@@ -1,3 +1,13 @@
+## 3.94.23 — canonical source ownership and structured HACS package
+
+- Removes duplicated generated module blocks from the Energy app source.
+- Establishes explicit app/runtime/domain/assets ownership with manifest-owned insertion order.
+- Makes `src/assets/` canonical and promotes hero artwork out of generated `dist/`.
+- Rebuilds `dist/` from scratch and generates a runtime checksum plus `PACKAGE_MANIFEST.json`.
+- Makes the immutable tag's complete `dist/` tree the HACS package; release assets become evidence-only.
+- Adds source, asset, package, documentation and simulated-install drift gates.
+- Keeps Energy semantics and public contracts unchanged.
+
 ## 3.94.22 — readable footer and cache-safe shared assets
 
 - Makes the shared UX footer readable at 11px desktop / 10.5px phone with full opacity.
