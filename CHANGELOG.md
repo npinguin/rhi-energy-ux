@@ -1,3 +1,12 @@
+## 3.94.20 — shared company-brand package
+
+- applies the approved transparent Robotix logo with dark-blue company/building artwork and lighter-blue slogan;
+- keeps one canonical brand asset with source/dist byte parity;
+- routes runtime branding through one company-logo constant;
+- adds portable `--rhi-company-*` sizing tokens for reuse across modules;
+- expands validation to block recolouring, filters, embedded redraws and brand-asset drift;
+- preserves the approved premium two-level header and compact gray secondary-navigation icons.
+
 ## 3.94.19 — canonical company branding
 
 - replaces the synthetic Robotix logo with the approved supplied artwork geometry;
