@@ -1,7 +1,7 @@
 const fs = require('fs');
 const vm = require('vm');
 
-const bundle = fs.readFileSync('source/homebrain-energy-card.js', 'utf8');
+const bundle = fs.readFileSync('dist/rhi-energy-ux.js', 'utf8');
 const start = bundle.indexOf('// BEGIN GENERATED MODULE: runtime/command-contract.js');
 const end = bundle.indexOf('// END GENERATED MODULE: runtime/command-action-model.js') + '// END GENERATED MODULE: runtime/command-action-model.js'.length;
 if (start < 0 || end < 0) throw new Error('Command modules not found');
