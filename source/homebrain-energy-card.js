@@ -2116,6 +2116,7 @@
         overview:['overviewExperience','solar','battery','grid','consumption','forecast','intelligence'],
         outlook:['outlook','forecast','battery','consumption','flexibleAssets'],
         flow:['solar','battery','grid','consumption','connection','flexibleAssets','relationships'],
+        'solar-generation':['solar','forecast','battery','grid'],
         solar:['solar','forecast','planning','flexibleAssets','commands','intelligence'],
         battery:['battery','strategyEffective','planning'],
         consumers:['consumer','consumerMix','flexibleAssets'],
@@ -2124,6 +2125,7 @@
         intelligence:['intelligence','activity','planning'],
         value:['value','metering','pricing'],
         planning:['planning','flexibleAssets','forecast','battery'],
+        'strategic-planning':['intelligence','planning','forecast','strategyEffective'],
         retrospective:['retrospective']
       };
       const keys = ['release', ...(byView[this.view] || [])];
@@ -5152,8 +5154,26 @@
       const summaryTotals = `<div class="planningAggregateTotals">${summaryItems.map(([label,value])=>`<span><small>${label}</small><b>${value===null?'—':value.toFixed(1)+' kWh'}</b></span>`).join('')}</div>`;
       const disclosure = firstDefined(vm.rows.find(row=>row.disclosure)?.disclosure, vm.quality.basis ? `Planning basis: ${human(vm.quality.basis)}. Actual execution follows the current operational intent.` : 'Future buckets are advisory. Actual execution follows the current operational intent.');
       const balanceLabel = sourceTotal===null || useTotal===null ? 'Planning balance unavailable' : `${sourceTotal.toFixed(1)} kWh source · ${useTotal.toFixed(1)} kWh use${balanceDelta===null?'':` · Δ ${balanceDelta.toFixed(3)} kWh`}`;
-      if (!vm.contractSupported) return `<section class="planningHero"><div class="planningHeroLead">${this.planningIconBadge('▣','purple','hero')}<div><small>PLANNING</small><h2>Planning contract unavailable</h2><p>The backend did not publish canonical Planning energy lanes.</p></div></div><span class="planningStatus warn">Unavailable</span></section>`;
       const heroValue = totalPlanned===null ? '—' : totalPlanned.toFixed(1)+' kWh';
+      const planningHeader = {
+        image:'/local/homebrain/infrastructure/energy/solar-hero.webp',
+        icon:'▣',
+        eyebrow:'Tactical planning',
+        title:`${horizonLabel} plan`,
+        value:heroValue,
+        unit:totalNeed===null?'planned flexible energy':`of ${totalNeed.toFixed(1)} kWh flexible need`,
+        explanation:remainingNeed===null?'Remaining need is unavailable.':`${remainingNeed.toFixed(1)} kWh still needs a suitable opportunity.`,
+        tone:'purple',
+        badgeText:vm.contractSupported ? statusLabel : 'Unavailable',
+        badgeTone:vm.contractSupported && vm.complete ? 'ok' : 'attention',
+        metrics:[
+          ['◎','Flexible need',fmtKwh(totalNeed,'—'),horizonLabel],
+          ['▣','Planned',fmtKwh(totalPlanned,'—'),horizonLabel],
+          ['◷','Still to plan',fmtKwh(remainingNeed,'—'),'Unresolved need'],
+          ['✓','Confidence',this.productStateLabel(confidence,'Limited'),'Planning confidence']
+        ]
+      };
+      if (!vm.contractSupported) return `${this.tabExperienceHeader(rt,'planning',planningHeader)}${this.contractGap('Tactical planning unavailable','The backend did not publish canonical Planning energy lanes.')}`;
       const participatingCount = assetTotals.length;
       const nextLines = assetTotals.map(item => `${escapeHtml(this.planningAssetName(item.asset))} · ${fmtKw(firstDefined(item.asset.requested_power_kw,item.asset.requested_charge_power_kw,item.asset.requested_power_kw_effective),'—')}`).join('<br>');
       const planningLoadRows = assetTotals.map(item => {
@@ -5163,7 +5183,7 @@
         const why=String(firstDefined(canonical.why_text,canonical.reason_label,'No explanation published.'));
         return `<article class="planningLoadRow"><div class="planningLoadIdentity">${this.planningIconBadge(this.planningAssetIcon(item.asset),this.planningAssetTone(item.asset),'asset')}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(item.asset))}</b><span class="priorityBadge">${escapeHtml(priority)}</span></div><small><i class="dot ${/connected/i.test(String(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'')))?'green':'gray'}"></i>${escapeHtml(human(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'Connection unavailable')))}</small></div></div><div><small>Next action</small><b class="nextActionBadge">${escapeHtml(next)}</b></div><div><small>Requested power</small><b>${fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')}</b></div><div><small>Planned today</small><b>${fmtKwh(item.plannedEnergy,'—')}</b></div><div><small>Why / reason</small><b>${escapeHtml(why)}</b></div><div><small>Plan status</small><b class="planStatusBadge ${/at.?risk|blocked|failed/i.test(String(firstDefined(canonical.exception_state,canonical.risk_state,canonical.today_status,'')))?'exception':'unknown'}">${escapeHtml(firstDefined(canonical.plan_conformance_label,canonical.exception_label,canonical.risk_label,'Status unavailable'))}</b></div></article>`;
       }).join('');
-      return `<section class="planningHero"><div class="planningHeroLead">${this.planningIconBadge('▣','purple','hero')}<div><small>PLANNING</small><h2>${horizonLabel}'s planned flexible energy</h2><div class="planningHeroValue">${heroValue}<span>${totalNeed===null?'need unavailable':`of ${totalNeed.toFixed(1)} kWh needed`}</span></div><p>${remainingNeed===null?'Remaining need is unavailable.':remainingNeed.toFixed(1)+' kWh still needs a suitable opportunity.'}</p></div></div><span class="planningStatus ${vm.complete?'ok':'warn'}">${escapeHtml(statusLabel)} · ${escapeHtml(this.productStateLabel(confidence,'Limited'))}</span></section>
+      return `${this.tabExperienceHeader(rt,'planning',planningHeader)}
       <section class="planningKpiStrip"><article><small>Total flexible need</small><b>${fmtKwh(totalNeed,'—')}</b></article><article><small>${vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today'}</small><b>${fmtKwh(totalPlanned,'—')}</b></article><article><small>Still to plan</small><b>${fmtKwh(remainingNeed,'—')}</b></article><article><small>Participating loads</small><b>${participatingCount}</b></article></section>
       <section class="panel planningOverview"><h2>Planning overview</h2><div class="operationalSummaryGrid"><article class="operationalSummaryCard planned"><span class="summaryIcon">▥</span><div><small>${vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today'}</small><b>${fmtKwh(totalPlanned,'—')}</b></div></article><article class="operationalSummaryCard next"><span class="summaryIcon">▣</span><div><small>Planned loads</small><b>${participatingCount}</b><p>${nextLines||'No planned load'}</p></div></article><article class="operationalSummaryCard charging"><span class="summaryIcon">◷</span><div><small>Still to plan</small><b>${fmtKwh(remainingNeed,'—')}</b><p>${remainingNeed===0?'All planned':'Planning remains'}</p></div></article><article class="operationalSummaryCard exceptional"><span class="summaryIcon">♢</span><div><small>Exceptions</small><b>—</b><p>Use published per-load status</p></div></article></div></section>
       <div class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>${vm.buckets.length} published bucket${vm.buckets.length===1?'':'s'} · backend timestamps preserved · no interpolation · zero values hidden · Grid out fixed at table end</p></div><span>All primary values are kWh per bucket</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>published by Planning</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="r3260SectionHead"><div><h2>Planned flexible loads</h2><p>Canonical Tactical plan projected without frontend recalculation.</p></div></div><div class="planningLoadList">${planningLoadRows||'<div class="empty"><b>No planned flexible loads</b></div>'}</div></section>`;
@@ -5225,6 +5245,12 @@
           [UX_INTERFACES.battery,'Home Battery','Home Battery charge and discharge flow'],
           [UX_INTERFACES.connection,'Charging connections','Visible charger assignments and measured power']
         ],
+        'solar-generation': [
+          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
+          [UX_INTERFACES.solar,'Solar','Live solar generation'],
+          [UX_INTERFACES.forecast,'Forecast','Expected solar generation'],
+          [UX_INTERFACES.battery,'Home Battery','Storage relationship context']
+        ],
         solar: [
           [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
           [UX_INTERFACES.solar,'Solar','Production and energy'],
@@ -5267,6 +5293,12 @@
           [UX_INTERFACES.intelligence,'Guidance','Recommendation, reason and affected assets'],
           [UX_INTERFACES.planningExperience,'Plan explanation','Product-safe planning context'],
           [UX_INTERFACES.activity,'Activity','Current operational context']
+        ],
+        'strategic-planning': [
+          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
+          [UX_INTERFACES.intelligence,'Intelligence','Current strategy and runtime context'],
+          [UX_INTERFACES.planning,'Planning','Planning context available for future strategic projection'],
+          [UX_INTERFACES.strategyEffective,'Effective strategy','Policies currently in effect']
         ],
         value: [
           [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
