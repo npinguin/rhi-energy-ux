@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 170" role="img" aria-labelledby="title desc">
+  <title id="title">Robotix.be</title>
+  <desc id="desc">DomotiX · Network · Security</desc>
+  <g fill="#084a82">
+    <text x="210" y="46" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="800" letter-spacing="-1.5">Robotix.be</text>
+    <text x="210" y="67" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="600" letter-spacing="2">DomotiX · Network · Security</text>
+  </g>
+  <g fill="none" stroke="#084a82" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M74 132h272"/>
+    <path d="M103 129V99l107-31 107 31v30"/>
+    <path d="M103 99l107 17 107-17"/>
+    <path d="M138 89v44m36-54v57m72-57v57m36-47v44"/>
+    <path d="M103 114l107 27 107-27"/>
+    <path d="M210 68v73"/>
+  </g>
+</svg>
