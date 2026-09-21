@@ -1,10 +1,10 @@
 const fs = require('fs');
 const vm = require('vm');
 
-const bundle = fs.readFileSync('dist/rhi-energy-ux.js', 'utf8');
-const start = bundle.indexOf('// BEGIN GENERATED MODULE: runtime/command-contract.js');
-const end = bundle.indexOf('// END GENERATED MODULE: runtime/command-action-model.js') + '// END GENERATED MODULE: runtime/command-action-model.js'.length;
-if (start < 0 || end < 0) throw new Error('Command modules not found');
+const bundle = [
+  fs.readFileSync('src/runtime/command-contract.js', 'utf8'),
+  fs.readFileSync('src/runtime/command-action-model.js', 'utf8')
+].join('\n');
 const helpers = `
 const parseMaybeJson = (value, fallback = null) => { if (value === undefined || value === null || value === '') return fallback; if (typeof value !== 'string') return value; try { return JSON.parse(value); } catch { return value; } };
 const firstDefined = (...values) => values.find(value => value !== undefined && value !== null);
@@ -14,7 +14,7 @@ const human = value => String(value || '').replace(/_/g, ' ');
 `;
 const context = {};
 vm.createContext(context);
-vm.runInContext(`${helpers}\n${bundle.slice(start, end)}\nthis.readEnergyCommandContract=readEnergyCommandContract; this.createCommandActionModel=createCommandActionModel; this.commandActionModelsForAsset=commandActionModelsForAsset;`, context);
+vm.runInContext(`${helpers}\n${bundle}\nthis.readEnergyCommandContract=readEnergyCommandContract; this.createCommandActionModel=createCommandActionModel; this.commandActionModelsForAsset=commandActionModelsForAsset;`, context);
 
 const gateway = {
   contract() {
