@@ -44,9 +44,9 @@ checksum = (DIST / "rhi-energy-ux.js.sha256").read_text(encoding="utf-8").strip(
 if manifest.get("runtime_sha256") != checksum:
     raise SystemExit("package manifest runtime checksum drift")
 
-if re.search(r"gh release create[\s\S]*dist/rhi-energy-ux\.js(?:\s|\\)", publish):
-    raise SystemExit("JS release asset would force HACS single-file mode and drop nested assets")
-if "dist/PACKAGE_MANIFEST.json" not in publish:
-    raise SystemExit("release must attach package manifest evidence")
+if re.search(r"gh release create[\s\S]*?(?:dist/|COMPATIBILITY\.json|RELEASE_MANIFEST\.json|QUALIFICATION\.json)", publish):
+    raise SystemExit("tagged HACS plugin release must not attach any GitHub Release assets")
+if "gh release upload" in publish:
+    raise SystemExit("publication must not upload GitHub Release assets")
 
-print("PASS HACS package: standard HACS plugin dist/ layout is explicit; immutable tag dist tree contains runtime + structured assets; release assets are evidence-only")
+print("PASS HACS package: standard HACS plugin dist/ layout is explicit; immutable tag dist tree contains runtime + structured assets; GitHub Release assets are forbidden so HACS selects the immutable tag dist tree")
