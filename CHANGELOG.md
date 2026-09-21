@@ -1,3 +1,11 @@
+## 3.94.24 — HACS full-tree delivery and shared top-navigation alignment
+
+- Removes all GitHub Release assets so tagged HACS installs use the immutable `dist/` tree.
+- Fixes clean installs that previously materialized only metadata/checksum files.
+- Aligns Energy / Intelligence / Insights into three equal-width centered primary navigation columns.
+- Prevents tablet-width clipping into the Robotix company-brand area.
+- Preserves Energy semantics, routes, backend contracts and second-level navigation.
+
 ## 3.94.24 — HACS full-tree delivery correction
 
 - Removes all GitHub Release assets from tagged HACS plugin releases.
