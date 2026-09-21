@@ -4,8 +4,8 @@ This package treats the Robotix company mark as a reusable product asset, not as
 
 ## Canonical asset
 
-- Source of truth: `source/assets/company-logo.svg`
-- Distribution copy: `dist/assets/company-logo.svg`
+- Source of truth: `src/assets/branding/company-logo.svg`
+- Distribution copy: `dist/assets/branding/company-logo.svg`
 - Background: transparent
 - Primary company/building colour: `#0B4C86`
 - Slogan colour: `#5B95C8`
@@ -42,7 +42,7 @@ Desktop, tablet and mobile may override the shared slot tokens. They must not ed
 
 - Brand asset ownership: shared RHI UX convention
 - Module ownership: header placement and responsive slot sizing
-- Build ownership: source asset → distribution asset synchronization
+- Build ownership: canonical `src/assets/` tree → structured `dist/assets/` package synchronization
 - Branding validation ownership: canonical hash, source/dist parity, approved copy/colours, cache-safe runtime delivery and no runtime redraw/filter
 - Layout/navigation validation owns brand-slot geometry; branding tests do not own responsive sizing
 - Footer tests must not assert logo transport or artwork details
