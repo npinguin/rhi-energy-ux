@@ -80,10 +80,7 @@ jobs:
             RELEASE_SHA=$(gh release view "${TAG}" --json targetCommitish --jq '.targetCommitish')
             test "$RELEASE_SHA" = "$TAG_SHA"
             test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = false
-            if gh release view "${TAG}" --json assets --jq '.assets[].name' | grep -Fxq 'rhi-energy-ux.js'; then
-              echo "Forbidden JS release asset present; HACS would use single-file mode." >&2
-              exit 1
-            fi
+            test "$(gh release view "${TAG}" --json assets --jq '.assets | length')" = 0
           fi
       - name: HACS validation
         uses: hacs/action@885037da508419fd08c13515967aec868dfdee2d
@@ -112,7 +109,7 @@ jobs:
         run: |
           python validation/validate_hacs_package.py
           python validation/test_hacs_install.py
-      - name: Publish or verify immutable tag and evidence-only release
+      - name: Publish or verify immutable tag and asset-free release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -145,24 +142,13 @@ jobs:
             gh release create "${TAG}" \
               --target "$TAG_SHA" \
               --title "RHI Energy UX ${TAG} — TEST CANDIDATE" \
-              --notes-file release/RELEASE_NOTES.md \
-              dist/rhi-energy-ux.js.sha256 \
-              dist/PACKAGE_MANIFEST.json \
-              COMPATIBILITY.json \
-              RELEASE_MANIFEST.json \
-              release/QUALIFICATION.json
+              --notes-file release/RELEASE_NOTES.md
           fi
 
           test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = false
 
-          if gh release view "${TAG}" --json assets --jq '.assets[].name' | grep -Fxq 'rhi-energy-ux.js'; then
-            echo "Forbidden JS release asset present; HACS would use single-file mode." >&2
-            exit 1
-          fi
-
-          for REQUIRED in rhi-energy-ux.js.sha256 PACKAGE_MANIFEST.json COMPATIBILITY.json RELEASE_MANIFEST.json QUALIFICATION.json; do
-            gh release view "${TAG}" --json assets --jq '.assets[].name' | grep -Fxq "$REQUIRED"
-          done
+          ASSET_COUNT=$(gh release view "${TAG}" --json assets --jq '.assets | length')
+          test "$ASSET_COUNT" = 0
       - name: Summary
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -170,8 +156,8 @@ jobs:
             echo '## RHI Energy UX HACS publication'
             echo "- Version: v${VERSION}"
             echo "- HACS install source: immutable tag dist/ tree"
-            echo "- GitHub Release assets: evidence only"
-            echo "- JS release asset: NOT PRESENT"
+            echo "- GitHub Release assets: NONE (required so HACS installs immutable tag dist/ tree)"
+            echo "- HACS release-asset override: DISABLED"
             echo "- Existing identical candidate: verified idempotently"
             echo "- Rebuild during publication: NO"
             echo "- Immutable HACS-visible TEST CANDIDATE: READY"
