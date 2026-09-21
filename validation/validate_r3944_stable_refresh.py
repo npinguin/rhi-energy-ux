@@ -47,6 +47,10 @@ checks = {
     'navigation_uses_single_shared_frame': '.navigationShell{--nav-active-bg:' in source and 'border-radius:18px' in source and 'overflow:hidden' in source,
     'navigation_inner_layers_are_light': '.navSections{gap:3px;padding:7px 10px 6px;background:transparent;border:0' in source and 'background:transparent!important;box-shadow:none!important' in source,
     'navigation_section_accents_present': '.navigationShell.nav-intelligence' in source and '.navigationShell.nav-insights' in source,
+    'navigation_brand_inside_shared_frame': 'class="navPrimaryRow"' in source and 'class="navBrand"' in source and 'Home Intelligence</b><small>ENERGY</small>' in source,
+    'navigation_primary_icons_present': 'class="navSectionIcon"' in source and "energy:'⚡'" in source and "intelligence:'◉'" in source and "insights:'▥'" in source,
+    'legacy_external_product_breadcrumb_removed': '<div class="productBrand">' not in source,
+    'premium_primary_row_proportions': '.navPrimaryRow{min-height:76px' in source and '.navSectionTab{min-height:46px' in source,
 }
 for name, ok in checks.items():
     print(f"{'PASS' if ok else 'FAIL'} {name}")
