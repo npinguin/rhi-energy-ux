@@ -1,3 +1,10 @@
+## 3.95.3 — hero/status stacking correction
+
+- fixes the remaining Energy layout drift where the hero and four status cards were still rendered side-by-side because an older two-column grid template survived the rc.38 override;
+- explicitly forces the top-level header container to a single-column vertical stack;
+- preserves the rc.38 hero, four-card status row, Quick Actions hierarchy, Energy semantics and HACS package structure;
+- adds a regression check for the vertical hero → status composition.
+
 ## 3.95.2 — Mobility rc.38 visual parity closure
 
 - locks Energy top-level composition to the Mobility rc.38 reference: hero → four status cards → quick actions → domain content;
