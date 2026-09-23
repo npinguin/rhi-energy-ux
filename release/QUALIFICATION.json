@@ -1,8 +1,8 @@
 {
-  "version": "3.95.3",
-  "candidate_tag": "v3.95.3",
+  "version": "3.95.4",
+  "candidate_tag": "v3.95.4",
   "candidate_sha": "pending",
-  "previous_release": "3.95.2",
+  "previous_release": "3.95.3",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -31,5 +31,8 @@
   "hero_clean_title_description_art": "NOT_EXECUTED",
   "top_status_four_card_parity": "NOT_EXECUTED",
   "quick_action_parity": "NOT_EXECUTED",
-  "hero_status_vertical_stack": "NOT_EXECUTED"
+  "hero_status_vertical_stack": "NOT_EXECUTED",
+  "flow_hero_family_alignment": "NOT_EXECUTED",
+  "metering_hero_family_alignment": "NOT_EXECUTED",
+  "hero_crop_visibility": "NOT_EXECUTED"
 }
