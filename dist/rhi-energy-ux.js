@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R3.94.24';
+  const UX_VERSION = 'R3.95.0';
   const COMPANY_LOGO_ASSET = `/hacsfiles/rhi-energy-ux/assets/branding/company-logo.svg?v=${encodeURIComponent(UX_VERSION)}`;
 
   const HERO_IMAGE_BATTERY = 'data:image/webp;base64,UklGRhY5AABXRUJQVlA4IAo5AADQGQKdASoIB2wCPjEWikQiISKiILA4oFAGCWlu+8ZLYW56byXrKfsuzt33VmD+yEOwQ52Pfnqfo085f/UArNWj7kH0rS/KBvC24A/SvfAP1N63L0APLD9iP9zvR71Lb4P/+fQv8W/2P+L5x+hb4xuE6A/jfBP4kcRPyU0Jv5p/hfQqjhcF/wfF9+tf7r7p/l5nH/s2OH7W/7XyS6BX8x/uvrAf6PnP/QP9H/8PcU/mf+G/5P944YP9qgh2bqQpJS1SMrN1IUkpf1t1ezdSFJKIc/05bdXs3UhSSl/W3V7N1IUkpf1t1ezdR2wQOJjbqQpJTAc2v513r+3VVdkP2btrSrZr+kX1t1ezdV+Jjopt2JtSIrlizdSFJ9LscM3LetcOFKs3UnqbR7ur2c+Rr6uR965bdXs3Qg6hUV1khocVJKuvEy7HuqfQ4SCfKiSGctuxIBL9Z8TLse7sl5McFcn7N1IVKZurZyweAKr2bQ015G99tBJTO8mNy9VWJlAaCRwbqQpJS/pF9bdkvJjo48xDzEnMAOKkKSUgP/d2JtR+CYJjXK9aR4E5bdXxse7sTagbawKy5SHv4RnLbq7Hzbq+V0bd/Yxt/KqvaCIZyzyTlt1IbnZvAFV7UU26vZupCklXXiY6KZ0UrraUIOpM/7N1H3cTG3Vs1/X98BSiBJTPObluJ3/z9lu99qPvySGhxUk6epCklMDxUkpdFITDt1ezdSZ/2bqF0wPFST4khhrllJZz43UnoQpJS/rcZ013Mvm5eica9BMo99T5+zdQp+hHrFG8EXjbqQqUzdV+JjbSDdV+Jjreto+WLN4opf5yPu6vZu2tKkLlOvictvSB13enyPu6n5AiXgDybjXoOdt1X4mOim3U/YmOim3ZLyWYfs3Vs1/X/JIZz4SXiil/W3V7OJr79MtrW+BGEO1tqlF9G9T5/Gx7vrdqSz+Gf51nikjnFUu2HZ9OUdnnha6upq70QfjluWFZwSa1P/ifZhoZ4NvtqTjpCI7PpXxUnHGiXS/yH/9U2o93V7OYpvL/kkM5bUrD0HwMf9dJSFJM568AVXxse763aks/iPlBSiglk2021IhV3qc/GGk5txgMc2CzwxQRAO0P+/KtILuhmRj9lyLzClGYgEIkqTPi8xi0z2C9VJyi8w2QNUvJ3yakTFuPKkQZ05bfW7Uln/835AlQuODikETJdHa/fkkNDipJ09SG52bwCNVU3BTtHxz8/mLeEZMI2DNkboCAgiXuWE7Wm1IXOiq6OSGarWJWni5d6MWjpOYiL0kkM5f8kh2SFJM566ozVV7N1Jn/Zy9VV8bHu+t2pLQAn/8zh4qa0ln2ua7OTh003tuGatJRCw4zse6OsDPi3ld6WOvXNRGJzNMwlOSbRt1fGx7vrdqSz/+gmUe7q9nL1VYmUe763aks//7w/lFjNZVHDp3prgaj41rlh94EM5+cX4Sp4JNtxarfP4IhrQsbAwNLJRSJC/Lv0dfKMx7wZ3PgpgCNf+a8K/touo/XTX9m6CumFSWcvVViZR7vrdqPd1fGx7vrdqPvyRYEqVKvidRfW3JySeKnQkfIFQUOTcAMRXFyVCFNMahlZTpQ4M8QKKy+MGTLAjTlOX4yp/DAKwLMBHdnTiJ4B0QIsDGWyf8jvlLCZ7qTd1RDu1NS0t7Fm9wQVDmQX0l/PQHFZvaLMdZHU3MybR2tNrk9MUsWbqvxMbl6qr2bqTP+zl6qp+uUanF661D0v625EUYEUB9N9/aAq4DbOMooIt3j/BjmPm0G/xKgHmvb0ldALLtbpZE+yjCLM/oHry28OAMeCDDGQCOdyTLFUmIJfC+Ek/rcGXYIXIJzoi1MShOVzkVK6KVROl+ICua/s3UMP+eENfEzVQhnSH/8/ZtIN0H77NXm0ioJ0uikLoJlHu6uuPov3Kytk/Q/gvLm67ujhzOQwJZLezoRT0oyqWXvpMVSpkj+VwljaXBPvmuXVm2tz7SqKboqf/ntInkgPmJFYGpG9+fZeBZB3ephvkHbk12AN4PehS6cn6g9iOPEYobC4jSQYFlkMjRP9bhWC4cqIsFSnRuKQS5rN1JHf7ADlNfzswSWlWbgI4tKiKutpbqt0v626xMo93V1ytuC9aQlZA+GOKIJs1Rp8wJuOGakbTBSZUTGV8aOdMrq72ShCc9ZoON7hKP2FHmWhhTliHtFB6P6LRVjYbVLSULRzJtG3V8rpOEoSrCR8injwlIqMfvwJz4SXUkd/vadIf/1Taj78khnLN+3CyQGeSjwt4srckRP1rYxJfgbPzzXoNsGsne/gfFDGEHqnWFxM3ZeqtUeNA43aJBhtglA5jl434Z10HG1rblt1iZR7xO/+fvwJy8Qbl1GxMl0dr9+SQ0OKknT1IbnZupCPHrANWhCIoj9h5UVfjpeJyWbzqxKPM1Ano2ZXJckMT35njR4eqzOEFNfgcRYw91+QMTjTIYTbq9qKbdibUe7q9m6kKT6XUmf9nL1VXxse763aks//n7LXn8z8wPyE6kaI0whtThfHbzc8JAsNYSeEH6DYF8OQDCQG/dpNLZcWvvJoqJ6goI+yAfYH8uHfT/TY1lE6O+bRt1fGx7vrdqSz/+fs3Umf9nL1VYmUe763aks//qm1HroLqxq6lk9qQUpgh8uolWg68Jyg/wvrxH8f4hquDZk+d3KELlUkvtCWDRId6XhV1gWLl43LtPi4AkhnLep8/jY931u1Hu6vaim3Ym1H35JDQ4qSdPUhudo0Ke8qjYLDngdhQoRP/Y86cbA13Rmum7W0UxVt05wXuNkB9vgLMQTX1dYIsKkSlXYwwvzl1jnugt4z0j1wUyLST+hNnYPw9EAmHZ7bK0nipGZjLRNnmfExt4AqvjY931u1Hu6vaim3Ym1H35JDQ4qSdPULqWLX0bTcn4wQ9+Dko39lQsdntHeuci4PYZTcEkmQ1f5igG5tOQhLRQVPbAbtFCVYRyfyq8HtWpHXUAt65cZZ6JwTXqGCyLcmStWOY4dIlqbZYCM5g8cLSBC9kXjt7SiDTbNnj9w50WGaTG5eqrEyj3dXs3gCq+Nj3fW7UffkmPEaZbZNZN4ApGWykE2KTsT0hPKqLITA3pIvg9WfGfLOIXQlbhb9tZxF1whpSL7NoSQ7qjKHu2t/C4Fycw9sdOK8geJ+FpT6Ec+CHiPp7g4/NzHEKF//co5vxtG9Z/g/9SYgU3+byOAWlOjbqjs8M+ohkhINY2bqQkY4xSuM1OZL/G8Ra0PDadKGxbxdPW3V7OXqXVMCA9jt3NJkX21/4a89EzcjXr2gUubsxg9v2UfHQLnAOX9mJIPyElsA2OqzMlE4K7D3qCLWyOr/BlMuowU4SxmjLTbZXZ5KgMIl2M1wcU8hIDbRYDJtG65Z8ygH4KgsyrtXe4yBya4yXRthgmkR/OTY7b/1t1fGx7ur2bwBSOziPSISdQqetWL3xvIvj5/VgXD96JHIgJq4Wsms2YhXWC0RIgNfcVAdpCdQmLimfdyPiuJRxJgVRAQZoFFZ1q2tHbuglAptixNG64GqyG8vGdtPuJc2GgpKjJtG3V7N1IWGVbbtxHTpKEkKdlLUg5IbnZuq/Ex0U26vZuq/DtgtOxgMvzI5iof4Bwp/kF04DecYxlKFs0thFjNDKowv0MOlXkRTdzt7WXndeXgRmNCiXhTgIHcO4uqZZNo26vjY931u1Hu6vaim3Ym1H35JDskKSdPUhudm6kKSdPP6u/SK3SYWe+AjfOZ6rih42L4ke5ftIwQwO0hYpZL5HuyT/qRL63+ZaohgOs9+ketniHBfyZJd4eJTkOlOjbqQ3OzeAKr2bqQqUzdV+Jjopt2JtR76nz+Nj3dXs3gCk5D+ezrq7XG+PoKg0ZIKAcN+lRZnsLK1DKAbVX8E3ppnGObJO3GN0E5ME5l1C61Ff8L9IaIeSV5mBk6bTAcimqBhNlx2ZPJMK3mU/o2PBzPiY28AVXxse7q9m6r8THRTbsTaj78khocVJOnqQpJTA8UZrFAQHKd3szRcS4nImag5neGQD2t1WmE1PsrmNlfd2hijkaEwuTk4nCbiwwQCZRT/sTp+/NnieG9LE54HTNOUVJaau+VZzeheTG3VfiY6KbdXs3Umf9nL1VYmUe+p8/aim3Ym1Hu6vaimZ0iUv6AGs/i88J5re7DyMpU49dZAC6BtQX+n+6699GVJjqbLQk9dycvWBpTA48eG7e37LIX/0mr+OdF1OjzFhzRAA9XkxjYB7sIVxgq7ouvSSQzl/ySHZIUkpf1vU+fxse763aks//oJlHvqfP2bqQ2/xDib18rMS8yfX6f5cTEqazY+rGGniJHEv3PrlHoTs75gU+aMkBFeTh2bLsMty8+7up+zKIEWWH+CKDmJJM9jQPtR7z5Ie6Qs+q3Sge3V1Z5i/jO0p76ev8HZHN/EmzIotK10+7gWDx4xCsL1oS3YQCsgM3N6ecs48wpy7cb8WYdwyWDdATgvfr29LXv1gutnuVGikqnRt1IbnZvAFV7N1IVKZuq/Ex0U27E2o99T3S30e9sZKHPTUOpPlT0h3/MviAiLxkQQhexTol3mhtPB98XWu/B0GO5O+dwsQr4NwnXkiMYsvYzbkHWKtxSMRj3yjzPZ2PymNVdXr/KJ1lu1gMZx1ZG8fBVumDT/s/yKXsOozkFdoOWETAnwlYGfuXfnN0MRTgHzp6giBPOMchEXZt8kZx7vVsusN4sDlqc4vUY3KMpjlTh4VriXlXEMo8efaQkn6Ku/zPXprNF+FXMTt1teh4r6a1dco9rbuW4JKInuMq/ZupE1ajaShW0bx7lXSxgpSXPHvOc4OqneQWVt1fGxwxQchogW8xNeWI9YZTcerJ5CPle4yJi12CN3lBLNBT6duBG4KkgpcDIWeCQ7QIHEUwTzPWuitZOs5pr71pyxSJAGirYeTnZn65/Z/zeWgbYUc+zKKnFqoRkMCD2lucVTlrXaEhqaNlcgi74mMT3A5sTUpm3UrATI4oimwUY0CIcIIF61iHLQS2K5ec8WENTSu8Fo89OJufbg8FXgSh7hA8VYf87fWE7stLTxOKaytnseSeWZzsbwPaMKdG3Uhudm6kKSUyMVJn/Zy9VWJlHvqfP2opt1ezdV+JjopmcvxLH4KGcwCdX2Wzqf9Wh7wu4rtKNoPV1vLWb0qVj32h6pVvVDUBQyY5NoCQsOknIkSDvOGbfETdXrTjtwZ5LPAF8+xsztkMg7ccnzHdcuCeKa5Ty4ttMOD/KFby+rSL1IqG7xgtodmt62VWZNJ+Avxwl6hUM3n/A1NsamELHiYuEbDPc4Yp4VzuKWMRh8XNqOG7wJxnwQTMQloL0kkM5f8khnLbsTaj31Pn8bHu+t2pLP/6CZR7ur2cvVViZP5zI1MYEWwWOWGbx9wlGP/tjGRLvWc5x3eQHDGvfbgXgXVkjW7gwB1crusB7RXrcvmaE615iDACFU8CM1jKkFQFE8jrv264cbruww+5KMex4UMwIiO7mW8lT/NG+zke3AVtqIz8bkIDPKCn59f030Pmgm/NOTnk2pEJwuYTHZtbNnkPoI3YwUsKv7zo6CZsYKWFX95y9IC3fOjoJmxgpYVf3nR0EzYwUsKv7zo6CVPTrijDd6dcUYbvTrijDd6dcUYbvTriqR310tCTPt3Tdm/7oOvtYdFB19mC1Gct6nz9m6kNzs3VfiY6KbdibUffkkNDipJS/rep8/jY93Ym1H513dibUe7q9nBEnL/kkMEAA/v3R2tXcHCn2mJdNmBfrkXy1qXUvSofKcbWTGQaLBNbVdrVkKuW+zxbU8h+cK9uuB3XilpclWSOD8ocFaZwHeE9lKDtsdrgNoUSa28eGGPFgmzN57lj2b1k6AC40uzzQJY84J6WBHWpIeWwlvlgmHu+1JrA1nV8QSjUYnGRDgkz37ujlOKu3bLx5T4AW2dF+WgAV0+ukkQpUAD6NVQ2Kw9qOvCuCJCF7Lj6k6a/7gf8Vd0kU40SbDkJrKuQysDcPumyasWXiQk6thj6NXYLVztx33dY863q6LZcJwA4cVv2eI6cuQ6/F3hloF6fhKvGUa07lMaD5UweSxWFQAPS2kir+MdGZdaOmTCHfUvUK7tYiAZGc0ptna67rcdl1vgAEqMaZ3HfZ4upAwo2cnWubgCSyN2sCX1RXicz/xvJ+duB0zMwZiQAaiEZpggvyZBcywAADtnzlxjQqnAOpOugkzbGQIOFDVXRRg8t1yVxPC9rplGfqxfdA6eqM4l2iH9RZQALAH4gAGBkZ+SZlA3uPtBCuVkobhsdAkLY1qqAo2o4ck3AQCn/ZyR3jpNdJzjIUu9up8XFWzdNxERx53DuI19AAAfbjNWgE7OuZ2v8EPenres59gATqcUioOWjfzz/NgLfVdb9QV2QyvxLiaD3LonnKHemkFYq7TNWYF6mcABFm3Ff6Q8x7+HZi0hlGsZ15lusHwJBAR+MYyAHdLJSfvCcCM++tbg+OT0QFcpe4NWnqCEGzcEoswZb2eTowLqGdCuZin+FSYrA3rk6tc8BtrB2zccjUdGMEq04T+LmV37sut8AHl2lAFX3mhrkDJ/BQcRu3qKBnjs+IY9QVWingRyE0HTrQV7/KdDGvbZpSnrxP3TUgYuEHCBs34MuW6EYPdYABYf2gUv5q8LFg8Y2hEQUFvsEDXMbP2eLFBjtAtaYGU7HpYuFZYOpMNySSyvy43mgyIgrInHaL+R//8X1+gW5fsMOk5LzusFR8G4+OZ5bu8OrBtb7rhQJPFK7pTV6V15bVzri6CDVssNF3g95BFs7DAADofR1EkKLqqdhUvudhJxOsvIov1mZzP5ZwSYXNQXNj14b8yDQ7urvGUmRrEwP+c4W8glTANX+ZozvG1iPzUoZS89zfkzM856ywIn2P5/CgFWr5gaiRk6Wtahu87Z24nYujSF0UAGxFxm6puzgCzYgUI4kbEBCUF1+uw3+NHa/kP6KCuDrDBBjToQr2JwmSIBa1UbD5K/Kn+5e2DQEldEAiSt5j8JmW9qw0y9FMLbusFyYt8PPHjz/iUZ5n80FAAFtC5iwvgS9/NZQy3awU2UiQtFAKA2uBbhBY5LjAna0f1qnDAc69NB/JxaqCfjiP1RiaWT23r5YSJTcWASzCACaSG3PQQ8BwnOlB60QBj/J36VzOtpKG+GyGVeht/rQCsOT7HQjvbaX997Vhcq/NMeReuh/KgihVFxPbTZyQwoC4LHGLkwAF3w+iigAAAAJQxqQkefOoh92ZE3pP2I9J6PxnMGl+a77nR/0v5T6qwVHmL9f4aIKdeIdmBVGZSiDCErIrx5KN/THsyd0V/khM7Xz7pwV8WY3qGpXX3NSF/SjWRsdY8CZoTGi+fb37M3eCMzj2zl8BkCnFAbb654x5oOBMRKTeYI3S2I/5OjW8AAAAAABTwEasKu78mCMpJ/viTeOO4gkV3twwRgb6TElH+MTpUvXUdQkCiaX5JdSoz/V7B2WvMgU/Dpr3IutCNC3hC4ND/trgy1cTVqak8x6ZPa+UH6jAB7YGdox3mcAtcBEUO7MlYxWrWTysAoafEs6zMNhvw6vv0UXE8A3aLCKG5VXknebvtvhrTCjm/paLJAo/YNyjPuAlCfPYd5JNlwjN/HSBLIHSzD6hVmRyTh5X7vR2Z5slTI67xUp77uyoI1Mky7+TukhbwwCW3RYEC5fMTqiIu7+3D6cZYmb4s8kChhCKPvzGQxnf8H+zfNvGduSh36fDFzgY5azwqLyAiDuchpce/PSaaD6fHMCy2AzUo874dK/ggp2JZAAAAABSfOKnJNUpWFD2ouhPluuF5wTdYujuM/7Q6X/vrze2Zwn7JpGltz3lrUXK4b6Yx+GiX5F/2VTIbAwZWXl1Qnn4rS1sKipIDHgiIqw85Whjaiuerq9h8RwlNFYjD4H6Bd/T1/cgTQVsktjam82DYHu//J5sNzCP5NOyev2MevCSVcVn12R1POQAl+/XUtch6l4+lVSGwhOLSdAFVE+0VRrYgT7SHbFlmcVxvR5mtJu7NZ4gu8SBNQrulrc97BJmqI63jYAn89lRtu1ohKAcGZ9QFyYB9j4R69MOm94qa3DH5ib1Fv5D+suAe3uLPat24OdrAJyRe3jxXJHdpug9VvMoE+Xo++1NBsDrZWNwB7wF+QeoUsTVQHyb8Iu9dGLP/xmzuwQZHEUzJ/FRe5yN/s4KM1vFXKPogh1ABwv/tuCFzsGmLqCUcSrn1j10wkgS6Lz3HmwE3D3GAoRDqLxFugVhl12OKNFU9v7/KIsMSL+1FsE9a8k22/U/Xr7Ay/YUKvMVeo0vRisgzzfh7SXkp3kkzcefac7ZPPFu9/ONgEQ+onaWwcLrkoq3byc5JzfkUimMfhUPQl+1XEErLjjK+pK5dEk7GjMCn331PN9KSBX/h1mpckWC9TBiPgEmpKvT2DdqSrbBzwZkiRqnSdfzACf779GBHKXK/qGqDsxpWobAH7NfjVPBH12mR0VQemDcI6qexwAAAdMyt4r6+EQnLrebFOnta7pSr2WT74m5SLzFvCrfhA3VEmgmInilCWRZcCyRLE2qdYn1WnisHtqYJEzbpp/HGL9RcrBpygUgZvz8ks+wB5d6ZeJpo1FqJxP06qfJZW+yqE0wPGh1btPEz6y2ecbWRYUNv/+eVGFEKL3dVyZvDfDaz9YuOP5FeHwSdPoRrxt/ufI2kKFQ6vmIAQ5JXGBfZBdDYL1/FPKdNUcbR9LcLjojbqdJoHG8ZP6y9oGS3poQwXEQfYt9POwIwaur0HjCCrDKXlJ1X/Nl/KISjqg4ToSqWd7fjAISc0M5h+FFXzeLw1VdAWhjnvEBqqr/9SugRjjVwXs0Ie28awa3bMSe1u47RW6RE3i+f+48uYz1nBmrHPMcoemQS0eb/odqjlrQnCN8BUOhb3Ig9hX7//TXR+Iu2AVmH7DOwPSbP1UQZrEEd5lN0zTRI/mnw6TzVpeOHwHbin5g7Dl9DQtpuvHwRJE8NVh13GFfG4/k5+OdSw3DEDFgh6SHjc3aLgbcGvFuspP/RfT7OtD6Rv/LeV+zdNoY3Lyc/cz/DW25IUVTbU41+2vVS08Z3JFiQp2D8sP8S9wM6wP7dISgHFE554vuyCMMuDDhA0SfxuzZcTiTMVOGxJ4qqKhMXNwi4LJI2xvflLel3PDb+6m9BkOo4aSebRv09zB9EtWPYIV32egEW8pggUQUO96RZtkDeqdLkScI3yMguzL1cex49MtcaRM26tcHmatQwfJx+6V507UPI+BQBsq9bFYw5znqYWCJz0hKocArPhfU1gMV7hCQXw7PalmStri8N1fq7pMEJqIra1T/aIEVQVCXZgFGJkdaWhrwUy/ChTyC+9eJ7ZBIO+HgZwce6PvnZQGXT3+ZFaTNXeN775EhL4M0e9BydoL/j6n/cNqgI0qu2P6oj0Wm+eeQ9MeeHY1jQo/M5cSITO7/LfUNejvH9bvcdALmkiHDC27Nz7enogfSGkM+H7J/YdVhQVTsvt6IcLk6JDJabU32/ZKPJxUhiuexlRC9hS2DOlFaCscjhWm+shP5PX/wZf2CgS2Jz5hVqHH60vOw9Cf+wEUVUoU5ZsXjGir0ETByv0PgTB8yzXF5Yp0MZ0uHiY6lk6LK7c6HOjW9Pk6jlQMY7f6Ro29pzcpNRr2espfITp1jhhe/Ei1dvCYImtkOFQ8HDr1KFs9/yYWLO5wt+VaOTXSupeN1v3L8PLbla25KTkWNfptfzNLBndAe/xva4VbJYGSpX+wEr/EKHFqMbWcsf2uDi4bktYqvzIaiY+xCsaPHoft6OV7zfKdrVHDyjUtMkbyWdwR+gIvtIWcVgDvojI4mCCZmftV4LC0l9HJSl8vYGKi8Ec7dwJ9RXvWb9gPIBv24dNbkoaw4KETlnCw2DHJcaaZaXlQO130JZ51gB1blny7b43TZp97g1a5FbErIYQ26VntXvg+sGPG+mJp+PqYbTdeFOEX/6zSCNVtr7PkMryYNZglSa/rm1vMnXrOU3YhHJG941AF0fTpbDT3eB/2iuYOC8Mdquj+xgTILndedYkMjQ/xpZOvfHrxdWOijEf+yOp6ZfiK1WGLDUNX9IlPsyF08xXd1DEI1oDEbYp1CfAOiO8hFi5rS0WFeClUYZ/PYAo6QA/JNj+bbZXnS31ZSZiLtGLVSel0WJTIeVnGFd43gquYnYh2kqg9K7f1LdCAVlGwPX8+q4Eeyma3tUUoIsA8I4lPdFMX+/M8DzW+S1QnEvbmwjNLLP22wgIy8NOPoOnzUJnkWLIiCMNf9VWNVUQsna0yKywCJh8Xpc6uWZShSw5LBsiVCkYCsrrsXZLsi86jWynHDv5sph33xlbezGp682WBLV4zPPfLo7WxyxM2YYRi2p96noC99KV7JgABc2SSfdqCvctBwAmGN23hSTFhYQqA4sV2tX4Pj5ZULpYtfEgy+Z7m+wL1WamU9yAW/UGNdUu8eX7UXeupSwL9wfm/CrLtGZw+nYt9HZ/TR6/Nd1sSeTXqhxjnkEAADSm+TZVRJ2U8g2smFs9Cec5uJ14MkmkfnstbYHdOJi9eEbCOR6UFvddaRFfGnJax+I13OxLQ+r79ALSa+SlmE7jp2qIhvz01PrVlAsDQeXDkoh9Bth4tZ7JvGEkGNchhb/V4ZSjvzNmqK9ipN/HBZUduJaTXL/Pjw/b25fsMWUBUBQ2FfhTw837yuYHJOkNQAAALumtdQuzPm4cn7P0LYVLknvBtYOYhWauPgZ+pCAine5UGACQ2wjotTQSEIRHattlK8LQvPaP854kfEC0OTKotAaSD8xpXTYE0SET57v1hwPwpl5ilmqSWYfqvvai6B9WAjxYqMo1LLDIfUNKiQDobDCw3R4rLqHPg8P2VNgxvy+Uv6vHGkl1zvT/XUXcw2DzLiWqtVEbB9Up2lZVtIsTv2opMDAxiaOOjzJ0/gA9xZAOAwNTcQvIaDdRXlBzyNmZk+tVyhFGrcT35QrgHzGfZrbIK38INrVW1F3ghxBTGGRdbTb1G3KI/aLwPIVKyEEoddz/n4vkj8epOOXJsZJW8ADxFswAAAAAJ0bVG7xWBd2ZhWZFBwjViSP8dp5lePXNIqWpY8pBcNRD3PDwTaYeXU4oKRh87yMPfBdtILGPjppowoL0h+7JywPKaeflG83H6gqCK7+MWKFuKEEPoPaRJyjvT6XaqzPyvd21pW4/STKPG+UNC7kMvDLxsw7vgJU6vCGz9JGjlA5v1tpxS8nDq1nyifQ49u4zBJfiOXh3gAAAAAABtxag0oAI4vKtagZewwexqMhN0f5kYWeYCreHr+aq0MaLuyWkT9AzQq39WI5emJBMm+XxNuhajQ/uyuSSR+r8Cdlm9w0tjtlwV/bvSE9mwXyZ7BrAMMF5RTdB/0sRRmBQsT4QbLJlwrDNWyU0XY0bycbhB6fpbIYq1wM7F/hrwKabYIjOrPxGJyP+7r7SmnnL6/Tbpd8cwZLYIH9HmW4hPqbAAAAAAAT8Ayw4KH/J7Dq2JryjuskcpA4tcagY5+vil53t4KvrSWK02VRhSrD6qyvU5BXQ+u6X9tCfEO3DsUDZ6cfbEQXzNJfxAcb8G7A27U0ilKbl5Eu8iCPkW9ay9PrurPRhL5h637xy0xVZwmh87fQfuIL7ScXMZPky0Tz9kjBVI1Reg5T1TPcZnMWA3jvxBIiD9lJt1yYis+XvzF2MIUqG8QPkfIYkTANlOmEMb5Sa6pbDejnfvDIedM9s3hQkYZACz4gAAAAAAK7Trycuws0axl/+TCT6A6BzSxiBbSrN2FkP24grKzMHVlvnDviJRYhvc4zAHJXabYJXTXWZDgWvbhTdvipYpqjzuzpD2c6WYAmiUTlLa8BSb/OMo8XazqmjVCvidMv8Q/bZXuxguQ2uZWFMcpRqpNZtpSiPdGFa+q0DMIJufIqsNrf2wxdVvBIeYc5HV91GI2ZGz5lSZ4njQQltVfmOunPZmP04cEC0wynERsdVh0w925Kjr5zejoTs9BjeLzNszwjDRFD/r/8QA2fIjOYbweKrwCJ1GxmcuIfcCjv1Xa4dsrIhq4wp6mnIAdspt0dUriylSRir/HD5D06agAAAB0QsGHdh9ZYWzyfF9augoz20jA267AUwEC+mDo7w8402k0fqXVtUVYKCFOG0PRTZtC+4OThFUSkOuMhArVj2U7F9nwoEMPuP/zColwxko8ePRPhmGJhah/pZChLEIcV4Vq5UKKmgE2grLY5d/VsH+J5+YK7NCAQRxB4EyZ7JrAgadtzMVk7f+WjeIH3qmme+/Y++Jgb7BXJOO3+KkNf9APx3hzoWSgfodYRVBdXBs6TLy/eMQdVxxhlRi69SHW+uvFlRENfJ3TgYd5OO6U6Rp1MML2W/7k6K6CbnL5hk6InLLAA7hmHVqHQVo4VXzhtJgiteZGPLvsEMdwlQ/5kk6aNlJIXYQv/tJua0/6P/QKWPvnovatm08xlffGAsiubKq91e6oRifyeuKhkCo3AGZMryoWg43ntT3Izher9mCx68DEpzdNqRqIUPzjXAO8aAV7aVC4mO6Vrm33jaYrsMYbemO/pBEmkx78TsUM8bmk2joAGWvxf/aL0gyJYOEpz+HiqLf06X0LEVkwC7HTuVhQWt+dHPZhVv9b/goBX5Fc1HEZFkONfodT72my2wlMAjj8PLeWWdkUKmMKn+wYdDXIRifX1N2/4//TyhHmnmOIEDbWGtkx1XKN+XG/OvBi3P0BzhHpjlw1AwzwTynMoudFKALUFYwm9uFqwpGB0IWl9a8aEPk1ugCtzsO7mOnhToDpZBTI4HUArrLqHrgNF+ncDtmd6dLpdN5aoPyrMZ3LGgcltOnIEBjeGgmUWEWx3nfGcz3WLHISemc398qigQGRouYUCV0KIkr+alg7TRAPcIghUazYUIcpngAnk5W+AABLTCfVwvOEfdBQiNFfAX9GpEpdZ4gxW98npK84Vmt5sHKMMk2mj1B3LCUb4M5i7GtYUxASopzLshx+k+x4/3Kd3v0r6lm5elRwKAm4jG6bPhar0HgEMKO6eSBEKTF4iylwuMS2Pxn7SytUukhpH0NRrfQZGi3zh9XVKPPIqUJG7beVUz2mGszR4Gw/TG/tQNWi42Y3f05JYUwL5Ct/v7kfLDNLRuqIWPVZ9j+8E5721OAp3s7OfAK6Z2qBjZAvtBUDlYb89rauII762u5fTlgjPyuyb+03VYRbg4yA0FtUyoOHXzK3k+8w/dcOk0aT97lsD6OiaB0cjihJo8hmPpm/c6uMs27/NvGQekApg1bV3B70ylxNV++2fU9ftp449ud0bYvqKGcLamzJ13b+FeuqNILekxw6CGJBbFUGNqrbwKAASyFBAAAAAeZRoZo4PVPIs8uAJHybpf4bLMc4Ck0+RJsH0kxCfwhFouEHd5uVJdDFg+dy3/EYJ0d+Y6pkT3Lfsg7+OP0IFn7LpoOJ+MW68JFRd07oCY6B/bfh5e6kKNl2FDfUgDNC2mxN+bMlDbT9pXNB/I0FasVDJ3F5QDu9t50j19yaHRFeWex0Ys/3ujA80/90tIzj8i4laGBFyV4XI/guGm2RVRUUT55qk3QYDVcAhZkVXVReWrR52tg/H+cUAAAAAAABjmT1vvcnoi9ae5qqOa4prfoQBXBg1diGyDkT0rq5Fbk2ioYwKysKfgjqglXmpt+OsBAYSxJOSkclpmrkooD+AAM053YK2UU6779YsmLrnQzQTHvF5DKqVDB5uK7WJ5h/R5eGnLpk9fSAe0obOZbPprBsTpGpAvOTbmw32lTJPaXb0X6v9n+HicYIYThvV0KOTL+sYWz45OPZDwGhgAAAAAAAcYJbUMYA/m6zfNfsl1JpjQahTYeJI0/AWLctz3PyqiozKT4xACvwDID9He6TE8xkG/hRCGLGvjyYuFW+PnNxV9MwjZX4mppRJdiYETRp5an1/wx+ltWVKLvFfkFdt2wl2XV7Mpd2QDc3FnrAZj0fKGSY/SWDQVK7Igwf3/UFrHJcgL+32H0LsuxKnVRYaxzUdfVGnLMeOKvIlIR/Xm/SUnG1qtUREvc0k1+RpEpsdjbdJSkxMxFvlRKV3ku/gZ6Rm8o718wFgE2p41LSKmShjt3bMp3NTuSj2LEqtCH1ljRSaCrslIvPLcC6cNjaAOHgATmO7uatdkE9a4iC34+7xEpFipsa/XHczNenbFGmyZDn46amH1n98OzNZy0BCHQAAAAAAADkcN1j0tX9ltlz9zqeZqKt98cRgOdaYneE9mvP5033OfP4bF0LySQ9GPh1mgdqGgHo+4GZW2oPI1vGu9mMKKNnPGp4h6jd5ef7QBxfhKwGRIVHthAlgrvNoX44ig+TGsC8rk3+g/+UFDQ3FNHPx2LZ1ZgQahqtJdMtD8Iu/chnkdKWi1mJ2dX+9IlLbZQAAAAAAAn1ZsYju1c87dvnDjxiqkXP5VHsVMfenGHt3vK+q6vgQJcIa0E1rxBaBCJPXCdCSbEJlYTiBcngGkt3fxMx0j5gUQMsDs5PqOwzza95ZOEjHiZ0amHgR77JxpZj1PfSGJ2Yhd/Dd1+syQ+3Rxo13Mespo3OzAI449UG95v14OVDZd6dDvWq96dtY1l7FnMVv0NkZnPolxX6zvsV3loLlYORG4Bz4LPfmFOHD6yoLjgTEJ326GX1zqBztgGZSzMjzJLF2HjDlgCNbiB59QC8SR9yd0LNMhc3lRbUe0upg+P+It1FzQHRopX8xrXpu6BOsgtLEEx1kzXTEgmKB3h1fsYphCCi11B7LDqzpbvPie0eKuneHdB1x/CjQoAAAAAAAABCwzqBy47aN++zCiKoUdXc9E6crN50N6DunaKNvOJUPfnjTMcrt0kfya1SZ4Qe0sdHkX77T1JUT+q/IBTSYy4YdXW3nyJH0qtJK/j/nACKhw9itj7eKtGi/LcAZaEahB+TDXjCtbY2oepgPt8LjroehSXYQ+qHl5HWb5JuRjM2aa92cBp08Viv77JAG3hq4LLfCaLcZy3sm8QRk6B21hI7hbufbO2bnik5B4+K7DsT6+aYnXa5paAjXm6KfmOI9IDZwLRFQUwyqtIkUAPzqtMDtmtck9UAVmc8RB6sU7wEe3NGNFmQKF1+h0PsAL8nPCNv2dkVu6Ac+YtEoLLuskdNHzblIZw35epfE1jzCIzSRPTKEHNyYWsY/0O6ZIATiwfg0l3dTQNaf567gNCk7xA4wi/COI+L33847pnntZzrw78v9//qff5FaDN4l49bdF7xNomT9yUxwBoqL2yRD7ubG4iw7+nk43m/kVosua6NgZZxVk2fFOQBoT1YqtN046rBN9D1HBEe31rn01SfpWLLFhbu7/IPMhlegtKPaERmh+5TmmscCdFNaIrTGKhkBxsTV2gUo9Rl/gTk/MR3gmB05B2sq3E/wpH03ElcDbgRVddJ8puGVmhmqUJJQPUD/jWFp1eBtOi6GtgP8DaJ87otAXGqQmiv5asHc0USHhPdxdH8MfX7ACXvvX0MtQZpEF0DEeUJJOT9iSbCot/1XdpwzsStAfCvd01fsCLosxHPfS3rLMFHXE8MIWFPfO+eHZXyo4nglwAstbET0wmWGKe2UsrOgcGaLNQmSVXIZrYIg10p5DyO14vYie5g44uHuWxG1ZigUW4HOUKXxHCuv1NeEL539WhMSLHKrTY22wAAAACvRBXQGjOGkSJJnRPdizziKgKT+XfigPaND7zMCx9ip5hTveFEg3NYB7RdUIUZqyxKH0VSWw0PiDwOxuCOU+N2os80OBqs3XTD0qCzh2OCqYZEKDCdT0sCk3RTCbc+kZRNRwJrsfR7o7MSX2LuhjaP/Wfmt+ccPU+WMBauFauw6C3sV8ANp18SsAJ6F2crsMeqx52yjHAKmc9aJYqyGV6aoaR5H6bMevwgYz79Oua3SsPcpPZao7SXmEiz0T86Ip7qNewcPau7X9Lz2BLnZSdb/s3nr+j98LYbE7U22fv11o5Ii+8AnCNW6u9FPalDEgKqOqI+OX4YNYHRbUGTNSVlLFO+d3gntoq78yaav+CjKED9UquYq6Z9cEP8ZAZKDVFsJWL43N97l0sCHRmE4Mz/kdVtJY9JP7Z2yluWMoC0X418M3KNBNUXn42fNOQA4bmUbsex6RsUrlMpLjWWlvUmNSmsIskWaI03uj732rw93ZMbtFc3hy39UyWFKvauVMQ0IlRa0LvLc8Y1d0XXzCoCrrT+8g+dG66Npp73lsUkHMt1HUS5aCVzZwCFlF5JN9rrN3+K4D667LW4UlHZGJsN5ebtynO1k/7/erSc5IKdZabxl/VNc8Y8hWuV08Z3gCH1D3L1v13pZ6oEJ3YtIz1AVqITxriMFPI4PkKFYDfhcvO83eSBe/KtTuQBU1C/70s59UyVrHbBD33a4mDEZ2rsrf85UK3UWuCmRo7aQMgAeomKTo3PkzU6VU6PS1gmhsBQOv56RNxLG0rnfQjiJQ31guM6qxRA///W5jJNPvsgyYqaQTn1Ft/69z5g7E6t3c+KG4S9eNSIAWYRepOOmdcX2mllWo6+GhuZThbQo4a0NUg+qinW7HHXWaaO9f//kKTpSFJGCXvy0C1y7NbrE9SsxNi6y1puT/24EDl3Nk60pVeXVwy8Z9cANvo26ugoV6/UxxoanZ2r69klRiPBw0PD07mHDZLYiJ8m8jthwXut7zc2++1D9cnuZTaodc2MH0UMM9Hfz+GLvuiPUMb9kOiJCDG1JGWisMyd2Kzc2VvHNUT2gX8Pjt0ws0gRuv/RBN+4Ng6rRm7DqpdUCqCl2xtetU4fPd473dIItjR16LqWtAaGzgj1rc6ouEs1GBqscbXkNnlGB2m1tJMicWTTSd2V3+uGxZmxS2Z1WKuW7tZs71slJgGH4L3tdM4WOs6omTyelbJJx/LPK2nWdRZnhPVOUJcGvDe/7Q6v1eTElhGzF/Y5W+m996oezCvSVkSECIG2K4UnrWnkGXKcmzgzaJ4MZQnijpj5dnZVaZ3Rrmz93rvnaKdy9Nv0DQZ3zoNnm7RBR9Gu312urgxW7pZm98CrBte5hUieFtd5l2vYzEr4TVi1A55FVgMg3LYZ9rUi4Ej0gikAUrzlaYgjltfzs25kKet3FLTfet3wopgA0Pydnp+GEWjon3qTjoy6RKPjWFZMOn8MIvZ5Bb/vBiLz3Bx/RE/AH4rlZnSZ0siycpm4NMIWCp2nj0yRk52zPVvqrnxKOmfi6dO4lYuO3Vb3O9IVZfutBHV4uPuJsPGmtTVH6GaYsy2GbttonKwGmlQAkkjOsFT3p+MQh/pkJiMFl6lMzhFMvf+rPDqq/t+SB4Qpli3RQjOWIHUy4nWATJrXdbHO77nNQMC5D2ZBInbg7PP58Ok8fZlIVH1Qj91enSdG/UXA0FraYktCdfke1+nKx01HVGJ6owJCEcHti1mVWD7ChY7HyWutaIFcZVyZJ1K9+PSST3BqN82Pkhu9zaG8aZn9zOz0CTk0v4iP9VW+Z+/TDclXxZGMxCc+9so5QVxVlSgiBDBzfc1WbVzi79HCvNQDjYgT2I5L3mdt4ptWKBg9LPyIHkGCNN1+ylJw39nyQ+AfyBt9asZBlPBy6+s3HBQ07a614V1BA9xD8/A16PwTw2lt03K0DrI0J7/UJVK02NIC7fTysp1ZmbO6pawfWacKOfqbuasbZT1rleHLHATYcTGkLfrcKmIjVojvjsorPvfYIdrNO3yPw6dzqsy5Y9S5zK3XLWAbbMW2Bzu8JlaJXMz8mptGhsOS2lC0iie1BBd4G4RWVRd+4YqBnnCrnlb3WB+mIoLzF+VStZSKHY+KvB68h7yWDAb/4/HHgxHwmb4tSgEPeLD+PSP4Hx0v9do830pF/+7qlc+NsFOZXdXajAtH25AdwX5MiciCZry/scC2jla4GGgAL3DaGmj9vfPyrjHAd5EL87tmUmD7Vzvo6vlOA+sH9fkp1L/ku+C8n0r85TkzPejHknQ9Q0Ec6dq1FWZuVud9Y9Keg62EdSIDVVqN2vXAsM4ZeU9xirsOxvXY5Ca7VaD5wRJ3xOPILgUArEtA6ivdpqOimdQS+lRFnpt7PGbqdRKVdyxgbFUb40Z5BGqFvziWjvs6ZUkjl3c6XWWl1zwZ6pxe/FbyW5s4El+o3/SClvIKxN1cy38oRXojO0QADQ97gAAAAAALeQXfjvJS6M8Y/3N3TyjQT1MdjmuSdLzsnDwUGZo26C/Tv6tzj4O0MQOjh7Qxcx3Z19ifHlWw25IyLvkG7dkvb3JjSzR36pbbEgMpchxCml1GWR23pgq0b/9HRKbwkcLpelxDV5jeWS0/tMRUvZbNpAH3dK6Sj12t93/dfTExagKn5i+lU8X6bGXE3gVUWBEgZeWTLqxfgaUd2zLmXB2ZHUjT6bfWcNiKbub3ti/LkRjaSYU12hz/Rfaeht0m/icbgaV9vcsY4kwHg8JvIzEmK24JHNbpihQrXjkR60bCaRTQ8deQNfmgke87PBl/1+0/dpf2B4bzLzf+fefA7yjbFZGqU40l0nhYpcyKGwvqkCa1xisqBwuS+L9K83ZyY7V/w7VIhmuaYam6mWfXFPZV63EIRROwiLoDWtxFMnZKlSFwRr/cL8DGJYyldGPD2PM2QVXwKWBcOF7K2FCS8xtdnRoLSqvrx5lTj+j8umuNOt8vzhcSkA/Bv5jmZXpFQQrYuhyfhIVKtftJ9oPHmIlzn5x/PlpOjAY94YATHTwmsgbOP9zTiG0lOEpSlk3XmNVGiaoAAAAAAAHhIGSzmu+7B/OPb0CWFTshwOGRUQiEXKInPduVMaDW+0kMpICPFyrIEdhQHlfWegBKA1muKZSBA4BmgN+00G1jE39NfFzIXG1uy4oK7q2/FCyMgdlOEfTbOZyk8NiVbyihOtZwFrXebnvCJV/zlX+9i1e2VX0gNvMdlloucZVRQTGvr3OzYu3S/XPGeHsBsCC6mkkNeIp6c/gTo+SbUAk0042TcKQ7oofR4OnVVvA5IlCs/iniBkxz6iwNFa5HF/oUR1xBTCY8XqLWwh4Y/6voah4KIdj4JJfch/X+10znO5971Wrqr/z8zYn9pjRSbQrWi6IITIm05DNZDjmlAzM8qCB+CUCXzHrkyMBfDEMI41QN8Qjau42zvEWcUpYZ0j0rj5QCKSoXPASokWkQyA2TOxNI5+wPeb0Kq3Xf5IG/Cu1cIjjok8UNl4FqDl70GNkeFPiQUgFPVROC5UxFpZH2FzUIy/sV/Og8RGVggo60mg8Cu0d6Ppy42VEagX5ObmtQnKONJOxzCKI3itEmFKQgnrIKYQuG9TUHMC7TjkqPZNm1cbgwfmEcD6SMdxUFU3tH7qEJfTYWYAQdRh5SfFLxK8R0ABl2/dqO9BBgA4R3qsUBxdkSxxy7I7kBhX79QElJ/vw6WXva5xMQJMQZwMgCA4AAAAAAAAAAGEQy2MAlnW3A2Qe9JAAA';
@@ -2011,6 +2011,194 @@ class FlexibleAssetDomainModel {
     });
   }
 
+  // ---- src/app/presentation.js ----
+// Energy presentation grammar.
+// Owns navigation metadata, tab hero assets, shared visual hierarchy and card primitives.
+// Domain semantics, calculations, actions and runtime truth remain backend/domain owned.
+
+const HB_ENERGY_NAVIGATION = Object.freeze([
+  {
+    id: "energy",
+    label: "Energy",
+    items: [
+      { id:"overview", label:"Overview", view:"overview", title:"Energy Overview", description:"Your home energy system at a glance." },
+      { id:"flow", label:"Flow", view:"flow", title:"Energy Flow", description:"See where energy is flowing right now." },
+      { id:"solar", label:"Solar", view:"solar-generation", title:"Solar", description:"Solar generation, inverters and the relationship with storage." },
+      { id:"battery", label:"Home Battery", view:"battery", title:"Home Battery", description:"Storage state, capacity and contribution to the home." },
+      { id:"consumers", label:"Consumers", view:"consumers", title:"Consumers", description:"Where energy is used and which loads are controllable." }
+    ]
+  },
+  {
+    id: "intelligence",
+    label: "Intelligence",
+    items: [
+      { id:"strategy", label:"Strategy", view:"strategies", title:"Strategy", description:"Strategy overview, effective policy and current runtime state." },
+      { id:"operational-planning", label:"Operational Planning", view:"solar", title:"Operational Planning", description:"What should happen now and in the next hours." },
+      { id:"tactical-planning", label:"Tactical Planning", view:"planning", title:"Tactical Planning", description:"How energy is allocated across today and tomorrow." },
+      { id:"strategic-planning", label:"Strategic Planning", view:"strategic-planning", title:"Strategic Planning", description:"Longer-term energy goals, constraints and optimisation." }
+    ]
+  },
+  {
+    id: "insights",
+    label: "Insights",
+    items: [
+      { id:"metering", label:"Metering", view:"metering", title:"Metering", description:"Measured energy for the selected period." },
+      { id:"value", label:"Value", view:"value", title:"Value", description:"Financial impact of your energy system." },
+      { id:"retrospective", label:"Retrospective", view:"retrospective", title:"Retrospective", description:"How Home Intelligence performed and what can improve." }
+    ]
+  }
+]);
+
+const HB_ENERGY_HERO_ASSETS = Object.freeze({
+  overview: "heroes/overview-hero.webp",
+  flow: "heroes/overview-hero.webp",
+  "solar-generation": "heroes/solar-hero.webp",
+  solar: "heroes/planning-hero.webp",
+  battery: "heroes/battery-hero.webp",
+  consumers: "heroes/consumers-hero.webp",
+  strategies: "heroes/strategies-hero.webp",
+  intelligence: "heroes/strategies-hero.webp",
+  outlook: "heroes/planning-hero.webp",
+  planning: "heroes/planning-hero.webp",
+  "strategic-planning": "heroes/strategies-hero.webp",
+  metering: "heroes/pricing-hero.webp",
+  value: "heroes/value-hero.webp",
+  retrospective: "heroes/diagnostics-hero.webp"
+});
+
+const HB_ENERGY_PROFILE_ALIASES = Object.freeze({
+  "solar-generation": "solar",
+  planning: "outlook",
+  "strategic-planning": "strategies"
+});
+
+function hbEnergyAssetUrl(relativePath = "") {
+  const normalized = String(relativePath || "").replace(/^\/+/, "");
+  return `/hacsfiles/rhi-energy-ux/assets/${normalized}?v=${encodeURIComponent(UX_VERSION)}`;
+}
+
+function hbEnergyHeroAsset(tab = "overview") {
+  return hbEnergyAssetUrl(HB_ENERGY_HERO_ASSETS[tab] || HB_ENERGY_HERO_ASSETS.overview);
+}
+
+function hbEnergyProfileKey(tab = "overview") {
+  return HB_ENERGY_PROFILE_ALIASES[tab] || tab;
+}
+
+function hbEnergyPresentationStyles() {
+  return `
+    :host{
+      --rhi-page-max:1640px;
+      --rhi-page-pad-x:28px;
+      --rhi-page-pad-y:18px;
+      --rhi-space-1:4px;
+      --rhi-space-2:8px;
+      --rhi-space-3:12px;
+      --rhi-space-4:16px;
+      --rhi-radius-sm:10px;
+      --rhi-radius-md:14px;
+      --rhi-radius-lg:18px;
+      --rhi-line:#E4EAF2;
+      --rhi-ink:#0F172A;
+      --rhi-muted:#64748B;
+      --rhi-blue:#1467F5;
+      --rhi-surface:#FFFFFF;
+      --rhi-soft:#F8FAFC;
+      --rhi-shadow:0 12px 30px rgba(15,35,80,.055);
+      --rhi-card-gap:8px;
+    }
+
+    /* Mobility-parity page hero: copy left, product image right, compact status row below. */
+    .hiTabExperienceHeader{display:block!important;margin:0 0 10px!important}
+    .hiTabHero{
+      position:relative!important;
+      min-height:136px!important;
+      height:auto!important;
+      display:grid!important;
+      grid-template-columns:minmax(0,1.28fr) minmax(280px,.72fr)!important;
+      align-items:stretch!important;
+      gap:14px!important;
+      padding:0!important;
+      overflow:hidden!important;
+      border:1px solid #DDE6F0!important;
+      border-radius:var(--rhi-radius-lg) var(--rhi-radius-lg) 0 0!important;
+      background:linear-gradient(135deg,#F8FBFF 0%,#FFFFFF 52%,#EEF5FF 100%)!important;
+      box-shadow:var(--rhi-shadow)!important;
+    }
+    .hiTabHeroCopy{
+      position:relative!important;
+      z-index:2!important;
+      min-width:0!important;
+      max-width:820px!important;
+      padding:18px 0 18px 22px!important;
+      align-self:center!important;
+    }
+    .hiTabHeroCopy>small{display:block!important;margin:0 0 4px!important;font-size:9px!important;font-weight:760!important;letter-spacing:.13em!important;text-transform:uppercase!important;color:#5E6E84!important}
+    .hiTabHeroCopy h2{margin:0 0 5px!important;font-size:clamp(24px,2.2vw,34px)!important;line-height:1.02!important;letter-spacing:-.035em!important;color:var(--rhi-ink)!important;font-weight:680!important;text-shadow:none!important}
+    .hiTabPurpose{margin:0!important;max-width:720px!important;color:var(--rhi-muted)!important;font-size:11.5px!important;line-height:1.38!important;font-weight:520!important}
+    .hiTabLiveLine{margin-top:9px!important;display:flex!important;align-items:baseline!important;gap:7px!important;flex-wrap:wrap!important;color:#334155!important}
+    .hiTabLiveLine strong{font-size:10px!important;font-weight:650!important;color:#64748B!important}
+    .hiTabHeroValue{margin:0!important;font-size:18px!important;line-height:1!important;font-weight:720!important;letter-spacing:-.025em!important;color:#0F172A!important}
+    .hiTabLiveLine>span{font-size:10px!important;color:#64748B!important}
+    .hiTabHeroArt{position:relative!important;min-height:136px!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;overflow:hidden!important;pointer-events:none!important}
+    .hiTabHeroArt:before{content:""!important;position:absolute!important;inset:0!important;z-index:2!important;background:linear-gradient(90deg,rgba(255,255,255,.18),rgba(255,255,255,.02) 34%,rgba(238,245,255,.04))!important;pointer-events:none!important}
+    .hiTabHeroArt img{position:relative!important;z-index:1!important;width:100%!important;height:100%!important;min-height:136px!important;max-height:148px!important;object-fit:cover!important;object-position:center 56%!important;transform:scale(1.01)!important}
+    .hiTabHeroBadge{position:absolute!important;right:12px!important;bottom:10px!important;z-index:3!important;width:auto!important;max-width:220px!important;padding:0!important;background:transparent!important}
+    .hiTabSimpleBadge{display:inline-flex!important;align-items:center!important;gap:6px!important;width:max-content!important;max-width:220px!important;border-radius:999px!important;padding:5px 8px!important;background:rgba(255,255,255,.88)!important;border:1px solid rgba(255,255,255,.75)!important;box-shadow:0 7px 18px rgba(15,35,80,.08)!important;backdrop-filter:blur(8px)!important;font-size:9.5px!important;font-weight:700!important;white-space:nowrap!important}
+    .hiTabSimpleBadge:before{content:""!important;width:7px!important;height:7px!important;border-radius:50%!important;background:#94a3b8!important;flex:0 0 auto!important}
+    .hiTabSimpleBadge.ok:before{background:#22c55e!important}
+    .hiTabSimpleBadge.attention:before{background:#f59e0b!important}
+
+    /* One card grammar for compact facts across all Energy tabs. */
+    .hiTabStatusGrid,.rhi-fact-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:var(--rhi-card-gap)!important;padding:8px!important;border:1px solid var(--rhi-line)!important;border-top:0!important;border-radius:0 0 var(--rhi-radius-lg) var(--rhi-radius-lg)!important;background:#fff!important;box-shadow:var(--rhi-shadow)!important}
+    .hiTabStatusItem,.rhi-fact{min-width:0!important;min-height:58px!important;display:grid!important;grid-template-columns:30px minmax(0,1fr)!important;gap:8px!important;align-items:center!important;padding:9px 11px!important;border:1px solid #EDF1F6!important;border-radius:var(--rhi-radius-md)!important;background:var(--rhi-soft)!important;box-shadow:none!important}
+    .hiTabStatusIcon{width:30px!important;height:30px!important;border-radius:9px!important;display:grid!important;place-items:center!important;background:#fff!important;border:1px solid #E6EDF7!important;font-size:15px!important}
+    .hiTabStatusCopy{min-width:0!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;column-gap:6px!important;align-items:baseline!important}
+    .hiTabStatusCopy small{font-size:9.5px!important;line-height:1.1!important;color:#718096!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+    .hiTabStatusCopy b{font-size:13px!important;line-height:1.1!important;font-weight:680!important;color:var(--rhi-ink)!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+    .hiTabStatusCopy em{grid-column:1/-1!important;margin-top:2px!important;font-size:9px!important;line-height:1.15!important;font-style:normal!important;color:var(--rhi-muted)!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+
+    .rhi-context-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:var(--rhi-card-gap)!important}
+    .rhi-context-card{min-width:0!important;border:1px solid var(--rhi-line)!important;border-radius:var(--rhi-radius-lg)!important;background:#fff!important;box-shadow:0 8px 22px rgba(15,35,80,.04)!important;padding:14px 16px!important}
+    .rhi-data-list{display:grid!important;gap:6px!important}
+    .rhi-data-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:12px!important;align-items:center!important;padding:9px 10px!important;border:1px solid #EDF1F6!important;border-radius:var(--rhi-radius-sm)!important;background:var(--rhi-soft)!important}
+
+    @media(max-width:1024px){
+      :host{--rhi-page-pad-x:18px;--rhi-page-pad-y:14px}
+      .hiTabHero{grid-template-columns:minmax(0,1fr) minmax(240px,.62fr)!important;min-height:142px!important}
+      .hiTabHeroCopy{padding:16px 0 16px 18px!important}
+      .hiTabHeroArt,.hiTabHeroArt img{min-height:142px!important}
+    }
+    @media(max-width:760px){
+      :host{--rhi-page-pad-x:10px;--rhi-page-pad-y:10px}
+      .hiTabHero{min-height:126px!important;grid-template-columns:minmax(0,1fr) minmax(118px,.42fr)!important;gap:2px!important;border-radius:16px 16px 0 0!important}
+      .hiTabHeroCopy{padding:13px 0 13px 13px!important}
+      .hiTabHeroCopy>small{font-size:8px!important;margin-bottom:3px!important}
+      .hiTabHeroCopy h2{font-size:23px!important;margin-bottom:4px!important}
+      .hiTabPurpose{font-size:10px!important;line-height:1.28!important;display:-webkit-box!important;-webkit-line-clamp:3!important;-webkit-box-orient:vertical!important;overflow:hidden!important}
+      .hiTabLiveLine{margin-top:7px!important}
+      .hiTabHeroArt,.hiTabHeroArt img{min-height:126px!important;max-height:126px!important}
+      .hiTabHeroArt img{object-position:62% center!important}
+      .hiTabHeroBadge{display:none!important}
+      .hiTabStatusGrid,.rhi-fact-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;border-radius:0 0 16px 16px!important}
+      .rhi-context-grid{grid-template-columns:1fr!important}
+    }
+    @media(max-width:430px){
+      :host{--rhi-page-pad-x:8px;--rhi-page-pad-y:8px}
+      .hiTabHero{min-height:118px!important;grid-template-columns:minmax(0,1fr) 110px!important}
+      .hiTabHeroCopy{padding:11px 0 11px 11px!important}
+      .hiTabHeroCopy h2{font-size:21px!important}
+      .hiTabPurpose{-webkit-line-clamp:2!important;font-size:9.5px!important}
+      .hiTabHeroArt,.hiTabHeroArt img{min-height:118px!important;max-height:118px!important}
+      .hiTabLiveLine strong{display:none!important}
+    }
+    @media(min-width:1440px){
+      .hiTabHero{grid-template-columns:minmax(0,1.36fr) minmax(360px,.64fr)!important}
+      .hiTabHeroArt img{object-position:55% center!important}
+    }
+  `;
+}
+
   class HomeBrainEnergyCard extends HTMLElement {
     constructor() {
       super();
@@ -2166,38 +2354,7 @@ class FlexibleAssetDomainModel {
     }
     runtime() { return new EnergyRuntime(this._hass || {}); }
     navigationModel() {
-      return [
-        {
-          id: 'energy',
-          label: 'Energy',
-          items: [
-            { id:'overview', label:'Overview', view:'overview', title:'Energy Overview', description:'Your home energy system at a glance.' },
-            { id:'flow', label:'Flow', view:'flow', title:'Energy Flow', description:'See where energy is flowing right now.' },
-            { id:'solar', label:'Solar', view:'solar-generation', title:'Solar', description:'Solar generation, inverters and the relationship with storage.' },
-            { id:'battery', label:'Home Battery', view:'battery', title:'Home Battery', description:'Storage state, capacity and contribution to the home.' },
-            { id:'consumers', label:'Consumers', view:'consumers', title:'Consumers', description:'Where energy is used and which loads are controllable.' }
-          ]
-        },
-        {
-          id: 'intelligence',
-          label: 'Intelligence',
-          items: [
-            { id:'strategy', label:'Strategy', view:'strategies', title:'Strategy', description:'Strategy overview, effective policy and current runtime state.' },
-            { id:'operational-planning', label:'Operational Planning', view:'solar', title:'Operational Planning', description:'What should happen now and in the next hours.' },
-            { id:'tactical-planning', label:'Tactical Planning', view:'planning', title:'Tactical Planning', description:'How energy is allocated across today and tomorrow.' },
-            { id:'strategic-planning', label:'Strategic Planning', view:'strategic-planning', title:'Strategic Planning', description:'Longer-term energy goals, constraints and optimisation.' }
-          ]
-        },
-        {
-          id: 'insights',
-          label: 'Insights',
-          items: [
-            { id:'metering', label:'Metering', view:'metering', title:'Metering', description:'Measured energy for the selected period.' },
-            { id:'value', label:'Value', view:'value', title:'Value', description:'Financial impact of your energy system.' },
-            { id:'retrospective', label:'Retrospective', view:'retrospective', title:'Retrospective', description:'How Home Intelligence performed and what can improve.' }
-          ]
-        }
-      ];
+      return HB_ENERGY_NAVIGATION;
     }
     resolveNavigation(sectionId = '', itemId = '', legacyView = '') {
       const sections = this.navigationModel();
@@ -3209,19 +3366,21 @@ class FlexibleAssetDomainModel {
       const contextGridCost = asNumber(firstDefined(contextBalance.expected_grid_cost_eur, contextBalance.grid_cost_eur));
       const contextGridImport = asNumber(firstDefined(contextBalance.expected_grid_import_kwh, contextBalance.grid_import_kwh));
       const profiles = {
-        overview: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/overview-hero.webp', icon:'✦', eyebrow:'Energy overview', title:'Site Consumption', value:fmtKw(demand,'—'), unit:'current site demand', explanation:`${flowState} · ${fmtKw(solar)} solar · ${fmtKw(current.grid.displayPowerKw)} grid`, tone:'blue', metrics:[['☀','Solar now',fmtKw(solar),'Producing now'],['▣','Home Battery',fmtPct(batterySoc),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['↗','Solar remaining',fmtKwh(solarRemaining),'Forecast left today']] },
-        outlook: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/outlook-hero.webp', icon:'↗', eyebrow:'Energy outlook', title:`${contextLabel} outlook`, value:fmtKwh(contextSolar), unit:`solar forecast ${contextLabel.toLowerCase()}`, explanation:human(firstDefined(selectedContext?.summary?.reason, rt.value('energy_intelligence.outlook_reason','Forecast, demand and planning in one view'))), tone:'purple', metrics:[['☀',`${contextLabel} forecast`,fmtKwh(contextSolar),`Expected solar ${contextLabel.toLowerCase()}`],['↗',contextTomorrow?'Expected demand':'Remaining',contextTomorrow?fmtKwh(contextDemandTotal):fmtKwh(contextRemaining),contextTomorrow?'Known demand tomorrow':'Forecast left today'],['⌂','Demand',fmtKwh(contextDemandTotal),'Expected demand'],['✓','Balance',fmtKwh(contextBalanceTotal),'Supply minus demand']] },
-        flow: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/flow-hero.webp', icon:'⚡', eyebrow:'Live energy flow', title:flowState, value:fmtKw(flowValue), unit:current.grid.direction === 'exporting' ? 'to grid' : current.grid.direction === 'importing' ? 'from grid' : 'grid flow', explanation:`${fmtKw(solar)} solar · ${fmtKw(demand)} demand`, tone:'purple', metrics:[['☀','Solar',fmtKw(solar),'Supplying the home'],['▣','Home Battery',fmtKw(batteryPower),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['⌂','Demand',fmtKw(demand),'Home consumption']] },
-        solar: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/solar-hero.webp', icon:'☀', eyebrow:'Solar', title:(solar||0)>0.05?'Generating now':'Not generating', value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
-        battery: { image:HERO_IMAGE_BATTERY, icon:'▣', eyebrow:'Home Battery', title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(this.batteryReservePct(rt)),'Protected minimum']] },
-        consumers: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/consumers-hero.webp', icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Home Intelligence status']] },
-        strategies: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/strategies-hero.webp', icon:'◎', eyebrow:'Strategies', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Configured intent and the strategy currently in effect', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
-        metering: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/metering-hero.webp', icon:'▥', eyebrow:'Metering', title:meteringContext.label, value:meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar), unit:'Solar production', explanation:`Measured energy flows this ${meteringContext.label.toLowerCase()}`, tone:'blue', metrics:[['▥','Consumption',meteringContext.consumption === null ? 'Unavailable' : fmtKwh(meteringContext.consumption),meteringContext.label],['☀','Solar',meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar),meteringContext.label],['↓','Grid import',meteringContext.gridImport === null ? 'Unavailable' : fmtKwh(meteringContext.gridImport),meteringContext.label],['↑','Grid export',meteringContext.gridExport === null ? 'Unavailable' : fmtKwh(meteringContext.gridExport),meteringContext.label]] },
-        intelligence: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/intelligence-hero.webp', icon:'✦', eyebrow:'Home Intelligence', title:status, value:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), unit:'automation mode', explanation:'Your home energy control center', tone:'orange', metrics:[['✓','Status',status,'Current intelligence state'],['✦','Confidence',this.productStateLabel(decision.confidence || rt.value('energy_intelligence.confidence','unknown'), 'Not available'),'Decision confidence'],['◎','Recommendation',recommendation,'What Home Intelligence advises'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
-        retrospective: (() => { const review=this.retrospectiveModel(); return { image:'/hacsfiles/rhi-energy-ux/assets/heroes/intelligence-hero.webp', icon:'↺', eyebrow:'Energy retrospective', title:review.rating, value:review.scoreText, unit:'intelligence performance', explanation:review.explanation, tone:'purple', metrics:[['◎','Coverage',review.coverageText,'Measured evidence'],['✦','Confidence',review.confidence,'Assessment confidence'],['↗','Trend',review.trendText,'Compared with previous period'],['✓','Objectives',String(review.kpis.length),'Measured goals']] }; })(),
-        value: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/value-hero.webp', icon:'€', eyebrow:'Energy value', title:valueContext.label, value:this.valueMoney(valueContext.net,valueContext.currency,valueContext.state), unit:'net financial result', explanation:valueContext.attention, tone:'green', metrics:[['✓','Result',valueContext.resultCompletenessLabel,'Measured site accounting'],['↓','Import cost',this.valueMoney(valueContext.importCost,valueContext.currency,valueContext.state),valueContext.label],['↑','Export revenue',this.valueMoney(valueContext.exportRevenue,valueContext.currency,valueContext.state),valueContext.label],['€','Net energy cost',this.valueMoney(valueContext.netEnergyCost,valueContext.currency,valueContext.state),valueContext.label]] }
+        overview: { image:hbEnergyHeroAsset('overview'), icon:'✦', eyebrow:'Energy overview', title:'Site Consumption', value:fmtKw(demand,'—'), unit:'current site demand', explanation:`${flowState} · ${fmtKw(solar)} solar · ${fmtKw(current.grid.displayPowerKw)} grid`, tone:'blue', metrics:[['☀','Solar now',fmtKw(solar),'Producing now'],['▣','Home Battery',fmtPct(batterySoc),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['↗','Solar remaining',fmtKwh(solarRemaining),'Forecast left today']] },
+        outlook: { image:hbEnergyHeroAsset('outlook'), icon:'↗', eyebrow:'Energy outlook', title:`${contextLabel} outlook`, value:fmtKwh(contextSolar), unit:`solar forecast ${contextLabel.toLowerCase()}`, explanation:human(firstDefined(selectedContext?.summary?.reason, rt.value('energy_intelligence.outlook_reason','Forecast, demand and planning in one view'))), tone:'purple', metrics:[['☀',`${contextLabel} forecast`,fmtKwh(contextSolar),`Expected solar ${contextLabel.toLowerCase()}`],['↗',contextTomorrow?'Expected demand':'Remaining',contextTomorrow?fmtKwh(contextDemandTotal):fmtKwh(contextRemaining),contextTomorrow?'Known demand tomorrow':'Forecast left today'],['⌂','Demand',fmtKwh(contextDemandTotal),'Expected demand'],['✓','Balance',fmtKwh(contextBalanceTotal),'Supply minus demand']] },
+        flow: { image:hbEnergyHeroAsset('flow'), icon:'⚡', eyebrow:'Live energy flow', title:flowState, value:fmtKw(flowValue), unit:current.grid.direction === 'exporting' ? 'to grid' : current.grid.direction === 'importing' ? 'from grid' : 'grid flow', explanation:`${fmtKw(solar)} solar · ${fmtKw(demand)} demand`, tone:'purple', metrics:[['☀','Solar',fmtKw(solar),'Supplying the home'],['▣','Home Battery',fmtKw(batteryPower),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['⌂','Demand',fmtKw(demand),'Home consumption']] },
+        solar: { image:hbEnergyHeroAsset('solar-generation'), icon:'☀', eyebrow:'Solar', title:(solar||0)>0.05?'Generating now':'Not generating', value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
+        battery: { image:hbEnergyHeroAsset('battery'), icon:'▣', eyebrow:'Home Battery', title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(this.batteryReservePct(rt)),'Protected minimum']] },
+        consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Home Intelligence status']] },
+        strategies: { image:hbEnergyHeroAsset('strategies'), icon:'◎', eyebrow:'Strategies', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Configured intent and the strategy currently in effect', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
+        metering: { image:hbEnergyHeroAsset('metering'), icon:'▥', eyebrow:'Metering', title:meteringContext.label, value:meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar), unit:'Solar production', explanation:`Measured energy flows this ${meteringContext.label.toLowerCase()}`, tone:'blue', metrics:[['▥','Consumption',meteringContext.consumption === null ? 'Unavailable' : fmtKwh(meteringContext.consumption),meteringContext.label],['☀','Solar',meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar),meteringContext.label],['↓','Grid import',meteringContext.gridImport === null ? 'Unavailable' : fmtKwh(meteringContext.gridImport),meteringContext.label],['↑','Grid export',meteringContext.gridExport === null ? 'Unavailable' : fmtKwh(meteringContext.gridExport),meteringContext.label]] },
+        intelligence: { image:hbEnergyHeroAsset('intelligence'), icon:'✦', eyebrow:'Home Intelligence', title:status, value:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), unit:'automation mode', explanation:'Your home energy control center', tone:'orange', metrics:[['✓','Status',status,'Current intelligence state'],['✦','Confidence',this.productStateLabel(decision.confidence || rt.value('energy_intelligence.confidence','unknown'), 'Not available'),'Decision confidence'],['◎','Recommendation',recommendation,'What Home Intelligence advises'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
+        retrospective: (() => { const review=this.retrospectiveModel(); return { image:hbEnergyHeroAsset('intelligence'), icon:'↺', eyebrow:'Energy retrospective', title:review.rating, value:review.scoreText, unit:'intelligence performance', explanation:review.explanation, tone:'purple', metrics:[['◎','Coverage',review.coverageText,'Measured evidence'],['✦','Confidence',review.confidence,'Assessment confidence'],['↗','Trend',review.trendText,'Compared with previous period'],['✓','Objectives',String(review.kpis.length),'Measured goals']] }; })(),
+        value: { image:hbEnergyHeroAsset('value'), icon:'€', eyebrow:'Energy value', title:valueContext.label, value:this.valueMoney(valueContext.net,valueContext.currency,valueContext.state), unit:'net financial result', explanation:valueContext.attention, tone:'green', metrics:[['✓','Result',valueContext.resultCompletenessLabel,'Measured site accounting'],['↓','Import cost',this.valueMoney(valueContext.importCost,valueContext.currency,valueContext.state),valueContext.label],['↑','Export revenue',this.valueMoney(valueContext.exportRevenue,valueContext.currency,valueContext.state),valueContext.label],['€','Net energy cost',this.valueMoney(valueContext.netEnergyCost,valueContext.currency,valueContext.state),valueContext.label]] }
       };
-      const p = profiles[tab] || profiles.overview;
+      const profileKey = hbEnergyProfileKey(tab);
+      const baseProfile = profiles[profileKey] || profiles.overview;
+      const p = { ...baseProfile, image: hbEnergyHeroAsset(tab) };
       const badgeKey = tab === 'solar' ? 'solar.power_kw' : tab === 'battery' ? 'battery.soc_pct' : tab === 'flow' ? 'grid.flow_direction' : tab === 'metering' ? 'metering.integrity_state' : tab === 'value' ? 'value_accounting.state' : 'energy_intelligence.status';
       let rawBadge = String(this.rowStatus(rt.row(badgeKey)) || '').trim().toLowerCase();
       if (tab === 'metering') rawBadge = String(meteringContext.health || rawBadge).toLowerCase();
@@ -3257,10 +3416,17 @@ class FlexibleAssetDomainModel {
       const semanticDescription = navItem?.description || p.explanation;
       const liveLabel = p.title && p.title !== semanticTitle ? p.title : '';
       return `<section class="hiTabExperienceHeader ${escapeHtml(p.tone)}" data-nav-section="${escapeHtml(this.navSection || '')}" data-nav-item="${escapeHtml(this.navItem || '')}">
-        <div class="hiTabHero" data-view="${escapeHtml(tab)}" style="--hi-hero-image:url('${escapeHtml(p.image || '')}')">
-          <div class="hiTabHeroIcon">${p.icon}</div>
-          <div class="hiTabHeroCopy"><small>${escapeHtml((navSection?.label || 'Energy') + ' / ' + (navItem?.label || p.eyebrow))}</small><h2>${escapeHtml(semanticTitle)}</h2><p class="hiTabPurpose">${escapeHtml(semanticDescription)}</p><div class="hiTabLiveLine">${liveLabel ? `<strong>${escapeHtml(liveLabel)}</strong>` : ''}<div class="hiTabHeroValue">${escapeHtml(p.value)}</div><span>${escapeHtml(p.unit)}</span></div></div>
-          <div class="hiTabHeroBadge"><span class="hiTabSimpleBadge ${p.badgeTone}">${escapeHtml(p.badgeText)}</span></div>
+        <div class="hiTabHero" data-view="${escapeHtml(tab)}">
+          <div class="hiTabHeroCopy">
+            <small>${escapeHtml((navSection?.label || 'Energy') + ' / ' + (navItem?.label || p.eyebrow))}</small>
+            <h2>${escapeHtml(semanticTitle)}</h2>
+            <p class="hiTabPurpose">${escapeHtml(semanticDescription)}</p>
+            <div class="hiTabLiveLine">${liveLabel ? `<strong>${escapeHtml(liveLabel)}</strong>` : ''}<div class="hiTabHeroValue">${escapeHtml(p.value)}</div><span>${escapeHtml(p.unit)}</span></div>
+          </div>
+          <div class="hiTabHeroArt" aria-hidden="true">
+            <img src="${escapeHtml(p.image || hbEnergyHeroAsset(tab))}" alt="">
+            <div class="hiTabHeroBadge"><span class="hiTabSimpleBadge ${escapeHtml(p.badgeTone)}">${escapeHtml(p.badgeText)}</span></div>
+          </div>
         </div>
         <div class="hiTabStatusGrid">${p.metrics.map(([icon,label,value,meaning])=>`<div class="hiTabStatusItem"><span class="hiTabStatusIcon" aria-hidden="true">${escapeHtml(icon || '•')}</span><div class="hiTabStatusCopy"><small>${escapeHtml(label)}</small><b>${escapeHtml(value ?? '—')}</b><em>${escapeHtml(meaning || '')}</em></div></div>`).join('')}</div>
       </section>`;
@@ -5202,7 +5368,7 @@ class FlexibleAssetDomainModel {
       const balanceLabel = sourceTotal===null || useTotal===null ? 'Planning balance unavailable' : `${sourceTotal.toFixed(1)} kWh source · ${useTotal.toFixed(1)} kWh use${balanceDelta===null?'':` · Δ ${balanceDelta.toFixed(3)} kWh`}`;
       const heroValue = totalPlanned===null ? '—' : totalPlanned.toFixed(1)+' kWh';
       const planningHeader = {
-        image:'/hacsfiles/rhi-energy-ux/assets/heroes/solar-hero.webp',
+        image:hbEnergyHeroAsset('solar-generation'),
         icon:'▣',
         eyebrow:'Tactical planning',
         title:`${horizonLabel} plan`,
@@ -5242,7 +5408,7 @@ class FlexibleAssetDomainModel {
         return `${this.tabExperienceHeader(rt,'solar-generation',model)}<section class="panel navigationPlaceholder"><small>ENERGY DOMAIN</small><h2>Solar generation content follows in the next screen pass</h2><p>The navigation and premium header are now in their final structural location. Inverter, panel and storage-link content is intentionally not moved into this release.</p></section>`;
       }
       const p = this.buildPageViewModel(rt, 'intelligence');
-      const model = { ...p, image:'/hacsfiles/rhi-energy-ux/assets/heroes/intelligence-hero.webp', icon:'◇', title:'Strategic planning', value:'—', unit:'longer-term horizon', explanation:'Longer-term goals, constraints and optimisation', badgeText:'Structure ready', badgeTone:'neutral', metrics:[['◎','Horizon','—','Longer-term'],['◇','Goals','—','Not migrated yet'],['◫','Constraints','—','Not migrated yet'],['↗','Optimisation','—','Not migrated yet']] };
+      const model = { ...p, image:hbEnergyHeroAsset('intelligence'), icon:'◇', title:'Strategic planning', value:'—', unit:'longer-term horizon', explanation:'Longer-term goals, constraints and optimisation', badgeText:'Structure ready', badgeTone:'neutral', metrics:[['◎','Horizon','—','Longer-term'],['◇','Goals','—','Not migrated yet'],['◫','Constraints','—','Not migrated yet'],['↗','Optimisation','—','Not migrated yet']] };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}<section class="panel navigationPlaceholder"><small>INTELLIGENCE</small><h2>Strategic planning content follows in the next screen pass</h2><p>The navigation position is established without inventing or relocating strategic planning semantics in this release.</p></section>`;
     }
     placeholder(rt) {
@@ -5476,7 +5642,7 @@ class FlexibleAssetDomainModel {
         console.error(`[HomeBrain Energy ${UX_VERSION}] ${this.view} render failed`, error);
         content = this.renderError(this.view, error);
       }
-      const markup = `<style>${this.styles()}
+      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}
 
       /* R3.62.0 canonical component framework and adaptive convergence */
       :host{--hi-space-1:4px;--hi-space-2:8px;--hi-space-3:12px;--hi-space-4:16px;--hi-radius-sm:8px;--hi-radius-md:12px;--hi-break-tablet:980px;--hi-break-phone:700px}
