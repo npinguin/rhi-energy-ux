@@ -3425,7 +3425,9 @@ function hbEnergyPresentationStyles() {
             <h2>${escapeHtml(semanticTitle)}</h2>
             <p class="hiTabPurpose">${escapeHtml(semanticDescription)}</p>
           </div>
-          <div class="hiTabHeroArt" aria-hidden="true"><img src="${escapeHtml(hbEnergyHeroAsset(heroKey))}" alt=""></div>
+          <div class="hiTabHeroArt" aria-hidden="true">
+            <img src="${escapeHtml(hbEnergyHeroAsset(heroKey))}" alt="">
+          </div>
         </div>
         <div class="hiTabStatusGrid" aria-label="${escapeHtml(semanticTitle)} status">${p.metrics.map(([icon,label,value,meaning])=>`<article class="hiTabStatusItem"><span class="hiTabStatusIcon" aria-hidden="true">${escapeHtml(icon || '•')}</span><div class="hiTabStatusCopy"><small>${escapeHtml(label)}</small><b>${escapeHtml(value ?? '—')}</b><em>${escapeHtml(meaning || '')}</em></div></article>`).join('')}</div>
       </section>`;
