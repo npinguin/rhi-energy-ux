@@ -2473,21 +2473,19 @@
       const navSection = this.navigationModel().find(section => section.id === this.navSection);
       const semanticTitle = navItem?.title || p.title;
       const semanticDescription = navItem?.description || p.explanation;
-      const liveLabel = p.title && p.title !== semanticTitle ? p.title : '';
+      const heroKey = navItem?.id || tab;
       return `<section class="hiTabExperienceHeader ${escapeHtml(p.tone)}" data-nav-section="${escapeHtml(this.navSection || '')}" data-nav-item="${escapeHtml(this.navItem || '')}">
         <div class="hiTabHero" data-view="${escapeHtml(tab)}">
           <div class="hiTabHeroCopy">
             <small>${escapeHtml((navSection?.label || 'Energy') + ' / ' + (navItem?.label || p.eyebrow))}</small>
             <h2>${escapeHtml(semanticTitle)}</h2>
             <p class="hiTabPurpose">${escapeHtml(semanticDescription)}</p>
-            <div class="hiTabLiveLine">${liveLabel ? `<strong>${escapeHtml(liveLabel)}</strong>` : ''}<div class="hiTabHeroValue">${escapeHtml(p.value)}</div><span>${escapeHtml(p.unit)}</span></div>
           </div>
           <div class="hiTabHeroArt" aria-hidden="true">
-            <img src="${escapeHtml(p.image || hbEnergyHeroAsset(tab))}" alt="">
-            <div class="hiTabHeroBadge"><span class="hiTabSimpleBadge ${escapeHtml(p.badgeTone)}">${escapeHtml(p.badgeText)}</span></div>
+            <img src="${escapeHtml(hbEnergyHeroAsset(heroKey))}" alt="">
           </div>
         </div>
-        <div class="hiTabStatusGrid">${p.metrics.map(([icon,label,value,meaning])=>`<div class="hiTabStatusItem"><span class="hiTabStatusIcon" aria-hidden="true">${escapeHtml(icon || '•')}</span><div class="hiTabStatusCopy"><small>${escapeHtml(label)}</small><b>${escapeHtml(value ?? '—')}</b><em>${escapeHtml(meaning || '')}</em></div></div>`).join('')}</div>
+        <div class="hiTabStatusGrid" aria-label="${escapeHtml(semanticTitle)} status">${p.metrics.map(([icon,label,value,meaning])=>`<article class="hiTabStatusItem"><span class="hiTabStatusIcon" aria-hidden="true">${escapeHtml(icon || '•')}</span><div class="hiTabStatusCopy"><small>${escapeHtml(label)}</small><b>${escapeHtml(value ?? '—')}</b><em>${escapeHtml(meaning || '')}</em></div></article>`).join('')}</div>
       </section>`;
     }
     measuredAssetPower(asset = {}) {
