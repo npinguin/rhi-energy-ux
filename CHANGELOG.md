@@ -1,3 +1,13 @@
+## 3.95.2 — Mobility rc.38 visual parity closure
+
+- locks Energy top-level composition to the Mobility rc.38 reference: hero → four status cards → quick actions → domain content;
+- keeps hero content limited to eyebrow, title, description and artwork with no live mini-status inside the hero;
+- keeps four top-level status cards across desktop/tablet and collapses to two columns only at phone width;
+- aligns quick-action geometry, primary-action treatment, spacing and breakpoints with Mobility;
+- adds a consistent action bar to Home Battery and fallback top-level views that previously had no actions;
+- adds a cross-product visual-parity regression gate so this presentation contract cannot silently drift again;
+- preserves Energy backend/domain contracts, HACS packaging and the existing hero image set.
+
 ## 3.95.1 — Mobility overview parity correction
 
 - matches the Energy hero composition to Mobility Overview and removes hero-level mini status values;
