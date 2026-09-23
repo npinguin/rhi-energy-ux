@@ -1256,6 +1256,8 @@
 
   // __RHI_PLANNING_MODULES__
 
+  // __RHI_PRESENTATION_MODULES__
+
   class HomeBrainEnergyCard extends HTMLElement {
     constructor() {
       super();
@@ -1411,38 +1413,7 @@
     }
     runtime() { return new EnergyRuntime(this._hass || {}); }
     navigationModel() {
-      return [
-        {
-          id: 'energy',
-          label: 'Energy',
-          items: [
-            { id:'overview', label:'Overview', view:'overview', title:'Energy Overview', description:'Your home energy system at a glance.' },
-            { id:'flow', label:'Flow', view:'flow', title:'Energy Flow', description:'See where energy is flowing right now.' },
-            { id:'solar', label:'Solar', view:'solar-generation', title:'Solar', description:'Solar generation, inverters and the relationship with storage.' },
-            { id:'battery', label:'Home Battery', view:'battery', title:'Home Battery', description:'Storage state, capacity and contribution to the home.' },
-            { id:'consumers', label:'Consumers', view:'consumers', title:'Consumers', description:'Where energy is used and which loads are controllable.' }
-          ]
-        },
-        {
-          id: 'intelligence',
-          label: 'Intelligence',
-          items: [
-            { id:'strategy', label:'Strategy', view:'strategies', title:'Strategy', description:'Strategy overview, effective policy and current runtime state.' },
-            { id:'operational-planning', label:'Operational Planning', view:'solar', title:'Operational Planning', description:'What should happen now and in the next hours.' },
-            { id:'tactical-planning', label:'Tactical Planning', view:'planning', title:'Tactical Planning', description:'How energy is allocated across today and tomorrow.' },
-            { id:'strategic-planning', label:'Strategic Planning', view:'strategic-planning', title:'Strategic Planning', description:'Longer-term energy goals, constraints and optimisation.' }
-          ]
-        },
-        {
-          id: 'insights',
-          label: 'Insights',
-          items: [
-            { id:'metering', label:'Metering', view:'metering', title:'Metering', description:'Measured energy for the selected period.' },
-            { id:'value', label:'Value', view:'value', title:'Value', description:'Financial impact of your energy system.' },
-            { id:'retrospective', label:'Retrospective', view:'retrospective', title:'Retrospective', description:'How Home Intelligence performed and what can improve.' }
-          ]
-        }
-      ];
+      return HB_ENERGY_NAVIGATION;
     }
     resolveNavigation(sectionId = '', itemId = '', legacyView = '') {
       const sections = this.navigationModel();
@@ -2454,19 +2425,21 @@
       const contextGridCost = asNumber(firstDefined(contextBalance.expected_grid_cost_eur, contextBalance.grid_cost_eur));
       const contextGridImport = asNumber(firstDefined(contextBalance.expected_grid_import_kwh, contextBalance.grid_import_kwh));
       const profiles = {
-        overview: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/overview-hero.webp', icon:'✦', eyebrow:'Energy overview', title:'Site Consumption', value:fmtKw(demand,'—'), unit:'current site demand', explanation:`${flowState} · ${fmtKw(solar)} solar · ${fmtKw(current.grid.displayPowerKw)} grid`, tone:'blue', metrics:[['☀','Solar now',fmtKw(solar),'Producing now'],['▣','Home Battery',fmtPct(batterySoc),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['↗','Solar remaining',fmtKwh(solarRemaining),'Forecast left today']] },
-        outlook: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/outlook-hero.webp', icon:'↗', eyebrow:'Energy outlook', title:`${contextLabel} outlook`, value:fmtKwh(contextSolar), unit:`solar forecast ${contextLabel.toLowerCase()}`, explanation:human(firstDefined(selectedContext?.summary?.reason, rt.value('energy_intelligence.outlook_reason','Forecast, demand and planning in one view'))), tone:'purple', metrics:[['☀',`${contextLabel} forecast`,fmtKwh(contextSolar),`Expected solar ${contextLabel.toLowerCase()}`],['↗',contextTomorrow?'Expected demand':'Remaining',contextTomorrow?fmtKwh(contextDemandTotal):fmtKwh(contextRemaining),contextTomorrow?'Known demand tomorrow':'Forecast left today'],['⌂','Demand',fmtKwh(contextDemandTotal),'Expected demand'],['✓','Balance',fmtKwh(contextBalanceTotal),'Supply minus demand']] },
-        flow: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/flow-hero.webp', icon:'⚡', eyebrow:'Live energy flow', title:flowState, value:fmtKw(flowValue), unit:current.grid.direction === 'exporting' ? 'to grid' : current.grid.direction === 'importing' ? 'from grid' : 'grid flow', explanation:`${fmtKw(solar)} solar · ${fmtKw(demand)} demand`, tone:'purple', metrics:[['☀','Solar',fmtKw(solar),'Supplying the home'],['▣','Home Battery',fmtKw(batteryPower),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['⌂','Demand',fmtKw(demand),'Home consumption']] },
-        solar: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/solar-hero.webp', icon:'☀', eyebrow:'Solar', title:(solar||0)>0.05?'Generating now':'Not generating', value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
-        battery: { image:HERO_IMAGE_BATTERY, icon:'▣', eyebrow:'Home Battery', title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(this.batteryReservePct(rt)),'Protected minimum']] },
-        consumers: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/consumers-hero.webp', icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Home Intelligence status']] },
-        strategies: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/strategies-hero.webp', icon:'◎', eyebrow:'Strategies', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Configured intent and the strategy currently in effect', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
-        metering: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/metering-hero.webp', icon:'▥', eyebrow:'Metering', title:meteringContext.label, value:meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar), unit:'Solar production', explanation:`Measured energy flows this ${meteringContext.label.toLowerCase()}`, tone:'blue', metrics:[['▥','Consumption',meteringContext.consumption === null ? 'Unavailable' : fmtKwh(meteringContext.consumption),meteringContext.label],['☀','Solar',meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar),meteringContext.label],['↓','Grid import',meteringContext.gridImport === null ? 'Unavailable' : fmtKwh(meteringContext.gridImport),meteringContext.label],['↑','Grid export',meteringContext.gridExport === null ? 'Unavailable' : fmtKwh(meteringContext.gridExport),meteringContext.label]] },
-        intelligence: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/intelligence-hero.webp', icon:'✦', eyebrow:'Home Intelligence', title:status, value:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), unit:'automation mode', explanation:'Your home energy control center', tone:'orange', metrics:[['✓','Status',status,'Current intelligence state'],['✦','Confidence',this.productStateLabel(decision.confidence || rt.value('energy_intelligence.confidence','unknown'), 'Not available'),'Decision confidence'],['◎','Recommendation',recommendation,'What Home Intelligence advises'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
-        retrospective: (() => { const review=this.retrospectiveModel(); return { image:'/hacsfiles/rhi-energy-ux/assets/heroes/intelligence-hero.webp', icon:'↺', eyebrow:'Energy retrospective', title:review.rating, value:review.scoreText, unit:'intelligence performance', explanation:review.explanation, tone:'purple', metrics:[['◎','Coverage',review.coverageText,'Measured evidence'],['✦','Confidence',review.confidence,'Assessment confidence'],['↗','Trend',review.trendText,'Compared with previous period'],['✓','Objectives',String(review.kpis.length),'Measured goals']] }; })(),
-        value: { image:'/hacsfiles/rhi-energy-ux/assets/heroes/value-hero.webp', icon:'€', eyebrow:'Energy value', title:valueContext.label, value:this.valueMoney(valueContext.net,valueContext.currency,valueContext.state), unit:'net financial result', explanation:valueContext.attention, tone:'green', metrics:[['✓','Result',valueContext.resultCompletenessLabel,'Measured site accounting'],['↓','Import cost',this.valueMoney(valueContext.importCost,valueContext.currency,valueContext.state),valueContext.label],['↑','Export revenue',this.valueMoney(valueContext.exportRevenue,valueContext.currency,valueContext.state),valueContext.label],['€','Net energy cost',this.valueMoney(valueContext.netEnergyCost,valueContext.currency,valueContext.state),valueContext.label]] }
+        overview: { image:hbEnergyHeroAsset('overview'), icon:'✦', eyebrow:'Energy overview', title:'Site Consumption', value:fmtKw(demand,'—'), unit:'current site demand', explanation:`${flowState} · ${fmtKw(solar)} solar · ${fmtKw(current.grid.displayPowerKw)} grid`, tone:'blue', metrics:[['☀','Solar now',fmtKw(solar),'Producing now'],['▣','Home Battery',fmtPct(batterySoc),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['↗','Solar remaining',fmtKwh(solarRemaining),'Forecast left today']] },
+        outlook: { image:hbEnergyHeroAsset('outlook'), icon:'↗', eyebrow:'Energy outlook', title:`${contextLabel} outlook`, value:fmtKwh(contextSolar), unit:`solar forecast ${contextLabel.toLowerCase()}`, explanation:human(firstDefined(selectedContext?.summary?.reason, rt.value('energy_intelligence.outlook_reason','Forecast, demand and planning in one view'))), tone:'purple', metrics:[['☀',`${contextLabel} forecast`,fmtKwh(contextSolar),`Expected solar ${contextLabel.toLowerCase()}`],['↗',contextTomorrow?'Expected demand':'Remaining',contextTomorrow?fmtKwh(contextDemandTotal):fmtKwh(contextRemaining),contextTomorrow?'Known demand tomorrow':'Forecast left today'],['⌂','Demand',fmtKwh(contextDemandTotal),'Expected demand'],['✓','Balance',fmtKwh(contextBalanceTotal),'Supply minus demand']] },
+        flow: { image:hbEnergyHeroAsset('flow'), icon:'⚡', eyebrow:'Live energy flow', title:flowState, value:fmtKw(flowValue), unit:current.grid.direction === 'exporting' ? 'to grid' : current.grid.direction === 'importing' ? 'from grid' : 'grid flow', explanation:`${fmtKw(solar)} solar · ${fmtKw(demand)} demand`, tone:'purple', metrics:[['☀','Solar',fmtKw(solar),'Supplying the home'],['▣','Home Battery',fmtKw(batteryPower),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['⌂','Demand',fmtKw(demand),'Home consumption']] },
+        solar: { image:hbEnergyHeroAsset('solar-generation'), icon:'☀', eyebrow:'Solar', title:(solar||0)>0.05?'Generating now':'Not generating', value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
+        battery: { image:hbEnergyHeroAsset('battery'), icon:'▣', eyebrow:'Home Battery', title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(this.batteryReservePct(rt)),'Protected minimum']] },
+        consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Home Intelligence status']] },
+        strategies: { image:hbEnergyHeroAsset('strategies'), icon:'◎', eyebrow:'Strategies', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Configured intent and the strategy currently in effect', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
+        metering: { image:hbEnergyHeroAsset('metering'), icon:'▥', eyebrow:'Metering', title:meteringContext.label, value:meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar), unit:'Solar production', explanation:`Measured energy flows this ${meteringContext.label.toLowerCase()}`, tone:'blue', metrics:[['▥','Consumption',meteringContext.consumption === null ? 'Unavailable' : fmtKwh(meteringContext.consumption),meteringContext.label],['☀','Solar',meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar),meteringContext.label],['↓','Grid import',meteringContext.gridImport === null ? 'Unavailable' : fmtKwh(meteringContext.gridImport),meteringContext.label],['↑','Grid export',meteringContext.gridExport === null ? 'Unavailable' : fmtKwh(meteringContext.gridExport),meteringContext.label]] },
+        intelligence: { image:hbEnergyHeroAsset('intelligence'), icon:'✦', eyebrow:'Home Intelligence', title:status, value:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), unit:'automation mode', explanation:'Your home energy control center', tone:'orange', metrics:[['✓','Status',status,'Current intelligence state'],['✦','Confidence',this.productStateLabel(decision.confidence || rt.value('energy_intelligence.confidence','unknown'), 'Not available'),'Decision confidence'],['◎','Recommendation',recommendation,'What Home Intelligence advises'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
+        retrospective: (() => { const review=this.retrospectiveModel(); return { image:hbEnergyHeroAsset('intelligence'), icon:'↺', eyebrow:'Energy retrospective', title:review.rating, value:review.scoreText, unit:'intelligence performance', explanation:review.explanation, tone:'purple', metrics:[['◎','Coverage',review.coverageText,'Measured evidence'],['✦','Confidence',review.confidence,'Assessment confidence'],['↗','Trend',review.trendText,'Compared with previous period'],['✓','Objectives',String(review.kpis.length),'Measured goals']] }; })(),
+        value: { image:hbEnergyHeroAsset('value'), icon:'€', eyebrow:'Energy value', title:valueContext.label, value:this.valueMoney(valueContext.net,valueContext.currency,valueContext.state), unit:'net financial result', explanation:valueContext.attention, tone:'green', metrics:[['✓','Result',valueContext.resultCompletenessLabel,'Measured site accounting'],['↓','Import cost',this.valueMoney(valueContext.importCost,valueContext.currency,valueContext.state),valueContext.label],['↑','Export revenue',this.valueMoney(valueContext.exportRevenue,valueContext.currency,valueContext.state),valueContext.label],['€','Net energy cost',this.valueMoney(valueContext.netEnergyCost,valueContext.currency,valueContext.state),valueContext.label]] }
       };
-      const p = profiles[tab] || profiles.overview;
+      const profileKey = hbEnergyProfileKey(tab);
+      const baseProfile = profiles[profileKey] || profiles.overview;
+      const p = { ...baseProfile, image: hbEnergyHeroAsset(tab) };
       const badgeKey = tab === 'solar' ? 'solar.power_kw' : tab === 'battery' ? 'battery.soc_pct' : tab === 'flow' ? 'grid.flow_direction' : tab === 'metering' ? 'metering.integrity_state' : tab === 'value' ? 'value_accounting.state' : 'energy_intelligence.status';
       let rawBadge = String(this.rowStatus(rt.row(badgeKey)) || '').trim().toLowerCase();
       if (tab === 'metering') rawBadge = String(meteringContext.health || rawBadge).toLowerCase();
@@ -2502,10 +2475,17 @@
       const semanticDescription = navItem?.description || p.explanation;
       const liveLabel = p.title && p.title !== semanticTitle ? p.title : '';
       return `<section class="hiTabExperienceHeader ${escapeHtml(p.tone)}" data-nav-section="${escapeHtml(this.navSection || '')}" data-nav-item="${escapeHtml(this.navItem || '')}">
-        <div class="hiTabHero" data-view="${escapeHtml(tab)}" style="--hi-hero-image:url('${escapeHtml(p.image || '')}')">
-          <div class="hiTabHeroIcon">${p.icon}</div>
-          <div class="hiTabHeroCopy"><small>${escapeHtml((navSection?.label || 'Energy') + ' / ' + (navItem?.label || p.eyebrow))}</small><h2>${escapeHtml(semanticTitle)}</h2><p class="hiTabPurpose">${escapeHtml(semanticDescription)}</p><div class="hiTabLiveLine">${liveLabel ? `<strong>${escapeHtml(liveLabel)}</strong>` : ''}<div class="hiTabHeroValue">${escapeHtml(p.value)}</div><span>${escapeHtml(p.unit)}</span></div></div>
-          <div class="hiTabHeroBadge"><span class="hiTabSimpleBadge ${p.badgeTone}">${escapeHtml(p.badgeText)}</span></div>
+        <div class="hiTabHero" data-view="${escapeHtml(tab)}">
+          <div class="hiTabHeroCopy">
+            <small>${escapeHtml((navSection?.label || 'Energy') + ' / ' + (navItem?.label || p.eyebrow))}</small>
+            <h2>${escapeHtml(semanticTitle)}</h2>
+            <p class="hiTabPurpose">${escapeHtml(semanticDescription)}</p>
+            <div class="hiTabLiveLine">${liveLabel ? `<strong>${escapeHtml(liveLabel)}</strong>` : ''}<div class="hiTabHeroValue">${escapeHtml(p.value)}</div><span>${escapeHtml(p.unit)}</span></div>
+          </div>
+          <div class="hiTabHeroArt" aria-hidden="true">
+            <img src="${escapeHtml(p.image || hbEnergyHeroAsset(tab))}" alt="">
+            <div class="hiTabHeroBadge"><span class="hiTabSimpleBadge ${escapeHtml(p.badgeTone)}">${escapeHtml(p.badgeText)}</span></div>
+          </div>
         </div>
         <div class="hiTabStatusGrid">${p.metrics.map(([icon,label,value,meaning])=>`<div class="hiTabStatusItem"><span class="hiTabStatusIcon" aria-hidden="true">${escapeHtml(icon || '•')}</span><div class="hiTabStatusCopy"><small>${escapeHtml(label)}</small><b>${escapeHtml(value ?? '—')}</b><em>${escapeHtml(meaning || '')}</em></div></div>`).join('')}</div>
       </section>`;
@@ -4447,7 +4427,7 @@
       const balanceLabel = sourceTotal===null || useTotal===null ? 'Planning balance unavailable' : `${sourceTotal.toFixed(1)} kWh source · ${useTotal.toFixed(1)} kWh use${balanceDelta===null?'':` · Δ ${balanceDelta.toFixed(3)} kWh`}`;
       const heroValue = totalPlanned===null ? '—' : totalPlanned.toFixed(1)+' kWh';
       const planningHeader = {
-        image:'/hacsfiles/rhi-energy-ux/assets/heroes/solar-hero.webp',
+        image:hbEnergyHeroAsset('solar-generation'),
         icon:'▣',
         eyebrow:'Tactical planning',
         title:`${horizonLabel} plan`,
@@ -4487,7 +4467,7 @@
         return `${this.tabExperienceHeader(rt,'solar-generation',model)}<section class="panel navigationPlaceholder"><small>ENERGY DOMAIN</small><h2>Solar generation content follows in the next screen pass</h2><p>The navigation and premium header are now in their final structural location. Inverter, panel and storage-link content is intentionally not moved into this release.</p></section>`;
       }
       const p = this.buildPageViewModel(rt, 'intelligence');
-      const model = { ...p, image:'/hacsfiles/rhi-energy-ux/assets/heroes/intelligence-hero.webp', icon:'◇', title:'Strategic planning', value:'—', unit:'longer-term horizon', explanation:'Longer-term goals, constraints and optimisation', badgeText:'Structure ready', badgeTone:'neutral', metrics:[['◎','Horizon','—','Longer-term'],['◇','Goals','—','Not migrated yet'],['◫','Constraints','—','Not migrated yet'],['↗','Optimisation','—','Not migrated yet']] };
+      const model = { ...p, image:hbEnergyHeroAsset('intelligence'), icon:'◇', title:'Strategic planning', value:'—', unit:'longer-term horizon', explanation:'Longer-term goals, constraints and optimisation', badgeText:'Structure ready', badgeTone:'neutral', metrics:[['◎','Horizon','—','Longer-term'],['◇','Goals','—','Not migrated yet'],['◫','Constraints','—','Not migrated yet'],['↗','Optimisation','—','Not migrated yet']] };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}<section class="panel navigationPlaceholder"><small>INTELLIGENCE</small><h2>Strategic planning content follows in the next screen pass</h2><p>The navigation position is established without inventing or relocating strategic planning semantics in this release.</p></section>`;
     }
     placeholder(rt) {
@@ -4721,7 +4701,7 @@
         console.error(`[HomeBrain Energy ${UX_VERSION}] ${this.view} render failed`, error);
         content = this.renderError(this.view, error);
       }
-      const markup = `<style>${this.styles()}
+      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}
 
       /* R3.62.0 canonical component framework and adaptive convergence */
       :host{--hi-space-1:4px;--hi-space-2:8px;--hi-space-3:12px;--hi-space-4:16px;--hi-radius-sm:8px;--hi-radius-md:12px;--hi-break-tablet:980px;--hi-break-phone:700px}
