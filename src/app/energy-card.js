@@ -4919,7 +4919,7 @@
 .flexibleMeteringTable .meteringTotalRow td{border-top:2px solid var(--line)!important;background:#f8fafc!important;font-weight:700!important}.flexibleMeteringTable .meteringTotalRow td:first-child b{font-size:12px!important}
       /* R3.95.2 canonical cross-product top-level composition.
          Mobility rc.38 is the reference geometry for hero -> status -> quick actions. */
-      .hiTabExperienceHeader{display:grid!important;gap:8px!important;margin:0!important}
+      .hiTabExperienceHeader{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-auto-flow:row!important;align-items:stretch!important;width:100%!important;gap:8px!important;margin:0!important}
       .hiTabHero{position:relative!important;display:block!important;min-height:clamp(176px,16vw,218px)!important;border:0!important;border-radius:18px!important;background:linear-gradient(90deg,#fff 0%,#fff 30%,rgba(255,255,255,.94) 39%,rgba(255,255,255,.18) 60%,rgba(255,255,255,0) 76%)!important;box-shadow:none!important;overflow:hidden!important;margin:0!important;padding:0!important;height:auto!important}
       .hiTabHero:before{display:none!important}
       .hiTabHeroCopy{position:relative!important;z-index:4!important;width:min(48%,650px)!important;max-width:none!important;padding:32px 20px 28px 24px!important;align-self:auto!important}
