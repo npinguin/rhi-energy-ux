@@ -2154,7 +2154,7 @@
       if (tab === 'outlook') controls = this.componentHorizonSelector('outlook', rt.outlookHorizons(), this.selectedOutlookHorizonId);
       if (tab === 'flow') controls = jump('Physical flow','hi-body-flow') + jump('Relationships','flow-relationships');
       if (tab === 'solar') { const mode=String(this.automationModeValue(rt,'automation')||'automatic').toLowerCase(); /* shared automation quick action evolution keeps validation continuity: this.automationQuickAction(rt, mode, 'solar') */ controls = this.automationQuickInline(rt, mode) + jump('Solar plan','hi-body-solar') + jump('Flexible loads','solar-flexible-loads'); }
-      if (tab === 'battery') controls = '';
+      if (tab === 'battery') controls = button('Energy flow','data-view="flow"') + button('Strategy','data-view="strategies"') + button('Tactical planning','data-view="planning"');
       if (tab === 'consumers') controls = `<label class="hiQuickSelect"><span>Group</span><select data-consumer-filter-select>${[['all','All'],['flexible','Flexible'],['fixed','Fixed'],['vehicles','Vehicles'],['heating','Heating'],['storage','Storage']].map(([id,label])=>`<option value="${id}"${this.consumerFilter===id?' selected':''}>${label}</option>`).join('')}</select></label>` + jump('Consumer list','consumer-list');
       if (tab === 'strategies') controls = jump('Profiles','strategy-profiles') + jump('Effective strategy','strategy-effective');
       if (tab === 'metering') controls = this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId) + this.componentMeteringSort();
@@ -2162,7 +2162,8 @@
       if (tab === 'retrospective') controls = jump('Objectives','retrospective-objectives') + jump('Opportunities','retrospective-opportunities') + jump('Details','retrospective-details');
       if (tab === 'planning') controls = `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">Today</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">Tomorrow</button></div>` + jump('Flexible loads','planning-flexible-loads');
       if (tab === 'value') controls = this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId, 'value') + jump('Breakdown','value-breakdown') + jump('Consumer allocation','value-consumers');
-      return controls ? `<section class="hiQuickActionBar" aria-label="Quick actions"><small>Quick actions</small><div class="hiQuickActionItems">${controls}</div></section>` : '';
+      if (!controls) controls = button('Overview','data-view="overview"') + button('Energy flow','data-view="flow"');
+      return `<section class="hiQuickActionBar" aria-label="Quick actions"><small>Quick actions</small><div class="hiQuickActionItems">${controls}</div></section>`;
     }
 
     understandingFooter(rt, tab) {
@@ -4916,100 +4917,62 @@
       @media(max-width:650px){.hiQuickActionBar{align-items:flex-start!important;gap:8px!important}.hiQuickActionItems{width:100%!important}.quickAutomation{width:100%!important;justify-content:space-between!important;flex-wrap:wrap!important}.quickAutomationLabel{font-size:11px!important}.quickAutomation .hiSegmented{width:100%!important}.quickAutomation .hiSegment{min-width:0!important;flex:1 1 0!important;padding:7px 8px!important;font-size:11px!important}.operationalSummaryGrid,.planningKpiStrip{grid-template-columns:1fr 1fr!important}.solarLoadSummary{grid-template-columns:1fr 1fr!important}.solarLoadIdentity,.solarLoadWhy{grid-column:1/-1!important}.solarLoadControls .requestedSlot{grid-template-columns:1fr!important}.planningLoadRow{grid-template-columns:1fr 1fr!important}.planningLoadIdentity{grid-column:1/-1!important}}
 
 .flexibleMeteringTable .meteringTotalRow td{border-top:2px solid var(--line)!important;background:#f8fafc!important;font-weight:700!important}.flexibleMeteringTable .meteringTotalRow td:first-child b{font-size:12px!important}
-      /* R3.95.1 Mobility-overview parity: hero, top-level status and actions. */
-      .hiTabExperienceHeader{display:grid!important;gap:10px!important;margin:0 0 0!important}
-      .hiTabHero{
-        position:relative!important;display:block!important;min-height:clamp(176px,16vw,218px)!important;
-        border:0!important;border-radius:18px!important;
-        background:linear-gradient(90deg,#fff 0%,#fff 30%,rgba(255,255,255,.94) 39%,rgba(255,255,255,.18) 60%,rgba(255,255,255,0) 76%)!important;
-        box-shadow:none!important;overflow:hidden!important;margin:0!important;padding:0!important
-      }
+      /* R3.95.2 canonical cross-product top-level composition.
+         Mobility rc.38 is the reference geometry for hero -> status -> quick actions. */
+      .hiTabExperienceHeader{display:grid!important;gap:8px!important;margin:0!important}
+      .hiTabHero{position:relative!important;display:block!important;min-height:clamp(176px,16vw,218px)!important;border:0!important;border-radius:18px!important;background:linear-gradient(90deg,#fff 0%,#fff 30%,rgba(255,255,255,.94) 39%,rgba(255,255,255,.18) 60%,rgba(255,255,255,0) 76%)!important;box-shadow:none!important;overflow:hidden!important;margin:0!important;padding:0!important;height:auto!important}
       .hiTabHero:before{display:none!important}
-      .hiTabHeroCopy{
-        position:relative!important;z-index:4!important;width:min(48%,650px)!important;max-width:none!important;
-        padding:32px 20px 28px 24px!important;align-self:auto!important
-      }
+      .hiTabHeroCopy{position:relative!important;z-index:4!important;width:min(48%,650px)!important;max-width:none!important;padding:32px 20px 28px 24px!important;align-self:auto!important}
       .hiTabHeroCopy>small{font-size:10px!important;color:#214A86!important;letter-spacing:.16em!important;margin:0!important}
-      .hiTabHeroCopy h2{
-        font-size:clamp(31px,3.1vw,48px)!important;line-height:.98!important;letter-spacing:-.048em!important;
-        color:#08133A!important;margin:8px 0 10px!important;font-weight:680!important
-      }
-      .hiTabPurpose{
-        max-width:510px!important;margin:0!important;font-size:clamp(12px,1.15vw,16px)!important;
-        line-height:1.42!important;color:#536A91!important;font-weight:500!important
-      }
+      .hiTabHeroCopy h2{font-size:clamp(31px,3.1vw,48px)!important;line-height:.98!important;letter-spacing:-.048em!important;color:#08133A!important;margin:8px 0 10px!important;font-weight:720!important}
+      .hiTabPurpose{max-width:510px!important;margin:0!important;font-size:clamp(12px,1.15vw,16px)!important;line-height:1.42!important;color:#536A91!important;font-weight:500!important}
       .hiTabLiveLine,.hiTabHeroBadge{display:none!important}
-      .hiTabHeroArt{
-        position:absolute!important;z-index:1!important;inset:0 0 0 27%!important;min-height:0!important;
-        display:block!important;overflow:hidden!important;pointer-events:none!important
-      }
-      .hiTabHeroArt:before{
-        content:""!important;display:block!important;position:absolute!important;z-index:2!important;inset:0!important;
-        background:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.96) 9%,rgba(255,255,255,.68) 19%,rgba(255,255,255,.13) 37%,rgba(255,255,255,0) 55%)!important
-      }
-      .hiTabHeroArt img{
-        position:absolute!important;z-index:1!important;inset:0!important;width:100%!important;height:100%!important;
-        min-height:0!important;max-height:none!important;object-fit:cover!important;object-position:center 52%!important;transform:none!important
-      }
+      .hiTabHeroArt{position:absolute!important;z-index:1!important;inset:0 0 0 27%!important;min-height:0!important;display:block!important;overflow:hidden!important;pointer-events:none!important}
+      .hiTabHeroArt:before{content:""!important;display:block!important;position:absolute!important;z-index:2!important;inset:0!important;background:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.96) 9%,rgba(255,255,255,.68) 19%,rgba(255,255,255,.13) 37%,rgba(255,255,255,0) 55%)!important}
+      .hiTabHeroArt img{position:absolute!important;z-index:1!important;inset:0!important;width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;object-fit:cover!important;object-position:center 52%!important;transform:none!important}
 
-      .hiTabStatusGrid{
-        display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;
-        margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important
-      }
-      .hiTabStatusItem{
-        min-width:0!important;min-height:94px!important;height:auto!important;display:grid!important;
-        grid-template-columns:52px minmax(0,1fr)!important;gap:11px!important;align-items:center!important;
-        padding:12px 14px!important;border:1px solid #DBE6F3!important;border-radius:15px!important;
-        background:rgba(255,255,255,.97)!important;box-shadow:0 8px 22px rgba(21,61,115,.045)!important
-      }
-      .hiTabStatusIcon{
-        width:46px!important;height:46px!important;min-width:46px!important;border-radius:14px!important;display:flex!important;
-        align-items:center!important;justify-content:center!important;background:#EEF5FF!important;color:#1467F5!important;
-        border:0!important;font-size:24px!important
-      }
+      .hiTabStatusGrid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
+      .hiTabStatusItem{min-width:0!important;min-height:94px!important;height:auto!important;display:grid!important;grid-template-columns:52px minmax(0,1fr)!important;gap:11px!important;align-items:center!important;padding:12px 14px!important;border:1px solid #DBE6F3!important;border-radius:15px!important;background:rgba(255,255,255,.97)!important;box-shadow:0 8px 22px rgba(21,61,115,.045)!important}
+      .hiTabStatusIcon{width:46px!important;height:46px!important;min-width:46px!important;border-radius:14px!important;display:flex!important;align-items:center!important;justify-content:center!important;background:#EEF5FF!important;color:#1467F5!important;border:0!important;font-size:24px!important}
       .hiTabStatusCopy{min-width:0!important;display:block!important}
       .hiTabStatusCopy small{display:block!important;margin:0 0 3px!important;color:#31558E!important;font-size:10px!important;font-weight:650!important}
-      .hiTabStatusCopy b{
-        display:block!important;margin:0 0 3px!important;color:#0B173D!important;font-size:clamp(14px,1.25vw,18px)!important;
-        font-weight:720!important;line-height:1.08!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important
-      }
-      .hiTabStatusCopy em{
-        display:block!important;margin-top:2px!important;color:#55709B!important;font-size:10px!important;font-style:normal!important;
-        font-weight:500!important;line-height:1.2!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important
-      }
+      .hiTabStatusCopy b{display:block!important;margin:0 0 3px!important;color:#0B173D!important;font-size:clamp(14px,1.25vw,18px)!important;font-weight:720!important;line-height:1.08!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+      .hiTabStatusCopy em{display:block!important;margin-top:2px!important;color:#55709B!important;font-size:10px!important;font-style:normal!important;font-weight:500!important;line-height:1.2!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
 
-      .hiQuickActionBar{
-        display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;
-        min-height:52px!important;margin:0!important;padding:6px 10px!important;border:1px solid #DBE6F3!important;border-radius:14px!important;
-        background:#fff!important;box-shadow:0 5px 16px rgba(21,61,115,.03)!important
-      }
-      .hiQuickActionBar>small{
-        flex:0 0 auto!important;margin-right:6px!important;text-transform:uppercase!important;letter-spacing:.13em!important;
-        font-size:9.5px!important;font-weight:700!important;color:#31558E!important
-      }
-      .hiQuickActionItems{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;flex-wrap:wrap!important}
-      .hiQuickAction,.hiQuickSelect,.scopeSelector,.hiQuickActionItems .hiSegmented{
-        min-height:40px!important;border-radius:10px!important
-      }
-      .hiQuickAction{
-        height:40px!important;padding:0 14px!important;border:1px solid #D8E4F1!important;background:#fff!important;color:#075FD8!important;
-        box-shadow:none!important;font-size:11px!important;font-weight:660!important
-      }
+      .hiQuickActionBar{min-height:52px!important;padding:6px 10px!important;margin:0!important;border:1px solid #DBE6F3!important;border-radius:14px!important;background:#fff!important;box-shadow:0 5px 16px rgba(21,61,115,.03)!important;display:flex!important;align-items:center!important;gap:8px!important;flex-wrap:wrap!important;overflow:visible!important}
+      .hiQuickActionBar>small{font-size:9.5px!important;letter-spacing:.13em!important;text-transform:uppercase!important;color:#31558E!important;font-weight:700!important;margin-right:2px!important;padding:0!important;flex:0 0 auto!important}
+      .hiQuickActionItems{display:flex!important;align-items:center!important;gap:8px!important;flex-wrap:wrap!important;min-width:0!important;overflow:visible!important}
+      .hiQuickAction{height:40px!important;min-height:40px!important;border:1px solid #D8E4F1!important;border-radius:10px!important;background:#fff!important;color:#075FD8!important;box-shadow:none!important;font-size:11px!important;font-weight:660!important;padding:0 13px!important;display:inline-flex!important;align-items:center!important;gap:7px!important;cursor:pointer!important;white-space:nowrap!important}
       .hiQuickAction:first-child{background:#0B66F6!important;border-color:#0B66F6!important;color:#fff!important}
+      .hiQuickSelect,.scopeSelector,.hiQuickActionItems .hiSegmented{min-height:40px!important;border-radius:10px!important}
 
-      @media(max-width:1180px){
-        .hiTabStatusGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+      @media(max-width:1024px){
+        .hiTabHero{min-height:188px!important}
+        .hiTabHeroCopy{width:50%!important;padding:26px 16px 22px 18px!important}
+        .hiTabHeroArt{inset:0 0 0 30%!important}
+        .hiTabStatusItem{grid-template-columns:42px minmax(0,1fr)!important;padding:10px!important;min-height:88px!important}
+        .hiTabStatusIcon{width:40px!important;height:40px!important;min-width:40px!important}
       }
-      @media(max-width:700px){
-        .hiTabHero{min-height:150px!important}
-        .hiTabHeroCopy{width:min(64%,520px)!important;padding:20px 12px 18px 16px!important}
-        .hiTabHeroCopy h2{font-size:28px!important}
+      @media(max-width:760px){
+        .hiTabHero{min-height:168px!important}
+        .hiTabHeroCopy{width:58%!important;padding:20px 10px 18px 14px!important}
+        .hiTabHeroCopy h2{font-size:29px!important}
         .hiTabHeroArt{inset:0 0 0 34%!important}
-        .hiTabStatusGrid{grid-template-columns:1fr 1fr!important;gap:6px!important}
-        .hiTabStatusItem{min-height:74px!important;grid-template-columns:38px minmax(0,1fr)!important;padding:9px 10px!important}
-        .hiTabStatusIcon{width:36px!important;height:36px!important;min-width:36px!important;font-size:18px!important}
+        .hiTabStatusGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
         .hiQuickActionBar{overflow-x:auto!important;flex-wrap:nowrap!important}
+        .hiQuickActionBar>small{flex:0 0 auto!important}
         .hiQuickActionItems{flex-wrap:nowrap!important}
+        .hiQuickAction{flex:0 0 auto!important}
+      }
+      @media(max-width:430px){
+        .hiTabHero{min-height:154px!important}
+        .hiTabHeroCopy{width:64%!important;padding:17px 8px 15px 12px!important}
+        .hiTabHeroCopy h2{font-size:25px!important}
+        .hiTabPurpose{font-size:10px!important;line-height:1.3!important}
+        .hiTabHeroArt{inset:0 0 0 38%!important}
+        .hiTabStatusGrid{grid-template-columns:1fr 1fr!important}
+        .hiTabStatusItem{grid-template-columns:34px minmax(0,1fr)!important;min-height:76px!important;padding:8px!important;gap:7px!important}
+        .hiTabStatusIcon{width:32px!important;height:32px!important;min-width:32px!important;border-radius:10px!important;font-size:18px!important}
       }
 </style><style>
 .navigationShell{--nav-active-bg:#edf5ff;--nav-active-border:#cfdef1;--nav-active-text:#0f4ca4;--rhi-company-area-min:250px;--rhi-company-area-max:320px;--rhi-company-logo-max-width:286px;--rhi-company-logo-max-height:116px;--rhi-company-logo-padding:10px 16px;--rhi-company-divider:rgba(226,232,240,.82);position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(var(--rhi-company-area-min),var(--rhi-company-area-max));gap:0;margin:0 0 12px;background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.91));border:1px solid rgba(207,217,230,.86);border-radius:22px;box-shadow:0 12px 30px rgba(15,23,42,.045);overflow:hidden;backdrop-filter:blur(16px)}.navigationShell.nav-intelligence{--nav-active-bg:#f1edff;--nav-active-border:#dfd5fb;--nav-active-text:#5a38b3}.navigationShell.nav-insights{--nav-active-bg:#e7f7f4;--nav-active-border:#cdebe6;--nav-active-text:#176e67}
