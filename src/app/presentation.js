@@ -37,17 +37,20 @@ const HB_ENERGY_NAVIGATION = Object.freeze([
 
 const HB_ENERGY_HERO_ASSETS = Object.freeze({
   overview: "heroes/overview-hero.webp",
-  flow: "heroes/overview-hero.webp",
+  flow: "heroes/flow-hero.webp",
+  solar: "heroes/solar-hero.webp",
   "solar-generation": "heroes/solar-hero.webp",
-  solar: "heroes/planning-hero.webp",
   battery: "heroes/battery-hero.webp",
   consumers: "heroes/consumers-hero.webp",
+  strategy: "heroes/strategies-hero.webp",
   strategies: "heroes/strategies-hero.webp",
-  intelligence: "heroes/strategies-hero.webp",
-  outlook: "heroes/planning-hero.webp",
+  intelligence: "heroes/intelligence-hero.webp",
+  "operational-planning": "heroes/planning-hero.webp",
+  outlook: "heroes/outlook-hero.webp",
+  "tactical-planning": "heroes/planning-hero.webp",
   planning: "heroes/planning-hero.webp",
   "strategic-planning": "heroes/strategies-hero.webp",
-  metering: "heroes/pricing-hero.webp",
+  metering: "heroes/metering-hero.webp",
   value: "heroes/value-hero.webp",
   retrospective: "heroes/diagnostics-hero.webp"
 });
