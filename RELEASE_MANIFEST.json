@@ -1,6 +1,6 @@
 {
   "product": "rhi-energy-ux",
-  "version": "3.94.24",
+  "version": "3.95.0",
   "stage": "test_candidate",
   "publication_authority": "github_releases",
   "publication_status": "installable_candidate_until_qualified",
