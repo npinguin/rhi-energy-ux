@@ -28,6 +28,12 @@
         "domain/planning/planning-contract.js",
         "domain/planning/planning-view-model.js"
       ]
+    },
+    {
+      "placeholder": "// __RHI_PRESENTATION_MODULES__",
+      "modules": [
+        "app/presentation.js"
+      ]
     }
   ],
   "assets_root": "assets"
