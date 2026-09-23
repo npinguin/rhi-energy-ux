@@ -1,3 +1,11 @@
+## 3.95.1 — Mobility overview parity correction
+
+- matches the Energy hero composition to Mobility Overview and removes hero-level mini status values;
+- promotes Energy's four primary facts to the same top-level status-card hierarchy as Mobility Overview;
+- aligns Quick Actions spacing and primary-action treatment with Mobility Overview;
+- fixes semantic hero-image mapping across Flow, Solar, Metering, Planning, Strategy and Retrospective;
+- preserves E0.15.25 / R1.89.44_CONTRACT compatibility with no backend contract change.
+
 ## 3.95.0 — Energy UX structural alignment
 
 - aligns Energy page heroes with the proven Mobility header geometry and responsive behavior;
