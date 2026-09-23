@@ -1,3 +1,11 @@
+## 3.95.4 — Flow and Metering hero family correction
+
+- replaces the remaining legacy Flow hero with a dedicated Energy-family 2172×724 asset;
+- replaces the remaining legacy Metering hero with a dedicated Energy-family 2172×724 asset;
+- uses hero-safe composition with a quiet left copy zone and principal Energy subject on the right for correct template clipping;
+- preserves the v3.95.3 Mobility-parity hero/status/actions layout and all Energy semantics;
+- keeps E0.15.25 / R1.89.44_CONTRACT compatibility with zero backend contract delta.
+
 ## 3.95.3 — hero/status stacking correction
 
 - fixes the remaining Energy layout drift where the hero and four status cards were still rendered side-by-side because an older two-column grid template survived the rc.38 override;
