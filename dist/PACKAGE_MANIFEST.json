@@ -10,7 +10,7 @@
     "branding",
     "heroes"
   ],
-  "runtime_sha256": "387580218557c00041b4631d739d95616b5dc37947f66e391f3281cfd9a7b247",
+  "runtime_sha256": "d0c667bc60fd63b9f8745a86e6fb130c2beb78ce642e30aa4da973ba54e0a100",
   "files": [
     {
       "path": "assets/branding/company-logo.svg",
@@ -18,15 +18,15 @@
     },
     {
       "path": "assets/heroes/battery-hero.webp",
-      "bytes": 20336
+      "bytes": 3396
     },
     {
       "path": "assets/heroes/consumers-hero.webp",
-      "bytes": 21918
+      "bytes": 3684
     },
     {
       "path": "assets/heroes/diagnostics-hero.webp",
-      "bytes": 22934
+      "bytes": 3796
     },
     {
       "path": "assets/heroes/flow-hero.webp",
@@ -46,31 +46,31 @@
     },
     {
       "path": "assets/heroes/overview-hero.webp",
-      "bytes": 20802
+      "bytes": 16654
     },
     {
       "path": "assets/heroes/planning-hero.webp",
-      "bytes": 21200
+      "bytes": 3586
     },
     {
       "path": "assets/heroes/pricing-hero.webp",
-      "bytes": 21464
+      "bytes": 3652
     },
     {
       "path": "assets/heroes/solar-hero.webp",
-      "bytes": 31708
+      "bytes": 9188
     },
     {
       "path": "assets/heroes/strategies-hero.webp",
-      "bytes": 23074
+      "bytes": 3220
     },
     {
       "path": "assets/heroes/value-hero.webp",
-      "bytes": 21792
+      "bytes": 3424
     },
     {
       "path": "rhi-energy-ux.js",
-      "bytes": 725466
+      "bytes": 725397
     },
     {
       "path": "rhi-energy-ux.js.sha256",
