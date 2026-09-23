@@ -127,6 +127,14 @@
         "source/package terminology",
         "migration-sequence documentation"
       ]
+    },
+    "visual_presentation": {
+      "owner": "validation/validate_mobility_rc38_visual_parity.py",
+      "owns": [
+        "top-level hero geometry",
+        "top-level status-card hierarchy",
+        "quick-action presentation parity"
+      ]
     }
   }
 }
