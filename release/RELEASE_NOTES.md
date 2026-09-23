@@ -1,28 +1,36 @@
-# RHI Energy UX v3.94.24 — HACS full-tree delivery correction TEST CANDIDATE
+# RHI Energy UX v3.95.0 — structural UX alignment TEST CANDIDATE
 
 ## Scope
 
-Release-governance/package-delivery correction over v3.94.23. Energy product semantics, backend contracts, routes, planning meaning and user actions are unchanged.
+Clean Energy UX alignment release over v3.94.24. It adopts the proven Mobility presentation pattern without moving Energy semantics, calculations, commands or ownership into the frontend.
 
-## Root cause
+## User experience
 
-Current HACS tagged-plugin installation prefers GitHub Release assets whenever a tagged release has any assets. The previous RHI UX model attached checksum/manifest/qualification files as “evidence-only” assets. On a clean install HACS therefore installed those attachments instead of materializing the immutable tag's complete `dist/` package, so runtime JS and nested assets could disappear.
+- Uses the same compact copy-left / image-right hero geometry as Mobility across desktop, tablet and phone.
+- Freezes a dedicated Energy hero family for Overview, Solar, Home Battery, Consumers, Planning, Metering/Pricing, Strategy, Value and Diagnostics/Retrospective.
+- Keeps hero artwork presentation-only: no product title text is baked into the images.
+- Gives every current Energy navigation destination an explicit presentation profile instead of silently falling back to Overview.
+- Preserves Energy-specific color and imagery while keeping Home Intelligence modules visibly related.
 
-## Correction
+## Maintainability
 
-- GitHub Release remains HACS-visible but contains **zero assets**.
-- The immutable Git tag owns the complete `dist/` package.
-- `content_in_root: false` retains the standard nested `dist/` plugin layout.
-- Candidate publication and stable promotion fail if any GitHub Release asset exists.
-- HACS install simulation now models actual tagged-release selection before installing the `dist/` tree.
-- Qualification remains repository-governed and is never uploaded as a release asset.
-- No Energy runtime/product behavior is changed.
+- Introduces one declarative Energy navigation model.
+- Introduces one declarative hero-asset map and a small view/profile alias map.
+- Adds a single presentation module for responsive hero and reusable card grammar.
+- Reuses existing backend-owned values, status, actions and page renderers.
+- Does not introduce a generic frontend framework, new data layer, new state store or duplicated domain model.
+- Existing card bodies remain semantically unchanged; the shared grammar standardizes compact facts, context cards and data rows.
 
-## Compatibility
+## Contract and compatibility
 
-- Energy UX: 3.94.24
+- Energy UX: 3.95.0
 - Minimum backend: E0.15.25
 - Public compatibility surface: R1.89.44_CONTRACT
-- Rollback release: v3.94.23
+- Backend/domain contract delta: none
+- Accepted technical debt: 0
+- Accepted feature debt: 0
+- Rollback release: v3.94.24
 
-Target Home Assistant qualification must use a clean HACS install and prove that `www/community/rhi-energy-ux/` contains `rhi-energy-ux.js` and the complete packaged `assets/` tree before runtime promotion.
+## Qualification
+
+Static and package validation are required before publication. Target Home Assistant runtime, desktop/iPad rendering, clean HACS install and rollback proof remain qualification gates for stable promotion of this immutable candidate.

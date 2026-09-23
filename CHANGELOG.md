@@ -1,3 +1,12 @@
+## 3.95.0 — Energy UX structural alignment
+
+- aligns Energy page heroes with the proven Mobility header geometry and responsive behavior;
+- freezes a dedicated Energy-first hero family across existing tabs;
+- centralizes navigation, hero selection and presentation primitives in one declarative presentation module;
+- gives current and compatibility views explicit presentation mappings instead of Overview fallback;
+- standardizes compact fact, context and data-row card grammar without moving domain semantics into the frontend;
+- preserves E0.15.25 / R1.89.44_CONTRACT compatibility with zero backend contract delta.
+
 ## 3.94.24 — HACS full-tree delivery correction
 
 - Removes all GitHub Release assets from tagged HACS plugin releases.

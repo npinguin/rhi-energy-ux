@@ -1,6 +1,6 @@
 {
   "name": "rhi-energy-ux",
-  "version": "3.94.24",
+  "version": "3.95.0",
   "private": false,
   "description": "Robotix Home Intelligence Energy UX - HACS Dashboard plugin",
   "license": "GPL-3.0-only",
