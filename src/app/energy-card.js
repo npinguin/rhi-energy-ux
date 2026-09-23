@@ -2473,21 +2473,19 @@
       const navSection = this.navigationModel().find(section => section.id === this.navSection);
       const semanticTitle = navItem?.title || p.title;
       const semanticDescription = navItem?.description || p.explanation;
-      const liveLabel = p.title && p.title !== semanticTitle ? p.title : '';
+      const heroKey = navItem?.id || tab;
       return `<section class="hiTabExperienceHeader ${escapeHtml(p.tone)}" data-nav-section="${escapeHtml(this.navSection || '')}" data-nav-item="${escapeHtml(this.navItem || '')}">
         <div class="hiTabHero" data-view="${escapeHtml(tab)}">
           <div class="hiTabHeroCopy">
             <small>${escapeHtml((navSection?.label || 'Energy') + ' / ' + (navItem?.label || p.eyebrow))}</small>
             <h2>${escapeHtml(semanticTitle)}</h2>
             <p class="hiTabPurpose">${escapeHtml(semanticDescription)}</p>
-            <div class="hiTabLiveLine">${liveLabel ? `<strong>${escapeHtml(liveLabel)}</strong>` : ''}<div class="hiTabHeroValue">${escapeHtml(p.value)}</div><span>${escapeHtml(p.unit)}</span></div>
           </div>
           <div class="hiTabHeroArt" aria-hidden="true">
-            <img src="${escapeHtml(p.image || hbEnergyHeroAsset(tab))}" alt="">
-            <div class="hiTabHeroBadge"><span class="hiTabSimpleBadge ${escapeHtml(p.badgeTone)}">${escapeHtml(p.badgeText)}</span></div>
+            <img src="${escapeHtml(hbEnergyHeroAsset(heroKey))}" alt="">
           </div>
         </div>
-        <div class="hiTabStatusGrid">${p.metrics.map(([icon,label,value,meaning])=>`<div class="hiTabStatusItem"><span class="hiTabStatusIcon" aria-hidden="true">${escapeHtml(icon || '•')}</span><div class="hiTabStatusCopy"><small>${escapeHtml(label)}</small><b>${escapeHtml(value ?? '—')}</b><em>${escapeHtml(meaning || '')}</em></div></div>`).join('')}</div>
+        <div class="hiTabStatusGrid" aria-label="${escapeHtml(semanticTitle)} status">${p.metrics.map(([icon,label,value,meaning])=>`<article class="hiTabStatusItem"><span class="hiTabStatusIcon" aria-hidden="true">${escapeHtml(icon || '•')}</span><div class="hiTabStatusCopy"><small>${escapeHtml(label)}</small><b>${escapeHtml(value ?? '—')}</b><em>${escapeHtml(meaning || '')}</em></div></article>`).join('')}</div>
       </section>`;
     }
     measuredAssetPower(asset = {}) {
@@ -4917,7 +4915,103 @@
       @media(max-width:900px){.operationalSummaryGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.solarLoadSummary{grid-template-columns:1.4fr repeat(3,minmax(0,1fr))!important}.solarLoadWhy{grid-column:2/4!important}.solarLoadControls{grid-template-columns:1fr!important}.solarLoadControls .loadActions{border-left:0!important;padding-left:0!important}.planningLoadRow{grid-template-columns:1.4fr repeat(2,minmax(0,1fr))!important}.planningLoadRow>div:nth-child(n+5){margin-top:6px!important}}
       @media(max-width:650px){.hiQuickActionBar{align-items:flex-start!important;gap:8px!important}.hiQuickActionItems{width:100%!important}.quickAutomation{width:100%!important;justify-content:space-between!important;flex-wrap:wrap!important}.quickAutomationLabel{font-size:11px!important}.quickAutomation .hiSegmented{width:100%!important}.quickAutomation .hiSegment{min-width:0!important;flex:1 1 0!important;padding:7px 8px!important;font-size:11px!important}.operationalSummaryGrid,.planningKpiStrip{grid-template-columns:1fr 1fr!important}.solarLoadSummary{grid-template-columns:1fr 1fr!important}.solarLoadIdentity,.solarLoadWhy{grid-column:1/-1!important}.solarLoadControls .requestedSlot{grid-template-columns:1fr!important}.planningLoadRow{grid-template-columns:1fr 1fr!important}.planningLoadIdentity{grid-column:1/-1!important}}
 
-.flexibleMeteringTable .meteringTotalRow td{border-top:2px solid var(--line)!important;background:#f8fafc!important;font-weight:700!important}.flexibleMeteringTable .meteringTotalRow td:first-child b{font-size:12px!important}</style><style>
+.flexibleMeteringTable .meteringTotalRow td{border-top:2px solid var(--line)!important;background:#f8fafc!important;font-weight:700!important}.flexibleMeteringTable .meteringTotalRow td:first-child b{font-size:12px!important}
+      /* R3.95.1 Mobility-overview parity: hero, top-level status and actions. */
+      .hiTabExperienceHeader{display:grid!important;gap:10px!important;margin:0 0 0!important}
+      .hiTabHero{
+        position:relative!important;display:block!important;min-height:clamp(176px,16vw,218px)!important;
+        border:0!important;border-radius:18px!important;
+        background:linear-gradient(90deg,#fff 0%,#fff 30%,rgba(255,255,255,.94) 39%,rgba(255,255,255,.18) 60%,rgba(255,255,255,0) 76%)!important;
+        box-shadow:none!important;overflow:hidden!important;margin:0!important;padding:0!important
+      }
+      .hiTabHero:before{display:none!important}
+      .hiTabHeroCopy{
+        position:relative!important;z-index:4!important;width:min(48%,650px)!important;max-width:none!important;
+        padding:32px 20px 28px 24px!important;align-self:auto!important
+      }
+      .hiTabHeroCopy>small{font-size:10px!important;color:#214A86!important;letter-spacing:.16em!important;margin:0!important}
+      .hiTabHeroCopy h2{
+        font-size:clamp(31px,3.1vw,48px)!important;line-height:.98!important;letter-spacing:-.048em!important;
+        color:#08133A!important;margin:8px 0 10px!important;font-weight:680!important
+      }
+      .hiTabPurpose{
+        max-width:510px!important;margin:0!important;font-size:clamp(12px,1.15vw,16px)!important;
+        line-height:1.42!important;color:#536A91!important;font-weight:500!important
+      }
+      .hiTabLiveLine,.hiTabHeroBadge{display:none!important}
+      .hiTabHeroArt{
+        position:absolute!important;z-index:1!important;inset:0 0 0 27%!important;min-height:0!important;
+        display:block!important;overflow:hidden!important;pointer-events:none!important
+      }
+      .hiTabHeroArt:before{
+        content:""!important;display:block!important;position:absolute!important;z-index:2!important;inset:0!important;
+        background:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.96) 9%,rgba(255,255,255,.68) 19%,rgba(255,255,255,.13) 37%,rgba(255,255,255,0) 55%)!important
+      }
+      .hiTabHeroArt img{
+        position:absolute!important;z-index:1!important;inset:0!important;width:100%!important;height:100%!important;
+        min-height:0!important;max-height:none!important;object-fit:cover!important;object-position:center 52%!important;transform:none!important
+      }
+
+      .hiTabStatusGrid{
+        display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;
+        margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important
+      }
+      .hiTabStatusItem{
+        min-width:0!important;min-height:94px!important;height:auto!important;display:grid!important;
+        grid-template-columns:52px minmax(0,1fr)!important;gap:11px!important;align-items:center!important;
+        padding:12px 14px!important;border:1px solid #DBE6F3!important;border-radius:15px!important;
+        background:rgba(255,255,255,.97)!important;box-shadow:0 8px 22px rgba(21,61,115,.045)!important
+      }
+      .hiTabStatusIcon{
+        width:46px!important;height:46px!important;min-width:46px!important;border-radius:14px!important;display:flex!important;
+        align-items:center!important;justify-content:center!important;background:#EEF5FF!important;color:#1467F5!important;
+        border:0!important;font-size:24px!important
+      }
+      .hiTabStatusCopy{min-width:0!important;display:block!important}
+      .hiTabStatusCopy small{display:block!important;margin:0 0 3px!important;color:#31558E!important;font-size:10px!important;font-weight:650!important}
+      .hiTabStatusCopy b{
+        display:block!important;margin:0 0 3px!important;color:#0B173D!important;font-size:clamp(14px,1.25vw,18px)!important;
+        font-weight:720!important;line-height:1.08!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important
+      }
+      .hiTabStatusCopy em{
+        display:block!important;margin-top:2px!important;color:#55709B!important;font-size:10px!important;font-style:normal!important;
+        font-weight:500!important;line-height:1.2!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important
+      }
+
+      .hiQuickActionBar{
+        display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;
+        min-height:52px!important;margin:0!important;padding:6px 10px!important;border:1px solid #DBE6F3!important;border-radius:14px!important;
+        background:#fff!important;box-shadow:0 5px 16px rgba(21,61,115,.03)!important
+      }
+      .hiQuickActionBar>small{
+        flex:0 0 auto!important;margin-right:6px!important;text-transform:uppercase!important;letter-spacing:.13em!important;
+        font-size:9.5px!important;font-weight:700!important;color:#31558E!important
+      }
+      .hiQuickActionItems{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;flex-wrap:wrap!important}
+      .hiQuickAction,.hiQuickSelect,.scopeSelector,.hiQuickActionItems .hiSegmented{
+        min-height:40px!important;border-radius:10px!important
+      }
+      .hiQuickAction{
+        height:40px!important;padding:0 14px!important;border:1px solid #D8E4F1!important;background:#fff!important;color:#075FD8!important;
+        box-shadow:none!important;font-size:11px!important;font-weight:660!important
+      }
+      .hiQuickAction:first-child{background:#0B66F6!important;border-color:#0B66F6!important;color:#fff!important}
+
+      @media(max-width:1180px){
+        .hiTabStatusGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+      }
+      @media(max-width:700px){
+        .hiTabHero{min-height:150px!important}
+        .hiTabHeroCopy{width:min(64%,520px)!important;padding:20px 12px 18px 16px!important}
+        .hiTabHeroCopy h2{font-size:28px!important}
+        .hiTabHeroArt{inset:0 0 0 34%!important}
+        .hiTabStatusGrid{grid-template-columns:1fr 1fr!important;gap:6px!important}
+        .hiTabStatusItem{min-height:74px!important;grid-template-columns:38px minmax(0,1fr)!important;padding:9px 10px!important}
+        .hiTabStatusIcon{width:36px!important;height:36px!important;min-width:36px!important;font-size:18px!important}
+        .hiQuickActionBar{overflow-x:auto!important;flex-wrap:nowrap!important}
+        .hiQuickActionItems{flex-wrap:nowrap!important}
+      }
+</style><style>
 .navigationShell{--nav-active-bg:#edf5ff;--nav-active-border:#cfdef1;--nav-active-text:#0f4ca4;--rhi-company-area-min:250px;--rhi-company-area-max:320px;--rhi-company-logo-max-width:286px;--rhi-company-logo-max-height:116px;--rhi-company-logo-padding:10px 16px;--rhi-company-divider:rgba(226,232,240,.82);position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(var(--rhi-company-area-min),var(--rhi-company-area-max));gap:0;margin:0 0 12px;background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.91));border:1px solid rgba(207,217,230,.86);border-radius:22px;box-shadow:0 12px 30px rgba(15,23,42,.045);overflow:hidden;backdrop-filter:blur(16px)}.navigationShell.nav-intelligence{--nav-active-bg:#f1edff;--nav-active-border:#dfd5fb;--nav-active-text:#5a38b3}.navigationShell.nav-insights{--nav-active-bg:#e7f7f4;--nav-active-border:#cdebe6;--nav-active-text:#176e67}
 .navProductArea{min-width:0}.navPrimaryRow{min-height:78px;display:grid;grid-template-columns:minmax(270px,.72fr) minmax(430px,1.28fr);align-items:center;gap:24px;padding:10px 22px 9px}.navBrand{display:flex;align-items:center;min-width:0;min-height:56px;padding:2px 0 0 4px}.navBrandCopy{display:grid;align-content:center;gap:2px;min-width:0}.navBrandCopy b{font-size:15px;line-height:1.1;font-weight:520;letter-spacing:-.01em;color:#58708f;white-space:nowrap}.navBrandCopy small{font-size:24px;line-height:1.02;letter-spacing:.055em;font-weight:790;color:#0b467f;white-space:nowrap}
 .navSections,.navItems{display:flex;align-items:center;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}.navSections::-webkit-scrollbar,.navItems::-webkit-scrollbar{display:none}
