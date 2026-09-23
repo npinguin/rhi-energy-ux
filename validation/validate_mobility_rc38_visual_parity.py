@@ -8,6 +8,7 @@ PRESENTATION = (ROOT / "src" / "app" / "presentation.js").read_text(encoding="ut
 checks = {
     "canonical_cross_product_contract": "R3.95.2 canonical cross-product top-level composition" in SOURCE,
     "hero_full_bleed_geometry": "min-height:clamp(176px,16vw,218px)!important" in SOURCE and "inset:0 0 0 27%!important" in SOURCE,
+    "hero_status_vertical_stack": "grid-template-columns:minmax(0,1fr)!important" in SOURCE and "grid-auto-flow:row!important" in SOURCE and "align-items:stretch!important" in SOURCE,
     "hero_has_no_live_substatus": ".hiTabLiveLine,.hiTabHeroBadge{display:none!important}" in SOURCE,
     "status_four_up_until_phone": "grid-template-columns:repeat(4,minmax(0,1fr))!important" in SOURCE and "@media(max-width:760px)" in SOURCE,
     "status_overview_weight": "min-height:94px!important" in SOURCE and "grid-template-columns:52px minmax(0,1fr)!important" in SOURCE,
