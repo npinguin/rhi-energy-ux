@@ -1,8 +1,8 @@
 {
-  "version": "3.94.24",
-  "candidate_tag": "v3.94.24",
+  "version": "3.95.0",
+  "candidate_tag": "v3.95.0",
   "candidate_sha": "pending",
-  "previous_release": "3.94.23",
+  "previous_release": "3.94.24",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
