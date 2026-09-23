@@ -3417,16 +3417,8 @@ function hbEnergyPresentationStyles() {
       const liveLabel = p.title && p.title !== semanticTitle ? p.title : '';
       return `<section class="hiTabExperienceHeader ${escapeHtml(p.tone)}" data-nav-section="${escapeHtml(this.navSection || '')}" data-nav-item="${escapeHtml(this.navItem || '')}">
         <div class="hiTabHero" data-view="${escapeHtml(tab)}">
-          <div class="hiTabHeroCopy">
-            <small>${escapeHtml((navSection?.label || 'Energy') + ' / ' + (navItem?.label || p.eyebrow))}</small>
-            <h2>${escapeHtml(semanticTitle)}</h2>
-            <p class="hiTabPurpose">${escapeHtml(semanticDescription)}</p>
-            <div class="hiTabLiveLine">${liveLabel ? `<strong>${escapeHtml(liveLabel)}</strong>` : ''}<div class="hiTabHeroValue">${escapeHtml(p.value)}</div><span>${escapeHtml(p.unit)}</span></div>
-          </div>
-          <div class="hiTabHeroArt" aria-hidden="true">
-            <img src="${escapeHtml(p.image || hbEnergyHeroAsset(tab))}" alt="">
-            <div class="hiTabHeroBadge"><span class="hiTabSimpleBadge ${escapeHtml(p.badgeTone)}">${escapeHtml(p.badgeText)}</span></div>
-          </div>
+          <div class="hiTabHeroCopy"><small>${escapeHtml((navSection?.label || 'Energy') + ' / ' + (navItem?.label || p.eyebrow))}</small><h2>${escapeHtml(semanticTitle)}</h2><p class="hiTabPurpose">${escapeHtml(semanticDescription)}</p><div class="hiTabLiveLine">${liveLabel ? `<strong>${escapeHtml(liveLabel)}</strong>` : ''}<div class="hiTabHeroValue">${escapeHtml(p.value)}</div><span>${escapeHtml(p.unit)}</span></div></div>
+          <div class="hiTabHeroArt" aria-hidden="true"><img src="${escapeHtml(p.image || hbEnergyHeroAsset(tab))}" alt=""><div class="hiTabHeroBadge"><span class="hiTabSimpleBadge ${escapeHtml(p.badgeTone)}">${escapeHtml(p.badgeText)}</span></div></div>
         </div>
         <div class="hiTabStatusGrid">${p.metrics.map(([icon,label,value,meaning])=>`<div class="hiTabStatusItem"><span class="hiTabStatusIcon" aria-hidden="true">${escapeHtml(icon || '•')}</span><div class="hiTabStatusCopy"><small>${escapeHtml(label)}</small><b>${escapeHtml(value ?? '—')}</b><em>${escapeHtml(meaning || '')}</em></div></div>`).join('')}</div>
       </section>`;
@@ -5642,7 +5634,7 @@ function hbEnergyPresentationStyles() {
         console.error(`[HomeBrain Energy ${UX_VERSION}] ${this.view} render failed`, error);
         content = this.renderError(this.view, error);
       }
-      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}
+      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${hbEnergyPresentationStyles()}
 
       /* R3.62.0 canonical component framework and adaptive convergence */
       :host{--hi-space-1:4px;--hi-space-2:8px;--hi-space-3:12px;--hi-space-4:16px;--hi-radius-sm:8px;--hi-radius-md:12px;--hi-break-tablet:980px;--hi-break-phone:700px}
