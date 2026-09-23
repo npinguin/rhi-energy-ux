@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "product": "rhi-energy-ux",
-  "version": "3.95.3",
+  "version": "3.95.4",
   "source_manifest_schema": 1,
   "hacs_package_root": "dist",
   "hacs_filename": "rhi-energy-ux.js",
@@ -10,7 +10,7 @@
     "branding",
     "heroes"
   ],
-  "runtime_sha256": "9266e70f45be1203634214e33a7cdb1bc9888aed0742b2bf985dba0c468044d0",
+  "runtime_sha256": "16d594a17ef3eee007c11fd3cd2340e4824fdbbd8cab8c4830b2e3880630e014",
   "files": [
     {
       "path": "assets/branding/company-logo.svg",
@@ -30,7 +30,7 @@
     },
     {
       "path": "assets/heroes/flow-hero.webp",
-      "bytes": 95406
+      "bytes": 155494
     },
     {
       "path": "assets/heroes/intelligence-hero.webp",
@@ -38,7 +38,7 @@
     },
     {
       "path": "assets/heroes/metering-hero.webp",
-      "bytes": 91812
+      "bytes": 91996
     },
     {
       "path": "assets/heroes/outlook-hero.webp",
