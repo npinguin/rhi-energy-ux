@@ -8,7 +8,6 @@ const required = [
   "this.assetVisual(load,{size:'sm'",
   "this.assetVisual(item.asset,{size:'xs'",
   'this.assetIdentityChip(item.asset',
-  'this.assetIdentityChip(x.asset',
   "this.assetVisual(load,{size:'xs'"
 ];
 for (const token of required) {

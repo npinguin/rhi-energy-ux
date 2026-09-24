@@ -1,8 +1,8 @@
 {
-  "version": "3.97.1",
-  "candidate_tag": "v3.97.1",
+  "version": "3.98.0",
+  "candidate_tag": "v3.98.0",
   "candidate_sha": "pending",
-  "previous_release": "3.97.0",
+  "previous_release": "3.97.1",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -57,5 +57,12 @@
   "solar_battery_source_split_truthfulness": "NOT_EXECUTED",
   "battery_contributor_body_sizing": "NOT_EXECUTED",
   "battery_contributor_image_containment": "NOT_EXECUTED",
-  "battery_hero_unchanged": "NOT_EXECUTED"
+  "battery_hero_unchanged": "NOT_EXECUTED",
+  "flow_hardware_inventory_absent": "NOT_EXECUTED",
+  "planning_hardware_inventory_absent": "NOT_EXECUTED",
+  "solar_hardware_hierarchy": "NOT_EXECUTED",
+  "solar_zone_panel_visual_selection": "NOT_EXECUTED",
+  "solar_inverter_children": "NOT_EXECUTED",
+  "solar_battery_aggregate_children": "NOT_EXECUTED",
+  "energy_product_artwork_uniformity": "NOT_EXECUTED"
 }
