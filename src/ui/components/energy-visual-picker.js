@@ -24,9 +24,9 @@ class HomeBrainEnergyVisualPicker {
         <span class="energyVisualQuality">${escapeHtml(human(entry.quality || "representative"))}</span>
       </button>`;
     }).join("");
-    return `<div class="energyVisualPickerBackdrop" data-energy-visual-close="1">
+    return `<div class="energyVisualPickerBackdrop" data-energy-visual-backdrop="1">
       <section class="energyVisualPickerPanel" role="dialog" aria-modal="true" aria-label="Choose representative image" data-energy-visual-panel="1">
-        <header><div><small>APPEARANCE · ${escapeHtml(human(type))}</small><h2>Choose representative image</h2><p>Only visuals for this logical Energy device type are available. This choice changes presentation only; runtime semantics remain backend-owned.</p></div><button type="button" class="energyVisualClose" data-energy-visual-close="1" aria-label="Close">×</button></header>
+        <header><div><small>APPEARANCE · ${escapeHtml(human(type))}</small><h2>Choose representative image</h2><p>Only visuals for this logical Energy device type are available. This choice changes presentation only; runtime semantics remain backend-owned.</p></div><button type="button" class="energyVisualClose" data-energy-visual-close-button="1" aria-label="Close">×</button></header>
         <div class="energyVisualChoices">${cards}</div>
         <footer><button type="button" class="energyVisualReset" data-energy-visual-reset="${escapeHtml(assetId)}">Use profile default</button></footer>
       </section>
