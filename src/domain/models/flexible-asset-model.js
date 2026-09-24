@@ -4,49 +4,83 @@
       this._all = null;
       this._byId = null;
     }
+    assetContext(asset = {}) {
+      const id = String(firstDefined(asset.asset_id, asset.flexible_asset_id, asset.target_asset_id, ''));
+      if (!id || typeof readEnergyAssetContext !== 'function') return { available:false, asset:null, profile:null, publication:null };
+      return readEnergyAssetContext(this.runtime.contractGateway(), id);
+    }
     isStorage(asset = {}) {
-      return /battery|storage/i.test(`${asset.ux_asset_type || ''} ${asset.asset_type || ''} ${asset.flexible_role || ''} ${asset.category || ''}`);
+      const context = this.assetContext(asset);
+      const values = [
+        context.asset?.asset_type,
+        context.profile?.asset_type,
+        asset.energy_asset_role,
+        asset.asset_type,
+        asset.ux_asset_type,
+        asset.flexible_role,
+        asset.category
+      ].map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
+      return values.some(value => ['battery','battery_system','storage','storage_cluster'].includes(value));
     }
     planningFor(assetId) {
       return this.runtime.planningOutcomeFor(assetId) || {};
     }
     participationState(asset = {}, planning = {}) {
       if (this.isStorage(asset)) return 'storage';
+      const context = this.assetContext(asset);
       const explicit = String(firstDefined(
+        context.asset?.participation_state,
         asset.participation_state,
         asset.automation_participation,
         asset.planning_participation,
-        asset.lifecycle_state,
-        asset.lifecycle_status,
         ''
-      ) || '').toLowerCase();
-      const disabledReason = `${firstDefined(asset.availability_reason,'')} ${firstDefined(planning.waiting_reason,planning.waiting_reason_code,planning.reason,'')}`.toLowerCase();
-      const enabled = firstDefined(asset.enabled, asset.planning_enabled, asset.participating, true);
+      ) || '').trim().toLowerCase();
       if (['disabled','excluded','off','not_participating','not participating'].includes(explicit)) return 'disabled';
-      if (!asBool(enabled, true) || /disabled|excluded|not.participating/.test(disabledReason)) return 'disabled';
-      const availability = String(firstDefined(asset.availability_state, asset.operating_state, '') || '').toLowerCase();
-      if (['unavailable','disconnected','offline','blocked'].includes(availability)) return 'temporarily_unavailable';
-      return 'participating';
+      if (['participating','enabled','active'].includes(explicit)) {
+        const availability = String(firstDefined(context.asset?.availability_state, asset.availability_state, '') || '').trim().toLowerCase();
+        return ['unavailable','disconnected','offline','blocked'].includes(availability) ? 'temporarily_unavailable' : 'participating';
+      }
+      const lifecycle = String(firstDefined(asset.lifecycle_state, asset.lifecycle_status, '') || '').trim().toLowerCase();
+      if (['disabled','inactive'].includes(lifecycle)) return 'disabled';
+      return 'unknown';
     }
     operationalState(asset = {}, planning = {}) {
-      const raw = String(firstDefined(asset.operating_state, asset.operation_state, planning.state, planning.status, '') || '').toLowerCase();
-      if (/paused|hold/.test(raw)) return 'paused';
-      if (/starting/.test(raw)) return 'starting';
-      if (/stopping/.test(raw)) return 'stopping';
-      if (/active|charging|running|executing/.test(raw) || (asNumber(firstDefined(asset.power_kw,asset.current_power_kw,asset.actual_power_kw)) || 0) > 0.05) return 'active';
-      if (/planned|selected/.test(raw) || asBool(planning.planned, false) || asBool(planning.selected, false)) return 'planned';
-      if (/waiting|pending/.test(raw) || asBool(planning.waiting, false)) return 'waiting';
-      if (/unavailable|offline|disconnected|blocked/.test(raw)) return 'unavailable';
-      return 'idle';
+      const context = this.assetContext(asset);
+      const raw = String(firstDefined(
+        context.asset?.operating_state,
+        asset.operating_state,
+        asset.operation_state,
+        planning.product_state,
+        planning.state,
+        planning.status,
+        ''
+      ) || '').trim().toLowerCase();
+      const aliases = {
+        charging:'active', running:'active', executing:'active',
+        selected:'planned', pending:'waiting',
+        offline:'unavailable', disconnected:'unavailable', blocked:'unavailable',
+        hold:'paused'
+      };
+      const normalized = aliases[raw] || raw;
+      return ['paused','starting','stopping','active','planned','waiting','unavailable','idle'].includes(normalized)
+        ? normalized
+        : 'unknown';
     }
     build(asset = {}) {
       const id = String(firstDefined(asset.asset_id, asset.flexible_asset_id, asset.target_asset_id, ''));
       const planning = this.planningFor(id);
+      const context = this.assetContext(asset);
       const participation = this.participationState(asset, planning);
       return {
         id,
         raw: asset,
         planning,
+        profile: context.profile,
+        profileId: String(context.asset?.profile_id || context.profile?.profile_id || ''),
+        publication: context.publication,
+        publicationGap: typeof energyAssetPublicationGap === 'function'
+          ? energyAssetPublicationGap(this.runtime.contractGateway(), id)
+          : { status:'unavailable', missing:[] },
         participation,
         operation: this.operationalState(asset, planning),
         isStorage: participation === 'storage',

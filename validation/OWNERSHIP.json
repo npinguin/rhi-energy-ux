@@ -135,6 +135,14 @@
         "top-level status-card hierarchy",
         "quick-action presentation parity"
       ]
+    },
+    "asset_profile_contract": {
+      "owner": "validation/test_asset_profile_contract.js",
+      "owns": [
+        "Energy Public V2 profile consumption",
+        "property publication completeness consumption",
+        "no display-name or power-based flexible-asset semantic inference"
+      ]
     }
   }
 }

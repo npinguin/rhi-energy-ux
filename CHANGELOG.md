@@ -1,3 +1,12 @@
+## 3.96.0 — canonical Energy asset context
+
+- consume Energy Public Contract V2 asset profiles and property-publication evidence through the existing registry/gateway boundary;
+- keep profile identity backend-owned, read-only and separate from UX artwork;
+- remove Flexible Asset display-name/storage regex classification;
+- remove power-threshold reconstruction of Flexible Asset operating state;
+- expose backend-owned profile/publication context in the normalized Flexible Asset model;
+- require Energy E0.15.31 while preserving the R1.89.44_CONTRACT compatibility surface and zero accepted debt.
+
 ## 3.95.4 — Flow and Metering hero family correction
 
 - replaces the remaining legacy Flow hero with a dedicated Energy-family 2172×724 asset;

@@ -4,27 +4,55 @@
   "owners": {
     "app": {
       "path": "src/app",
-      "owns": ["Energy custom element", "shared shell", "navigation", "renderers", "package asset references"]
+      "owns": [
+        "Energy custom element",
+        "shared shell",
+        "navigation",
+        "renderers",
+        "package asset references"
+      ]
     },
     "runtime": {
       "path": "src/runtime",
-      "owns": ["Home Assistant public Energy contract registry/gateway", "contract readers", "command contract boundary"]
+      "owns": [
+        "Home Assistant public Energy contract registry/gateway",
+        "contract readers",
+        "command contract boundary",
+        "canonical Energy V2 asset profile and publication-context readers"
+      ]
     },
     "domain_models": {
       "path": "src/domain/models",
-      "owns": ["canonical Energy UX view models", "metering model", "flexible-asset domain model"]
+      "owns": [
+        "canonical Energy UX view models",
+        "metering model",
+        "flexible-asset domain model",
+        "presentation-neutral consumption of backend-owned asset profile/state context"
+      ]
     },
     "planning": {
       "path": "src/domain/planning",
-      "owns": ["planning contract adaptation", "planning contract reader", "planning view model"]
+      "owns": [
+        "planning contract adaptation",
+        "planning contract reader",
+        "planning view model"
+      ]
     },
     "assets": {
       "path": "src/assets",
-      "owns": ["canonical package artwork grouped by public asset category"]
+      "owns": [
+        "canonical package artwork grouped by public asset category"
+      ]
     },
     "package": {
       "path": "tools/build.py",
-      "owns": ["source manifest consumption", "module injection", "bundle generation", "dist package assembly", "package manifest generation"]
+      "owns": [
+        "source manifest consumption",
+        "module injection",
+        "bundle generation",
+        "dist package assembly",
+        "package manifest generation"
+      ]
     }
   }
 }

@@ -99,3 +99,25 @@ Cross-owner assertions are test technical debt because they make unrelated chang
 ## Physical source/package architecture
 
 The repository structure is part of the architecture contract: `src/app`, `src/runtime`, `src/domain`, and `src/assets` have explicit ownership. `src/manifest.json` owns build composition. `dist/` is generated and is the complete HACS install package; it is never edited as source.
+
+## Canonical Energy V2 asset context
+
+Energy UX may consume `sensor.rhi_energy_public_contract_v2` only through the
+runtime interface registry/gateway and `runtime/asset-profile-contract.js`.
+
+The backend owns:
+
+- canonical `asset_type`;
+- read-only Energy `profile_id`;
+- the Energy asset-profile catalog;
+- participation / operating / availability conclusions that are published on the asset;
+- per-object property-publication completeness.
+
+The UX owns presentation only. It must not infer semantic identity from display names,
+entity ids, commercial artwork or image keys. It must not infer operational state from
+power thresholds. Missing canonical state remains unknown/unavailable.
+
+Energy profiles currently have `profile_scope=domain_asset_type` and are read-only.
+No profile picker is shown until the backend explicitly publishes an editable profile
+contract with canonical choices and write/readback capability.
+

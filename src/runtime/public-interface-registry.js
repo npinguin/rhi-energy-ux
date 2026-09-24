@@ -3,6 +3,7 @@
   const UX_INTERFACES = Object.freeze({
     release: RELEASE_ENTITY,
     pilotReadiness: 'sensor.energy_pilot_readiness',
+    publicV2: 'sensor.rhi_energy_public_contract_v2',
     assets: 'sensor.energy_asset_index',
     relationships: 'sensor.energy_relationship_index',
     commands: 'sensor.energy_command_index',
