@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "ux_version": "3.95.4",
+  "ux_version": "3.96.0",
   "energy_contract": {
     "minimum": "R1.89.44_CONTRACT",
-    "minimum_backend": "E0.15.25",
+    "minimum_backend": "E0.15.31",
     "tested_backend_releases": [
-      "E0.15.25"
+      "E0.15.31"
     ]
   },
   "deployment": {
