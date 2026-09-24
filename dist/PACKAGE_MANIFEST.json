@@ -1,21 +1,58 @@
 {
   "schema_version": 1,
   "product": "rhi-energy-ux",
-  "version": "3.97.1",
+  "version": "3.98.0",
   "source_manifest_schema": 1,
   "hacs_package_root": "dist",
   "hacs_filename": "rhi-energy-ux.js",
   "assets_root": "assets",
   "asset_categories": [
     "branding",
+    "energy",
     "heroes",
     "mobility"
   ],
-  "runtime_sha256": "7b29f07be8604f3ac464f3b38e7d7166ef6414d66197112e6e0b4434dbea7e2c",
+  "runtime_sha256": "3f348650429edb27d69823337ec579c9af7ab20c8075c52fca47a68d4c9a66c0",
   "files": [
     {
       "path": "assets/branding/company-logo.svg",
       "bytes": 17019
+    },
+    {
+      "path": "assets/energy/byd_lvs_20.webp",
+      "bytes": 9264
+    },
+    {
+      "path": "assets/energy/homewizard_p1.webp",
+      "bytes": 8596
+    },
+    {
+      "path": "assets/energy/jinkosolar_jkm435n_54hl4r.webp",
+      "bytes": 9856
+    },
+    {
+      "path": "assets/energy/solaredge_backup_interface_3phase.webp",
+      "bytes": 7203
+    },
+    {
+      "path": "assets/energy/solaredge_home_battery_48v_9_6.webp",
+      "bytes": 8162
+    },
+    {
+      "path": "assets/energy/solaredge_rwb_10k.webp",
+      "bytes": 8652
+    },
+    {
+      "path": "assets/energy/solaredge_rws_8k.webp",
+      "bytes": 8044
+    },
+    {
+      "path": "assets/energy/solaredge_s500b_optimizer.webp",
+      "bytes": 14512
+    },
+    {
+      "path": "assets/energy/sunpower_spr_x21_335_blk.webp",
+      "bytes": 8146
     },
     {
       "path": "assets/heroes/battery-hero.webp",
@@ -115,7 +152,7 @@
     },
     {
       "path": "rhi-energy-ux.js",
-      "bytes": 790774
+      "bytes": 796272
     },
     {
       "path": "rhi-energy-ux.js.sha256",
