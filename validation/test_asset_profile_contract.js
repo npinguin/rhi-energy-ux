@@ -41,7 +41,9 @@ const states = {
           availability_state:'AVAILABLE',
           property_publication:{
             authority:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
-            complete:false,
+            complete:true,
+            resolution_complete:false,
+            missing_required_property_keys:[],
             unresolved_required_property_keys:['flexible_load.power_kw'],
             v1_fallback_allowed:false
           }
@@ -88,8 +90,8 @@ const runtime = {
 const vehicleCtx = context.readEnergyAssetContext(runtime.contractGateway(),'vehicle_test');
 if (!vehicleCtx.available || vehicleCtx.profile?.asset_type !== 'flexible_load') throw new Error('canonical V2 profile context missing');
 const gap = context.energyAssetPublicationGap(runtime.contractGateway(),'vehicle_test');
-if (gap.status !== 'incomplete' || gap.missing[0] !== 'flexible_load.power_kw' || gap.v1_fallback_allowed !== false) {
-  throw new Error('publication gap contract lost');
+if (gap.status !== 'complete' || gap.missing.length !== 0 || gap.unresolved[0] !== 'flexible_load.power_kw' || gap.resolution_complete !== false || gap.v1_fallback_allowed !== false) {
+  throw new Error('publication/resolution evidence contract lost');
 }
 
 const model = new context.FlexibleAssetDomainModel(runtime);
