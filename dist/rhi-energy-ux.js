@@ -80,17 +80,25 @@ const RHI_ENERGY_VISUAL_PREFERENCE_KEY = "homebrain.energy.visual_preferences.v1
 
 const RHI_ENERGY_LOGICAL_VISUALS = Object.freeze([
   { id:"battery_system.home", asset_type:"battery_system", label:"Home battery system", brand:"Generic", model:"Home battery system", variant:"System", profile_patterns:["energy.battery_system."], package_path:"heroes/battery-hero.webp", quality:"representative", selectable:true },
-  { id:"battery.byd_lvs", asset_type:"battery", label:"BYD LVS battery", brand:"BYD", model:"LVS", variant:"Battery module", profile_patterns:[], inline_asset:"byd_lvs20", quality:"verified_model_choice", selectable:true },
+  { id:"battery.byd_lvs_20", asset_type:"battery", label:"BYD Battery-Box Premium LVS 20.0", brand:"BYD", model:"Battery-Box Premium LVS 20.0", variant:"20.0 kWh · 5 × LVS 4.0", profile_patterns:[], inline_asset:"byd_lvs20", quality:"verified_model_choice", selectable:true },
+  { id:"battery.solaredge_home_48v_9_6", asset_type:"battery", label:"SolarEdge Home Battery 48V 9.6 kWh", brand:"SolarEdge", model:"Home Battery 48V", variant:"9.6 kWh", profile_patterns:[], inline_asset:"solaredge_48v_9_6", quality:"verified_model_choice", selectable:true },
   { id:"battery.home", asset_type:"battery", label:"Home battery", brand:"Generic", model:"Home battery", variant:"Battery module", profile_patterns:["energy.battery."], package_path:"heroes/battery-hero.webp", quality:"representative", selectable:true },
 
+  { id:"grid_connection.homewizard_p1", asset_type:"grid_connection", label:"HomeWizard P1 Meter", brand:"HomeWizard", model:"P1 Meter", variant:"HWE-P1 / HWE-P1-AU", profile_patterns:[], package_path:"heroes/metering-hero.webp", quality:"representative_model_choice", selectable:true },
   { id:"grid_connection.smart_meter", asset_type:"grid_connection", label:"Smart meter / grid connection", brand:"Generic", model:"Smart meter", variant:"Grid connection", profile_patterns:["energy.grid_connection."], package_path:"heroes/metering-hero.webp", quality:"representative", selectable:true },
   { id:"grid_phase.generic", asset_type:"grid_phase", label:"Grid phase", brand:"Generic", model:"Grid phase", variant:"Phase", profile_patterns:["energy.grid_phase."], package_path:"heroes/flow-hero.webp", quality:"representative", selectable:true },
 
   { id:"solar_production.array", asset_type:"solar_production", label:"Solar production", brand:"Generic", model:"PV array", variant:"System", profile_patterns:["energy.solar_production."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
+  { id:"solar_panel.sunpower_x21_335_blk", asset_type:"solar_panel", label:"SunPower SPR-X21-335-BLK", brand:"SunPower", model:"SPR-X21-335-BLK", variant:"X21 Black · 335 W", profile_patterns:[], package_path:"heroes/solar-hero.webp", quality:"representative_model_choice", selectable:true },
+  { id:"solar_panel.jinkosolar_jkm435n_54hl4r", asset_type:"solar_panel", label:"JinkoSolar JKM435N-54HL4R", brand:"JinkoSolar", model:"JKM435N-54HL4R", variant:"Tiger Neo N-Type · 435 W", profile_patterns:[], package_path:"heroes/solar-hero.webp", quality:"representative_model_choice", selectable:true },
+  { id:"solar_inverter.solaredge_rwb_10k", asset_type:"solar_inverter", label:"SolarEdge Home Hub 10 kW", brand:"SolarEdge", model:"SE10K-RWB48BFN4", variant:"RWB 10K Home", profile_patterns:[], package_path:"heroes/solar-hero.webp", quality:"representative_model_choice", selectable:true },
+  { id:"solar_inverter.solaredge_rws_8k", asset_type:"solar_inverter", label:"SolarEdge StorEdge 8 kW", brand:"SolarEdge", model:"SE8K-RWS48BEN4", variant:"RWS 8K", profile_patterns:[], package_path:"heroes/solar-hero.webp", quality:"representative_model_choice", selectable:true },
   { id:"solar_inverter.solaredge", asset_type:"solar_inverter", label:"SolarEdge inverter", brand:"SolarEdge", model:"Solar inverter", variant:"Inverter", integration_domains:["solaredge","solaredge_modbus_multi"], package_path:"heroes/solar-hero.webp", quality:"representative_brand", selectable:true },
   { id:"solar_inverter.generic", asset_type:"solar_inverter", label:"Solar inverter", brand:"Generic", model:"Solar inverter", variant:"Inverter", profile_patterns:["energy.solar_inverter."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
   { id:"solar_inverter_phase.generic", asset_type:"solar_inverter_phase", label:"Solar inverter phase", brand:"Generic", model:"Inverter phase", variant:"Phase", profile_patterns:["energy.solar_inverter_phase."], package_path:"heroes/flow-hero.webp", quality:"representative", selectable:true },
+  { id:"solar_optimizer.solaredge_s500b", asset_type:"solar_optimizer", label:"SolarEdge Power Optimizer S500B", brand:"SolarEdge", model:"S500B-1GM4MRM-NA02", variant:"Power Optimizer", profile_patterns:[], package_path:"heroes/solar-hero.webp", quality:"representative_model_choice", selectable:true },
   { id:"solar_optimizer.solaredge", asset_type:"solar_optimizer", label:"Solar optimizer", brand:"SolarEdge", model:"Power Optimizer", variant:"Optimizer", integration_domains:["solaredge_optimizers"], package_path:"heroes/solar-hero.webp", quality:"representative_brand", selectable:true },
+  { id:"backup_interface.solaredge_3phase", asset_type:"backup_interface", label:"SolarEdge Home Backup Interface 3 Phase", brand:"SolarEdge", model:"BI-NEUNU-3P-01", variant:"BI-EU3P", profile_patterns:[], package_path:"heroes/flow-hero.webp", quality:"representative_model_choice", selectable:true },
   { id:"solar_optimizer.generic", asset_type:"solar_optimizer", label:"Solar optimizer", brand:"Generic", model:"PV optimizer", variant:"Optimizer", profile_patterns:["energy.solar_optimizer."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
   { id:"solar_forecast.provider", asset_type:"solar_forecast", label:"Solar forecast", brand:"Generic", model:"Forecast provider", variant:"Forecast", profile_patterns:["energy.solar_forecast."], package_path:"heroes/outlook-hero.webp", quality:"representative", selectable:true },
 
@@ -264,8 +272,12 @@ function resolveEnergyOwnedVisualRef(visualRef = "") {
   const ref = String(visualRef || "").trim();
   const entry = typeof rhiEnergyVisualEntryFromRef === "function" ? rhiEnergyVisualEntryFromRef(ref) : null;
   if (!entry) return null;
-  const url = entry.inline_asset === "byd_lvs20" && typeof HERO_IMAGE_BYD_LVS20 === "string"
-    ? HERO_IMAGE_BYD_LVS20
+  const inlineAssets = {
+    byd_lvs20: typeof HERO_IMAGE_BYD_LVS20 === "string" ? HERO_IMAGE_BYD_LVS20 : "",
+    solaredge_48v_9_6: typeof HERO_IMAGE_SOLAREDGE_92 === "string" ? HERO_IMAGE_SOLAREDGE_92 : ""
+  };
+  const url = entry.inline_asset
+    ? inlineAssets[String(entry.inline_asset || "")] || ""
     : rhiEnergyVisualAssetUrl(entry.package_path || "");
   if (!url) return null;
   return Object.freeze({
@@ -4487,6 +4499,134 @@ function rhiEnergyVisualPickerStyles() {
         <article class="operationalSummaryCard exceptional"><span class="summaryIcon">♢</span><div><small>Exceptions</small><b>${exceptionKnown?exceptions.length:'—'}</b><p>${exceptionKnown?(exceptions.length?lines(exceptions,'live'):'No published exception'):'Exception state unavailable'}</p></div></article>
       </div></section>`;
     }
+    energyAssetContext(rt, asset = {}) {
+      const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
+      const context = id && typeof readEnergyAssetContext === 'function'
+        ? readEnergyAssetContext(rt.contractGateway(), id)
+        : { asset:null, profile:null, publication:null };
+      return {
+        ...asset,
+        ...objectFrom(context.asset || {}),
+        profile_id:firstDefined(context.asset?.profile_id, asset.profile_id, ''),
+        profile:objectFrom(context.profile || {}),
+        publication:objectFrom(context.publication || {})
+      };
+    }
+    energyAssetFacts(rt, asset = {}, limit = 4) {
+      const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
+      if (!id) return [];
+      const priority = ['state','operating_state','health','soc_pct','power_kw','current_power_kw','energy_today_kwh','production_today_kwh','capacity_kwh','available_kwh','voltage_v','current_a','temperature_c','efficiency_pct'];
+      const rows = rt.rowsByAsset(id)
+        .filter(row => row && !row.missing && rowValue(row, null) !== null)
+        .filter(row => !/alias|deprecated|diagnostic|debug/i.test(`${row.source_type || ''} ${row.migration_role || ''} ${row.key || row.property_key || ''}`))
+        .map(row => {
+          const key = String(firstDefined(row.key,row.property_key,row.property_id,'') || '');
+          const suffix = key.split('.').pop();
+          const rank = priority.indexOf(suffix);
+          return { row, key, suffix, rank:rank < 0 ? 999 : rank };
+        })
+        .sort((a,b)=>a.rank-b.rank || a.key.localeCompare(b.key));
+      const seen = new Set();
+      const facts = [];
+      for (const item of rows) {
+        if (seen.has(item.suffix)) continue;
+        seen.add(item.suffix);
+        facts.push({
+          label:human(item.suffix),
+          value:rowDisplayValue(item.row,'—'),
+          status:rowStatusLabel(item.row)
+        });
+        if (facts.length >= limit) break;
+      }
+      return facts;
+    }
+    energyDeviceStatusCard(rt, asset = {}, roleLabel = '') {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
+      const type = String(firstDefined(enriched.asset_type,enriched.object_class,'device') || 'device');
+      const profile = objectFrom(enriched.profile || {});
+      const profileLabel = firstDefined(profile.display_name,profile.label,profile.name,enriched.profile_id,'');
+      const facts = this.energyAssetFacts(rt,enriched,4);
+      const health = firstDefined(rt.rawText(`${id}.health`,''), enriched.health, enriched.status, '');
+      const publication = objectFrom(enriched.publication || {});
+      const configState = publication.complete === true ? 'Configured' : profileLabel ? 'Profiled' : 'Detected';
+      return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
+        <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
+        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3></div><span class="energyDeviceState">${escapeHtml(health ? human(health) : configState)}</span></div>
+        <div class="energyDeviceConfig">${profileLabel ? `<span><b>Profile</b>${escapeHtml(human(profileLabel))}</span>` : ''}<span><b>Config</b>${escapeHtml(configState)}</span></div>
+        <div class="energyDeviceFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span class="energyDeviceNoFacts"><small>Status</small><b>Published device · no additional live facts</b></span>`}</div></div>
+      </article>`;
+    }
+    energyHardwareCards(rt, types = [], title = 'System devices', description = '') {
+      const wanted = new Set(types.map(value => String(value).toLowerCase()));
+      const assets = rt.assets()
+        .map(asset => this.energyAssetContext(rt, asset))
+        .filter(asset => wanted.has(String(firstDefined(asset.asset_type,asset.object_class,'')).toLowerCase()))
+        .filter(asset => !['solar_inverter_phase','grid_phase'].includes(String(firstDefined(asset.asset_type,asset.object_class,'')).toLowerCase()));
+      if (!assets.length) return '';
+      const roleLabels = {
+        solar_panel:'Solar panel',
+        solar_production:'Solar array',
+        solar_inverter:'Solar inverter',
+        solar_optimizer:'Power optimizer',
+        battery:'Battery',
+        battery_system:'Battery system',
+        backup_interface:'Backup interface',
+        grid_connection:'Grid connection',
+        gas_meter:'Gas meter',
+        meter:'Meter'
+      };
+      return `<section class="panel energyHardwarePanel"><div class="energyHardwareHead"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description || 'Configuration, identity and live facts from the Energy public contract.')}</p></div><span>${assets.length} device${assets.length===1?'':'s'}</span></div><div class="energyDeviceGrid">${assets.map(asset=>this.energyDeviceStatusCard(rt,asset,roleLabels[String(firstDefined(asset.asset_type,asset.object_class,'')).toLowerCase()]||'Device')).join('')}</div></section>`;
+    }
+    solarEnergyStory(rt) {
+      const current = this.currentEnergyModel(rt);
+      const solar = current.solar.powerKw;
+      const site = current.consumption.siteConsumptionKw;
+      const home = current.consumption.homeConsumptionKw;
+      const battery = current.battery;
+      const gridImport = current.grid.importPowerKw;
+      const gridExport = current.grid.exportPowerKw;
+      const solarText = solar === null ? 'Solar production is not currently measured.' : `Your solar system is producing ${fmtKw(solar)} now.`;
+      const homeText = site === null ? 'Current site consumption is not available.' : `The home bus is supplying ${fmtKw(site)} of site consumption${home === null ? '' : `, including ${fmtKw(home)} non-flexible home consumption`}.`;
+      const batteryText = battery.state === 'charging'
+        ? `The Home Battery is charging at ${fmtKw(battery.displayPowerKw,'—')}. Exact solar-versus-grid charge allocation is not separately published.`
+        : battery.state === 'discharging'
+          ? `The Home Battery is supplying ${fmtKw(battery.displayPowerKw,'—')} to the Home Bus.`
+          : battery.state === 'idle'
+            ? 'The Home Battery is idle.'
+            : 'Battery flow is currently unavailable.';
+      const gridText = current.grid.direction === 'exporting'
+        ? `The site is exporting ${fmtKw(gridExport,'—')} to the grid.`
+        : current.grid.direction === 'importing'
+          ? `The site is importing ${fmtKw(gridImport,'—')} from the grid.`
+          : 'Grid flow is balanced locally.';
+      const whereSolar = solar !== null && solar > 0.05
+        ? (current.grid.direction === 'exporting'
+          ? 'Solar feeds the Home Bus first; the measured site balance currently includes export to the grid.'
+          : battery.state === 'charging'
+            ? 'Solar feeds the Home Bus while the battery is charging. The backend does not publish a source split, so the UX does not invent how much charge came from solar versus grid.'
+            : 'Solar feeds the Home Bus, where it is consumed by the home and active loads before any measured grid exchange.')
+        : 'There is no meaningful solar production to route right now.';
+      return `<section class="panel solarEnergyStory"><div class="solarStoryHead"><div><small>From panel to home</small><h2>What is happening with my solar?</h2><p>Live measured facts are kept separate from inferred source allocation.</p></div><div class="solarStoryRoute"><span>Panel</span><i>→</i><span>Inverter</span><i>→</i><span>Home Bus</span><i>↔</i><span>Battery / Grid</span></div></div>
+        <div class="solarAnswerGrid">
+          <article><small>What are my panels doing?</small><b>${escapeHtml(solarText)}</b></article>
+          <article><small>What is my home using?</small><b>${escapeHtml(homeText)}</b></article>
+          <article><small>What is the battery doing?</small><b>${escapeHtml(batteryText)}</b></article>
+          <article><small>What is happening at the grid?</small><b>${escapeHtml(gridText)}</b></article>
+        </div>
+        <div class="solarWhereAnswer"><span>Where is my solar going?</span><b>${escapeHtml(whereSolar)}</b></div>
+      </section>`;
+    }
+    energyHardwareStyles() {
+      return `
+        .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead,.solarStoryHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
+        .energyDeviceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.energyDeviceCard{display:grid;grid-template-columns:126px minmax(0,1fr);gap:12px;border:1px solid #e5ebf3;background:#fff;border-radius:14px;padding:12px;min-height:166px}.energyDeviceVisual{height:138px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fbfdff,#f6f8fb);border-radius:11px;overflow:hidden}.energyDeviceVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.energyDeviceVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:5px;box-sizing:border-box}.energyDeviceBody{min-width:0}.energyDeviceTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.energyDeviceTop small{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.energyDeviceTop h3{font-size:13px;line-height:1.25;margin:3px 0 8px}.energyDeviceState{font-size:9px;background:#eef7f1;color:#3f7f5a;border-radius:999px;padding:5px 7px;white-space:nowrap}.energyDeviceConfig{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.energyDeviceConfig span{font-size:9px;color:#64748b;background:#f8fafc;border-radius:7px;padding:5px 6px}.energyDeviceConfig b{color:#334155;margin-right:4px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyDeviceFacts span{background:#f8fafc;border-radius:7px;padding:6px;min-width:0}.energyDeviceFacts small,.energyDeviceFacts b{display:block}.energyDeviceFacts small{font-size:8px;color:#64748b}.energyDeviceFacts b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.energyDeviceNoFacts{grid-column:1/-1}
+        .solarStoryHead{align-items:center}.solarStoryHead small{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#d97706;font-weight:750}.solarStoryHead h2{margin:3px 0}.solarStoryRoute{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}.solarStoryRoute span{font-size:10px;font-weight:700;padding:6px 9px;border-radius:999px;background:#fff7ed;border:1px solid #fed7aa}.solarStoryRoute i{font-style:normal;color:#94a3b8}.solarAnswerGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.solarAnswerGrid article{background:#f8fafc;border:1px solid #edf1f6;border-radius:10px;padding:10px}.solarAnswerGrid small{display:block;color:#64748b;font-size:9px;margin-bottom:4px}.solarAnswerGrid b{font-size:11px;line-height:1.4;font-weight:650}.solarWhereAnswer{margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:11px 12px}.solarWhereAnswer span{display:block;color:#9a5b17;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}.solarWhereAnswer b{display:block;margin-top:3px;font-size:11.5px;line-height:1.4}
+        @media(max-width:1100px){.energyDeviceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.solarAnswerGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.energyDeviceGrid{grid-template-columns:1fr}.energyDeviceCard{grid-template-columns:104px minmax(0,1fr)}.energyDeviceVisual{height:118px}.solarStoryHead{display:block}.solarStoryRoute{justify-content:flex-start;margin-top:10px}.solarAnswerGrid{grid-template-columns:1fr}}
+      `;
+    }
+
     solar(rt) {
       const pageVm = this.buildPageViewModel(rt, 'solar');
       const d = rt.decision();
@@ -4575,6 +4715,8 @@ function rhiEnergyVisualPickerStyles() {
       const planningSummaryPlain = sortedLoads.length ? `${chargingNow} active · ${waitingToday} waiting · ${plannedToday} planned` : 'No flexible loads available';
       return `${this.tabExperienceHeader(rt,'solar',pageVm)}<div class="r3260SolarPage solarV3457 solarDecisionUx">
         <div class="r3230Kpis r3260Kpis summaryRow four">${this.metric('☀','Solar Production',fmtKw(solarPower),'Now','orange',rt.statusForKeys('solar.power_kw'))}${this.metric('▣','Available for Flexible Loads',fmtKw(flexibleLoadBudget, '—'),'Planning budget unavailable','green','UNAVAILABLE')}${this.metric('↗','Forecast Today',fmtKwh(forecastToday),'Total','blue',rt.statusForKeys('forecast.solar_today_kwh'))}${this.metric('◷','Next Hour',nextHour === null ? '—' : (rt.row('forecast.next_hour_energy_kwh').missing ? fmtKw(nextHour) : fmtKwh(nextHour)),'Expected surplus','purple',rt.statusForKeys(['forecast.next_hour_energy_kwh','forecast.next_hour_power_kw']))}</div>
+        ${this.solarEnergyStory(rt)}
+        ${this.energyHardwareCards(rt,['solar_panel','solar_production','solar_inverter','battery','battery_system'],'Your solar system','Panels, inverters and batteries with their published configuration and live status.')}
         ${this.solarOperationalExecutionPanel(rt, participatingLoads)}
         <section class="panel flexibleLoadsPanel decisionLoadsPanel compactFlexibleLoads" id="solar-flexible-loads"><div class="r3260SectionHead"><div><h2>Flexible Loads</h2><p>Loads that can use available solar now or later today.</p></div><div class="sortControl"><span>Sort</span>${this.segmentedControl(sortButtons, this.loadSort, 'sort')}</div></div><div class="flexLoadList">${loadRows}</div></section>${disabledLoadRows ? `<section class="panel disabledAssetsSection"><div class="r3260SectionHead"><div><h2>Disabled assets</h2><p>Excluded from solar planning and shown separately from participating loads.</p></div></div><div class="consumerExplorerList">${disabledLoadRows}</div></section>` : ''}${strategySettings}
         <section class="solarCompactSummaryRow"><div class="solarCompactFact"><span>Today</span><b>${fmtKwh(rt.number('metering.solar_energy_today_kwh'), '—')}</b></div><div class="solarCompactFact"><span>Export</span><b>${fmtKwh(rt.number('metering.grid_export_today_kwh'), '—')}</b></div><div class="solarCompactFact"><span>Flexible loads</span><b>${fmtKwh(rt.number('planning.expected_flexible_load_today_kwh'), fmtKwh(rt.number('consumer.energy_to_target_kwh'), String(sortedLoads.length)))}</b></div><div class="solarCompactFact"><span>Available for Flexible Loads</span><b>${fmtKw(flexibleLoadBudget, '—')}</b></div></section>
@@ -4757,6 +4899,7 @@ function rhiEnergyVisualPickerStyles() {
             </div>
           </div>
         </section>
+        ${this.energyHardwareCards(rt,['solar_panel','solar_production','solar_inverter','battery','battery_system','backup_interface','grid_connection'],'Physical energy devices','Published hardware behind the measured energy flow.')}
         <div class="flowDetailsGrid flowDetailsGridTwoUp">
           <section class="panel"><h2>Charging connections</h2><p>Chargers and vehicle assignments currently visible to Energy.</p>${chargers.map(charger => this.connectorCard(rt, charger)).join('') || `<div class="empty"><b>${connectionSnapshot.available ? 'No active charging connections' : 'Connection data unavailable'}</b><span>${connectionSnapshot.available ? 'No charger assignment is currently active.' : 'The canonical connection snapshot is not available.'}</span></div>`}</section>
           <section class="panel"><h2>Active physical consumers</h2><p>Participating loads with a live physical relationship to the energy system.</p>${consumers.map(consumer => this.consumerCard(rt, consumer)).join('') || `<div class="empty"><b>No flexible consumers available</b><span>No controllable loads are currently available.</span></div>`}</section>
@@ -4960,7 +5103,7 @@ function rhiEnergyVisualPickerStyles() {
       const power = rt.number(`${assetId}.power_kw`);
       const state = String(rt.rawText(`${assetId}.state`, '') || '').toLowerCase();
       const health = rt.rawText(`${assetId}.health`, 'UNKNOWN');
-      const image = this.batteryHeroImagePath(assetId, name);
+      const asset = this.energyAssetContext(rt, rt.asset(assetId) || { asset_id:assetId, display_name:name, asset_type:'battery' });
       const stateLabel = state === 'charging' ? 'Charging'
         : state === 'discharging' ? 'Discharging'
         : state === 'idle' ? 'Idle'
@@ -4971,7 +5114,7 @@ function rhiEnergyVisualPickerStyles() {
         : stateLabel === 'Discharging' ? 'Supplying energy to the Home Bus'
         : stateLabel === 'Idle' ? 'No active battery flow'
         : 'Battery flow is not currently available';
-      return `<article class="batteryContributorCard"><div class="batteryContributorVisual"><img class="batteryContributorImage" src="${image}" alt="${escapeHtml(name)}"></div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorMeta"><span>Power now</span><b>${fmtKw(power, '—')}</b></div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div></article>`;
+      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorMeta"><span>Power now</span><b>${fmtKw(power, '—')}</b></div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div></article>`;
     }
     battery(rt) {
       const pageVm = this.buildPageViewModel(rt, 'battery');
@@ -6174,7 +6317,7 @@ function rhiEnergyVisualPickerStyles() {
         console.error(`[HomeBrain Energy ${UX_VERSION}] ${this.view} render failed`, error);
         content = this.renderError(this.view, error);
       }
-      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
+      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${this.energyHardwareStyles()}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
 
       /* R3.62.0 canonical component framework and adaptive convergence */
       :host{--hi-space-1:4px;--hi-space-2:8px;--hi-space-3:12px;--hi-space-4:16px;--hi-radius-sm:8px;--hi-radius-md:12px;--hi-break-tablet:980px;--hi-break-phone:700px}
