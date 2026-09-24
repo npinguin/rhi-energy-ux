@@ -1,8 +1,8 @@
 {
-  "version": "3.96.1",
-  "candidate_tag": "v3.96.1",
+  "version": "3.96.2",
+  "candidate_tag": "v3.96.2",
   "candidate_sha": "pending",
-  "previous_release": "3.96.0",
+  "previous_release": "3.96.1",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -39,5 +39,9 @@
   "energy_property_publication_evidence": "NOT_EXECUTED",
   "flexible_asset_backend_state_ownership": "NOT_EXECUTED",
   "mobility_visual_ref_rendering": "NOT_EXECUTED",
-  "mobility_visual_asset_delivery": "NOT_EXECUTED"
+  "mobility_visual_asset_delivery": "NOT_EXECUTED",
+  "picture_first_planning_assets": "NOT_EXECUTED",
+  "picture_first_flexible_loads": "NOT_EXECUTED",
+  "picture_first_outlook_assets": "NOT_EXECUTED",
+  "picture_first_summary_assets": "NOT_EXECUTED"
 }
