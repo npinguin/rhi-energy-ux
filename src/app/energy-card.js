@@ -2582,9 +2582,10 @@
         gridExportKw:current.grid.exportPowerKw
       });
     }
-    overviewEnergyRow({ icon = '', label = '', subtitle = '', value = '—', variant = 'normal', progress = null } = {}) {
+    overviewEnergyRow({ icon = '', label = '', subtitle = '', value = '—', variant = 'normal', progress = null, asset = null } = {}) {
       const progressBar = progress === null ? '' : `<div class="bar"><i style="width:${escapeHtml(progress)}%"></i></div>`;
-      return `<div class="overviewEnergyRow ${escapeHtml(variant)}"><span class="overviewEnergyIcon">${icon}</span><div class="overviewEnergyCopy"><b>${escapeHtml(label)}</b><small>${escapeHtml(subtitle)}</small>${progressBar}</div><strong>${escapeHtml(value)}</strong></div>`;
+      const identity = asset ? `<span class="overviewEnergyAssetVisual">${this.assetVisual(asset,{size:'xs',fallbackIcon:icon || this.flexibleAssetIcon(asset)})}</span>` : `<span class="overviewEnergyIcon">${icon}</span>`;
+      return `<div class="overviewEnergyRow ${escapeHtml(variant)}">${identity}<div class="overviewEnergyCopy"><b>${escapeHtml(label)}</b><small>${escapeHtml(subtitle)}</small>${progressBar}</div><strong>${escapeHtml(value)}</strong></div>`;
     }
     overview(rt) {
       const pageVm = this.buildPageViewModel(rt, 'overview');
@@ -2603,7 +2604,7 @@
       if (balanceVm.battery.direction === 'out_of_storage' && balanceVm.battery.displayPowerKw !== null) sourceRows.push(this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}));
       if (balanceVm.gridImportKw !== null && balanceVm.gridImportKw > 0.05) sourceRows.push(this.overviewEnergyRow({icon:'⚡',label:'Grid Import',subtitle:'Importing',value:fmtKw(balanceVm.gridImportKw),progress:this.progress(balanceVm.gridImportKw)}));
       const contributors = balanceVm.flexible.filter(row => row.powerKw !== null && row.powerKw > 0.05);
-      const contributorRows = contributors.map(row => this.overviewEnergyRow({icon:this.flexibleAssetIcon(row.raw || {display_name:row.name}),label:row.name,subtitle:'Flexible Load contributor',value:fmtKw(row.powerKw,'—'),variant:'child'})).join('');
+      const contributorRows = contributors.map(row => this.overviewEnergyRow({icon:this.flexibleAssetIcon(row.raw || {display_name:row.name}),asset:row.raw || null,label:row.name,subtitle:'Flexible Load contributor',value:fmtKw(row.powerKw,'—'),variant:'child'})).join('');
       const siteConsumptionText = fmtKw(balanceVm.siteConsumptionKw,'—');
       const homeConsumptionSubtitle = balanceVm.homeConsumptionKw === null
         ? (String(balanceVm.homeStatus || '').toUpperCase() === 'INCOMPLETE' ? 'Unavailable · Flexible Load power incomplete' : 'Household consumption unavailable')
