@@ -1,3 +1,12 @@
+## 3.97.1 — Home Battery contributor body sizing
+
+- keeps the approved Home Battery hero unchanged;
+- constrains physical battery contributor cards to compact bounded body geometry;
+- renders contributor product artwork in a dedicated fixed visual frame with centered object-fit contain;
+- keeps status, SoC, power, health and state explanation outside the image;
+- adds tablet/phone containment rules and a regression gate for hero preservation;
+- preserves Energy E0.15.32 / R1.89.44_CONTRACT and zero accepted technical/feature debt.
+
 ## 3.97.0 — logical-device visual catalog and picker
 
 - adds a representative Energy image catalog partitioned by logical device type;
