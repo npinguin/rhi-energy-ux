@@ -161,6 +161,14 @@
         "panel to inverter to Home Bus explanatory path",
         "non-invented solar versus grid battery source allocation"
       ]
+    },
+    "battery_contributor_layout": {
+      "owner": "validation/test_battery_contributor_layout.js",
+      "owns": [
+        "Home Battery contributor body geometry",
+        "Home Battery contributor image containment",
+        "Home Battery hero preservation during body-only fixes"
+      ]
     }
   }
 }
