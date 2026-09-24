@@ -40,5 +40,9 @@ for (const file of [
 const card = fs.readFileSync(path.join(root,'src/app/energy-card.js'),'utf8');
 if (!card.includes('resolveEnergyVisualRef(consumer.visual_ref)')) throw new Error('consumer card is not visual_ref driven');
 if (!card.includes('resolveEnergyVisualRef(charger.visual_ref)')) throw new Error('connection card is not visual_ref driven');
+if (!card.includes("assetVisualMarkup(load,'solarLoadVisual')")) throw new Error('Flexible Loads card is not visual_ref driven');
+if (!card.includes("assetVisualMarkup(item.asset,'planningAssetVisual')")) throw new Error('Planning lane header is not visual_ref driven');
+if (!card.includes("assetVisualMarkup(item.asset,'planningLoadVisual')")) throw new Error('Planned Flexible Loads row is not visual_ref driven');
+if (!card.includes('totals.flexibleLoadsKwh')) throw new Error('Planning total does not fall back to backend-published lane total');
 
 console.log('PASS cross-domain visual_ref resolution');
