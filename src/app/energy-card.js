@@ -1302,6 +1302,7 @@
       this._lastRuntimeSignature = '';
       this._lastMarkup = '';
       this._forceRender = true;
+      this.energyVisualPickerAssetId = '';
     }
     restoreView() {
       try {
@@ -1507,6 +1508,49 @@
       </div>`;
     }
     onClick(event) {
+      const visualBackdrop = event.target.closest('[data-energy-visual-backdrop]');
+      if (visualBackdrop && event.target === visualBackdrop) {
+        this.energyVisualPickerAssetId = '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const visualClose = event.target.closest('[data-energy-visual-close-button]');
+      if (visualClose) {
+        this.energyVisualPickerAssetId = '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const visualReset = event.target.closest('[data-energy-visual-reset]');
+      if (visualReset) {
+        if (typeof rhiEnergyClearVisualPreference === 'function') rhiEnergyClearVisualPreference(visualReset.dataset.energyVisualReset || '');
+        this.energyVisualPickerAssetId = '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const visualSelect = event.target.closest('[data-energy-visual-select]');
+      if (visualSelect) {
+        const assetId = visualSelect.dataset.energyVisualAsset || '';
+        const visualRef = visualSelect.dataset.energyVisualSelect || '';
+        const rt = this.runtime();
+        const asset = typeof rt.asset === 'function'
+          ? rt.asset(assetId)
+          : (typeof rt.assets === 'function' ? rt.assets().find(row => String(row?.asset_id || '') === String(assetId)) : null);
+        if (asset && typeof rhiEnergySetVisualPreference === 'function') rhiEnergySetVisualPreference(asset, visualRef);
+        this.energyVisualPickerAssetId = '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const visualOpen = event.target.closest('[data-energy-visual-open]');
+      if (visualOpen) {
+        this.energyVisualPickerAssetId = visualOpen.dataset.energyVisualOpen || '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
       const strategyEdit = event.target.closest('[data-strategy-edit]');
       if (strategyEdit && !strategyEdit.disabled) { this.strategyEditProfileId = strategyEdit.dataset.strategyEdit || ''; this.render(); return; }
       const strategyCancel = event.target.closest('[data-strategy-cancel]');
@@ -4314,13 +4358,38 @@
     }
     assetVisual(asset = {}, { size = 'md', fallbackIcon = '◆', decorative = true } = {}) {
       const visualRef = String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
-      const resolved = visualRef && typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(visualRef) : null;
+      const resolved = typeof resolveEnergyAssetVisual === 'function'
+        ? resolveEnergyAssetVisual(asset)
+        : (visualRef && typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(visualRef) : null);
       const label = this.planningAssetName(asset);
+      const assetId = String(firstDefined(asset.asset_id, asset.id, '') || '').trim();
+      const assetType = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
+      const pickerChoices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(assetType) : [];
+      const canPick = !!assetId && !visualRef.startsWith('mobility.') && pickerChoices.length > 0;
+      const pickerAttrs = canPick
+        ? ` data-energy-visual-open="${escapeHtml(assetId)}" role="button" tabindex="0" title="Choose representative image"`
+        : '';
       if (resolved?.url) {
         const alt = decorative ? '' : label;
-        return `<span class="assetVisual assetVisual-${escapeHtml(size)}"><img src="${escapeHtml(resolved.url)}" alt="${escapeHtml(alt)}" style="filter:${escapeHtml(resolved.filter || 'none')}"></span>`;
+        return `<span class="assetVisual assetVisual-${escapeHtml(size)}"${pickerAttrs}><img src="${escapeHtml(resolved.url)}" alt="${escapeHtml(alt)}" style="filter:${escapeHtml(resolved.filter || 'none')}"></span>`;
       }
-      return `<span class="assetVisual assetVisual-${escapeHtml(size)} assetVisualFallback" aria-hidden="true">${escapeHtml(fallbackIcon)}</span>`;
+      return `<span class="assetVisual assetVisual-${escapeHtml(size)} assetVisualFallback"${pickerAttrs} aria-hidden="${canPick ? 'false' : 'true'}">${escapeHtml(fallbackIcon)}</span>`;
+    }
+    energyVisualPickerOverlay(rt) {
+      const assetId = String(this.energyVisualPickerAssetId || '').trim();
+      if (!assetId) return '';
+      const asset = typeof rt.asset === 'function'
+        ? rt.asset(assetId)
+        : (typeof rt.assets === 'function' ? rt.assets().find(row => String(row?.asset_id || '') === assetId) : null);
+      if (!asset) return '';
+      const type = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
+      const choices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(type) : [];
+      if (!choices.length) return '';
+      const selected = typeof rhiEnergySelectedVisualRef === 'function' ? rhiEnergySelectedVisualRef(assetId) : '';
+      const fallbackEntry = typeof rhiEnergyDefaultVisualEntry === 'function' ? rhiEnergyDefaultVisualEntry(asset) : null;
+      const current = selected || (fallbackEntry && typeof rhiEnergyVisualRef === 'function' ? rhiEnergyVisualRef(fallbackEntry) : '');
+      const picker = new HomeBrainEnergyVisualPicker();
+      return picker.render(asset, current);
     }
     assetIdentityChip(asset = {}, meta = '') {
       return `<span class="assetIdentityChip">${this.assetVisual(asset,{size:'xs',fallbackIcon:this.planningAssetIcon(asset)})}<span><b>${escapeHtml(this.planningAssetName(asset))}</b>${meta ? `<small>${escapeHtml(meta)}</small>` : ''}</span></span>`;
@@ -4749,7 +4818,7 @@
         console.error(`[HomeBrain Energy ${UX_VERSION}] ${this.view} render failed`, error);
         content = this.renderError(this.view, error);
       }
-      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}
+      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
 
       /* R3.62.0 canonical component framework and adaptive convergence */
       :host{--hi-space-1:4px;--hi-space-2:8px;--hi-space-3:12px;--hi-space-4:16px;--hi-radius-sm:8px;--hi-radius-md:12px;--hi-break-tablet:980px;--hi-break-phone:700px}
@@ -5064,7 +5133,7 @@
 @media(max-width:1024px){.hiTabHero{min-height:188px!important}.hiTabHeroCopy{width:50%!important;padding:26px 16px 22px 18px!important}.hiTabHeroArt{inset:0 0 0 30%!important}.hiTabStatusItem{grid-template-columns:42px minmax(0,1fr)!important;padding:10px!important;min-height:88px!important}.hiTabStatusIcon{width:40px!important;height:40px!important;min-width:40px!important}}
 @media(max-width:760px){.hiTabHero{min-height:168px!important}.hiTabHeroCopy{width:58%!important;padding:20px 10px 18px 14px!important}.hiTabHeroCopy h2{font-size:29px!important}.hiTabPurpose{font-size:12px!important}.hiTabHeroArt{inset:0 0 0 34%!important}.hiTabStatusGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.hiQuickActionBar{overflow-x:auto!important;flex-wrap:nowrap!important}.hiQuickActionItems{flex-wrap:nowrap!important}.hiQuickAction{flex:0 0 auto!important}}
 @media(max-width:430px){.hiTabHero{min-height:154px!important}.hiTabHeroCopy{width:64%!important;padding:17px 8px 15px 12px!important}.hiTabHeroCopy h2{font-size:25px!important}.hiTabPurpose{font-size:10px!important;line-height:1.3!important}.hiTabHeroArt{inset:0 0 0 38%!important}.hiTabStatusGrid{grid-template-columns:1fr 1fr!important}.hiTabStatusItem{grid-template-columns:34px minmax(0,1fr)!important;min-height:76px!important;padding:8px!important;gap:7px!important}.hiTabStatusIcon{width:32px!important;height:32px!important;min-width:32px!important;border-radius:10px!important;font-size:18px!important}}
-</style><main class="energy">${this.nav()}${this.renderMainWarning(footer)}<section>${this.productLanguage(content)}</section>${this.propertyDraftBar()}${this.productLanguage(this.renderFooter(rt,this.view,footer))}</main>`;
+</style><main class="energy">${this.nav()}${this.renderMainWarning(footer)}<section>${this.productLanguage(content)}</section>${this.propertyDraftBar()}${this.energyVisualPickerOverlay(rt)}${this.productLanguage(this.renderFooter(rt,this.view,footer))}</main>`;
       if (markup === this._lastMarkup) { this.persistInteractionContext(); return; }
       this._lastMarkup = markup;
       this.persistInteractionContext();
