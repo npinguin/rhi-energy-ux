@@ -1,8 +1,8 @@
 {
-  "version": "3.97.0",
-  "candidate_tag": "v3.97.0",
+  "version": "3.97.1",
+  "candidate_tag": "v3.97.1",
   "candidate_sha": "pending",
-  "previous_release": "3.96.3",
+  "previous_release": "3.97.0",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -54,5 +54,8 @@
   "solar_hardware_facts_and_images": "NOT_EXECUTED",
   "solar_panel_inverter_battery_configuration_status": "NOT_EXECUTED",
   "solar_panel_to_home_bus_explanation": "NOT_EXECUTED",
-  "solar_battery_source_split_truthfulness": "NOT_EXECUTED"
+  "solar_battery_source_split_truthfulness": "NOT_EXECUTED",
+  "battery_contributor_body_sizing": "NOT_EXECUTED",
+  "battery_contributor_image_containment": "NOT_EXECUTED",
+  "battery_hero_unchanged": "NOT_EXECUTED"
 }
