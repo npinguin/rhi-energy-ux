@@ -1,3 +1,14 @@
+## 3.97.0 — logical-device visual catalog and picker
+
+- adds a representative Energy image catalog partitioned by logical device type;
+- maps backend profile/integration context to same-type representative defaults without adding visual semantics to backend profiles;
+- adds a type-safe image picker and UX-local presentation preference persistence;
+- prevents cross-type selection and keeps unknown profiles on same-type fallbacks;
+- preserves producer-owned Mobility visual_ref precedence for flexible loads;
+- routes shared asset rendering through one Energy asset visual resolver;
+- adds owned contract coverage and visual-library governance documentation;
+- preserves Energy E0.15.32 / R1.89.44_CONTRACT and zero accepted technical/feature debt.
+
 ## 3.96.3 — canonical asset visuals everywhere
 
 - preserves visual_ref and canonical source identity on Consumer Mix normalization;

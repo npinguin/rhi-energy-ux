@@ -9,7 +9,8 @@
         "shared shell",
         "navigation",
         "renderers",
-        "package asset references"
+        "package asset references",
+        "logical-device representative visual catalog"
       ]
     },
     "runtime": {
@@ -18,7 +19,8 @@
         "Home Assistant public Energy contract registry/gateway",
         "contract readers",
         "command contract boundary",
-        "canonical Energy V2 asset profile and publication-context readers"
+        "canonical Energy V2 asset profile and publication-context readers",
+        "Energy and producer visual_ref resolution"
       ]
     },
     "domain_models": {
@@ -52,6 +54,13 @@
         "bundle generation",
         "dist package assembly",
         "package manifest generation"
+      ]
+    },
+    "ui": {
+      "path": "src/ui",
+      "owns": [
+        "interactive UX components",
+        "logical-device visual picker composition"
       ]
     }
   }
