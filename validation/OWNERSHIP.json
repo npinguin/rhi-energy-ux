@@ -143,6 +143,16 @@
         "property publication completeness consumption",
         "no display-name or power-based flexible-asset semantic inference"
       ]
+    },
+    "energy_logical_visual_catalog": {
+      "owner": "validation/test_energy_visual_catalog.js",
+      "owns": [
+        "logical-device visual catalog type partitioning",
+        "profile-to-representative-image resolution",
+        "same-type visual picker safety",
+        "Energy UX visual preference persistence",
+        "producer-owned visual_ref precedence"
+      ]
     }
   }
 }
