@@ -23,6 +23,12 @@ const context = {
 };
 vm.createContext(context);
 for (const file of files) vm.runInContext(fs.readFileSync(file, 'utf8'), context, {filename:file});
+vm.runInContext(
+  'globalThis.FlexibleAssetDomainModel = FlexibleAssetDomainModel;'
+  + 'globalThis.readEnergyAssetContext = readEnergyAssetContext;'
+  + 'globalThis.energyAssetPublicationGap = energyAssetPublicationGap;',
+  context
+);
 
 const states = {
   'sensor.rhi_energy_public_contract_v2': {
