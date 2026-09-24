@@ -3108,29 +3108,6 @@
         <div class="solarLoadControls"><div class="requestedSlot"><small class="controlTitle">Requested charge power</small>${requestedControl || `<label class="sliderField unavailable"><div><span>Requested charge power</span><b>—</b></div><input type="range" disabled></label>`}${maxPowerText ? `<em class="maxPowerHint">${escapeHtml(maxPowerText)}</em>` : ''}</div>${actionButtons ? `<div class="loadActions decisionActions"><span>Manual intervention</span>${actionButtons}</div>` : ''}</div>${controlAvailability}${infoBanner}<div class="loadDetailsFull">${this.componentDetailsBlock(detailsId, 'Details', `${this.kv('Planning', human(planning.state || '—'))}${this.kv('Why', canonicalWhy)}${this.kv('Asset id', id)}`)}</div>
       </article>`;
     }
-    solarOperationalExecutionPanel(rt, loads = []) {
-      const planningVm = this.buildPlanningViewModel(rt);
-      const canonicalTotals = objectFrom(planningVm.todayTotals);
-      const canonicalPlannedTotal = asNumber(firstDefined(canonicalTotals.planned_flexible_energy_kwh, canonicalTotals.planned_today_kwh));
-      const entries = loads.map(load => {
-        const id=String(load.asset_id||load.flexible_asset_id||'');
-        const planning=rt.planningOutcomeFor(id)||load.energy_planning||{};
-        const status=this.canonicalOperationalStatus(rt,load,planning);
-        const requested=asNumber(firstDefined(load.requested_power_kw_effective,load.requested_power_kw,load.requested_charge_power_kw));
-        return {name:load.display_name||rt.assetName(id)||human(id),asset:load,planned:status.plannedTodayKwh,power:requested,status};
-      });
-      const charging=entries.filter(x=>x.status.isCharging);
-      const planned=entries.filter(x=>x.planned!==null && x.planned>0);
-      const exceptions=entries.filter(x=>x.status.exceptional===true);
-      const exceptionKnown=entries.every(x=>x.status.exceptional!==null);
-      const lines=(items,field='power')=>items.map(x=>this.assetIdentityChip(x.asset, field==='planned'?fmtKwh(x.planned,'—'):fmtKw(field==='live'?x.status.actualPowerKw:x.power,'—'))).join('');
-      return `<section class="panel operationalOverview" id="solar-operational-execution"><div class="operationalOverviewHead"><div><h2>Operational overview</h2><p>Live execution and today’s Tactical plan are shown as separate facts.</p></div></div><div class="operationalSummaryGrid">
-        <article class="operationalSummaryCard charging"><span class="summaryIcon">⚡</span><div><small>Charging now</small><b>${charging.length}</b><p>${charging.length?lines(charging,'live'):'No measured load charging'}</p></div></article>
-        <article class="operationalSummaryCard next"><span class="summaryIcon">▣</span><div><small>Planned loads</small><b>${planned.length}</b><p>${planned.length?lines(planned):'No load planned today'}</p></div></article>
-        <article class="operationalSummaryCard planned"><span class="summaryIcon">▥</span><div><small>Planned today</small><b>${fmtKwh(canonicalPlannedTotal,'—')}</b><p>${planned.length?lines(planned,'planned'):'No planned energy'}</p></div></article>
-        <article class="operationalSummaryCard exceptional"><span class="summaryIcon">♢</span><div><small>Exceptions</small><b>${exceptionKnown?exceptions.length:'—'}</b><p>${exceptionKnown?(exceptions.length?lines(exceptions,'live'):'No published exception'):'Exception state unavailable'}</p></div></article>
-      </div></section>`;
-    }
     energyAssetContext(rt, asset = {}) {
       const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
       const context = id && typeof readEnergyAssetContext === 'function'
@@ -3189,27 +3166,6 @@
         <div class="energyDeviceConfig">${profileLabel ? `<span><b>Profile</b>${escapeHtml(human(profileLabel))}</span>` : ''}<span><b>Config</b>${escapeHtml(configState)}</span></div>
         <div class="energyDeviceFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span class="energyDeviceNoFacts"><small>Status</small><b>Published device · no additional live facts</b></span>`}</div></div>
       </article>`;
-    }
-    energyHardwareCards(rt, types = [], title = 'System devices', description = '') {
-      const wanted = new Set(types.map(value => String(value).toLowerCase()));
-      const assets = rt.assets()
-        .map(asset => this.energyAssetContext(rt, asset))
-        .filter(asset => wanted.has(String(firstDefined(asset.asset_type,asset.object_class,'')).toLowerCase()))
-        .filter(asset => !['solar_inverter_phase','grid_phase'].includes(String(firstDefined(asset.asset_type,asset.object_class,'')).toLowerCase()));
-      if (!assets.length) return '';
-      const roleLabels = {
-        solar_panel:'Solar panel',
-        solar_production:'Solar array',
-        solar_inverter:'Solar inverter',
-        solar_optimizer:'Power optimizer',
-        battery:'Battery',
-        battery_system:'Battery system',
-        backup_interface:'Backup interface',
-        grid_connection:'Grid connection',
-        gas_meter:'Gas meter',
-        meter:'Meter'
-      };
-      return `<section class="panel energyHardwarePanel"><div class="energyHardwareHead"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description || 'Configuration, identity and live facts from the Energy public contract.')}</p></div><span>${assets.length} device${assets.length===1?'':'s'}</span></div><div class="energyDeviceGrid">${assets.map(asset=>this.energyDeviceStatusCard(rt,asset,roleLabels[String(firstDefined(asset.asset_type,asset.object_class,'')).toLowerCase()]||'Device')).join('')}</div></section>`;
     }
     energyAssetType(asset = {}) {
       return String(firstDefined(asset.asset_type,asset.object_class,'') || '').trim().toLowerCase();
