@@ -50,7 +50,7 @@ assert.match(catalog,/solar_production\.jinkosolar_jkm435n_54hl4r/);
 const requiredArtwork = [
   "byd_lvs_20.webp",
   "solaredge_home_battery_48v_9_6.webp",
-  "solaredge_rwb_10k.webp",
+  "solaredge_rwb_10k.svg",
   "solaredge_rws_8k.webp",
   "solaredge_backup_interface_3phase.webp",
   "solaredge_s500b_optimizer.webp",
