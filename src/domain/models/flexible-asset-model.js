@@ -78,6 +78,10 @@
         profile: context.profile,
         profileId: String(context.asset?.profile_id || context.profile?.profile_id || ''),
         publication: context.publication,
+        visualRef: String(firstDefined(context.asset?.visual_ref, asset.visual_ref, '') || ''),
+        visual: typeof resolveEnergyVisualRef === 'function'
+          ? resolveEnergyVisualRef(firstDefined(context.asset?.visual_ref, asset.visual_ref, ''))
+          : null,
         publicationGap: typeof energyAssetPublicationGap === 'function'
           ? energyAssetPublicationGap(this.runtime.contractGateway(), id)
           : { status:'unavailable', missing:[] },

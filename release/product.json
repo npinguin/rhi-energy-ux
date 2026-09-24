@@ -1,10 +1,10 @@
 {
   "product": "rhi-energy-ux",
   "contract": "R1.89.44_CONTRACT",
-  "minimum_backend": "E0.15.31",
-  "tested_backend": "E0.15.31",
+  "minimum_backend": "E0.15.32",
+  "tested_backend": "E0.15.32",
   "stage": "test_candidate",
-  "rollback_release": "v3.95.4",
+  "rollback_release": "v3.96.0",
   "runtime_artifact": "dist/rhi-energy-ux.js",
   "hacs_repository_type": "dashboard",
   "hacs_validation_category": "plugin",

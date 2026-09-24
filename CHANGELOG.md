@@ -1,3 +1,11 @@
+## 3.96.1 — cross-domain Mobility visual_ref rendering
+
+- consume Mobility-owned `visual_ref` passed through Energy E0.15.32;
+- package the required Mobility vehicle/charger artwork locally inside Energy UX;
+- resolve vehicle appearance and charger identity without brand/model/display-name inference;
+- render the canonical visual on active Flexible Load and Charging Connection cards;
+- keep Energy UX independent from Mobility UX runtime paths and preserve zero accepted debt.
+
 ## 3.96.0 — canonical Energy asset context
 
 - consume Energy Public Contract V2 asset profiles and property-publication evidence through the existing registry/gateway boundary;

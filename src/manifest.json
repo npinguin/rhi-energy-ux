@@ -7,6 +7,7 @@
       "modules": [
         "runtime/public-interface-registry.js",
         "runtime/energy-contract-gateway.js",
+        "runtime/visual-asset-resolver.js",
         "runtime/asset-profile-contract.js",
         "runtime/consumption-contract.js",
         "domain/models/current-energy-view-model.js",
