@@ -11,6 +11,9 @@
 - Preserves producer-owned Mobility visual_ref as authoritative for cross-domain flexible loads.
 - Routes existing asset rendering through one common Energy asset visual resolver so overview, planning, value and detail surfaces stay aligned.
 - Adds CI ownership and contract tests for type partitioning, default resolution, preference persistence and producer visual precedence.
+- Adds a Solar hardware experience showing published solar panels, inverters and batteries with image, configuration/profile context and live facts.
+- Adds a measured-flow answer panel explaining panel → inverter → Home Bus → battery/grid without inventing solar-versus-grid source allocation.
+- Reuses the same product visual resolver in Solar, Battery and Physical Flow so image selection and cropping stay consistent.
 
 ## Compatibility
 
