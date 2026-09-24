@@ -1,27 +1,27 @@
-# RHI Energy UX v3.96.1 — cross-domain Mobility visual_ref TEST CANDIDATE
+# RHI Energy UX v3.96.2 — picture-first asset identity TEST CANDIDATE
 
 ## Scope
 
-3.96.1 is the consumer-side pilot of the Foundation F1.8.14 visual identity architecture.
+3.96.2 makes visual asset recognition a default Energy UX principle instead of a screen-specific enhancement.
 
-Energy E0.15.32 preserves Mobility's package-neutral `visual_ref`. Energy UX resolves that reference only against its own packaged visual catalog and renders the corresponding vehicle or charger on live Energy Flow cards.
+Backend-published `visual_ref` remains the only cross-domain identity. Energy UX resolves that key against its own packaged artwork and now renders the corresponding asset picture consistently in Flexible Loads, Tactical Planning, Outlook and operational summaries.
 
 ## Ownership
 
 - Foundation owns visual registry mechanics and global key validation.
-- Mobility owns assignment of `visual_ref` to vehicle/charger semantic assets.
-- Energy preserves the producer-owned key without interpreting product identity.
-- Energy UX owns its local image files, appearance filters and rendering.
-- No Mobility UX URL/path or runtime dependency is introduced.
+- Mobility owns assignment of vehicle/charger `visual_ref`.
+- Energy E0.15.32 preserves producer-owned visual identity without interpretation.
+- Energy UX owns local artwork, filters, sizing and presentation.
+- Missing artwork falls back explicitly to a domain icon; text-only rendering is not the default when a known visual exists.
 
 ## Compatibility
 
-- Energy UX: 3.96.1
+- Energy UX: 3.96.2
 - Required/tested Energy backend: E0.15.32
-- Mobility producer bundle for this pilot: M0.10.1
-- Existing Energy compatibility surface: R1.89.44_CONTRACT
+- Mobility producer bundle: M0.10.1
+- Energy contract: R1.89.44_CONTRACT
 - Accepted technical debt: 0
 - Accepted feature debt: 0
-- Rollback release: v3.96.0
+- Rollback release: v3.96.1
 
 Target Home Assistant qualification remains mandatory.
