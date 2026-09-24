@@ -1,21 +1,24 @@
-# RHI Energy UX v3.96.3 — canonical asset visuals everywhere TEST CANDIDATE
+# RHI Energy UX v3.97.0 — logical-device visual catalog and picker TEST CANDIDATE
 
 ## Scope
 
-3.96.3 closes the remaining text-only asset identity gaps in Value and consumer-allocation views.
+3.97.0 brings the Mobility visual-library pattern to Energy logical devices without moving product semantics into UX artwork.
 
-- Consumer allocation preserves canonical source identity and visual_ref.
-- Known consumers render picture + human asset name instead of technical hashes.
-- Pricing of flexible loads renders the same asset visual used elsewhere.
-- Disabled flexible loads and exception summaries remain picture-first.
-- visual_ref stays the only cross-domain visual identity; Energy UX resolves it against its own packaged artwork.
+- Adds a representative image catalog partitioned by logical Energy device type.
+- Resolves profile/integration context to a same-type representative default.
+- Adds a type-safe image picker; batteries cannot select inverter artwork and vice versa.
+- Stores the selected appearance as an Energy UX presentation preference while Energy backend profiles remain intentionally non-visual.
+- Preserves producer-owned Mobility visual_ref as authoritative for cross-domain flexible loads.
+- Routes existing asset rendering through one common Energy asset visual resolver so overview, planning, value and detail surfaces stay aligned.
+- Adds CI ownership and contract tests for type partitioning, default resolution, preference persistence and producer visual precedence.
 
 ## Compatibility
 
-- Energy UX: 3.96.3
+- Energy UX: 3.97.0
 - Required/tested Energy backend: E0.15.32
+- Energy contract: R1.89.44_CONTRACT
 - Mobility producer bundle: M0.10.1
-- Rollback release: v3.96.2
+- Rollback release: v3.96.3
 - Accepted technical debt: 0
 - Accepted feature debt: 0
 

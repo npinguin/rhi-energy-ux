@@ -1,8 +1,8 @@
 {
-  "version": "3.96.3",
-  "candidate_tag": "v3.96.3",
+  "version": "3.97.0",
+  "candidate_tag": "v3.97.0",
   "candidate_sha": "pending",
-  "previous_release": "3.96.2",
+  "previous_release": "3.96.3",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -46,5 +46,9 @@
   "picture_first_summary_assets": "NOT_EXECUTED",
   "visual_everywhere_value": "NOT_EXECUTED",
   "visual_everywhere_consumer_allocation": "NOT_EXECUTED",
-  "canonical_consumer_identity": "NOT_EXECUTED"
+  "canonical_consumer_identity": "NOT_EXECUTED",
+  "energy_logical_visual_catalog": "NOT_EXECUTED",
+  "energy_type_safe_image_picker": "NOT_EXECUTED",
+  "energy_profile_visual_defaults": "NOT_EXECUTED",
+  "energy_visual_preference_persistence": "NOT_EXECUTED"
 }
