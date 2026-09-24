@@ -4,7 +4,7 @@
   "minimum_backend": "E0.15.32",
   "tested_backend": "E0.15.32",
   "stage": "test_candidate",
-  "rollback_release": "v3.97.0",
+  "rollback_release": "v3.97.1",
   "runtime_artifact": "dist/rhi-energy-ux.js",
   "hacs_repository_type": "dashboard",
   "hacs_validation_category": "plugin",
