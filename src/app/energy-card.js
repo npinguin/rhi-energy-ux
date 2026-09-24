@@ -3108,29 +3108,6 @@
         <div class="solarLoadControls"><div class="requestedSlot"><small class="controlTitle">Requested charge power</small>${requestedControl || `<label class="sliderField unavailable"><div><span>Requested charge power</span><b>—</b></div><input type="range" disabled></label>`}${maxPowerText ? `<em class="maxPowerHint">${escapeHtml(maxPowerText)}</em>` : ''}</div>${actionButtons ? `<div class="loadActions decisionActions"><span>Manual intervention</span>${actionButtons}</div>` : ''}</div>${controlAvailability}${infoBanner}<div class="loadDetailsFull">${this.componentDetailsBlock(detailsId, 'Details', `${this.kv('Planning', human(planning.state || '—'))}${this.kv('Why', canonicalWhy)}${this.kv('Asset id', id)}`)}</div>
       </article>`;
     }
-    solarOperationalExecutionPanel(rt, loads = []) {
-      const planningVm = this.buildPlanningViewModel(rt);
-      const canonicalTotals = objectFrom(planningVm.todayTotals);
-      const canonicalPlannedTotal = asNumber(firstDefined(canonicalTotals.planned_flexible_energy_kwh, canonicalTotals.planned_today_kwh));
-      const entries = loads.map(load => {
-        const id=String(load.asset_id||load.flexible_asset_id||'');
-        const planning=rt.planningOutcomeFor(id)||load.energy_planning||{};
-        const status=this.canonicalOperationalStatus(rt,load,planning);
-        const requested=asNumber(firstDefined(load.requested_power_kw_effective,load.requested_power_kw,load.requested_charge_power_kw));
-        return {name:load.display_name||rt.assetName(id)||human(id),asset:load,planned:status.plannedTodayKwh,power:requested,status};
-      });
-      const charging=entries.filter(x=>x.status.isCharging);
-      const planned=entries.filter(x=>x.planned!==null && x.planned>0);
-      const exceptions=entries.filter(x=>x.status.exceptional===true);
-      const exceptionKnown=entries.every(x=>x.status.exceptional!==null);
-      const lines=(items,field='power')=>items.map(x=>this.assetIdentityChip(x.asset, field==='planned'?fmtKwh(x.planned,'—'):fmtKw(field==='live'?x.status.actualPowerKw:x.power,'—'))).join('');
-      return `<section class="panel operationalOverview" id="solar-operational-execution"><div class="operationalOverviewHead"><div><h2>Operational overview</h2><p>Live execution and today’s Tactical plan are shown as separate facts.</p></div></div><div class="operationalSummaryGrid">
-        <article class="operationalSummaryCard charging"><span class="summaryIcon">⚡</span><div><small>Charging now</small><b>${charging.length}</b><p>${charging.length?lines(charging,'live'):'No measured load charging'}</p></div></article>
-        <article class="operationalSummaryCard next"><span class="summaryIcon">▣</span><div><small>Planned loads</small><b>${planned.length}</b><p>${planned.length?lines(planned):'No load planned today'}</p></div></article>
-        <article class="operationalSummaryCard planned"><span class="summaryIcon">▥</span><div><small>Planned today</small><b>${fmtKwh(canonicalPlannedTotal,'—')}</b><p>${planned.length?lines(planned,'planned'):'No planned energy'}</p></div></article>
-        <article class="operationalSummaryCard exceptional"><span class="summaryIcon">♢</span><div><small>Exceptions</small><b>${exceptionKnown?exceptions.length:'—'}</b><p>${exceptionKnown?(exceptions.length?lines(exceptions,'live'):'No published exception'):'Exception state unavailable'}</p></div></article>
-      </div></section>`;
-    }
     energyAssetContext(rt, asset = {}) {
       const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
       const context = id && typeof readEnergyAssetContext === 'function'
@@ -3190,27 +3167,89 @@
         <div class="energyDeviceFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span class="energyDeviceNoFacts"><small>Status</small><b>Published device · no additional live facts</b></span>`}</div></div>
       </article>`;
     }
-    energyHardwareCards(rt, types = [], title = 'System devices', description = '') {
-      const wanted = new Set(types.map(value => String(value).toLowerCase()));
-      const assets = rt.assets()
-        .map(asset => this.energyAssetContext(rt, asset))
-        .filter(asset => wanted.has(String(firstDefined(asset.asset_type,asset.object_class,'')).toLowerCase()))
-        .filter(asset => !['solar_inverter_phase','grid_phase'].includes(String(firstDefined(asset.asset_type,asset.object_class,'')).toLowerCase()));
-      if (!assets.length) return '';
-      const roleLabels = {
-        solar_panel:'Solar panel',
-        solar_production:'Solar array',
-        solar_inverter:'Solar inverter',
-        solar_optimizer:'Power optimizer',
-        battery:'Battery',
-        battery_system:'Battery system',
-        backup_interface:'Backup interface',
-        grid_connection:'Grid connection',
-        gas_meter:'Gas meter',
-        meter:'Meter'
-      };
-      return `<section class="panel energyHardwarePanel"><div class="energyHardwareHead"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description || 'Configuration, identity and live facts from the Energy public contract.')}</p></div><span>${assets.length} device${assets.length===1?'':'s'}</span></div><div class="energyDeviceGrid">${assets.map(asset=>this.energyDeviceStatusCard(rt,asset,roleLabels[String(firstDefined(asset.asset_type,asset.object_class,'')).toLowerCase()]||'Device')).join('')}</div></section>`;
+    energyAssetType(asset = {}) {
+      return String(firstDefined(asset.asset_type,asset.object_class,'') || '').trim().toLowerCase();
     }
+    energyAssetParentId(asset = {}) {
+      return String(firstDefined(asset.parent_asset_id,asset.parent_id,asset.system_asset_id,asset.group_asset_id,asset.array_asset_id,asset.zone_asset_id,'') || '').trim();
+    }
+    solarHardwareSection(title, description, body, meta = '') {
+      if (!body) return '';
+      return `<section class="panel solarHardwareSection"><div class="solarHardwareSectionHead"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${meta ? `<span>${escapeHtml(meta)}</span>` : ''}</div>${body}</section>`;
+    }
+    solarArrayCard(rt, asset, childPanels = []) {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id),'Solar array');
+      const facts = this.energyAssetFacts(rt,enriched,5);
+      const panelTypes = childPanels.map(panel => firstDefined(panel.model,panel.display_name,panel.name,rt.assetName(panel.asset_id),'')).filter(Boolean);
+      return `<article class="solarAggregateCard solarArrayCard">
+        <div class="solarAggregateHead">
+          <div class="solarAggregateVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:'☀',decorative:false})}</div>
+          <div class="solarAggregateCopy"><small>SOLAR ARRAY / ZONE</small><h3>${escapeHtml(name)}</h3><p>${panelTypes.length ? escapeHtml(panelTypes.join(' · ')) : 'Choose the representative panel type for this array.'}</p></div>
+          <span class="solarAggregateCount">${childPanels.length ? `${childPanels.length} panel record${childPanels.length===1?'':'s'}` : 'Array'}</span>
+        </div>
+        <div class="solarAggregateFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span><small>Status</small><b>Published array · no additional live facts</b></span>`}</div>
+        ${childPanels.length ? `<div class="solarChildGrid">${childPanels.map(panel=>this.energyDeviceStatusCard(rt,panel,'Solar panel')).join('')}</div>` : ''}
+      </article>`;
+    }
+    solarInverterSystem(rt, inverters = []) {
+      if (!inverters.length) return '';
+      return this.solarHardwareSection(
+        'Inverter system',
+        'Physical inverters converting solar DC production for the Home Bus.',
+        `<div class="solarChildGrid">${inverters.map(asset=>this.energyDeviceStatusCard(rt,asset,'Solar inverter')).join('')}</div>`,
+        `${inverters.length} inverter${inverters.length===1?'':'s'}`
+      );
+    }
+    solarBatterySystem(rt, systems = [], batteries = []) {
+      if (!systems.length && !batteries.length) return '';
+      const system = systems[0] || null;
+      const systemSummary = system ? this.energyAssetContext(rt,system) : null;
+      const systemId = String(firstDefined(systemSummary?.asset_id,systemSummary?.id,'') || '');
+      const systemName = systemSummary ? firstDefined(systemSummary.display_name,systemSummary.name,rt.assetName(systemId),'Home Battery System') : 'Home Battery System';
+      const facts = systemSummary ? this.energyAssetFacts(rt,systemSummary,5) : [];
+      const head = `<div class="solarSystemSummary"><div><small>BATTERY SYSTEM</small><h3>${escapeHtml(systemName)}</h3><p>Aggregate storage state with the physical batteries shown underneath.</p></div><div class="solarAggregateFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span><small>Batteries</small><b>${batteries.length}</b></span>`}</div></div>`;
+      const children = batteries.length ? `<div class="solarChildGrid">${batteries.map(asset=>this.energyDeviceStatusCard(rt,asset,'Battery')).join('')}</div>` : '';
+      return this.solarHardwareSection('Battery system','Storage connected to the solar/home energy system.',head+children,`${batteries.length} batter${batteries.length===1?'y':'ies'}`);
+    }
+    solarHardwareExperience(rt) {
+      const assets = rt.assets().map(asset=>this.energyAssetContext(rt,asset));
+      const arrays = assets.filter(asset=>this.energyAssetType(asset)==='solar_production');
+      const panels = assets.filter(asset=>this.energyAssetType(asset)==='solar_panel');
+      const inverters = assets.filter(asset=>this.energyAssetType(asset)==='solar_inverter');
+      const systems = assets.filter(asset=>this.energyAssetType(asset)==='battery_system');
+      const batteries = assets.filter(asset=>this.energyAssetType(asset)==='battery');
+      const optimizers = assets.filter(asset=>this.energyAssetType(asset)==='solar_optimizer');
+      const backup = assets.filter(asset=>this.energyAssetType(asset)==='backup_interface');
+
+      const panelsFor = array => {
+        const id = String(firstDefined(array.asset_id,array.id,'') || '');
+        return panels.filter(panel => this.energyAssetParentId(panel) === id);
+      };
+      const assignedPanelIds = new Set(arrays.flatMap(array => panelsFor(array).map(panel=>String(firstDefined(panel.asset_id,panel.id,'')||''))));
+      const unassignedPanels = panels.filter(panel => !assignedPanelIds.has(String(firstDefined(panel.asset_id,panel.id,'')||'')));
+
+      const arrayCards = arrays.map(array=>this.solarArrayCard(rt,array,panelsFor(array))).join('')
+        + (unassignedPanels.length ? `<div class="solarUnassignedPanels"><h3>Published panel devices</h3><div class="solarChildGrid">${unassignedPanels.map(panel=>this.energyDeviceStatusCard(rt,panel,'Solar panel')).join('')}</div></div>` : '');
+      const arraysSection = this.solarHardwareSection(
+        'Solar arrays',
+        'Each solar zone keeps its own facts and representative panel type. Use the image picker on the array to choose SunPower or Jinko where appropriate.',
+        arrayCards || (panels.length ? `<div class="solarChildGrid">${panels.map(panel=>this.energyDeviceStatusCard(rt,panel,'Solar panel')).join('')}</div>` : ''),
+        arrays.length ? `${arrays.length} zone${arrays.length===1?'':'s'}` : ''
+      );
+      const inverterSection = this.solarInverterSystem(rt,inverters);
+      const batterySection = this.solarBatterySystem(rt,systems,batteries);
+      const supportAssets = [...optimizers,...backup];
+      const supportSection = supportAssets.length ? this.solarHardwareSection(
+        'Solar support devices',
+        'Optimizers and backup interfaces that support the physical solar installation.',
+        `<div class="solarChildGrid">${supportAssets.map(asset=>this.energyDeviceStatusCard(rt,asset,this.energyAssetType(asset)==='solar_optimizer'?'Power optimizer':'Backup interface')).join('')}</div>`,
+        `${supportAssets.length} device${supportAssets.length===1?'':'s'}`
+      ) : '';
+      return `<div class="solarHardwareExperience">${arraysSection}${inverterSection}${batterySection}${supportSection}</div>`;
+    }
+
     solarEnergyStory(rt) {
       const current = this.currentEnergyModel(rt);
       const solar = current.solar.powerKw;
@@ -3254,8 +3293,9 @@
       return `
         .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead,.solarStoryHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
         .energyDeviceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.energyDeviceCard{display:grid;grid-template-columns:126px minmax(0,1fr);gap:12px;border:1px solid #e5ebf3;background:#fff;border-radius:14px;padding:12px;min-height:166px}.energyDeviceVisual{height:138px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fbfdff,#f6f8fb);border-radius:11px;overflow:hidden}.energyDeviceVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.energyDeviceVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:5px;box-sizing:border-box}.energyDeviceBody{min-width:0}.energyDeviceTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.energyDeviceTop small{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.energyDeviceTop h3{font-size:13px;line-height:1.25;margin:3px 0 8px}.energyDeviceState{font-size:9px;background:#eef7f1;color:#3f7f5a;border-radius:999px;padding:5px 7px;white-space:nowrap}.energyDeviceConfig{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.energyDeviceConfig span{font-size:9px;color:#64748b;background:#f8fafc;border-radius:7px;padding:5px 6px}.energyDeviceConfig b{color:#334155;margin-right:4px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyDeviceFacts span{background:#f8fafc;border-radius:7px;padding:6px;min-width:0}.energyDeviceFacts small,.energyDeviceFacts b{display:block}.energyDeviceFacts small{font-size:8px;color:#64748b}.energyDeviceFacts b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.energyDeviceNoFacts{grid-column:1/-1}
-        .solarStoryHead{align-items:center}.solarStoryHead small{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#d97706;font-weight:750}.solarStoryHead h2{margin:3px 0}.solarStoryRoute{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}.solarStoryRoute span{font-size:10px;font-weight:700;padding:6px 9px;border-radius:999px;background:#fff7ed;border:1px solid #fed7aa}.solarStoryRoute i{font-style:normal;color:#94a3b8}.solarAnswerGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.solarAnswerGrid article{background:#f8fafc;border:1px solid #edf1f6;border-radius:10px;padding:10px}.solarAnswerGrid small{display:block;color:#64748b;font-size:9px;margin-bottom:4px}.solarAnswerGrid b{font-size:11px;line-height:1.4;font-weight:650}.solarWhereAnswer{margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:11px 12px}.solarWhereAnswer span{display:block;color:#9a5b17;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}.solarWhereAnswer b{display:block;margin-top:3px;font-size:11.5px;line-height:1.4}
-        @media(max-width:1100px){.energyDeviceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.solarAnswerGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.energyDeviceGrid{grid-template-columns:1fr}.energyDeviceCard{grid-template-columns:104px minmax(0,1fr)}.energyDeviceVisual{height:118px}.solarStoryHead{display:block}.solarStoryRoute{justify-content:flex-start;margin-top:10px}.solarAnswerGrid{grid-template-columns:1fr}}
+        .solarHardwareExperience{display:grid;gap:12px;margin:12px 0}.solarHardwareSection{margin:0}.solarHardwareSectionHead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}.solarHardwareSectionHead h2{margin:0 0 4px}.solarHardwareSectionHead p{margin:0;color:#64748b;font-size:11px}.solarHardwareSectionHead>span,.solarAggregateCount{font-size:10px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}.solarAggregateCard{border:1px solid #e5ebf3;border-radius:14px;padding:12px;background:#fff}.solarAggregateCard+.solarAggregateCard{margin-top:10px}.solarAggregateHead{display:grid;grid-template-columns:116px minmax(0,1fr) auto;gap:12px;align-items:center}.solarAggregateVisual{height:104px;display:flex;align-items:center;justify-content:center;background:#f8fafc;border-radius:11px;overflow:hidden}.solarAggregateVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.solarAggregateVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:6px;box-sizing:border-box}.solarAggregateCopy small,.solarSystemSummary small{font-size:9px;font-weight:750;color:#64748b;letter-spacing:.08em}.solarAggregateCopy h3,.solarSystemSummary h3{margin:3px 0 5px;font-size:15px}.solarAggregateCopy p,.solarSystemSummary p{margin:0;color:#64748b;font-size:10.5px;line-height:1.4}.solarAggregateFacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.solarAggregateFacts span{min-width:96px;background:#f8fafc;border-radius:8px;padding:7px 8px}.solarAggregateFacts small,.solarAggregateFacts b{display:block}.solarAggregateFacts small{font-size:8px;color:#64748b}.solarAggregateFacts b{font-size:10px;margin-top:2px}.solarChildGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}.solarSystemSummary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start}.solarUnassignedPanels{margin-top:12px}.solarUnassignedPanels h3{font-size:12px;margin:0 0 6px}
+                .solarStoryHead{align-items:center}.solarStoryHead small{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#d97706;font-weight:750}.solarStoryHead h2{margin:3px 0}.solarStoryRoute{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}.solarStoryRoute span{font-size:10px;font-weight:700;padding:6px 9px;border-radius:999px;background:#fff7ed;border:1px solid #fed7aa}.solarStoryRoute i{font-style:normal;color:#94a3b8}.solarAnswerGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.solarAnswerGrid article{background:#f8fafc;border:1px solid #edf1f6;border-radius:10px;padding:10px}.solarAnswerGrid small{display:block;color:#64748b;font-size:9px;margin-bottom:4px}.solarAnswerGrid b{font-size:11px;line-height:1.4;font-weight:650}.solarWhereAnswer{margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:11px 12px}.solarWhereAnswer span{display:block;color:#9a5b17;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}.solarWhereAnswer b{display:block;margin-top:3px;font-size:11.5px;line-height:1.4}
+        @media(max-width:1100px){.energyDeviceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.solarAnswerGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.solarChildGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.energyDeviceGrid{grid-template-columns:1fr}.energyDeviceCard{grid-template-columns:104px minmax(0,1fr)}.energyDeviceVisual{height:118px}.solarStoryHead{display:block}.solarStoryRoute{justify-content:flex-start;margin-top:10px}.solarAnswerGrid{grid-template-columns:1fr}.solarChildGrid{grid-template-columns:1fr}.solarAggregateHead{grid-template-columns:92px minmax(0,1fr)}.solarAggregateCount{grid-column:2}.solarAggregateVisual{height:88px}.solarSystemSummary{grid-template-columns:1fr}}
       `;
     }
 
@@ -3348,8 +3388,7 @@
       return `${this.tabExperienceHeader(rt,'solar',pageVm)}<div class="r3260SolarPage solarV3457 solarDecisionUx">
         <div class="r3230Kpis r3260Kpis summaryRow four">${this.metric('☀','Solar Production',fmtKw(solarPower),'Now','orange',rt.statusForKeys('solar.power_kw'))}${this.metric('▣','Available for Flexible Loads',fmtKw(flexibleLoadBudget, '—'),'Planning budget unavailable','green','UNAVAILABLE')}${this.metric('↗','Forecast Today',fmtKwh(forecastToday),'Total','blue',rt.statusForKeys('forecast.solar_today_kwh'))}${this.metric('◷','Next Hour',nextHour === null ? '—' : (rt.row('forecast.next_hour_energy_kwh').missing ? fmtKw(nextHour) : fmtKwh(nextHour)),'Expected surplus','purple',rt.statusForKeys(['forecast.next_hour_energy_kwh','forecast.next_hour_power_kw']))}</div>
         ${this.solarEnergyStory(rt)}
-        ${this.energyHardwareCards(rt,['solar_panel','solar_production','solar_inverter','battery','battery_system'],'Your solar system','Panels, inverters and batteries with their published configuration and live status.')}
-        ${this.solarOperationalExecutionPanel(rt, participatingLoads)}
+        ${this.solarHardwareExperience(rt)}
         <section class="panel flexibleLoadsPanel decisionLoadsPanel compactFlexibleLoads" id="solar-flexible-loads"><div class="r3260SectionHead"><div><h2>Flexible Loads</h2><p>Loads that can use available solar now or later today.</p></div><div class="sortControl"><span>Sort</span>${this.segmentedControl(sortButtons, this.loadSort, 'sort')}</div></div><div class="flexLoadList">${loadRows}</div></section>${disabledLoadRows ? `<section class="panel disabledAssetsSection"><div class="r3260SectionHead"><div><h2>Disabled assets</h2><p>Excluded from solar planning and shown separately from participating loads.</p></div></div><div class="consumerExplorerList">${disabledLoadRows}</div></section>` : ''}${strategySettings}
         <section class="solarCompactSummaryRow"><div class="solarCompactFact"><span>Today</span><b>${fmtKwh(rt.number('metering.solar_energy_today_kwh'), '—')}</b></div><div class="solarCompactFact"><span>Export</span><b>${fmtKwh(rt.number('metering.grid_export_today_kwh'), '—')}</b></div><div class="solarCompactFact"><span>Flexible loads</span><b>${fmtKwh(rt.number('planning.expected_flexible_load_today_kwh'), fmtKwh(rt.number('consumer.energy_to_target_kwh'), String(sortedLoads.length)))}</b></div><div class="solarCompactFact"><span>Available for Flexible Loads</span><b>${fmtKw(flexibleLoadBudget, '—')}</b></div></section>
       </div>`;
@@ -3531,7 +3570,6 @@
             </div>
           </div>
         </section>
-        ${this.energyHardwareCards(rt,['solar_panel','solar_production','solar_inverter','battery','battery_system','backup_interface','grid_connection'],'Physical energy devices','Published hardware behind the measured energy flow.')}
         <div class="flowDetailsGrid flowDetailsGridTwoUp">
           <section class="panel"><h2>Charging connections</h2><p>Chargers and vehicle assignments currently visible to Energy.</p>${chargers.map(charger => this.connectorCard(rt, charger)).join('') || `<div class="empty"><b>${connectionSnapshot.available ? 'No active charging connections' : 'Connection data unavailable'}</b><span>${connectionSnapshot.available ? 'No charger assignment is currently active.' : 'The canonical connection snapshot is not available.'}</span></div>`}</section>
           <section class="panel"><h2>Active physical consumers</h2><p>Participating loads with a live physical relationship to the energy system.</p>${consumers.map(consumer => this.consumerCard(rt, consumer)).join('') || `<div class="empty"><b>No flexible consumers available</b><span>No controllable loads are currently available.</span></div>`}</section>
