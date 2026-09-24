@@ -1,3 +1,12 @@
+## 3.96.2 — picture-first asset identity
+
+- makes the canonical asset picture a default identity primitive wherever an Energy asset is rendered;
+- shows Mobility asset artwork in Flexible Loads, Planning lane headers, planning summaries, planned-load rows, Outlook child rows and operational summaries;
+- resolves only backend-published `visual_ref` through the existing package-local Energy visual resolver;
+- falls back visibly to a domain icon only when no usable asset visual exists;
+- adds release-blocking coverage so known visual assets cannot silently regress to text-only rendering;
+- preserves Energy E0.15.32 / R1.89.44_CONTRACT and zero accepted technical/feature debt.
+
 ## 3.96.1 — cross-domain Mobility visual_ref rendering
 
 - consume Mobility-owned `visual_ref` passed through Energy E0.15.32;

@@ -1,6 +1,6 @@
 {
   "name": "rhi-energy-ux",
-  "version": "3.96.1",
+  "version": "3.96.2",
   "private": false,
   "description": "Robotix Home Intelligence Energy UX - HACS Dashboard plugin",
   "license": "GPL-3.0-only",
@@ -13,7 +13,7 @@
     "test": "npm run validate",
     "release:sync": "python tools/sync-release-metadata.py",
     "check:test-ownership": "python validation/validate_test_ownership.py",
-    "test:contract": "node validation/test_command_contract.js && node validation/test_current_energy_view_model.js && node validation/test_energy_contract_gateway.js && node validation/test_asset_profile_contract.js && node validation/test_visual_ref_contract.js && node validation/test_live_consumption_flow_metering.js && node validation/test_planning_contract.js && python validation/validate_contract_gateway_architecture.py && python validation/validate_r3941_runtime_contracts.py && python validation/validate_r3941_runtime_regressions.py && python validation/validate_r3942_flow_contract.py && python validation/validate_r3943_consumption_truth.py && python validation/validate_r3945_contract_clarity.py && python validation/validate_r3946_current_energy_model.py",
+    "test:contract": "node validation/test_command_contract.js && node validation/test_current_energy_view_model.js && node validation/test_energy_contract_gateway.js && node validation/test_asset_profile_contract.js && node validation/test_visual_ref_contract.js && node validation/test_picture_first_asset_identity.js && node validation/test_live_consumption_flow_metering.js && node validation/test_planning_contract.js && python validation/validate_contract_gateway_architecture.py && python validation/validate_r3941_runtime_contracts.py && python validation/validate_r3941_runtime_regressions.py && python validation/validate_r3942_flow_contract.py && python validation/validate_r3943_consumption_truth.py && python validation/validate_r3945_contract_clarity.py && python validation/validate_r3946_current_energy_model.py",
     "test:ux": "python validation/validate_r3944_stable_refresh.py && python validation/validate_r3947_footer_runtime_guard.py && python validation/validate_branding_assets.py && python validation/validate_shared_ux_footer.py && python validation/validate_renderer_reference_integrity.py && python validation/validate_mobility_rc38_visual_parity.py",
     "test:package": "npm run check:syntax && node validation/test_bundle_load.mjs && npm run check:source-ownership && npm run check:asset-policy && npm run check:hacs-package && npm run test:hacs-install && npm run validate:public",
     "test:release": "python validation/validate_release_governance.py && npm run check:test-ownership && npm run check:documentation-drift",
