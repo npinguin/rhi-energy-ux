@@ -1,8 +1,8 @@
 {
-  "version": "3.96.0",
-  "candidate_tag": "v3.96.0",
+  "version": "3.96.1",
+  "candidate_tag": "v3.96.1",
   "candidate_sha": "pending",
-  "previous_release": "3.95.4",
+  "previous_release": "3.96.0",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -37,5 +37,7 @@
   "hero_crop_visibility": "NOT_EXECUTED",
   "energy_public_v2_asset_profiles": "NOT_EXECUTED",
   "energy_property_publication_evidence": "NOT_EXECUTED",
-  "flexible_asset_backend_state_ownership": "NOT_EXECUTED"
+  "flexible_asset_backend_state_ownership": "NOT_EXECUTED",
+  "mobility_visual_ref_rendering": "NOT_EXECUTED",
+  "mobility_visual_asset_delivery": "NOT_EXECUTED"
 }
