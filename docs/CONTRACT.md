@@ -93,3 +93,24 @@ Backend owns lifetime-source lineage, baselines, deltas, periodization, attribut
 - pending/incomplete/not-applicable remain separate;
 - degraded truth remains visible with calm quality context;
 - missing backend truth is not hidden by a frontend estimate.
+
+## Energy Public V2 asset profile contract
+
+`sensor.rhi_energy_public_contract_v2` is an additive canonical interface for asset
+context. The UX consumes it only through `UX_INTERFACES.publicV2`.
+
+Required semantics consumed by the UX:
+
+- `objects[].asset_id`
+- `objects[].asset_type`
+- `objects[].profile_id`
+- optional explicit `participation_state`, `operating_state`, `availability_state`
+- `objects[].property_publication`
+- top-level `profiles[]`
+
+`property_publication.v1_fallback_allowed=false` is fail-closed. The UX must not
+repair a missing canonical V2 property with a V1 compatibility projection.
+
+Profile identity is semantic Energy context; image selection remains presentation.
+The current profile catalog is read-only and is not a manufacturer/model picker.
+
