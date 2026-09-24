@@ -1,8 +1,8 @@
 {
-  "version": "3.98.0",
-  "candidate_tag": "v3.98.0",
+  "version": "3.98.1",
+  "candidate_tag": "v3.98.1",
   "candidate_sha": "pending",
-  "previous_release": "3.97.1",
+  "previous_release": "3.98.0",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -64,5 +64,9 @@
   "solar_zone_panel_visual_selection": "NOT_EXECUTED",
   "solar_inverter_children": "NOT_EXECUTED",
   "solar_battery_aggregate_children": "NOT_EXECUTED",
-  "energy_product_artwork_uniformity": "NOT_EXECUTED"
+  "energy_product_artwork_uniformity": "NOT_EXECUTED",
+  "solar_tab_hardware_ownership": "NOT_EXECUTED",
+  "operational_planning_no_hardware": "NOT_EXECUTED",
+  "cross_tab_device_visual_coverage": "NOT_EXECUTED",
+  "solaredge_se10k_rwb_crisp_artwork": "NOT_EXECUTED"
 }
