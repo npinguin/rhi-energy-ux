@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ${{ github.repository }}-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -33,21 +33,6 @@ jobs:
           python-version: '3.12'
       - name: Install locked dependencies
         run: npm ci
-      - name: Build and commit deterministic candidate dist
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run build
-          if git diff --quiet -- dist; then
-            echo "dist already aligned"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add dist
-            git commit -m "Build Energy UX 3.98.1 dist"
-            git push origin "HEAD:${{ github.head_ref }}"
-          fi
       - name: Full validation
         run: npm run validate
       - name: Protect immutable published package
