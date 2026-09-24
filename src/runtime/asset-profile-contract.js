@@ -24,12 +24,17 @@ function energyAssetPublicationGap(gateway, assetId = "") {
   const context = readEnergyAssetContext(gateway, assetId);
   const publication = context.publication;
   if (!publication) return { status:"unavailable", missing:[] };
-  const missing = Array.isArray(publication.unresolved_required_property_keys)
+  const missing = Array.isArray(publication.missing_required_property_keys)
+    ? publication.missing_required_property_keys.map(String).filter(Boolean)
+    : [];
+  const unresolved = Array.isArray(publication.unresolved_required_property_keys)
     ? publication.unresolved_required_property_keys.map(String).filter(Boolean)
     : [];
   return {
     status: publication.complete === true && missing.length === 0 ? "complete" : "incomplete",
     missing,
+    unresolved,
+    resolution_complete: publication.resolution_complete === true,
     authority: String(publication.authority || "RHI_ENERGY_PUBLIC_CONTRACT_V2"),
     v1_fallback_allowed: publication.v1_fallback_allowed === true
   };
