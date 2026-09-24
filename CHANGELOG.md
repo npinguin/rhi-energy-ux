@@ -1,3 +1,13 @@
+## 3.98.0 — Solar hardware hierarchy and product artwork
+
+- removes Physical energy devices from Flow and keeps Flow focused on measured energy paths;
+- keeps Tactical/Operational Planning free of hardware inventory and removes the misplaced Solar operational-overview spillover;
+- makes Solar the canonical hardware/configuration experience with arrays/zones, inverter children, battery aggregate + children, and support devices;
+- allows each solar array/zone to select its own representative SunPower or Jinko panel artwork;
+- wires verified Energy product artwork into the type-safe visual catalog and keeps all device rendering contained and centered;
+- removes dead flat-hardware helper code and adds release-blocking Solar IA coverage;
+- preserves Energy E0.15.32 / R1.89.44_CONTRACT and zero accepted technical/feature debt.
+
 ## 3.97.1 — Home Battery contributor body sizing
 
 - keeps the approved Home Battery hero unchanged;
