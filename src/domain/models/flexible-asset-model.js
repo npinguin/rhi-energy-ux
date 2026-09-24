@@ -69,11 +69,18 @@
     build(asset = {}) {
       const id = String(firstDefined(asset.asset_id, asset.flexible_asset_id, asset.target_asset_id, ''));
       const planning = this.planningFor(id);
+      const context = this.assetContext(asset);
       const participation = this.participationState(asset, planning);
       return {
         id,
         raw: asset,
         planning,
+        profile: context.profile,
+        profileId: String(context.asset?.profile_id || context.profile?.profile_id || ''),
+        publication: context.publication,
+        publicationGap: typeof energyAssetPublicationGap === 'function'
+          ? energyAssetPublicationGap(this.runtime.contractGateway(), id)
+          : { status:'unavailable', missing:[] },
         participation,
         operation: this.operationalState(asset, planning),
         isStorage: participation === 'storage',
