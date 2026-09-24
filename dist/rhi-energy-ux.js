@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R3.96.3';
+  const UX_VERSION = 'R3.97.0';
   const COMPANY_LOGO_ASSET = `/hacsfiles/rhi-energy-ux/assets/branding/company-logo.svg?v=${encodeURIComponent(UX_VERSION)}`;
 
   const HERO_IMAGE_BATTERY = 'data:image/webp;base64,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';
@@ -72,6 +72,124 @@
     return Object.freeze({ entityId, state, attrs, contract });
   }
 
+// ---- src/app/energy-asset-catalog.js ----
+// Energy logical-device visual catalog.
+// Backend profiles remain semantic and non-visual. This UX module owns representative
+// artwork, same-type defaults, picker options and local presentation preference.
+const RHI_ENERGY_VISUAL_PREFERENCE_KEY = "homebrain.energy.visual_preferences.v1";
+
+const RHI_ENERGY_LOGICAL_VISUALS = Object.freeze([
+  { id:"battery_system.home", asset_type:"battery_system", label:"Home battery system", brand:"Generic", model:"Home battery system", variant:"System", profile_patterns:["energy.battery_system."], package_path:"heroes/battery-hero.webp", quality:"representative", selectable:true },
+  { id:"battery.byd_lvs", asset_type:"battery", label:"BYD LVS battery", brand:"BYD", model:"LVS", variant:"Battery module", profile_patterns:[], inline_asset:"byd_lvs20", quality:"verified_model_choice", selectable:true },
+  { id:"battery.home", asset_type:"battery", label:"Home battery", brand:"Generic", model:"Home battery", variant:"Battery module", profile_patterns:["energy.battery."], package_path:"heroes/battery-hero.webp", quality:"representative", selectable:true },
+
+  { id:"grid_connection.smart_meter", asset_type:"grid_connection", label:"Smart meter / grid connection", brand:"Generic", model:"Smart meter", variant:"Grid connection", profile_patterns:["energy.grid_connection."], package_path:"heroes/metering-hero.webp", quality:"representative", selectable:true },
+  { id:"grid_phase.generic", asset_type:"grid_phase", label:"Grid phase", brand:"Generic", model:"Grid phase", variant:"Phase", profile_patterns:["energy.grid_phase."], package_path:"heroes/flow-hero.webp", quality:"representative", selectable:true },
+
+  { id:"solar_production.array", asset_type:"solar_production", label:"Solar production", brand:"Generic", model:"PV array", variant:"System", profile_patterns:["energy.solar_production."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
+  { id:"solar_inverter.solaredge", asset_type:"solar_inverter", label:"SolarEdge inverter", brand:"SolarEdge", model:"Solar inverter", variant:"Inverter", integration_domains:["solaredge","solaredge_modbus_multi"], package_path:"heroes/solar-hero.webp", quality:"representative_brand", selectable:true },
+  { id:"solar_inverter.generic", asset_type:"solar_inverter", label:"Solar inverter", brand:"Generic", model:"Solar inverter", variant:"Inverter", profile_patterns:["energy.solar_inverter."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
+  { id:"solar_inverter_phase.generic", asset_type:"solar_inverter_phase", label:"Solar inverter phase", brand:"Generic", model:"Inverter phase", variant:"Phase", profile_patterns:["energy.solar_inverter_phase."], package_path:"heroes/flow-hero.webp", quality:"representative", selectable:true },
+  { id:"solar_optimizer.solaredge", asset_type:"solar_optimizer", label:"Solar optimizer", brand:"SolarEdge", model:"Power Optimizer", variant:"Optimizer", integration_domains:["solaredge_optimizers"], package_path:"heroes/solar-hero.webp", quality:"representative_brand", selectable:true },
+  { id:"solar_optimizer.generic", asset_type:"solar_optimizer", label:"Solar optimizer", brand:"Generic", model:"PV optimizer", variant:"Optimizer", profile_patterns:["energy.solar_optimizer."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
+  { id:"solar_forecast.provider", asset_type:"solar_forecast", label:"Solar forecast", brand:"Generic", model:"Forecast provider", variant:"Forecast", profile_patterns:["energy.solar_forecast."], package_path:"heroes/outlook-hero.webp", quality:"representative", selectable:true },
+
+  { id:"gas_meter.smart_meter", asset_type:"gas_meter", label:"Gas meter", brand:"Generic", model:"Smart gas meter", variant:"Meter", profile_patterns:["energy.gas_meter."], package_path:"heroes/metering-hero.webp", quality:"representative", selectable:true },
+  { id:"price_source.market", asset_type:"price_source", label:"Energy price source", brand:"Generic", model:"Energy market", variant:"Price source", profile_patterns:["energy.price_source."], package_path:"heroes/pricing-hero.webp", quality:"representative", selectable:true },
+  { id:"home_consumption.home", asset_type:"home_consumption", label:"Home consumption", brand:"Generic", model:"Home", variant:"Consumption", profile_patterns:["energy.home_consumption."], package_path:"heroes/consumers-hero.webp", quality:"representative", selectable:true },
+
+  // Producer-domain flexible loads keep producer visual_ref when available. This
+  // same-type fallback is only used when no producer visual identity is published.
+  { id:"flexible_load.generic", asset_type:"flexible_load", label:"Flexible load", brand:"Generic", model:"Controllable load", variant:"Flexible load", profile_patterns:["energy.flexible_load."], package_path:"heroes/consumers-hero.webp", quality:"generic_fallback", selectable:true }
+]);
+
+function rhiEnergyVisualCatalog() {
+  return RHI_ENERGY_LOGICAL_VISUALS.map(row => ({ ...row }));
+}
+
+function rhiEnergyVisualCatalogForType(assetType = "") {
+  const type = String(assetType || "").trim().toLowerCase();
+  return rhiEnergyVisualCatalog().filter(row => row.asset_type === type && row.selectable !== false);
+}
+
+function rhiEnergyVisualRef(entryOrId = "") {
+  const id = typeof entryOrId === "object" ? String(entryOrId?.id || "") : String(entryOrId || "");
+  return id ? `energy.logical.${id}` : "";
+}
+
+function rhiEnergyVisualEntryFromRef(visualRef = "") {
+  const ref = String(visualRef || "").trim();
+  if (!ref.startsWith("energy.logical.")) return null;
+  const id = ref.slice("energy.logical.".length);
+  return RHI_ENERGY_LOGICAL_VISUALS.find(row => row.id === id) || null;
+}
+
+function rhiEnergyVisualEntryMatchesAsset(entry = {}, asset = {}) {
+  const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
+  if (!assetType || entry.asset_type !== assetType) return false;
+  const profileId = String(asset.profile_id || asset.raw?.profile_id || "").trim();
+  const integrationDomain = String(asset.integration_domain || asset.raw?.integration_domain || "").trim();
+  const profileMatch = (entry.profile_patterns || []).some(prefix => profileId.startsWith(prefix));
+  const integrationMatch = (entry.integration_domains || []).includes(integrationDomain);
+  return profileMatch || integrationMatch;
+}
+
+function rhiEnergyDefaultVisualEntry(asset = {}) {
+  const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
+  const candidates = rhiEnergyVisualCatalogForType(assetType);
+  if (!candidates.length) return null;
+  return candidates.find(entry => rhiEnergyVisualEntryMatchesAsset(entry, asset))
+    || candidates.find(entry => /generic|home|provider|market|array|smart_meter/.test(entry.id))
+    || candidates[0]
+    || null;
+}
+
+function rhiEnergyReadVisualPreferences() {
+  try {
+    const raw = globalThis?.localStorage?.getItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function rhiEnergySelectedVisualRef(assetId = "") {
+  const id = String(assetId || "").trim();
+  if (!id) return "";
+  return String(rhiEnergyReadVisualPreferences()[id] || "").trim();
+}
+
+function rhiEnergySetVisualPreference(asset = {}, visualRef = "") {
+  const assetId = String(asset.asset_id || asset.id || "").trim();
+  const ref = String(visualRef || "").trim();
+  if (!assetId || !ref) return false;
+  const entry = rhiEnergyVisualEntryFromRef(ref);
+  const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
+  if (!entry || entry.asset_type !== assetType) return false;
+  try {
+    const preferences = rhiEnergyReadVisualPreferences();
+    preferences[assetId] = ref;
+    globalThis?.localStorage?.setItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY, JSON.stringify(preferences));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function rhiEnergyClearVisualPreference(assetId = "") {
+  const id = String(assetId || "").trim();
+  if (!id) return false;
+  try {
+    const preferences = rhiEnergyReadVisualPreferences();
+    delete preferences[id];
+    globalThis?.localStorage?.setItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY, JSON.stringify(preferences));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 // ---- src/runtime/visual-asset-resolver.js ----
 // Package-local resolver for Foundation/Mobility visual_ref identities.
 // The backend publishes only package-neutral keys. Energy UX owns these image files.
@@ -142,9 +260,59 @@ function rhiEnergyVisualAssetUrl(relativePath = "") {
   return `/hacsfiles/rhi-energy-ux/assets/${normalized}?v=${encodeURIComponent(UX_VERSION)}`;
 }
 
+function resolveEnergyOwnedVisualRef(visualRef = "") {
+  const ref = String(visualRef || "").trim();
+  const entry = typeof rhiEnergyVisualEntryFromRef === "function" ? rhiEnergyVisualEntryFromRef(ref) : null;
+  if (!entry) return null;
+  const url = entry.inline_asset === "byd_lvs20" && typeof HERO_IMAGE_BYD_LVS20 === "string"
+    ? HERO_IMAGE_BYD_LVS20
+    : rhiEnergyVisualAssetUrl(entry.package_path || "");
+  if (!url) return null;
+  return Object.freeze({
+    visual_ref: ref,
+    kind: "energy_logical_device",
+    asset_type: entry.asset_type,
+    catalog_id: entry.id,
+    quality: entry.quality || "representative",
+    url,
+    filter: "none"
+  });
+}
+
+function resolveEnergyAssetVisual(asset = {}) {
+  const sourceRef = String(asset.visual_ref || asset.visualRef || asset.raw?.visual_ref || "").trim();
+  // Producer visual identity stays authoritative across the domain boundary.
+  if (sourceRef.startsWith("mobility.")) return resolveEnergyVisualRef(sourceRef);
+
+  const assetId = String(asset.asset_id || asset.id || "").trim();
+  const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
+  const selectedRef = typeof rhiEnergySelectedVisualRef === "function"
+    ? rhiEnergySelectedVisualRef(assetId)
+    : "";
+  const selectedEntry = typeof rhiEnergyVisualEntryFromRef === "function"
+    ? rhiEnergyVisualEntryFromRef(selectedRef)
+    : null;
+  if (selectedEntry && selectedEntry.asset_type === assetType) {
+    return resolveEnergyOwnedVisualRef(selectedRef);
+  }
+
+  const sourceEntry = typeof rhiEnergyVisualEntryFromRef === "function"
+    ? rhiEnergyVisualEntryFromRef(sourceRef)
+    : null;
+  if (sourceEntry && sourceEntry.asset_type === assetType) {
+    return resolveEnergyOwnedVisualRef(sourceRef);
+  }
+
+  const fallbackEntry = typeof rhiEnergyDefaultVisualEntry === "function"
+    ? rhiEnergyDefaultVisualEntry(asset)
+    : null;
+  return fallbackEntry ? resolveEnergyOwnedVisualRef(rhiEnergyVisualRef(fallbackEntry)) : null;
+}
+
 function resolveEnergyVisualRef(visualRef = "") {
   const ref = String(visualRef || "").trim();
   if (!ref) return null;
+  if (ref.startsWith("energy.logical.")) return resolveEnergyOwnedVisualRef(ref);
   if (ref === "mobility.vehicle.generic.fallback") {
     return Object.freeze({ visual_ref:ref, kind:"vehicle", url:rhiEnergyVisualAssetUrl("mobility/vehicle_fallback.png"), filter:"none" });
   }
@@ -2390,6 +2558,67 @@ function hbEnergyPresentationStyles() {
   `;
 }
 
+// ---- src/ui/components/energy-visual-picker.js ----
+// Type-safe Energy logical-device image picker.
+// The picker may only select visuals from the current logical asset_type.
+class HomeBrainEnergyVisualPicker {
+  constructor() {}
+
+  catalogFor(asset = {}) {
+    const type = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
+    return typeof rhiEnergyVisualCatalogForType === "function" ? rhiEnergyVisualCatalogForType(type) : [];
+  }
+
+  render(asset = {}, selectedRef = "") {
+    const assetId = String(asset.asset_id || asset.id || "").trim();
+    const type = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
+    const choices = this.catalogFor(asset);
+    if (!assetId || !type || !choices.length) return "";
+    const current = String(selectedRef || "").trim();
+    const cards = choices.map(entry => {
+      const ref = rhiEnergyVisualRef(entry);
+      const visual = typeof resolveEnergyVisualRef === "function" ? resolveEnergyVisualRef(ref) : null;
+      const selected = ref === current;
+      return `<button class="energyVisualChoice ${selected ? "selected" : ""}" type="button" data-energy-visual-select="${escapeHtml(ref)}" data-energy-visual-asset="${escapeHtml(assetId)}">
+        <span class="energyVisualChoiceImage">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || "none")}">` : ""}</span>
+        <span class="energyVisualChoiceCopy"><small>${escapeHtml(entry.brand || "Representative")}</small><b>${escapeHtml(entry.model || entry.label)}</b><em>${escapeHtml(entry.variant || human(type))}</em></span>
+        <span class="energyVisualQuality">${escapeHtml(human(entry.quality || "representative"))}</span>
+      </button>`;
+    }).join("");
+    return `<div class="energyVisualPickerBackdrop" data-energy-visual-backdrop="1">
+      <section class="energyVisualPickerPanel" role="dialog" aria-modal="true" aria-label="Choose representative image" data-energy-visual-panel="1">
+        <header><div><small>APPEARANCE · ${escapeHtml(human(type))}</small><h2>Choose representative image</h2><p>Only visuals for this logical Energy device type are available. This choice changes presentation only; runtime semantics remain backend-owned.</p></div><button type="button" class="energyVisualClose" data-energy-visual-close-button="1" aria-label="Close">×</button></header>
+        <div class="energyVisualChoices">${cards}</div>
+        <footer><button type="button" class="energyVisualReset" data-energy-visual-reset="${escapeHtml(assetId)}">Use profile default</button></footer>
+      </section>
+    </div>`;
+  }
+}
+
+function rhiEnergyVisualPickerStyles() {
+  return `
+    .assetVisual[data-energy-visual-open]{cursor:pointer;outline:0}
+    .assetVisual[data-energy-visual-open]:hover{box-shadow:0 0 0 2px rgba(37,99,235,.16)}
+    .energyVisualPickerBackdrop{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.44);display:grid;place-items:center;padding:20px}
+    .energyVisualPickerPanel{width:min(760px,94vw);max-height:86vh;overflow:auto;background:#fff;border-radius:22px;border:1px solid #e2e8f0;box-shadow:0 30px 80px rgba(15,23,42,.28);padding:20px}
+    .energyVisualPickerPanel header{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+    .energyVisualPickerPanel header small{font-size:10px;font-weight:800;letter-spacing:.12em;color:#64748b}
+    .energyVisualPickerPanel header h2{margin:5px 0 6px;font-size:22px}
+    .energyVisualPickerPanel header p{margin:0;color:#64748b;font-size:12px;line-height:1.45;max-width:62ch}
+    .energyVisualClose{border:0;background:#f1f5f9;border-radius:10px;width:36px;height:36px;font-size:22px;cursor:pointer}
+    .energyVisualChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:18px}
+    .energyVisualChoice{display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;align-items:center;text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:14px;padding:10px;cursor:pointer;position:relative}
+    .energyVisualChoice:hover{border-color:#93c5fd;background:#f8fbff}.energyVisualChoice.selected{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12)}
+    .energyVisualChoiceImage{width:110px;height:78px;border-radius:10px;background:#f8fafc;display:grid;place-items:center;overflow:hidden}
+    .energyVisualChoiceImage img{max-width:100%;max-height:100%;object-fit:contain}
+    .energyVisualChoiceCopy{min-width:0}.energyVisualChoiceCopy small,.energyVisualChoiceCopy b,.energyVisualChoiceCopy em{display:block}
+    .energyVisualChoiceCopy small{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.08em}.energyVisualChoiceCopy b{font-size:13px;margin-top:3px}.energyVisualChoiceCopy em{font-size:10px;color:#64748b;font-style:normal;margin-top:3px}
+    .energyVisualQuality{grid-column:2;font-size:9px;color:#64748b}
+    .energyVisualPickerPanel footer{display:flex;justify-content:flex-end;margin-top:14px}.energyVisualReset{border:1px solid #dbe3ee;background:#fff;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer}
+    @media(max-width:700px){.energyVisualChoices{grid-template-columns:1fr}.energyVisualPickerPanel{padding:14px}.energyVisualChoice{grid-template-columns:88px minmax(0,1fr)}.energyVisualChoiceImage{width:88px;height:66px}}
+  `;
+}
+
   class HomeBrainEnergyCard extends HTMLElement {
     constructor() {
       super();
@@ -2429,6 +2658,7 @@ function hbEnergyPresentationStyles() {
       this._lastRuntimeSignature = '';
       this._lastMarkup = '';
       this._forceRender = true;
+      this.energyVisualPickerAssetId = '';
     }
     restoreView() {
       try {
@@ -2634,6 +2864,49 @@ function hbEnergyPresentationStyles() {
       </div>`;
     }
     onClick(event) {
+      const visualBackdrop = event.target.closest('[data-energy-visual-backdrop]');
+      if (visualBackdrop && event.target === visualBackdrop) {
+        this.energyVisualPickerAssetId = '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const visualClose = event.target.closest('[data-energy-visual-close-button]');
+      if (visualClose) {
+        this.energyVisualPickerAssetId = '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const visualReset = event.target.closest('[data-energy-visual-reset]');
+      if (visualReset) {
+        if (typeof rhiEnergyClearVisualPreference === 'function') rhiEnergyClearVisualPreference(visualReset.dataset.energyVisualReset || '');
+        this.energyVisualPickerAssetId = '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const visualSelect = event.target.closest('[data-energy-visual-select]');
+      if (visualSelect) {
+        const assetId = visualSelect.dataset.energyVisualAsset || '';
+        const visualRef = visualSelect.dataset.energyVisualSelect || '';
+        const rt = this.runtime();
+        const asset = typeof rt.asset === 'function'
+          ? rt.asset(assetId)
+          : (typeof rt.assets === 'function' ? rt.assets().find(row => String(row?.asset_id || '') === String(assetId)) : null);
+        if (asset && typeof rhiEnergySetVisualPreference === 'function') rhiEnergySetVisualPreference(asset, visualRef);
+        this.energyVisualPickerAssetId = '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const visualOpen = event.target.closest('[data-energy-visual-open]');
+      if (visualOpen) {
+        this.energyVisualPickerAssetId = visualOpen.dataset.energyVisualOpen || '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
       const strategyEdit = event.target.closest('[data-strategy-edit]');
       if (strategyEdit && !strategyEdit.disabled) { this.strategyEditProfileId = strategyEdit.dataset.strategyEdit || ''; this.render(); return; }
       const strategyCancel = event.target.closest('[data-strategy-cancel]');
@@ -5441,13 +5714,38 @@ function hbEnergyPresentationStyles() {
     }
     assetVisual(asset = {}, { size = 'md', fallbackIcon = '◆', decorative = true } = {}) {
       const visualRef = String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
-      const resolved = visualRef && typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(visualRef) : null;
+      const resolved = typeof resolveEnergyAssetVisual === 'function'
+        ? resolveEnergyAssetVisual(asset)
+        : (visualRef && typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(visualRef) : null);
       const label = this.planningAssetName(asset);
+      const assetId = String(firstDefined(asset.asset_id, asset.id, '') || '').trim();
+      const assetType = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
+      const pickerChoices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(assetType) : [];
+      const canPick = !!assetId && !visualRef.startsWith('mobility.') && pickerChoices.length > 0;
+      const pickerAttrs = canPick
+        ? ` data-energy-visual-open="${escapeHtml(assetId)}" role="button" tabindex="0" title="Choose representative image"`
+        : '';
       if (resolved?.url) {
         const alt = decorative ? '' : label;
-        return `<span class="assetVisual assetVisual-${escapeHtml(size)}"><img src="${escapeHtml(resolved.url)}" alt="${escapeHtml(alt)}" style="filter:${escapeHtml(resolved.filter || 'none')}"></span>`;
+        return `<span class="assetVisual assetVisual-${escapeHtml(size)}"${pickerAttrs}><img src="${escapeHtml(resolved.url)}" alt="${escapeHtml(alt)}" style="filter:${escapeHtml(resolved.filter || 'none')}"></span>`;
       }
-      return `<span class="assetVisual assetVisual-${escapeHtml(size)} assetVisualFallback" aria-hidden="true">${escapeHtml(fallbackIcon)}</span>`;
+      return `<span class="assetVisual assetVisual-${escapeHtml(size)} assetVisualFallback"${pickerAttrs} aria-hidden="${canPick ? 'false' : 'true'}">${escapeHtml(fallbackIcon)}</span>`;
+    }
+    energyVisualPickerOverlay(rt) {
+      const assetId = String(this.energyVisualPickerAssetId || '').trim();
+      if (!assetId) return '';
+      const asset = typeof rt.asset === 'function'
+        ? rt.asset(assetId)
+        : (typeof rt.assets === 'function' ? rt.assets().find(row => String(row?.asset_id || '') === assetId) : null);
+      if (!asset) return '';
+      const type = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
+      const choices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(type) : [];
+      if (!choices.length) return '';
+      const selected = typeof rhiEnergySelectedVisualRef === 'function' ? rhiEnergySelectedVisualRef(assetId) : '';
+      const fallbackEntry = typeof rhiEnergyDefaultVisualEntry === 'function' ? rhiEnergyDefaultVisualEntry(asset) : null;
+      const current = selected || (fallbackEntry && typeof rhiEnergyVisualRef === 'function' ? rhiEnergyVisualRef(fallbackEntry) : '');
+      const picker = new HomeBrainEnergyVisualPicker();
+      return picker.render(asset, current);
     }
     assetIdentityChip(asset = {}, meta = '') {
       return `<span class="assetIdentityChip">${this.assetVisual(asset,{size:'xs',fallbackIcon:this.planningAssetIcon(asset)})}<span><b>${escapeHtml(this.planningAssetName(asset))}</b>${meta ? `<small>${escapeHtml(meta)}</small>` : ''}</span></span>`;
@@ -5876,7 +6174,7 @@ function hbEnergyPresentationStyles() {
         console.error(`[HomeBrain Energy ${UX_VERSION}] ${this.view} render failed`, error);
         content = this.renderError(this.view, error);
       }
-      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}
+      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
 
       /* R3.62.0 canonical component framework and adaptive convergence */
       :host{--hi-space-1:4px;--hi-space-2:8px;--hi-space-3:12px;--hi-space-4:16px;--hi-radius-sm:8px;--hi-radius-md:12px;--hi-break-tablet:980px;--hi-break-phone:700px}
@@ -6191,7 +6489,7 @@ function hbEnergyPresentationStyles() {
 @media(max-width:1024px){.hiTabHero{min-height:188px!important}.hiTabHeroCopy{width:50%!important;padding:26px 16px 22px 18px!important}.hiTabHeroArt{inset:0 0 0 30%!important}.hiTabStatusItem{grid-template-columns:42px minmax(0,1fr)!important;padding:10px!important;min-height:88px!important}.hiTabStatusIcon{width:40px!important;height:40px!important;min-width:40px!important}}
 @media(max-width:760px){.hiTabHero{min-height:168px!important}.hiTabHeroCopy{width:58%!important;padding:20px 10px 18px 14px!important}.hiTabHeroCopy h2{font-size:29px!important}.hiTabPurpose{font-size:12px!important}.hiTabHeroArt{inset:0 0 0 34%!important}.hiTabStatusGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}.hiQuickActionBar{overflow-x:auto!important;flex-wrap:nowrap!important}.hiQuickActionItems{flex-wrap:nowrap!important}.hiQuickAction{flex:0 0 auto!important}}
 @media(max-width:430px){.hiTabHero{min-height:154px!important}.hiTabHeroCopy{width:64%!important;padding:17px 8px 15px 12px!important}.hiTabHeroCopy h2{font-size:25px!important}.hiTabPurpose{font-size:10px!important;line-height:1.3!important}.hiTabHeroArt{inset:0 0 0 38%!important}.hiTabStatusGrid{grid-template-columns:1fr 1fr!important}.hiTabStatusItem{grid-template-columns:34px minmax(0,1fr)!important;min-height:76px!important;padding:8px!important;gap:7px!important}.hiTabStatusIcon{width:32px!important;height:32px!important;min-width:32px!important;border-radius:10px!important;font-size:18px!important}}
-</style><main class="energy">${this.nav()}${this.renderMainWarning(footer)}<section>${this.productLanguage(content)}</section>${this.propertyDraftBar()}${this.productLanguage(this.renderFooter(rt,this.view,footer))}</main>`;
+</style><main class="energy">${this.nav()}${this.renderMainWarning(footer)}<section>${this.productLanguage(content)}</section>${this.propertyDraftBar()}${this.energyVisualPickerOverlay(rt)}${this.productLanguage(this.renderFooter(rt,this.view,footer))}</main>`;
       if (markup === this._lastMarkup) { this.persistInteractionContext(); return; }
       this._lastMarkup = markup;
       this.persistInteractionContext();
