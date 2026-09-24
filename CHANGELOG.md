@@ -1,3 +1,12 @@
+## 3.96.3 — Energy-wide asset identity closure
+
+- extends picture-first asset identity to Consumers managed assets, Strategy participating assets, Metering Flexible Loads and Value flexible-load/consumer allocation surfaces;
+- joins secondary rows back to the canonical Flexible Asset model where an asset id is available instead of rendering technical identifiers as the primary identity;
+- suppresses literal `undefined` / `null` source labels in Metering;
+- keeps canonical `visual_ref` resolution package-local and falls back explicitly when no visual is available;
+- adds release-blocking Energy-wide asset identity regression coverage;
+- preserves Energy E0.15.32 and zero accepted technical/feature debt.
+
 ## 3.96.2 — picture-first asset identity
 
 - makes the canonical asset picture a default identity primitive wherever an Energy asset is rendered;
