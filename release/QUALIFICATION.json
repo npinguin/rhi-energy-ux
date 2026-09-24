@@ -1,8 +1,8 @@
 {
-  "version": "3.96.2",
-  "candidate_tag": "v3.96.2",
+  "version": "3.96.3",
+  "candidate_tag": "v3.96.3",
   "candidate_sha": "pending",
-  "previous_release": "3.96.1",
+  "previous_release": "3.96.2",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -43,5 +43,8 @@
   "picture_first_planning_assets": "NOT_EXECUTED",
   "picture_first_flexible_loads": "NOT_EXECUTED",
   "picture_first_outlook_assets": "NOT_EXECUTED",
-  "picture_first_summary_assets": "NOT_EXECUTED"
+  "picture_first_summary_assets": "NOT_EXECUTED",
+  "visual_everywhere_value": "NOT_EXECUTED",
+  "visual_everywhere_consumer_allocation": "NOT_EXECUTED",
+  "canonical_consumer_identity": "NOT_EXECUTED"
 }
