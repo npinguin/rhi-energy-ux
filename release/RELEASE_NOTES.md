@@ -1,32 +1,27 @@
-# RHI Energy UX v3.96.0 — canonical Energy asset context TEST CANDIDATE
+# RHI Energy UX v3.96.1 — cross-domain Mobility visual_ref TEST CANDIDATE
 
 ## Scope
 
-Focused Energy-only contract and ownership closure over v3.95.4.
+3.96.1 is the consumer-side pilot of the Foundation F1.8.14 visual identity architecture.
 
-The UX now consumes the additive Energy Public Contract V2 asset context introduced by backend E0.15.31. This is deliberately small: one canonical asset-profile reader, one publication-evidence reader and removal of name/power-based Flexible Asset semantic inference.
+Energy E0.15.32 preserves Mobility's package-neutral `visual_ref`. Energy UX resolves that reference only against its own packaged visual catalog and renders the corresponding vehicle or charger on live Energy Flow cards.
 
-## Contract and ownership
+## Ownership
 
-- Backend Energy owns canonical `asset_type`, read-only `profile_id`, profile catalog and publication evidence.
-- Foundation remains the technical discovery/selection owner.
-- Mobility remains owner of vehicle/charger physical execution and producer truth.
-- Energy UX owns presentation only.
-- Asset profiles are `domain_asset_type` context, not manufacturer/model/SKU identity.
-- No profile picker is rendered while the backend profile contract is read-only.
-- Missing V2 publication evidence never falls back to V1.
-- Flexible Asset storage identity is no longer inferred from labels.
-- Flexible Asset operating state is no longer inferred from power thresholds.
+- Foundation owns visual registry mechanics and global key validation.
+- Mobility owns assignment of `visual_ref` to vehicle/charger semantic assets.
+- Energy preserves the producer-owned key without interpreting product identity.
+- Energy UX owns its local image files, appearance filters and rendering.
+- No Mobility UX URL/path or runtime dependency is introduced.
 
 ## Compatibility
 
-- Energy UX: 3.96.0
-- Required/tested Energy backend: E0.15.31
-- Existing V1 compatibility surface: R1.89.44_CONTRACT
+- Energy UX: 3.96.1
+- Required/tested Energy backend: E0.15.32
+- Mobility producer bundle for this pilot: M0.10.1
+- Existing Energy compatibility surface: R1.89.44_CONTRACT
 - Accepted technical debt: 0
 - Accepted feature debt: 0
-- Rollback release: v3.95.4
+- Rollback release: v3.96.0
 
-## Qualification
-
-Static/package validation is required before publication. Target Home Assistant proof must confirm V2 asset-profile publication, publication evidence, Flexible Asset state ownership, HACS upgrade and rollback.
+Target Home Assistant qualification remains mandatory.
