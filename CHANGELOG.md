@@ -7,6 +7,8 @@
 - preserves producer-owned Mobility visual_ref precedence for flexible loads;
 - routes shared asset rendering through one Energy asset visual resolver;
 - adds owned contract coverage and visual-library governance documentation;
+- shows solar panels, inverters and batteries as fact-driven product cards in Solar and reuses product visuals in Battery and Physical Flow;
+- explains panel → inverter → Home Bus → battery/grid from measured flow while explicitly avoiding invented solar-versus-grid allocation;
 - preserves Energy E0.15.32 / R1.89.44_CONTRACT and zero accepted technical/feature debt.
 
 ## 3.96.3 — canonical asset visuals everywhere
