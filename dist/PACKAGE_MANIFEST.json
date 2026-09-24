@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "product": "rhi-energy-ux",
-  "version": "3.98.0",
+  "version": "3.98.1",
   "source_manifest_schema": 1,
   "hacs_package_root": "dist",
   "hacs_filename": "rhi-energy-ux.js",
@@ -12,7 +12,7 @@
     "heroes",
     "mobility"
   ],
-  "runtime_sha256": "3f348650429edb27d69823337ec579c9af7ab20c8075c52fca47a68d4c9a66c0",
+  "runtime_sha256": "d8dbc767786a287ce618c0435e74df530cf66a0d9612019aad6a1f34341743b6",
   "files": [
     {
       "path": "assets/branding/company-logo.svg",
@@ -39,8 +39,8 @@
       "bytes": 8162
     },
     {
-      "path": "assets/energy/solaredge_rwb_10k.webp",
-      "bytes": 8652
+      "path": "assets/energy/solaredge_rwb_10k.svg",
+      "bytes": 2559
     },
     {
       "path": "assets/energy/solaredge_rws_8k.webp",
@@ -152,7 +152,7 @@
     },
     {
       "path": "rhi-energy-ux.js",
-      "bytes": 796272
+      "bytes": 792889
     },
     {
       "path": "rhi-energy-ux.js.sha256",

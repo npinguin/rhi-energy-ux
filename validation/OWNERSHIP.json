@@ -178,6 +178,15 @@
         "Solar owns array inverter battery and support-device hierarchy",
         "Solar zone panel visual choices"
       ]
+    },
+    "tab_information_architecture_and_device_visuals": {
+      "owner": "validation/test_tab_ia_device_visuals.js",
+      "owns": [
+        "Solar navigation and hardware ownership",
+        "Operational Planning navigation and execution-only ownership",
+        "Energy and Mobility device visual coverage across tabs",
+        "SE10K RWB crisp artwork replacement"
+      ]
     }
   }
 }

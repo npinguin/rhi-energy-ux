@@ -1,3 +1,13 @@
+## 3.98.1 — tab ownership and device visual coverage
+
+- restores Energy → Solar as the actual Solar hardware/generation screen;
+- gives Intelligence → Operational Planning its own execution-focused screen with no solar hardware inventory;
+- audits every tab and adds canonical Energy/Mobility device images wherever a concrete device or asset is represented;
+- preserves semantic icons for abstract system lanes, totals and evidence where a product picture would be misleading;
+- replaces the blurred SolarEdge SE10K-RWB48 raster with crisp scalable artwork;
+- adds a release-blocking cross-tab IA/device-visual regression gate;
+- preserves Energy E0.15.32 / R1.89.44_CONTRACT and zero accepted technical/feature debt.
+
 ## 3.98.0 — Solar hardware hierarchy and product artwork
 
 - removes Physical energy devices from Flow and keeps Flow focused on measured energy paths;
