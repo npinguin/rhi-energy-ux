@@ -10,12 +10,17 @@ assert.match(app,/Panel<\/span><i>→<\/i><span>Inverter<\/span><i>→<\/i><span
 assert.match(app,/Exact solar-versus-grid charge allocation is not separately published/);
 assert.match(app,/the UX does not invent how much charge came from solar versus grid/);
 
-assert.match(app,/energyHardwareCards\(rt,\['solar_panel','solar_production','solar_inverter','battery','battery_system'\]/);
-assert.match(app,/Your solar system/);
+assert.match(app,/solarHardwareExperience\(rt\)/);
+assert.match(app,/Solar arrays/);
+assert.match(app,/Inverter system/);
+assert.match(app,/Battery system/);
+assert.match(app,/Solar support devices/);
+assert.doesNotMatch(app,/solarOperationalExecutionPanel\(rt/);
 assert.match(app,/energyDeviceStatusCard/);
 assert.match(app,/energyAssetFacts/);
 assert.match(app,/this\.assetVisual\(enriched/);
-assert.match(app,/this\.assetVisual\(asset,\{size:'lg',fallbackIcon:'▣'/);
+assert.match(app,/this\.assetVisual\(enriched,\{size:'lg',fallbackIcon:this\.planningAssetIcon\(enriched\),decorative:false\}/);
+assert.match(app,/this\.assetVisual\(enriched,\{size:'lg',fallbackIcon:'☀',decorative:false\}/);
 
 for (const id of [
   "battery.byd_lvs_20",
