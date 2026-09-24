@@ -1,3 +1,13 @@
+## 3.96.3 — canonical asset visuals everywhere
+
+- preserves visual_ref and canonical source identity on Consumer Mix normalization;
+- resolves Value consumer allocation back to the semantic Energy/Mobility asset before rendering;
+- replaces technical consumer hashes with picture + human asset name whenever canonical identity is available;
+- adds asset pictures to Pricing of flexible loads, Consumer allocation, disabled flexible-load cards and exception summaries;
+- keeps visual_ref as the only cross-domain visual identity and uses package-local artwork only;
+- adds release-blocking coverage for Value and consumer-allocation visual identity;
+- preserves Energy E0.15.32 and zero accepted technical/feature debt.
+
 ## 3.96.2 — picture-first asset identity
 
 - makes the canonical asset picture a default identity primitive wherever an Energy asset is rendered;
