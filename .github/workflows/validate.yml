@@ -33,6 +33,14 @@ jobs:
           python-version: '3.12'
       - name: Install locked dependencies
         run: npm ci
+      - name: Build candidate package for branch handoff
+        run: npm run build
+      - name: Upload candidate dist for branch handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-dist
+          path: dist
+          if-no-files-found: error
       - name: Full validation
         run: npm run validate
       - name: Protect immutable published package
