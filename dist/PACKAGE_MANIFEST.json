@@ -11,7 +11,7 @@
     "heroes",
     "mobility"
   ],
-  "runtime_sha256": "56069ef0518089471362ae72973dc771baffd61bff2465642f19d5a908f98871",
+  "runtime_sha256": "70b3088e001dea60637daeafd1c6f3290183edae8f2703d2138d8b88bad7b3ae",
   "files": [
     {
       "path": "assets/branding/company-logo.svg",
@@ -115,7 +115,7 @@
     },
     {
       "path": "rhi-energy-ux.js",
-      "bytes": 774135
+      "bytes": 774097
     },
     {
       "path": "rhi-energy-ux.js.sha256",

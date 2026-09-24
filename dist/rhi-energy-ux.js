@@ -80,7 +80,7 @@ const RHI_ENERGY_VISUAL_PREFERENCE_KEY = "homebrain.energy.visual_preferences.v1
 
 const RHI_ENERGY_LOGICAL_VISUALS = Object.freeze([
   { id:"battery_system.home", asset_type:"battery_system", label:"Home battery system", brand:"Generic", model:"Home battery system", variant:"System", profile_patterns:["energy.battery_system."], package_path:"heroes/battery-hero.webp", quality:"representative", selectable:true },
-  { id:"battery.byd_lvs", asset_type:"battery", label:"BYD LVS battery", brand:"BYD", model:"LVS", variant:"Battery module", profile_patterns:["energy.battery.solaredge_modbus_multi"], inline_asset:"byd_lvs20", quality:"representative_model", selectable:true },
+  { id:"battery.byd_lvs", asset_type:"battery", label:"BYD LVS battery", brand:"BYD", model:"LVS", variant:"Battery module", profile_patterns:[], inline_asset:"byd_lvs20", quality:"verified_model_choice", selectable:true },
   { id:"battery.home", asset_type:"battery", label:"Home battery", brand:"Generic", model:"Home battery", variant:"Battery module", profile_patterns:["energy.battery."], package_path:"heroes/battery-hero.webp", quality:"representative", selectable:true },
 
   { id:"grid_connection.smart_meter", asset_type:"grid_connection", label:"Smart meter / grid connection", brand:"Generic", model:"Smart meter", variant:"Grid connection", profile_patterns:["energy.grid_connection."], package_path:"heroes/metering-hero.webp", quality:"representative", selectable:true },
