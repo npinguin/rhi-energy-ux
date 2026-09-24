@@ -3347,6 +3347,8 @@
       const planningSummaryPlain = sortedLoads.length ? `${chargingNow} active · ${waitingToday} waiting · ${plannedToday} planned` : 'No flexible loads available';
       return `${this.tabExperienceHeader(rt,'solar',pageVm)}<div class="r3260SolarPage solarV3457 solarDecisionUx">
         <div class="r3230Kpis r3260Kpis summaryRow four">${this.metric('☀','Solar Production',fmtKw(solarPower),'Now','orange',rt.statusForKeys('solar.power_kw'))}${this.metric('▣','Available for Flexible Loads',fmtKw(flexibleLoadBudget, '—'),'Planning budget unavailable','green','UNAVAILABLE')}${this.metric('↗','Forecast Today',fmtKwh(forecastToday),'Total','blue',rt.statusForKeys('forecast.solar_today_kwh'))}${this.metric('◷','Next Hour',nextHour === null ? '—' : (rt.row('forecast.next_hour_energy_kwh').missing ? fmtKw(nextHour) : fmtKwh(nextHour)),'Expected surplus','purple',rt.statusForKeys(['forecast.next_hour_energy_kwh','forecast.next_hour_power_kw']))}</div>
+        ${this.solarEnergyStory(rt)}
+        ${this.energyHardwareCards(rt,['solar_panel','solar_production','solar_inverter','battery','battery_system'],'Your solar system','Panels, inverters and batteries with their published configuration and live status.')}
         ${this.solarOperationalExecutionPanel(rt, participatingLoads)}
         <section class="panel flexibleLoadsPanel decisionLoadsPanel compactFlexibleLoads" id="solar-flexible-loads"><div class="r3260SectionHead"><div><h2>Flexible Loads</h2><p>Loads that can use available solar now or later today.</p></div><div class="sortControl"><span>Sort</span>${this.segmentedControl(sortButtons, this.loadSort, 'sort')}</div></div><div class="flexLoadList">${loadRows}</div></section>${disabledLoadRows ? `<section class="panel disabledAssetsSection"><div class="r3260SectionHead"><div><h2>Disabled assets</h2><p>Excluded from solar planning and shown separately from participating loads.</p></div></div><div class="consumerExplorerList">${disabledLoadRows}</div></section>` : ''}${strategySettings}
         <section class="solarCompactSummaryRow"><div class="solarCompactFact"><span>Today</span><b>${fmtKwh(rt.number('metering.solar_energy_today_kwh'), '—')}</b></div><div class="solarCompactFact"><span>Export</span><b>${fmtKwh(rt.number('metering.grid_export_today_kwh'), '—')}</b></div><div class="solarCompactFact"><span>Flexible loads</span><b>${fmtKwh(rt.number('planning.expected_flexible_load_today_kwh'), fmtKwh(rt.number('consumer.energy_to_target_kwh'), String(sortedLoads.length)))}</b></div><div class="solarCompactFact"><span>Available for Flexible Loads</span><b>${fmtKw(flexibleLoadBudget, '—')}</b></div></section>
@@ -3529,6 +3531,7 @@
             </div>
           </div>
         </section>
+        ${this.energyHardwareCards(rt,['solar_panel','solar_production','solar_inverter','battery','battery_system','backup_interface','grid_connection'],'Physical energy devices','Published hardware behind the measured energy flow.')}
         <div class="flowDetailsGrid flowDetailsGridTwoUp">
           <section class="panel"><h2>Charging connections</h2><p>Chargers and vehicle assignments currently visible to Energy.</p>${chargers.map(charger => this.connectorCard(rt, charger)).join('') || `<div class="empty"><b>${connectionSnapshot.available ? 'No active charging connections' : 'Connection data unavailable'}</b><span>${connectionSnapshot.available ? 'No charger assignment is currently active.' : 'The canonical connection snapshot is not available.'}</span></div>`}</section>
           <section class="panel"><h2>Active physical consumers</h2><p>Participating loads with a live physical relationship to the energy system.</p>${consumers.map(consumer => this.consumerCard(rt, consumer)).join('') || `<div class="empty"><b>No flexible consumers available</b><span>No controllable loads are currently available.</span></div>`}</section>
@@ -3732,7 +3735,7 @@
       const power = rt.number(`${assetId}.power_kw`);
       const state = String(rt.rawText(`${assetId}.state`, '') || '').toLowerCase();
       const health = rt.rawText(`${assetId}.health`, 'UNKNOWN');
-      const image = this.batteryHeroImagePath(assetId, name);
+      const asset = this.energyAssetContext(rt, rt.asset(assetId) || { asset_id:assetId, display_name:name, asset_type:'battery' });
       const stateLabel = state === 'charging' ? 'Charging'
         : state === 'discharging' ? 'Discharging'
         : state === 'idle' ? 'Idle'
@@ -3743,7 +3746,7 @@
         : stateLabel === 'Discharging' ? 'Supplying energy to the Home Bus'
         : stateLabel === 'Idle' ? 'No active battery flow'
         : 'Battery flow is not currently available';
-      return `<article class="batteryContributorCard"><div class="batteryContributorVisual"><img class="batteryContributorImage" src="${image}" alt="${escapeHtml(name)}"></div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorMeta"><span>Power now</span><b>${fmtKw(power, '—')}</b></div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div></article>`;
+      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorMeta"><span>Power now</span><b>${fmtKw(power, '—')}</b></div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div></article>`;
     }
     battery(rt) {
       const pageVm = this.buildPageViewModel(rt, 'battery');
@@ -4946,7 +4949,7 @@
         console.error(`[HomeBrain Energy ${UX_VERSION}] ${this.view} render failed`, error);
         content = this.renderError(this.view, error);
       }
-      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
+      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${this.energyHardwareStyles()}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
 
       /* R3.62.0 canonical component framework and adaptive convergence */
       :host{--hi-space-1:4px;--hi-space-2:8px;--hi-space-3:12px;--hi-space-4:16px;--hi-radius-sm:8px;--hi-radius-md:12px;--hi-break-tablet:980px;--hi-break-phone:700px}
