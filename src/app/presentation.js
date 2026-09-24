@@ -9,7 +9,7 @@ const HB_ENERGY_NAVIGATION = Object.freeze([
     items: [
       { id:"overview", label:"Overview", view:"overview", title:"Energy Overview", description:"Your home energy system at a glance." },
       { id:"flow", label:"Flow", view:"flow", title:"Energy Flow", description:"See where energy is flowing right now." },
-      { id:"solar", label:"Solar", view:"solar-generation", title:"Solar", description:"Solar generation, inverters and the relationship with storage." },
+      { id:"solar", label:"Solar", view:"solar", title:"Solar", description:"Solar generation, arrays, inverters and the relationship with storage." },
       { id:"battery", label:"Home Battery", view:"battery", title:"Home Battery", description:"Storage state, capacity and contribution to the home." },
       { id:"consumers", label:"Consumers", view:"consumers", title:"Consumers", description:"Where energy is used and which loads are controllable." }
     ]
@@ -19,7 +19,7 @@ const HB_ENERGY_NAVIGATION = Object.freeze([
     label: "Intelligence",
     items: [
       { id:"strategy", label:"Strategy", view:"strategies", title:"Strategy", description:"Strategy overview, effective policy and current runtime state." },
-      { id:"operational-planning", label:"Operational Planning", view:"solar", title:"Operational Planning", description:"What should happen now and in the next hours." },
+      { id:"operational-planning", label:"Operational Planning", view:"operational-planning", title:"Operational Planning", description:"What should happen now and in the next hours." },
       { id:"tactical-planning", label:"Tactical Planning", view:"planning", title:"Tactical Planning", description:"How energy is allocated across today and tomorrow." },
       { id:"strategic-planning", label:"Strategic Planning", view:"strategic-planning", title:"Strategic Planning", description:"Longer-term energy goals, constraints and optimisation." }
     ]
