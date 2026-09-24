@@ -71,8 +71,12 @@ function resolveEnergyOwnedVisualRef(visualRef = "") {
   const ref = String(visualRef || "").trim();
   const entry = typeof rhiEnergyVisualEntryFromRef === "function" ? rhiEnergyVisualEntryFromRef(ref) : null;
   if (!entry) return null;
-  const url = entry.inline_asset === "byd_lvs20" && typeof HERO_IMAGE_BYD_LVS20 === "string"
-    ? HERO_IMAGE_BYD_LVS20
+  const inlineAssets = {
+    byd_lvs20: typeof HERO_IMAGE_BYD_LVS20 === "string" ? HERO_IMAGE_BYD_LVS20 : "",
+    solaredge_48v_9_6: typeof HERO_IMAGE_SOLAREDGE_92 === "string" ? HERO_IMAGE_SOLAREDGE_92 : ""
+  };
+  const url = entry.inline_asset
+    ? inlineAssets[String(entry.inline_asset || "")] || ""
     : rhiEnergyVisualAssetUrl(entry.package_path || "");
   if (!url) return null;
   return Object.freeze({
