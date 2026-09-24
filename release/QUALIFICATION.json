@@ -1,8 +1,8 @@
 {
-  "version": "3.95.4",
-  "candidate_tag": "v3.95.4",
+  "version": "3.96.0",
+  "candidate_tag": "v3.96.0",
   "candidate_sha": "pending",
-  "previous_release": "3.95.3",
+  "previous_release": "3.95.4",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -34,5 +34,8 @@
   "hero_status_vertical_stack": "NOT_EXECUTED",
   "flow_hero_family_alignment": "NOT_EXECUTED",
   "metering_hero_family_alignment": "NOT_EXECUTED",
-  "hero_crop_visibility": "NOT_EXECUTED"
+  "hero_crop_visibility": "NOT_EXECUTED",
+  "energy_public_v2_asset_profiles": "NOT_EXECUTED",
+  "energy_property_publication_evidence": "NOT_EXECUTED",
+  "flexible_asset_backend_state_ownership": "NOT_EXECUTED"
 }
