@@ -153,6 +153,14 @@
         "Energy UX visual preference persistence",
         "producer-owned visual_ref precedence"
       ]
+    },
+    "solar_hardware_experience": {
+      "owner": "validation/test_solar_hardware_experience.js",
+      "owns": [
+        "Solar hardware facts and visuals",
+        "panel to inverter to Home Bus explanatory path",
+        "non-invented solar versus grid battery source allocation"
+      ]
     }
   }
 }
