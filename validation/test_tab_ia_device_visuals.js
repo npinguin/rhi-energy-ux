@@ -83,9 +83,8 @@ const metering = method("flexibleLoadMeteringTable");
 assert.match(metering, /meteringAssetIdentity/);
 assert.match(metering, /this\.assetVisual\(asset/);
 
-const value = method("value");
-assert.match(value, /this\.assetVisual\(identity\.asset/);
-assert.match(value, /this\.assetVisual\(asset/);
+assert.match(app, /valueAssetIdentity[^\n]*this\.assetVisual\(identity\.asset/);
+assert.match(app, /flexPricingRow[^\n]*this\.assetVisual\(asset/);
 
 assert.match(catalog, /solar_inverter\.solaredge_rwb_10k[\s\S]*package_path:"energy\/solaredge_rwb_10k\.svg"/);
 assert.ok(fs.existsSync("src/assets/energy/solaredge_rwb_10k.svg"), "missing crisp RWB SVG");
