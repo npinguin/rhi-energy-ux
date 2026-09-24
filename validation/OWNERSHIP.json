@@ -169,6 +169,15 @@
         "Home Battery contributor image containment",
         "Home Battery hero preservation during body-only fixes"
       ]
+    },
+    "solar_information_architecture": {
+      "owner": "validation/test_solar_information_architecture.js",
+      "owns": [
+        "Flow excludes hardware inventory",
+        "Planning excludes hardware inventory",
+        "Solar owns array inverter battery and support-device hierarchy",
+        "Solar zone panel visual choices"
+      ]
     }
   }
 }
