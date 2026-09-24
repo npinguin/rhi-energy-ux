@@ -50,5 +50,9 @@
   "energy_logical_visual_catalog": "NOT_EXECUTED",
   "energy_type_safe_image_picker": "NOT_EXECUTED",
   "energy_profile_visual_defaults": "NOT_EXECUTED",
-  "energy_visual_preference_persistence": "NOT_EXECUTED"
+  "energy_visual_preference_persistence": "NOT_EXECUTED",
+  "solar_hardware_facts_and_images": "NOT_EXECUTED",
+  "solar_panel_inverter_battery_configuration_status": "NOT_EXECUTED",
+  "solar_panel_to_home_bus_explanation": "NOT_EXECUTED",
+  "solar_battery_source_split_truthfulness": "NOT_EXECUTED"
 }
