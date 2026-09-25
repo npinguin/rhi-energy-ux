@@ -187,6 +187,15 @@
         "Energy and Mobility device visual coverage across tabs",
         "SE10K RWB crisp artwork replacement"
       ]
+    },
+    "gas_insights_tab": {
+      "owner": "validation/test_gas_insights_tab.js",
+      "owns": [
+        "Gas is final Energy tab",
+        "Gas hero asset and house-style header",
+        "canonical gas meter identity",
+        "HA-native statistics graph host"
+      ]
     }
   }
 }
