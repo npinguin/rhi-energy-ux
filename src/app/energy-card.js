@@ -3880,7 +3880,9 @@
       return this.tabExperienceHeader(rt,'metering',pageVm) + this.meteringCleanPage(vm);
     }
     retrospectiveState() {
-      return this.runtime().contractGateway().state('retrospective');
+      // E0.15.47/E0.15.48 do not publish a canonical retrospective domain.
+      // Fail closed instead of reading the retired V1 retrospective entity.
+      return null;
     }
     retrospectiveParsed(value, fallback) {
       if (value === null || value === undefined || value === '') return fallback;
