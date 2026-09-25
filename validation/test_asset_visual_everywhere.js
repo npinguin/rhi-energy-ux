@@ -6,12 +6,13 @@ for (const token of [
   'valueConsumerRow',
   'this.assetVisual(identity.asset',
   "this.assetVisual(asset,{size:'sm'",
-  'consumer_id: row.consumer_id',
-  'visual_ref: row.visual_ref'
+  'const candidateIds = [',
+  'const canonicalId = String(firstDefined(match.asset_id',
+  'asset_id: canonicalId || row.asset_id ||'
 ]) {
   if(!card.includes(token)) throw new Error('missing canonical visual identity path: '+token);
 }
 if (card.includes("exceptions.map(x=>escapeHtml(x.name))")) {
   throw new Error('exception summary regressed to text-only asset names');
 }
-console.log('PASS canonical pictures across Energy Value and consumer allocation');
+console.log('PASS canonical asset identity drives pictures across Energy Value and consumer allocation');
