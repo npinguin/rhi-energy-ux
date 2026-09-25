@@ -340,13 +340,17 @@
         showMainWarning: backendStatus.showMainWarning
       };
     }
+    publicV2() {
+      if (!this._publicV2) this._publicV2 = readEnergyPublicV2(this.contractGateway());
+      return this._publicV2;
+    }
+    assetProjection(assetId) {
+      return createEnergyAssetProjection(this.publicV2(), assetId);
+    }
     assets() {
       if (this._assets) return this._assets;
-      const entityId = this.interfaceEntity('assets');
-      const attrs = this.attrs(entityId);
-      let assets = parseMaybeJson(attrs.assets_json, null) || parseMaybeJson(attrs.assets, null) || parseMaybeJson(attrs.asset_index_json, null) || [];
-      if (!Array.isArray(assets) && assets && typeof assets === 'object') assets = Object.values(assets);
-      this._assets = Array.isArray(assets) ? assets : [];
+      const v2 = this.publicV2();
+      this._assets = v2.available ? [...v2.objects] : [];
       return this._assets;
     }
     asset(assetId) { return this.assets().find(a => String(a.asset_id || '') === String(assetId)) || null; }
@@ -745,11 +749,7 @@
     }
 
     relationships() {
-      const entityId = this.interfaceEntity('relationships');
-      const attrs = this.attrs(entityId);
-      let rows = parseMaybeJson(attrs.relationships, null) || parseMaybeJson(attrs.relationships_json, null) || parseMaybeJson(attrs.relationships_by_id, null) || [];
-      if (!Array.isArray(rows) && rows && typeof rows === 'object') rows = Object.values(rows);
-      return Array.isArray(rows) ? rows : [];
+      return this.publicV2().available ? [...this.publicV2().relationships] : [];
     }
     flowRelationships() {
       return this.relationships().filter(r => String(r.relationship_type || '').toLowerCase() === 'flows_to');
@@ -759,8 +759,8 @@
     }
     containsChildren(parentAssetId) {
       const relChildren = this.relationships()
-        .filter(r => String(r.relationship_type || '').toLowerCase() === 'contains' && String(r.from_asset_id || '') === String(parentAssetId))
-        .map(r => String(r.to_asset_id || '')).filter(Boolean);
+        .filter(r => String(r.relationship_type || '').toLowerCase() === 'contains' && String(r.source_asset_id || r.from_asset_id || '') === String(parentAssetId))
+        .map(r => String(r.target_asset_id || r.to_asset_id || '')).filter(Boolean);
       const assetChildren = this.assets().filter(a => String(a.parent_asset_id || '') === String(parentAssetId)).map(a => String(a.asset_id || '')).filter(Boolean);
       return [...new Set([...relChildren, ...assetChildren])];
     }
