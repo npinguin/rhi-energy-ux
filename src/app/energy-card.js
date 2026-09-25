@@ -4442,108 +4442,13 @@
       return '';
     }
     diagnosticSpec(tab) {
-      const specs = {
-        overview: [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces and compatible version used by this screen'],
-          [UX_INTERFACES.overviewExperience,'Overview explanation','Provides the product-safe overview summary'],
-          [UX_INTERFACES.solar,'Solar','Live solar production'],
-          [UX_INTERFACES.consumption,'Home demand','Current household consumption'],
-          [UX_INTERFACES.grid,'Grid','Import and export'],
-          [UX_INTERFACES.battery,'Home Battery','Home Battery state and flow'],
-          [UX_INTERFACES.intelligence,'Guidance','Recommendation and reason']
-        ],
-        outlook: [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.outlook,'Outlook','Today and Tomorrow summaries'],
-          [UX_INTERFACES.forecast,'Forecast','Solar forecast facts'],
-          [UX_INTERFACES.planning,'Planning facts','Timing, targets and feasibility'],
-          [UX_INTERFACES.planningExperience,'Planning explanation','Product-safe wording and next action']
-        ],
-        planning: [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.planning,'Planning timeline','Authoritative Today and Tomorrow planning buckets'],
-          [UX_INTERFACES.flexibleAssets,'Flexible assets','Asset names, availability and energy need'],
-          [UX_INTERFACES.outlook,'Outlook projection','Projected graph and horizon context']
-        ],
-        retrospective: [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.retrospective,'Retrospective','Canonical score, evidence coverage, prerequisites, objectives and recommendations']
-        ],
-        flow: [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.assets,'Assets','Canonical energy assets'],
-          [UX_INTERFACES.relationships,'Connections','Physical and logical relationships'],
-          [UX_INTERFACES.solar,'Solar','Solar flow'],
-          [UX_INTERFACES.consumption,'Home demand','Household flow'],
-          [UX_INTERFACES.grid,'Grid','Import and export flow'],
-          [UX_INTERFACES.battery,'Home Battery','Home Battery charge and discharge flow'],
-          [UX_INTERFACES.connection,'Charging connections','Visible charger assignments and measured power']
-        ],
-        'solar-generation': [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.solar,'Solar','Live solar generation'],
-          [UX_INTERFACES.forecast,'Forecast','Expected solar generation'],
-          [UX_INTERFACES.battery,'Home Battery','Storage relationship context']
-        ],
-        solar: [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.solar,'Solar','Production and energy'],
-          [UX_INTERFACES.forecast,'Forecast','Expected production'],
-          [UX_INTERFACES.flexibleAssets,'Flexible assets','Controllable loads and storage'],
-          [UX_INTERFACES.planning,'Planning facts','Targets, timing and feasibility'],
-          [UX_INTERFACES.planningExperience,'Planning explanation','Product-safe plan wording'],
-          [UX_INTERFACES.commands,'Actions','Available operational commands']
-        ],
-        battery: [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.battery,'Home Battery','Measured Home Battery state'],
-          [UX_INTERFACES.strategyProfiles,'Configured strategy','Requested battery policy'],
-          [UX_INTERFACES.strategyEffective,'Effective strategy','Policy currently in effect'],
-          [UX_INTERFACES.planning,'Planning','Relevant storage plan'],
-          [UX_INTERFACES.commands,'Actions','Available storage commands']
-        ],
-        consumers: [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.consumer,'Consumers','Identity and measured facts'],
-          [UX_INTERFACES.consumerMix,'Energy mix','Source contribution and attribution'],
-          [UX_INTERFACES.flexibleAssets,'Controllability','Requested settings and readiness'],
-          [UX_INTERFACES.value,'Financial attribution','Consumer value and cost allocation'],
-          [UX_INTERFACES.commands,'Actions','Meaningful available commands']
-        ],
-        strategies: [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.strategyProfiles,'Configured strategy','Editable strategy profiles'],
-          [UX_INTERFACES.strategyEffective,'Effective strategy','Policy currently applied'],
-          [UX_INTERFACES.planning,'Planning','Resulting structured plan'],
-          [UX_INTERFACES.commands,'Actions','Available strategy and asset commands']
-        ],
-        metering: [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.metering,'Measurements','Selected period, totals and quality'],
-          [UX_INTERFACES.commands,'Reset action','Available baseline-remediation command']
-        ],
-        intelligence: [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.intelligence,'Guidance','Recommendation, reason and affected assets'],
-          [UX_INTERFACES.planningExperience,'Plan explanation','Product-safe planning context'],
-          [UX_INTERFACES.activity,'Activity','Current operational context']
-        ],
-        'strategic-planning': [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.intelligence,'Intelligence','Current strategy and runtime context'],
-          [UX_INTERFACES.planning,'Planning','Planning context available for future strategic projection'],
-          [UX_INTERFACES.strategyEffective,'Effective strategy','Policies currently in effect']
-        ],
-        value: [
-          [RELEASE_ENTITY,'Release compatibility','Publishes the interfaces used by this screen'],
-          [UX_INTERFACES.value,'Financial result','Historical and current-period accounting'],
-          [UX_INTERFACES.pricing,'Pricing','Tariffs and export compensation'],
-          [UX_INTERFACES.metering,'Period context','Selected accounting period and measurements'],
-          [UX_INTERFACES.consumerMix,'Consumer allocation','Energy attribution used by Value']
-        ]
-      };
-      return specs[tab] || specs.overview;
+      const label=human(tab || 'overview');
+      return [
+        [RELEASE_ENTITY,'Release compatibility','Candidate identity, backend baseline and release governance evidence'],
+        [UX_INTERFACES.publicV2,'Energy Public V2',`${label} product truth through the single canonical Energy contract`]
+      ];
     }
+
     diagnosticEntity(rt, entityId, label, purpose) {
       const raw = rt.rawState(entityId);
       const allowed = rt.isAllowed(entityId);
