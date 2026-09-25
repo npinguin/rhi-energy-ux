@@ -15,7 +15,13 @@ function readEnergyPublicV2(gateway) {
   };
   const objects = array(attrs.objects);
   const profiles = array(attrs.profiles);
-  const relationships = array(attrs.relationships);
+  const relationships = array(attrs.relationships).map(row => Object.freeze({
+    ...row,
+    from_asset_id:String(row.from_asset_id || row.source_asset_id || ''),
+    to_asset_id:String(row.to_asset_id || row.target_asset_id || ''),
+    source_asset_id:String(row.source_asset_id || row.from_asset_id || ''),
+    target_asset_id:String(row.target_asset_id || row.to_asset_id || '')
+  }));
   const commands = array(attrs.commands);
   const planning = object(attrs.planning);
   const intelligence = object(attrs.intelligence);
