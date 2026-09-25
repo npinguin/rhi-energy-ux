@@ -24,9 +24,6 @@ function readEnergyPublicV2(gateway) {
   }));
   const commands = array(attrs.commands);
   const activity = array(attrs.activity);
-  const flexibleAssets = array(attrs.flexible_assets);
-  const connections = array(attrs.connections);
-  const metering = object(attrs.metering);
   const planning = object(attrs.planning);
   const intelligence = object(attrs.intelligence);
   const overview = object(attrs.overview);
@@ -34,6 +31,12 @@ function readEnergyPublicV2(gateway) {
   const valueAccounting = object(attrs.value_accounting);
   const layers = object(attrs.layers);
   const summary = object(attrs.summary);
+  const flexibleAssets = Object.freeze(
+    objects
+      .filter(row => String(row.asset_type || row.object_class || '').toLowerCase() === 'flexible_asset')
+      .map(row => Object.freeze({ ...row }))
+  );
+  const planningObjects = Object.freeze(array(layers.planning_objects));
   const objectById = new Map(objects.map(row => [String(row.asset_id || ''), row]).filter(([id]) => id));
   const profileById = new Map(profiles.map(row => [String(row.profile_id || ''), row]).filter(([id]) => id));
 
@@ -110,10 +113,9 @@ function readEnergyPublicV2(gateway) {
     configuration,
     valueAccounting,
     activity,
-    flexibleAssets,
-    connections,
-    metering,
     layers,
+    flexibleAssets,
+    planningObjects,
     commands,
     objectById,
     profileById,
