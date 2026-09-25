@@ -10,6 +10,7 @@ required = [
     root/'src/domain/planning/planning-view-model.js',
 ]
 failures=[]
+source_card = (root/'src/app/energy-card.js').read_text(encoding='utf-8')
 for path in required:
     if not path.is_file(): failures.append(f'missing:{path.relative_to(root)}')
 planning_start=main.find('    planning(rt) {')
@@ -78,7 +79,6 @@ if failures:
 print('PASS public interface ownership: one Energy product entrypoint')
 
 # Canonical V2 closure: migrated product meanings may not regress to V1 owners.
-source_card = (root/'src/app/energy-card.js').read_text(encoding='utf-8')
 current_model = (root/'src/domain/models/current-energy-view-model.js').read_text(encoding='utf-8')
 if "const entityId = this.interfaceEntity('assets')" in source_card:
     failures.append('assets_regressed_to_v1_asset_index')
