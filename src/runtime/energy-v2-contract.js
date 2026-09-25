@@ -24,6 +24,9 @@ function readEnergyPublicV2(gateway) {
   }));
   const commands = array(attrs.commands);
   const activity = array(attrs.activity);
+  const flexibleAssets = array(attrs.flexible_assets);
+  const connections = array(attrs.connections);
+  const metering = object(attrs.metering);
   const planning = object(attrs.planning);
   const intelligence = object(attrs.intelligence);
   const overview = object(attrs.overview);
@@ -107,6 +110,9 @@ function readEnergyPublicV2(gateway) {
     configuration,
     valueAccounting,
     activity,
+    flexibleAssets,
+    connections,
+    metering,
     layers,
     commands,
     objectById,
