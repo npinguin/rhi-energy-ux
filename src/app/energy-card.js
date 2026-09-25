@@ -250,31 +250,55 @@
     }
     allRows() {
       if (this._rows) return this._rows;
+      const v2 = this.publicV2();
       const result = new Map();
-      this.publicUxEntities().forEach(entityId => {
-        this.rowsForEntity(entityId).forEach(row => {
-          const key = String(row.key || row.property_key || '');
-          if (key && !result.has(key)) result.set(key, { entity_id: entityId, ...row, key });
+      const add = row => {
+        const key = String(row?.property_id || row?.property_key || row?.key || '');
+        if (!key || result.has(key)) return;
+        result.set(key, {
+          entity_id:v2.envelope.entityId,
+          ...row,
+          property_id:String(row.property_id || key),
+          property_key:key,
+          key
         });
-      });
+      };
+      (v2.allPropertyRows || []).forEach(add);
+
+      // Preserve the existing view API without creating another truth source:
+      // intelligence fields are direct projections of the canonical V2 object.
+      Object.entries(v2.intelligence || {}).forEach(([key,value]) => add({
+        asset_id:'energy_intelligence',
+        property_id:`energy_intelligence.${key}`,
+        property_key:`energy_intelligence.${key}`,
+        key:`energy_intelligence.${key}`,
+        value,
+        availability:value === undefined || value === null ? 'UNAVAILABLE' : 'AVAILABLE',
+        quality:'authoritative',
+        source_type:'canonical_v2_intelligence'
+      }));
       this._rows = result;
       return result;
     }
     propertyRows() { return [...this.allRows().values()]; }
     row(key) {
-      const entityId = this.entityForKey(key);
-      if (!entityId) return { key, value: null, unit: '', health: 'NOT_PUBLISHED', quality: 'missing', missing: true };
-      const hit = this.rowsForEntity(entityId).find(r => String(r.key || r.property_key) === String(key));
-      return hit
-        ? { entity_id: entityId, ...hit, key }
-        : { key, entity_id: entityId, value: null, unit: '', health: 'NOT_PUBLISHED', quality: 'missing', missing: true };
+      const wanted=String(key || '');
+      return this.allRows().get(wanted)
+        || { key:wanted, property_id:wanted, property_key:wanted, value:null, unit:'', health:'NOT_PUBLISHED', quality:'missing', missing:true };
     }
     editablePropertyRows() {
-      const entityId = this.interfaceEntity('editableProperties');
-      return entityId ? this.rowsForEntity(entityId).map(row => ({ entity_id:entityId, ...row, key:String(row.property_id || row.key || row.property_key || '') })) : [];
+      return (this.publicV2().allPropertyRows || [])
+        .filter(row => row?.editable === true || row?.write_supported === true || row?.write?.supported === true)
+        .map(row => ({
+          entity_id:this.publicV2().envelope.entityId,
+          ...row,
+          key:String(row.property_id || row.property_key || row.key || ''),
+          property_key:String(row.property_key || row.property_id || row.key || ''),
+          property_id:String(row.property_id || row.property_key || row.key || '')
+        }));
     }
     editableProperty(propertyId) {
-      const wanted = String(propertyId || '');
+      const wanted=String(propertyId || '');
       return this.editablePropertyRows().find(row => String(row.property_id || row.key || row.property_key || '') === wanted) || null;
     }
     value(key, fallback = null) { return rowValue(this.row(key), fallback); }
@@ -381,12 +405,7 @@
       return this.commands().filter(command => this.commandVisible(command) && (!targetAssetId || String(command.target_asset_id || '') === String(targetAssetId)));
     }
     activities() {
-      if (this._activities) return this._activities;
-      const entityId = this.interfaceEntity('activity');
-      const attrs = this.attrs(entityId);
-      let activities = parseMaybeJson(attrs.activities, null) || parseMaybeJson(attrs.activities_json, null) || parseMaybeJson(attrs.activities_by_id, null) || [];
-      if (!Array.isArray(activities) && activities && typeof activities === 'object') activities = Object.values(activities);
-      this._activities = Array.isArray(activities) ? activities : [];
+      if (!this._activities) this._activities = [...(this.publicV2().activity || [])];
       return this._activities;
     }
     activity(type) { return this.activities().find(a => String(a.activity_type || '').toLowerCase() === String(type).toLowerCase()) || null; }
@@ -408,13 +427,8 @@
       };
     }
     overviewExperience() {
-      const entityId = this.interfaceEntity('overviewExperience');
-      const attrs = this.attrs(entityId);
-      const payload = parseMaybeJson(attrs.experience_json, null)
-        || parseMaybeJson(attrs.summary_json, null)
-        || parseMaybeJson(attrs.overview_json, null)
-        || attrs;
-      return entityId ? { entity_id: entityId, ...objectFrom(payload) } : null;
+      const v2=this.publicV2();
+      return v2.available ? { entity_id:v2.envelope.entityId, ...objectFrom(v2.overview) } : null;
     }
     pilotReadiness() {
       const entityId = this.interfaceEntity('pilotReadiness');
@@ -426,23 +440,10 @@
     }
     planningExperienceRows() {
       if (this._planningExperienceRows) return this._planningExperienceRows;
-      const entityId = this.interfaceEntity('planningExperience');
-      const attrs = this.attrs(entityId);
-      let rows = parseMaybeJson(attrs.rows_json, null)
-        || parseMaybeJson(attrs.experiences_json, null)
-        || parseMaybeJson(attrs.asset_experiences_json, null)
-        || parseMaybeJson(attrs.rows, null)
-        || parseMaybeJson(attrs.experiences, null)
-        || [];
-      const byId = parseMaybeJson(attrs.experience_by_asset_id, attrs.experience_by_asset_id || null)
-        || parseMaybeJson(attrs.rows_by_asset_id, attrs.rows_by_asset_id || null);
-      if ((!rows || (Array.isArray(rows) && !rows.length)) && byId && typeof byId === 'object' && !Array.isArray(byId)) {
-        rows = Object.entries(byId).map(([asset_id, row]) => ({ asset_id, ...objectFrom(row) }));
-      }
-      if (!Array.isArray(rows) && rows && typeof rows === 'object') rows = Object.entries(rows).map(([asset_id, row]) => ({ asset_id, ...objectFrom(row) }));
-      this._planningExperienceRows = (Array.isArray(rows) ? rows : []).map((row, index) => ({
-        experience_id: row.experience_id || row.id || row.asset_id || `planning_experience_${index + 1}`,
-        entity_id: entityId,
+      const v2=this.publicV2();
+      this._planningExperienceRows=(v2.layers?.planning_objects || []).map((row,index)=>({
+        experience_id:row.experience_id || row.id || row.asset_id || `planning_experience_${index+1}`,
+        entity_id:v2.envelope.entityId,
         ...objectFrom(row)
       }));
       return this._planningExperienceRows;
@@ -678,56 +679,15 @@
 
     planningIndexRows() {
       if (this._planningOutcomes) return this._planningOutcomes;
-      const entityId = this.interfaceEntity('planning');
-      const attrs = this.attrs(entityId);
-      let rows = parseMaybeJson(attrs.planning_assets_json, null)
-        || parseMaybeJson(attrs.planning_assets, null)
-        || parseMaybeJson(attrs.planning_outcomes_json, null)
-        || parseMaybeJson(attrs.planning_outcomes, null)
-        || parseMaybeJson(attrs.asset_plans_json, null)
-        || parseMaybeJson(attrs.asset_plans, null)
-        || parseMaybeJson(attrs.plans_json, null)
-        || parseMaybeJson(attrs.plans, null)
-        || parseMaybeJson(attrs.energy_planning_json, null)
-        || parseMaybeJson(attrs.energy_planning, null)
-        || parseMaybeJson(attrs.rows_json, null)
-        || parseMaybeJson(attrs.rows, null)
-        || parseMaybeJson(attrs.assets_json, null)
-        || parseMaybeJson(attrs.assets, null)
-        || [];
-      if (!Array.isArray(rows) && rows && typeof rows === 'object') rows = Object.values(rows);
-      rows = Array.isArray(rows) ? rows : [];
-
-      // Support property-style planning projection without making the UX infer planning.
-      // The backend still owns the outcome; UX only groups published energy_planning.* fields.
-      const props = objectFrom(parseMaybeJson(attrs.properties_by_key, attrs.properties_by_key || {}));
-      const byAsset = new Map();
-      Object.entries(props || {}).forEach(([key, raw]) => {
-        const value = (raw && typeof raw === 'object' && raw.value !== undefined) ? raw.value : raw;
-        const planningField = '(state|status|reason|intent|next_action|next_planned_action|plan_execution_allowed|blocked_reason|waiting_reason|waiting_reason_code|expected_start_condition|source|eligible|considered|planned|waiting|active|selected_order|minimum_ready_state|preferred_ready_state|maximum_ready_state|confidence_state|grid_use_state|selected_route|selected_asset_id|selected_goal_level|user_summary_label|user_reason_label|engineer_reason|expected_today|expected_today_status|expected_today_reason|eta_minutes|ready_in_minutes|eta_to_target_minutes|expected_ready_at|ready_at|goal_label|goal_type|minimum_target_value|preferred_target_value|maximum_useful_value|target_unit|deadline|deadline_time|strictness|source_route|route_label|selected_power_kw|current_power_kw|energy_needed_kwh|need_kwh|need_state|planned_today_kwh|planned_tomorrow_kwh|planned_horizon_kwh|unresolved_horizon_kwh|today_status|today_label|reason_code|what_text|why_text)';
-        const match = String(key).match(new RegExp(`^(.+)\\.energy_planning\\.${planningField}$`, 'i'))
-          || String(key).match(new RegExp(`^energy_planning\\.(.+)\\.${planningField}$`, 'i'));
-        if (!match) return;
-        const assetId = match[1];
-        const field = match[2];
-        const row = byAsset.get(assetId) || { asset_id: assetId };
-        row[field] = value;
-        byAsset.set(assetId, row);
-      });
-      rows.push(...byAsset.values());
-
-      this._planningOutcomes = rows.map((row, i) => {
-        const nested = objectFrom(row.energy_planning || row.planning || row.asset_plan || {});
-        const sourceRoute = objectFrom(row.source_route || nested.source_route || {});
-        return {
-          planning_id: row.planning_id || row.id || row.plan_id || `planning_${i + 1}`,
-          entity_id: entityId,
-          ...row,
-          ...nested,
-          source_route: Object.keys(sourceRoute).length ? sourceRoute : (row.source_route || nested.source_route),
-          asset_id: row.asset_id || row.target_asset_id || row.flexible_asset_id || row.planning_target_asset_id || nested.asset_id
-        };
-      }).filter(row => row.asset_id);
+      const v2=this.publicV2();
+      this._planningOutcomes=(v2.layers?.planning_objects || [])
+        .map((row,i)=>({
+          planning_id:row.planning_id || row.id || row.plan_id || `planning_${i+1}`,
+          entity_id:v2.envelope.entityId,
+          ...objectFrom(row),
+          asset_id:row.asset_id || row.target_asset_id || row.flexible_asset_id || row.planning_target_asset_id
+        }))
+        .filter(row=>row.asset_id);
       return this._planningOutcomes;
     }
     planningOutcomeFor(assetId) {
@@ -1124,8 +1084,18 @@
     }
     valuePeriods() {
       if (this._valuePeriods) return this._valuePeriods;
-      const entityId = this.interfaceEntity('value');
-      this._valuePeriods = entityId ? this.periodRows(entityId) : [];
+      const v2=this.publicV2();
+      const periods=objectFrom(v2.valueAccounting?.periods || {});
+      const order={today:1,day:1,week:2,month:3,year:4};
+      const labels={today:'Today',day:'Today',week:'This week',month:'This month',year:'This year'};
+      this._valuePeriods=Object.entries(periods).map(([period_id,row])=>({
+        entity_id:v2.envelope.entityId,
+        period_id:String(period_id).toLowerCase(),
+        label:labels[String(period_id).toLowerCase()] || human(period_id),
+        selector_order:order[String(period_id).toLowerCase()] || 99,
+        summary:{ cost:objectFrom(row), quality:{ financial:row?.quality || 'UNKNOWN' } },
+        ...objectFrom(row)
+      })).sort((a,b)=>(a.selector_order||99)-(b.selector_order||99));
       return this._valuePeriods;
     }
     meteringRemediations() {
