@@ -387,12 +387,16 @@
       return v2.available ? { entity_id:v2.envelope.entityId, ...objectFrom(v2.overview) } : null;
     }
     pilotReadiness() {
-      const entityId = this.interfaceEntity('pilotReadiness');
-      const attrs = this.attrs(entityId);
-      const payload = parseMaybeJson(attrs.readiness_json, null)
-        || parseMaybeJson(attrs.summary_json, null)
-        || attrs;
-      return entityId ? { entity_id: entityId, state: this.state(entityId)?.state, ...objectFrom(payload) } : null;
+      const v2=this.publicV2();
+      const coverage=this.coverage();
+      return {
+        entity_id:v2.envelope.entityId,
+        state:v2.available ? (coverage.complete ? 'READY' : 'PARTIAL') : 'UNAVAILABLE',
+        contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+        contract_version:v2.contractVersion,
+        release:v2.release,
+        coverage
+      };
     }
     planningExperienceRows() {
       if (this._planningExperienceRows) return this._planningExperienceRows;
@@ -411,47 +415,47 @@
     consumerMixRows() {
       if (this._consumerMixRows) return this._consumerMixRows;
       const v2=this.publicV2();
-      const selectedId=String(v2.metering?.selected_period_id || 'today').toLowerCase();
-      const period=objectFrom(v2.metering?.periods?.[selectedId] || {});
-      const byAsset=objectFrom(period.flexible_assets_kwh || {});
       this._consumerMixRows=(v2.flexibleAssets || []).map((raw,index)=>{
         const row=objectFrom(raw);
         const assetId=String(row.asset_id || `flexible_${index+1}`);
+        const projected=this.assetProjection(assetId);
+        const power=asNumber(projected?.property?.('power_kw')?.value ?? row.power_kw);
+        const need=asNumber(projected?.property?.('energy_to_target_kwh')?.value ?? row.energy_to_target_kwh);
         return {
           mix_row_id:assetId,
           entity_id:v2.envelope.entityId,
           ...row,
           asset_id:assetId,
           display_name:row.display_name || this.assetName(assetId),
-          category:row.asset_type || 'flexible_asset',
+          category:row.asset_type || row.object_class || 'flexible_asset',
           controllability:'FLEXIBLE',
-          current_power_kw:asNumber(row.power_kw),
-          energy_today_kwh:asNumber(byAsset[assetId]),
-          energy_need_kwh:asNumber(row.energy_to_target_kwh),
-          availability:row.availability_state || 'UNAVAILABLE',
+          current_power_kw:power,
+          energy_today_kwh:null,
+          energy_need_kwh:need,
+          availability:row.availability_state || row.health || 'UNAVAILABLE',
           visible:true,
           flexible:true,
-          source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.flexible_assets','RHI_ENERGY_PUBLIC_CONTRACT_V2.metering']
+          source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.objects'],
+          metering_state:'UNAVAILABLE',
+          metering_reason:'Canonical per-asset period energy is not published by E0.15.47.'
         };
       });
       return this._consumerMixRows;
     }
     consumerMixSummary() {
       if (this._consumerMixSummary) return this._consumerMixSummary;
-      const v2=this.publicV2();
-      const selectedId=String(v2.metering?.selected_period_id || 'today').toLowerCase();
-      const period=objectFrom(v2.metering?.periods?.[selectedId] || {});
       const rows=this.consumerMixRows();
       const power=rows.map(row=>asNumber(row.current_power_kw));
       const need=rows.map(row=>asNumber(row.energy_need_kwh)).filter(value=>value!==null);
       this._consumerMixSummary={
-        current_power_kw:power.some(value=>value===null) ? null : power.reduce((sum,value)=>sum+(value||0),0),
+        current_power_kw:power.length && power.every(value=>value!==null) ? power.reduce((sum,value)=>sum+value,0) : null,
         known_energy_need_kwh:need.length ? need.reduce((sum,value)=>sum+value,0) : null,
         asset_count:rows.length,
-        energy_kwh:asNumber(period.flexible_loads_energy_in_kwh),
-        energy_by_asset_kwh:objectFrom(period.flexible_assets_kwh || {}),
-        health:String(period.quality || (rows.length ? 'AVAILABLE' : 'UNAVAILABLE')),
-        source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.flexible_assets','RHI_ENERGY_PUBLIC_CONTRACT_V2.metering']
+        energy_kwh:null,
+        energy_by_asset_kwh:{},
+        health:'PARTIAL',
+        reason:'Canonical current flexible-asset truth is available; category/per-asset period energy is not published by E0.15.47.',
+        source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.objects']
       };
       return this._consumerMixSummary;
     }
@@ -474,21 +478,6 @@
       });
     }
 
-    flexibleProjectionRows(entityId) {
-      const attrs = this.attrs(entityId);
-      let rows = parseMaybeJson(attrs.flexible_assets, null)
-        || parseMaybeJson(attrs.flexible_assets_json, null)
-        || parseMaybeJson(attrs.storage_assets, null)
-        || parseMaybeJson(attrs.storage_assets_json, null)
-        || parseMaybeJson(attrs.load_assets, null)
-        || parseMaybeJson(attrs.load_assets_json, null)
-        || parseMaybeJson(attrs.assets, null)
-        || parseMaybeJson(attrs.assets_json, null)
-        || parseMaybeJson(attrs.flexible_asset_rows, null)
-        || [];
-      if (!Array.isArray(rows) && rows && typeof rows === 'object') rows = Object.values(rows);
-      return Array.isArray(rows) ? rows : [];
-    }
     flexibleRuntimePropertyRow(assetId, names) {
       const exact = [];
       names.forEach(name => {
@@ -787,59 +776,6 @@
       return 'ok';
     }
 
-    horizonRows(entityId, fallbackKind = 'horizon') {
-      const attrs = this.attrs(entityId);
-      let rows = parseMaybeJson(attrs.horizons_json, null)
-        || parseMaybeJson(attrs.horizons, null)
-        || parseMaybeJson(attrs.outlook_horizons_json, null)
-        || parseMaybeJson(attrs.outlook_horizons, null)
-        || parseMaybeJson(attrs.metering_horizons_json, null)
-        || parseMaybeJson(attrs.metering_horizons, null)
-        || parseMaybeJson(attrs.rows_json, null)
-        || parseMaybeJson(attrs.rows, null)
-        || [];
-      const byId = parseMaybeJson(attrs.horizons_by_id, attrs.horizons_by_id || null);
-      if ((!rows || (Array.isArray(rows) && !rows.length)) && byId && typeof byId === 'object' && !Array.isArray(byId)) {
-        rows = Object.entries(byId).map(([horizon_id, row]) => ({ horizon_id, ...objectFrom(row) }));
-      }
-      if (!Array.isArray(rows) && rows && typeof rows === 'object') rows = Object.entries(rows).map(([horizon_id, row]) => ({ horizon_id, ...objectFrom(row) }));
-      rows = Array.isArray(rows) ? rows : [];
-      return rows.map((raw, index) => {
-        const row = objectFrom(raw);
-        const nested = objectFrom(row.horizon || row.outlook || row.metering);
-        const summaryRaw = objectFrom(firstDefined(row.summary, nested.summary, {}));
-        const summary = {
-          mode: objectFrom(firstDefined(summaryRaw.mode, row.mode, nested.mode, {})),
-          supply: objectFrom(firstDefined(summaryRaw.supply, row.supply, nested.supply, {})),
-          demand: objectFrom(firstDefined(summaryRaw.demand, row.demand, nested.demand, {})),
-          balance: objectFrom(firstDefined(summaryRaw.balance, row.balance, nested.balance, {})),
-          candidates: objectFrom(firstDefined(summaryRaw.candidates, row.candidates, nested.candidates, {})),
-          quality: objectFrom(firstDefined(summaryRaw.quality, row.quality, nested.quality, {})),
-          measured: objectFrom(firstDefined(summaryRaw.measured, row.measured, nested.measured, {})),
-          expected: objectFrom(firstDefined(summaryRaw.expected, row.expected, nested.expected, {})),
-          cost: objectFrom(firstDefined(summaryRaw.cost, row.cost, nested.cost, {})),
-          source_refs: firstDefined(summaryRaw.source_refs, row.source_refs, nested.source_refs, [])
-        };
-        const id = String(firstDefined(row.horizon_id, row.id, row.key, nested.horizon_id, `D${index}`));
-        const label = firstDefined(row.label, row.display_name, row.name, nested.label, id === 'D0' ? 'Today' : id === 'D1' ? 'Tomorrow' : human(id));
-        return {
-          entity_id: entityId,
-          horizon_id: id,
-          label,
-          start_time: firstDefined(row.start_time, row.start, nested.start_time, ''),
-          end_time: firstDefined(row.end_time, row.end, nested.end_time, ''),
-          timezone: firstDefined(row.timezone, row.tz, nested.timezone, ''),
-          graph_support: asBool(firstDefined(row.graph_support, nested.graph_support, attrs.graph_support, false), false),
-          bucket_support: asBool(firstDefined(row.bucket_support, nested.bucket_support, attrs.bucket_support, false), false),
-          contract_kind: fallbackKind,
-          ...row,
-          ...nested,
-          horizon_id: id,
-          label,
-          summary
-        };
-      }).filter(row => row.horizon_id);
-    }
     outlookHorizons() {
       if (!this._outlookHorizons) this._outlookHorizons=this.planningHorizons();
       return this._outlookHorizons;
@@ -850,78 +786,22 @@
       }
       return this._meteringHorizons;
     }
-    periodRows(entityId) {
-      const attrs = this.attrs(entityId);
-      let rows = parseMaybeJson(attrs.periods_json, null)
-        || parseMaybeJson(attrs.periods, null)
-        || parseMaybeJson(attrs.metering_periods_json, null)
-        || parseMaybeJson(attrs.metering_periods, null)
-        || [];
-      const byId = parseMaybeJson(attrs.period_summary_by_id, attrs.period_summary_by_id || null)
-        || parseMaybeJson(attrs.period_summaries_by_id, attrs.period_summaries_by_id || null)
-        || parseMaybeJson(attrs.summaries_by_id, attrs.summaries_by_id || null)
-        || {};
-      if ((!rows || (Array.isArray(rows) && !rows.length)) && byId && typeof byId === 'object' && !Array.isArray(byId)) {
-        rows = Object.entries(byId).map(([period_id, summary]) => ({ period_id, summary }));
-      }
-      if (!Array.isArray(rows) && rows && typeof rows === 'object') rows = Object.entries(rows).map(([period_id, row]) => ({ period_id, ...objectFrom(row) }));
-      const labelMap = { today: 'Today', day: 'Today', week: 'This week', month: 'This month', year: 'This year' };
-      const orderMap = { today: 1, day: 1, week: 2, month: 3, year: 4 };
-      rows = Array.isArray(rows) ? rows : [];
-      return rows.map((raw, index) => {
-        const row = objectFrom(raw);
-        const nested = objectFrom(row.period || row.metering || row.accounting);
-        const id = String(firstDefined(row.period_id, row.id, row.key, nested.period_id, `period_${index}`)).toLowerCase();
-        const byIdSummary = objectFrom(byId?.[id] || byId?.[String(id).toUpperCase()] || {});
-        const summaryRaw = objectFrom(firstDefined(row.summary, nested.summary, byIdSummary, {}));
-        const summary = {
-          measured: objectFrom(firstDefined(summaryRaw.measured, row.measured, nested.measured, byIdSummary.measured, {})),
-          expected: objectFrom(firstDefined(summaryRaw.expected, row.expected, nested.expected, byIdSummary.expected, {})),
-          cost: objectFrom(firstDefined(summaryRaw.cost, row.cost, nested.cost, byIdSummary.cost, {})),
-          quality: objectFrom(firstDefined(summaryRaw.quality, row.quality, nested.quality, byIdSummary.quality, {})),
-          source_refs: firstDefined(summaryRaw.source_refs, row.source_refs, nested.source_refs, byIdSummary.source_refs, [])
-        };
-        const label = firstDefined(row.label, row.display_name, row.name, nested.label, labelMap[id], human(id));
-        return {
-          entity_id: entityId,
-          period_id: id,
-          label,
-          start_time: firstDefined(row.start_time, row.start, nested.start_time, ''),
-          end_time: firstDefined(row.end_time, row.end, nested.end_time, ''),
-          timezone: firstDefined(row.timezone, row.tz, nested.timezone, ''),
-          graph_support: asBool(firstDefined(row.graph_support, nested.graph_support, attrs.graph_support, false), false),
-          bucket_support: asBool(firstDefined(row.bucket_support, nested.bucket_support, attrs.bucket_support, false), false),
-          selector_order: asNumber(firstDefined(row.selector_order, row.order, nested.selector_order, orderMap[id], index + 1)),
-          ...row,
-          ...nested,
-          period_id: id,
-          label,
-          summary
-        };
-      }).filter(row => row.period_id).sort((a, b) => (asNumber(a.selector_order) || 99) - (asNumber(b.selector_order) || 99));
-    }
     meteringPeriods() {
       if (this._meteringPeriods) return this._meteringPeriods;
-      const v2=this.publicV2();
-      const periods=objectFrom(v2.metering?.periods || {});
+      const periods=objectFrom(this.publicV2().valueAccounting?.periods || {});
       const labels={today:'Today',day:'Today',week:'This week',month:'This month',year:'This year'};
       const order={today:1,day:1,week:2,month:3,year:4};
-      this._meteringPeriods=Object.entries(periods).map(([period_id,raw])=>{
-        const row=objectFrom(raw);
+      this._meteringPeriods=Object.keys(periods).map(period_id=>{
         const id=String(period_id).toLowerCase();
         return {
-          entity_id:v2.envelope.entityId,
+          entity_id:this.publicV2().envelope.entityId,
           period_id:id,
           label:labels[id] || human(id),
           selector_order:order[id] || 99,
-          ...row,
-          summary:{
-            measured:row,
-            expected:{},
-            cost:objectFrom(v2.valueAccounting?.periods?.[id] || {}),
-            quality:{ period:row.quality || 'UNKNOWN' },
-            source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.metering']
-          }
+          graph_support:false,
+          bucket_support:false,
+          measurement_state:'UNAVAILABLE',
+          reason:'Canonical metering energy is not published by E0.15.47.'
         };
       }).sort((a,b)=>(a.selector_order||99)-(b.selector_order||99));
       return this._meteringPeriods;
@@ -2193,8 +2073,8 @@
       const requested = String(this.selectedMeteringPeriodId || rt.value('metering.selected_period','today') || 'today').toLowerCase();
       const periodId = requested === 'day' ? 'today' : requested;
       const period = byPeriodId.get(periodId) || { period_id:periodId, label:this.periodLabel({ period_id:periodId }), graph_support:false, bucket_support:false };
-      const rawPeriod=objectFrom(rt.publicV2().metering?.periods?.[periodId] || {});
-      const effectivePeriod={ ...period, ...rawPeriod, summary:{ ...(period.summary || {}), measured:rawPeriod, quality:{ period:rawPeriod.quality || 'UNKNOWN' } } };
+      const rawPeriod={};
+      const effectivePeriod={ ...period, summary:{ ...(period.summary || {}), measured:{}, quality:{ period:'UNAVAILABLE' } } };
       const flexibleLoadRows = this.flexibleLoadMeteringRows(rt, periodId);
       const rows = this.meteringRowsFromPeriod(effectivePeriod);
       const recordsHaveValues = this.meteringPeriodRowsAvailable(rows);
@@ -3906,36 +3786,16 @@
         sub:row?.missing ? 'Not published' : ''
       };
     }
-    flexibleLoadMeteringRows(rt, periodId = 'today') {
-      const wanted=String(periodId || 'today').toLowerCase() === 'day' ? 'today' : String(periodId || 'today').toLowerCase();
-      const period=objectFrom(rt.publicV2().metering?.periods?.[wanted] || {});
-      const values=objectFrom(period.flexible_assets_kwh || {});
-      const status=String(period.quality || 'UNAVAILABLE');
-      return Object.entries(values).map(([assetId,value])=>({
-        asset_id:assetId,
-        label:rt.assetName(assetId),
-        key:`metering.${wanted}.flexible_assets_kwh.${assetId}`,
-        metric_key:'flexible_load_detail',
-        value:asNumber(value),
-        unit:'kWh',
-        status,
-        measurement_state:status,
-        availability:status === 'OK' ? 'AVAILABLE' : status,
-        user_action_required:false,
-        source_label:'RHI_ENERGY_PUBLIC_CONTRACT_V2.metering',
-        ux_visible:true,
-        is_total:false,
-        is_unattributed:false
-      })).filter(row=>row.value!==null);
+    flexibleLoadMeteringRows(_rt, _periodId = 'today') {
+      return [];
     }
 
-    meteringRowsFromRecords(rt, periodId = 'today') {
+    meteringRowsFromRecords(_rt, periodId = 'today') {
       const wanted=String(periodId || 'today').toLowerCase() === 'day' ? 'today' : String(periodId || 'today').toLowerCase();
-      const raw=objectFrom(rt.publicV2().metering?.periods?.[wanted] || {});
       return this.meteringRowsFromPeriod({
         period_id:wanted,
-        ...raw,
-        summary:{ measured:raw, quality:{ period:raw.quality || 'UNKNOWN' } }
+        measurement_state:'UNAVAILABLE',
+        summary:{ measured:{}, quality:{ period:'UNAVAILABLE' } }
       });
     }
 
