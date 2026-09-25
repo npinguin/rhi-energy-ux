@@ -988,18 +988,16 @@
     }
     meteringRemediations() {
       if (this._meteringRemediations) return this._meteringRemediations;
-      const attrs = this.contractGateway().attrs('metering');
-      let rows = parseMaybeJson(attrs.applicable_remediations_json, []);
-      if (!Array.isArray(rows) && rows && typeof rows === 'object') rows = Object.values(rows);
-      this._meteringRemediations = (Array.isArray(rows) ? rows : []).map((raw,index) => {
-        const row = objectFrom(raw);
-        return {
-          remediation_id:row.remediation_id || row.problem_id || `metering_remediation_${index+1}`,
-          ...row,
-          period_id:String(firstDefined(row.period_id,row.context?.period_id,'') || '').toLowerCase(),
-          applicable:asBool(firstDefined(row.applicable,row.currently_applicable,true),true)
-        };
-      }).filter(row => row.applicable);
+      this._meteringRemediations=this.commands()
+        .filter(command=>command.command_id === 'energy.command.reset_metering_baseline' && command.visible === true)
+        .map(command=>({
+          remediation_id:command.command_instance_id || command.command_row_id,
+          period_id:String(command.period_id || '').toLowerCase(),
+          command_id:command.command_id,
+          command,
+          applicable:true,
+          requires_confirmation:command.requires_confirmation !== false
+        }));
       return this._meteringRemediations;
     }
     meteringRemediationsForPeriod(periodId) {
@@ -1674,11 +1672,13 @@
       const propertyId = String(firstDefined(row?.property_id, row?.property_key, row?.key, data.property_id, '') || '').trim();
       const valueParameter = String(firstDefined(write.value_parameter, row?.value_parameter, 'value') || 'value');
       const readbackProperty = String(firstDefined(write.readback_property, row?.readback_property, propertyId, '') || '').trim();
-      return { supported, operationId, data:{...data, property_id:propertyId}, valueParameter, readbackProperty, propertyId };
+      const service=String(firstDefined(write.service,row?.service,'') || '').trim();
+      const split=splitService(service);
+      return { supported, operationId, service, domain:split.domain, action:split.action, data:{...data, property_id:propertyId}, valueParameter, readbackProperty, propertyId };
     }
     hasPublicWriteRoute(row) {
       const meta = this.writeMeta(row);
-      return meta.supported && meta.operationId === 'energy.property.write' && !!meta.propertyId && !!meta.readbackProperty;
+      return meta.supported && meta.operationId === 'energy.property.write' && meta.service === 'rhi_energy.write_property' && !!meta.propertyId && !!meta.readbackProperty;
     }
     isWritableRow(row) { return this.hasPublicWriteRoute(row); }
     refreshDraftUi(profileId = '') {
@@ -1742,7 +1742,7 @@
         this.render();
         return;
       }
-      const call = this._hass.callService('script', 'energy_write_public_property', payload);
+      const call = this._hass.callService(meta.domain, meta.action, payload);
       Promise.resolve(call).then(() => {
         this.writeFeedback[propertyKey] = { ...this.writeFeedback[propertyKey], state: 'verifying', transportComplete: true, updated: Date.now() };
         this.render();
@@ -1794,12 +1794,12 @@
     requestCommandExecution(command, targetAssetId = '', parameterValues = {}) {
       if (!command || !this.runtime().commandEnabled(command)) return;
       const meta = this.commandMeta(command);
-      if (meta.operationId !== 'energy.command.execute' || meta.service !== 'script.energy_execute_public_command' || !this._hass?.callService) return;
+      if (meta.operationId !== 'energy.command.execute' || meta.service !== 'rhi_energy.invoke_command' || !meta.domain || !meta.action || !this._hass?.callService) return;
       const commandId = String(command.command_id || meta.data.command_id || '');
       const target = String(targetAssetId || command.target_asset_id || meta.data.target_asset_id || '');
       const parameters = { ...objectFrom(meta.data.parameters || {}), ...objectFrom(parameterValues || {}) };
       const payload = { ...meta.data, command_id: commandId, target_asset_id: target, parameters };
-      this._hass.callService('script', 'energy_execute_public_command', payload);
+      this._hass.callService(meta.domain, meta.action, payload);
       this.dispatchEvent(new CustomEvent('homebrain-energy-command-intent-sent', {
         bubbles: true, composed: true, detail: { operation_id: meta.operationId, ...payload }
       }));
@@ -2189,42 +2189,40 @@
       });
     }
     valuePeriodContext(rt) {
-      const entityId = rt.interfaceEntity('value');
-      const attrs = entityId ? rt.attrs(entityId) : {};
-      const productStatus = objectFrom(parseMaybeJson(attrs.product_status_json, attrs.product_status_json || {}));
-      const summary = objectFrom(parseMaybeJson(attrs.summary_json, attrs.summary_json || {}));
-      const rowsByKey = objectFrom(parseMaybeJson(attrs.rows_by_key, attrs.rows_by_key || {}));
-      const selected = objectFrom(parseMaybeJson(attrs.selected_context_json, attrs.selected_context_json || {}));
-      const periodId = String(firstDefined(selected.value, selected.period_id, this.selectedMeteringPeriodId, 'today') || 'today').toLowerCase();
-      const label = firstDefined(selected.label, ({today:'Today',week:'This week',month:'This month',year:'This year'})[periodId], human(periodId));
-      const rowFact = (...keys) => { for (const key of keys) { const row=objectFrom(rowsByKey[key] || {}); const value=firstDefined(row.value,row.amount,row.result); if (value !== undefined) return value; } return undefined; };
-      const fact = (summaryKeys, rowKeys) => { for (const key of summaryKeys) if (Object.prototype.hasOwnProperty.call(summary,key)) return summary[key]; return rowFact(...rowKeys); };
-      const currency = firstDefined(summary.currency, attrs.currency, 'EUR');
-      const state = String(firstDefined(productStatus.state, attrs.status, attrs.accounting_ready === true ? 'OK' : 'UNAVAILABLE') || 'UNAVAILABLE');
-      const stateLabel = firstDefined(productStatus.label, attrs.status_label, state.toUpperCase()==='OK' ? 'Available' : human(state));
-      const accountingReady = asBool(firstDefined(attrs.accounting_ready, state.toUpperCase()==='OK'), false);
-      const pricingComplete = asBool(firstDefined(attrs.pricing_complete, true), true);
-      const net = asNumber(fact(['net_financial_result_eur','net_financial_result'], ['value.net_financial_result_eur','value.net_financial_result']));
-      const importCost = asNumber(fact(['import_cost_eur','import_cost'], ['value.import_cost_eur','value.import_cost']));
-      const exportRevenue = asNumber(fact(['export_revenue_eur','export_revenue'], ['value.export_revenue_eur','value.export_revenue']));
-      const netEnergyCost = asNumber(fact(['net_energy_cost_eur','net_energy_cost'], ['value.net_energy_cost_eur','value.net_energy_cost']));
-      const savings = asNumber(fact(['savings_eur','savings'], ['value.savings_eur','value.savings']));
-      const avoided = asNumber(fact(['avoided_grid_cost_eur','avoided_grid_cost'], ['value.avoided_grid_cost_eur','value.avoided_grid_cost']));
-      const selfConsumption = asNumber(fact(['self_consumption_value_eur','self_consumption_value'], ['value.self_consumption_value_eur','value.self_consumption_value']));
-      const interpretation = firstDefined(summary.explanation, summary.interpretation, net !== null ? `${label} financial result is ${net >= 0 ? 'positive' : 'negative'}.` : `${label} financial result is unavailable.`);
-      const consumers = asArray(firstDefined(summary.consumer_allocation, attrs.consumer_allocation_json, attrs.flexible_asset_value_json, []));
-      const completenessCode = String(firstDefined(attrs.completeness, summary.completeness, productStatus.completeness, '') || '').toUpperCase();
-      const actualResultComplete = /ACTUAL_COMPLETE|^COMPLETE$/.test(completenessCode) || (accountingReady && net !== null && importCost !== null && exportRevenue !== null);
-      const counterfactualEvaluated = !/COUNTERFACTUAL_NOT_EVALUATED|COUNTERFACTUAL_INCOMPLETE/.test(completenessCode);
-      const attributionEvaluated = consumers.some(row => asNumber(firstDefined(row.attributed_eur,row.attributed_value,row.net_value_eur,row.actual_energy_cost_eur)) !== null);
-      const resultCompletenessLabel = actualResultComplete ? 'Actual result complete' : stateLabel;
-      const resultScopeLabel = actualResultComplete
-        ? (!counterfactualEvaluated && !attributionEvaluated ? 'Comparison and per-asset allocation are not evaluated.' : !counterfactualEvaluated ? 'Comparison is not evaluated.' : !attributionEvaluated ? 'Per-asset allocation is not evaluated.' : 'Actual and additional analysis are complete.')
-        : firstDefined(productStatus.description, attrs.status_label, 'Financial result is not complete.');
-      const attention = actualResultComplete
+      const v2=rt.publicV2();
+      const accounting=objectFrom(v2.valueAccounting || {});
+      const periods=objectFrom(accounting.periods || {});
+      const requested=String(this.selectedMeteringPeriodId || accounting.selected_period_id || 'today').toLowerCase();
+      const periodId=requested === 'day' ? 'today' : requested;
+      const summary=objectFrom(periods[periodId] || (periodId === String(accounting.selected_period_id || '').toLowerCase() ? accounting.selected : {}) || {});
+      const label=({today:'Today',week:'This week',month:'This month',year:'This year'})[periodId] || human(periodId);
+      const currency='EUR';
+      const net=asNumber(summary.net_financial_result_eur);
+      const importCost=asNumber(summary.import_cost_eur);
+      const exportRevenue=asNumber(summary.export_revenue_eur);
+      const netEnergyCost=asNumber(summary.net_energy_cost_eur);
+      const accountingReady=summary.available === true;
+      const actualResultComplete=summary.actual_complete === true;
+      const state=actualResultComplete ? 'OK' : accountingReady ? 'PARTIAL' : 'UNAVAILABLE';
+      const stateLabel=actualResultComplete ? 'Available' : accountingReady ? 'Partial' : 'Unavailable';
+      const resultCompletenessLabel=actualResultComplete ? 'Actual result complete' : stateLabel;
+      const resultScopeLabel=actualResultComplete
+        ? 'Comparison and per-asset allocation are not evaluated.'
+        : String(summary.reason || 'Financial result is not complete.');
+      const interpretation=net !== null
+        ? `${label} financial result is ${net >= 0 ? 'positive' : 'negative'}.`
+        : `${label} financial result is unavailable.`;
+      const attention=actualResultComplete
         ? `Measured import cost and export revenue are complete for ${label.toLowerCase()}.`
-        : firstDefined(productStatus.explanation, productStatus.description, accountingReady ? 'Financial calculation is ready.' : pricingComplete ? 'Financial calculation is not available yet.' : 'Pricing configuration is incomplete.');
-      return { period:null, periodId, label, state, stateLabel, resultCompletenessLabel, resultScopeLabel, actualResultComplete, counterfactualEvaluated, attributionEvaluated, currency, net, importCost, exportRevenue, netEnergyCost, savings, avoided, selfConsumption, breakdown:objectFrom(summary.tariff_breakdown || {}), consumers, interpretation, attention, reason:firstDefined(productStatus.reason,''), tariffs:this.valueTariffRows(rt, objectFrom(summary.tariff_breakdown || {})), accountingReady, pricingComplete };
+        : String(summary.reason || 'Financial calculation is not available yet.');
+      return {
+        period:summary, periodId, label, state, stateLabel, resultCompletenessLabel, resultScopeLabel,
+        actualResultComplete, counterfactualEvaluated:false, attributionEvaluated:false,
+        currency, net, importCost, exportRevenue, netEnergyCost,
+        savings:null, avoided:null, selfConsumption:null, breakdown:{}, consumers:[],
+        interpretation, attention, reason:String(summary.reason || ''),
+        tariffs:this.valueTariffRows(rt, {}), accountingReady, pricingComplete:true
+      };
     }
 
     buildMeteringPeriodViewModel(rt) {
@@ -2239,16 +2237,13 @@
       const requested = String(this.selectedMeteringPeriodId || rt.value('metering.selected_period','today') || 'today').toLowerCase();
       const periodId = requested === 'day' ? 'today' : requested;
       const period = byPeriodId.get(periodId) || { period_id:periodId, label:this.periodLabel({ period_id:periodId }), graph_support:false, bucket_support:false };
-      const meteringAttrs = rt.contractGateway().attrs('metering');
-      const selectedSummary = objectFrom(parseMaybeJson(meteringAttrs.selected_period_summary_json, null) || {});
-      const selectedMatches = String(firstDefined(selectedSummary.period_id,selectedSummary.period,'') || '').toLowerCase() === periodId;
-      const effectivePeriod = selectedMatches ? { ...period, summary:{ quality:selectedSummary } } : period;
+      const rawPeriod=objectFrom(rt.publicV2().metering?.periods?.[periodId] || {});
+      const effectivePeriod={ ...period, ...rawPeriod, summary:{ ...(period.summary || {}), measured:rawPeriod, quality:{ period:rawPeriod.quality || 'UNKNOWN' } } };
       const flexibleLoadRows = this.flexibleLoadMeteringRows(rt, periodId);
-      const recordRows = this.meteringRowsFromRecords(rt, periodId);
-      const recordsHaveValues = this.meteringPeriodRowsAvailable(recordRows);
-      const rows = recordsHaveValues ? recordRows : this.meteringFallbackRows(rt, periodId);
-      const summaryHasData = recordsHaveValues || (selectedMatches && Object.keys(selectedSummary).length > 0);
-      const quality = selectedMatches && Object.keys(selectedSummary).length ? selectedSummary : this.meteringQualityFromRows(rows);
+      const rows = this.meteringRowsFromPeriod(effectivePeriod);
+      const recordsHaveValues = this.meteringPeriodRowsAvailable(rows);
+      const summaryHasData = recordsHaveValues || Object.keys(rawPeriod).length > 0;
+      const quality = { health:rawPeriod.quality || 'UNAVAILABLE', measurement_state:rawPeriod.quality || 'UNAVAILABLE', user_action_required:false };
       const normalizeMetricKey = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
       const allRows = Object.values(rows).flat().filter(Boolean);
       const metricValue = aliases => {
@@ -2656,9 +2651,8 @@
         return String(row?.asset_id || '').toLowerCase() === String(assetId).toLowerCase()
           && names.some(name => key === `${String(assetId).toLowerCase()}.${name.toLowerCase()}` || key.endsWith(`.${name.toLowerCase()}`));
       };
-      const canonicalEntity = rt.interfaceEntity('flexibleAssets');
-      const canonical = canonicalEntity ? rt.rowsForEntity(canonicalEntity).find(matches) : null;
-      return canonical ? { entity_id:canonicalEntity, ...canonical } : { missing:true };
+      const canonical = rt.propertyRows().find(matches) || null;
+      return canonical ? { entity_id:rt.publicV2().envelope.entityId, ...canonical } : { missing:true };
     }
     isDeprecatedTargetEnergyAlias(row) {
       if (!row || row.missing) return false;
@@ -3372,16 +3366,10 @@
       return [...byId.values()];
     }
     canonicalConnectionSnapshot(rt) {
-      const envelope = rt.contractGateway().contract('connection');
-      const attrs = envelope.attributes || {};
-      const raw = parseMaybeJson(attrs.connections_json, null);
-      const values = Array.isArray(raw) ? raw : [];
-      const rows = values.filter(value => {
-        const row = objectFrom(value);
-        return asBool(firstDefined(row.ux_visible, row.visible), false);
-      }).map(value => {
-        const row = objectFrom(value);
-        const id = String(firstDefined(row.connection_asset_id,row.asset_id,row.charger_asset_id,row.charger_id,row.connection_id,'') || '');
+      const v2=rt.publicV2();
+      const rows=(v2.connections || []).map(value=>{
+        const row=objectFrom(value);
+        const id=String(firstDefined(row.connection_asset_id,row.asset_id,row.charger_asset_id,row.charger_id,row.connection_id,'') || '');
         return Object.freeze({
           ...row,
           asset_id:id,
@@ -3392,16 +3380,18 @@
           operating_state:String(firstDefined(row.operating_state,'') || ''),
           physical_power_kw:asNumber(firstDefined(row.power_kw,row.physical_power_kw,row.actual_power_kw,row.current_power_kw))
         });
-      }).filter(row => row.asset_id);
+      }).filter(row=>row.asset_id);
+      const powers=rows.map(row=>asNumber(row.physical_power_kw));
       return Object.freeze({
-        available:envelope.available && Array.isArray(raw),
+        available:v2.available,
         rows,
-        totalPowerKw:asNumber(attrs.connection_total_power_kw),
-        observedAt:String(attrs.observed_at||''),
-        snapshotRevision:String(attrs.snapshot_revision||''),
-        sourceOwner:String(firstDefined(attrs.source_owner,envelope.entityId||''))
+        totalPowerKw:powers.some(value=>value===null) ? null : powers.reduce((sum,value)=>sum+(value||0),0),
+        observedAt:'',
+        snapshotRevision:'',
+        sourceOwner:'RHI_ENERGY_PUBLIC_CONTRACT_V2.connections'
       });
     }
+
     flow(rt) {
       const pageVm = this.buildPageViewModel(rt, 'flow');
       const current = this.currentEnergyModel(rt);
@@ -3961,90 +3951,38 @@
       };
     }
     flexibleLoadMeteringRows(rt, periodId = 'today') {
-      const wantedPeriod = String(periodId || 'today').toLowerCase() === 'day' ? 'today' : String(periodId || 'today').toLowerCase();
-      const attrs = rt.contractGateway().attrs('metering');
-      const raw = parseMaybeJson(attrs.records_json, null);
-      if (!Array.isArray(raw)) return [];
-      return raw.map(value => objectFrom(value)).filter(row => {
-        const period = String(firstDefined(row.period_id,row.period,row.context?.value,'') || '').toLowerCase();
-        const role = String(firstDefined(row.record_role,'') || '').toLowerCase();
-        const visible = row.ux_visible === true;
-        return period === wantedPeriod && visible && ['flexible_load_detail','flexible_loads','flexible_loads_unattributed'].includes(role);
-      }).map(row => {
-        const role = String(firstDefined(row.record_role,'') || '').toLowerCase();
-        const assetId = String(firstDefined(row.asset_id,row.consumer_asset_id,row.child_asset_id,'') || '');
-        return {
-          ...row,
-          asset_id:assetId,
-          label:String(firstDefined(row.display_name,row.asset_label,rt.assetName(assetId),role === 'flexible_loads' ? 'Flexible Loads' : human(assetId)) || 'Flexible Load'),
-          key:String(firstDefined(row.property_id,row.key,row.property_key,'')),
-          value:asNumber(firstDefined(row.energy_kwh,row.value)),
-          unit:String(firstDefined(row.unit,'kWh')),
-          status:String(firstDefined(row.measurement_state,row.status,row.health,'UNAVAILABLE')),
-          measurement_state:String(firstDefined(row.measurement_state,row.status,'UNAVAILABLE')),
-          status_label:String(firstDefined(row.status_label,'')),
-          attribution_state:String(firstDefined(row.attribution_state,'')),
-          trust_state:String(firstDefined(row.trust_state,'')),
-          availability:String(firstDefined(row.availability,'')),
-          user_action_required:asBool(row.user_action_required,false),
-          source_label:String(firstDefined(row.source_label,'')),
-          ux_visible:true,
-          is_total:role === 'flexible_loads',
-          is_unattributed:role === 'flexible_loads_unattributed'
-        };
-      }).filter(row => row.value !== null || row.measurement_state)
-        .sort((a,b) => Number(a.is_total) - Number(b.is_total) || Number(a.is_unattributed) - Number(b.is_unattributed) || a.label.localeCompare(b.label));
+      const wanted=String(periodId || 'today').toLowerCase() === 'day' ? 'today' : String(periodId || 'today').toLowerCase();
+      const period=objectFrom(rt.publicV2().metering?.periods?.[wanted] || {});
+      const values=objectFrom(period.flexible_assets_kwh || {});
+      const status=String(period.quality || 'UNAVAILABLE');
+      return Object.entries(values).map(([assetId,value])=>({
+        asset_id:assetId,
+        label:rt.assetName(assetId),
+        key:`metering.${wanted}.flexible_assets_kwh.${assetId}`,
+        metric_key:'flexible_load_detail',
+        value:asNumber(value),
+        unit:'kWh',
+        status,
+        measurement_state:status,
+        availability:status === 'OK' ? 'AVAILABLE' : status,
+        user_action_required:false,
+        source_label:'RHI_ENERGY_PUBLIC_CONTRACT_V2.metering',
+        ux_visible:true,
+        is_total:false,
+        is_unattributed:false
+      })).filter(row=>row.value!==null);
     }
+
     meteringRowsFromRecords(rt, periodId = 'today') {
-      const wantedPeriod = String(periodId || 'today').toLowerCase() === 'day' ? 'today' : String(periodId || 'today').toLowerCase();
-      const attrs = rt.contractGateway().attrs('metering');
-      const raw = parseMaybeJson(attrs.records_json, null);
-      const records = Array.isArray(raw) ? raw.map(objectFrom).filter(row => {
-        const period = String(firstDefined(row.period_id,row.period,'') || '').toLowerCase();
-        return period === wantedPeriod && row.ux_visible === true;
-      }) : [];
-      const choose = (role, preferredAssetId = '') => {
-        const matches = records.filter(row => String(row.record_role || '').toLowerCase() === role);
-        if (!matches.length) return null;
-        return preferredAssetId ? (matches.find(row => String(row.asset_id || '') === preferredAssetId) || matches[0]) : matches[0];
-      };
-      const toRow = (label, metricKey, record) => ({
-        label,
-        metric_key:metricKey,
-        property_key:String(firstDefined(record?.property_key,record?.property_id,record?.key,'')),
-        key:String(firstDefined(record?.property_key,record?.property_id,record?.key,'')),
-        value:asNumber(firstDefined(record?.energy_kwh,record?.value)),
-        unit:String(firstDefined(record?.unit,'kWh')),
-        status:String(firstDefined(record?.measurement_state,record?.status,record?.health,'UNAVAILABLE')),
-        measurement_state:String(firstDefined(record?.measurement_state,record?.status,'UNAVAILABLE')),
-        trust_state:String(firstDefined(record?.trust_state,'')),
-        availability:String(firstDefined(record?.availability,'')),
-        status_label:String(firstDefined(record?.status_label,'')),
-        ux_visible:record?.ux_visible === true,
-        user_action_required:asBool(record?.user_action_required,false)
+      const wanted=String(periodId || 'today').toLowerCase() === 'day' ? 'today' : String(periodId || 'today').toLowerCase();
+      const raw=objectFrom(rt.publicV2().metering?.periods?.[wanted] || {});
+      return this.meteringRowsFromPeriod({
+        period_id:wanted,
+        ...raw,
+        summary:{ measured:raw, quality:{ period:raw.quality || 'UNKNOWN' } }
       });
-      return {
-        supply:[
-          toRow('Solar production','solar_production_kwh',choose('solar_production','solar')),
-          toRow('Grid import','grid_import_kwh',choose('grid_import','grid_import')),
-          toRow('Home Battery discharge','battery_discharge_kwh',choose('home_battery_discharge','battery'))
-        ],
-        demand:[
-          toRow('Site Consumption','site_consumption_kwh',choose('site_consumption','site_consumption')),
-          toRow('Home Consumption','home_consumption_kwh',choose('home_consumption','home_consumption')),
-          toRow('Flexible Loads','flexible_loads_energy_in_kwh',choose('flexible_loads','flexible_loads')),
-          toRow('Home Battery charge','battery_charge_kwh',choose('home_battery_charge','battery'))
-        ],
-        grid:[
-          toRow('Grid import','grid_import_kwh',choose('grid_import','grid_import')),
-          toRow('Grid export','grid_export_kwh',choose('grid_export','grid_export'))
-        ],
-        battery:[
-          toRow('Home Battery charge','battery_charge_kwh',choose('home_battery_charge','battery')),
-          toRow('Home Battery discharge','battery_discharge_kwh',choose('home_battery_discharge','battery'))
-        ]
-      };
     }
+
     meteringRowsFromPeriod(period) {
       const measured = objectFrom(period?.summary?.measured || {});
       const quality = objectFrom(period?.summary?.quality || {});
