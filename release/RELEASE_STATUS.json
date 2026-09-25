@@ -7,7 +7,7 @@
   "github_release_prerelease": false,
   "hacs_visibility": "normal_release_visible_without_beta_toggle",
   "contract": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-  "minimum_backend": "E0.15.47",
+  "minimum_backend": "E0.15.48",
   "static_validation": "required_before_publication",
   "hacs_validation": "required_before_publication",
   "target_runtime_proof": "see release/QUALIFICATION.json",
