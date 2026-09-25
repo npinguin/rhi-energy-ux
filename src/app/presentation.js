@@ -11,7 +11,8 @@ const HB_ENERGY_NAVIGATION = Object.freeze([
       { id:"flow", label:"Flow", view:"flow", title:"Energy Flow", description:"See where energy is flowing right now." },
       { id:"solar", label:"Solar", view:"solar", title:"Solar", description:"Solar generation, arrays, inverters and the relationship with storage." },
       { id:"battery", label:"Home Battery", view:"battery", title:"Home Battery", description:"Storage state, capacity and contribution to the home." },
-      { id:"consumers", label:"Consumers", view:"consumers", title:"Consumers", description:"Where energy is used and which loads are controllable." }
+      { id:"consumers", label:"Consumers", view:"consumers", title:"Consumers", description:"Where energy is used and which loads are controllable." },
+      { id:"gas", label:"Gas", view:"gas", title:"Gas", description:"Gas consumption, history and meter health." }
     ]
   },
   {
@@ -42,6 +43,7 @@ const HB_ENERGY_HERO_ASSETS = Object.freeze({
   "solar-generation": "heroes/solar-hero.webp",
   battery: "heroes/battery-hero.webp",
   consumers: "heroes/consumers-hero.webp",
+  gas: "heroes/gas-hero.svg",
   strategy: "heroes/strategies-hero.webp",
   strategies: "heroes/strategies-hero.webp",
   intelligence: "heroes/intelligence-hero.webp",
