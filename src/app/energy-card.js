@@ -324,9 +324,17 @@
       if (!this._publicV2) this._publicV2 = readEnergyPublicV2(this.contractGateway());
       return this._publicV2;
     }
-    assetProjection(assetId) {
-      return createEnergyAssetProjection(this.publicV2(), assetId);
-    }
+    contractEntityId() { return this.publicV2().envelope.entityId; }
+    assetProjection(assetId) { return selectEnergyAsset(this.publicV2(), assetId); }
+    overviewProjection() { return selectEnergyOverview(this.publicV2()); }
+    planningProjection(horizon = 'D0') { return selectEnergyPlanning(this.publicV2(), horizon); }
+    strategyProjection() { return selectEnergyStrategies(this.publicV2()); }
+    pricingProjection() { return selectEnergyPricing(this.publicV2()); }
+    valueProjection(period = 'today') { return selectEnergyValue(this.publicV2(), period); }
+    meteringProjection(period = 'today') { return selectEnergyMetering(this.publicV2(), period); }
+    activityProjection() { return selectEnergyActivity(this.publicV2()); }
+    commandProjection(assetId = '') { return selectEnergyCommands(this.publicV2(), assetId); }
+    coverage() { return selectEnergyCoverage(this.publicV2()); }
     assets() {
       if (this._assets) return this._assets;
       const v2 = this.publicV2();
@@ -339,7 +347,7 @@
       if (!this._commandContract) this._commandContract = readEnergyCommandContract(this.contractGateway());
       return this._commandContract;
     }
-    commands() { return this.commandContract().rows; }
+    commands() { return this.commandProjection().rows.map(row => this.commandContract().rows.find(candidate => candidate.command_id === row.command_id && candidate.target_asset_id === row.target_asset_id) || row); }
     commandVisible(command) { return !!command && command.command_resolved === true && command.visible === true; }
     commandResolved(command) { return !!command && command.command_resolved === true; }
     commandApplicable(command) { return !!command && command.currently_applicable === true; }
@@ -361,7 +369,7 @@
       return this.commands().filter(command => this.commandVisible(command) && (!targetAssetId || String(command.target_asset_id || '') === String(targetAssetId)));
     }
     activities() {
-      if (!this._activities) this._activities = [...(this.publicV2().activity || [])];
+      if (!this._activities) this._activities = [...this.activityProjection().rows];
       return this._activities;
     }
     activity(type) { return this.activities().find(a => String(a.activity_type || '').toLowerCase() === String(type).toLowerCase()) || null; }
@@ -383,8 +391,8 @@
       };
     }
     overviewExperience() {
-      const v2=this.publicV2();
-      return v2.available ? { entity_id:v2.envelope.entityId, ...objectFrom(v2.overview) } : null;
+      const projection=this.overviewProjection();
+      return projection.available ? { entity_id:this.contractEntityId(), ...projection.raw } : null;
     }
     pilotReadiness() {
       const v2=this.publicV2();
@@ -605,17 +613,18 @@
     }
 
     planningHorizons() {
-      const contract = readPlanningContract(this.contractGateway(), 'D0');
-      return Object.entries(contract.horizonsById).map(([id, value]) => ({ horizon_id: String(id).toUpperCase(), ...planningObject(value) }));
+      const planning=this.publicV2().planning || {};
+      const horizons=planning.planning_horizons && typeof planning.planning_horizons === 'object' ? planning.planning_horizons : {};
+      return Object.entries(horizons).map(([id,value])=>({ horizon_id:String(id).toUpperCase(), ...planningObject(value) }));
     }
     planningHorizon(id = 'D0') {
-      return readPlanningContract(this.contractGateway(), id).horizon || null;
+      return this.planningProjection(id).horizon || null;
     }
     planningHorizonTotals(id = 'D0') {
-      return readPlanningContract(this.contractGateway(), id).laneTotals;
+      return this.planningProjection(id).lane_totals;
     }
     planningBuckets(id = 'D0') {
-      return readPlanningContract(this.contractGateway(), id).buckets;
+      return this.planningProjection(id).buckets;
     }
 
     relationships() {
@@ -2025,12 +2034,10 @@
       });
     }
     valuePeriodContext(rt) {
-      const v2=rt.publicV2();
-      const accounting=objectFrom(v2.valueAccounting || {});
-      const periods=objectFrom(accounting.periods || {});
-      const requested=String(this.selectedMeteringPeriodId || accounting.selected_period_id || 'today').toLowerCase();
-      const periodId=requested === 'day' ? 'today' : requested;
-      const summary=objectFrom(periods[periodId] || (periodId === String(accounting.selected_period_id || '').toLowerCase() ? accounting.selected : {}) || {});
+      const selected=String(this.selectedMeteringPeriodId || 'today').toLowerCase();
+      const periodId=selected === 'day' ? 'today' : selected;
+      const valueProjection=rt.valueProjection(periodId);
+      const summary=objectFrom(valueProjection.value || {});
       const label=({today:'Today',week:'This week',month:'This month',year:'This year'})[periodId] || human(periodId);
       const currency='EUR';
       const net=asNumber(summary.net_financial_result_eur);
@@ -2488,7 +2495,7 @@
           && names.some(name => key === `${String(assetId).toLowerCase()}.${name.toLowerCase()}` || key.endsWith(`.${name.toLowerCase()}`));
       };
       const canonical = rt.propertyRows().find(matches) || null;
-      return canonical ? { entity_id:rt.publicV2().envelope.entityId, ...canonical } : { missing:true };
+      return canonical ? { entity_id:rt.contractEntityId(), ...canonical } : { missing:true };
     }
     isDeprecatedTargetEnergyAlias(row) {
       if (!row || row.missing) return false;
@@ -3201,8 +3208,16 @@
       });
       return [...byId.values()];
     }
-    canonicalConnectionSnapshot(rt) {
-      const v2=rt.publicV2();
+    canonicalConnectionSnapshot(_rt) {
+      return Object.freeze({
+        available:false,
+        rows:Object.freeze([]),
+        totalPowerKw:null,
+        observedAt:'',
+        reason:'Canonical physical connection telemetry is not published by E0.15.47.',
+        source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+      });
+    }
       const rows=(v2.connections || []).map(value=>{
         const row=objectFrom(value);
         const id=String(firstDefined(row.connection_asset_id,row.asset_id,row.charger_asset_id,row.charger_id,row.connection_id,'') || '');
