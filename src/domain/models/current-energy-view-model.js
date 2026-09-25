@@ -27,8 +27,6 @@
   }
 
   function createBatteryCurrentFlowViewModel(gateway) {
-    const envelope = gateway.contract('battery');
-    const attrs = envelope.attributes || {};
     const signed = readTypedPropertyContract(gateway, 'battery', 'battery.power_kw');
     const charge = readTypedPropertyContract(gateway, 'battery', 'battery.charge_power_kw');
     const discharge = readTypedPropertyContract(gateway, 'battery', 'battery.discharge_power_kw');
@@ -37,9 +35,8 @@
     const available = readTypedPropertyContract(gateway, 'battery', 'battery.available_kwh');
     const capacity = readTypedPropertyContract(gateway, 'battery', 'battery.capacity_kwh');
     const healthProperty = readTypedPropertyContract(gateway, 'battery', 'battery.health');
-    const flowProjection = objectFrom(parseMaybeJson(attrs.flow_projection_json, attrs.flow_projection_json || null));
-    const state = canonicalBatteryState(firstDefined(stateProperty.value, flowProjection.state, attrs.state));
-    const projectedPowerKw = asNumber(firstDefined(flowProjection.power_kw, null));
+    const state = canonicalBatteryState(stateProperty.value);
+    const projectedPowerKw = signed.number === null ? null : Math.abs(signed.number);
     let displayPowerKw = null;
     let signedFlowKw = null;
     let direction = 'unknown';
@@ -68,11 +65,11 @@
       detail = 'No active battery flow';
     }
 
-    const health = String(firstDefined(healthProperty.value, healthProperty.health, envelope.available ? 'OK' : 'UNAVAILABLE'));
+    const health = String(firstDefined(healthProperty.value, healthProperty.health, signed.value !== null ? 'OK' : 'UNAVAILABLE'));
     return Object.freeze({
       state,
       health,
-      reason:String(firstDefined(healthProperty.reason, stateProperty.reason, attrs.health_reason, '')),
+      reason:String(firstDefined(healthProperty.reason, stateProperty.reason, '')),
       signedPowerKw:signed.number,
       chargePowerKw:charge.number,
       dischargePowerKw:discharge.number,
@@ -81,8 +78,8 @@
       direction,
       label,
       detail,
-      flowRole:String(firstDefined(flowProjection.flow_role, direction === 'out_of_storage' ? 'producer' : direction === 'into_storage' ? 'consumer' : 'inactive')),
-      uxVisible:asBool(firstDefined(flowProjection.ux_visible, displayPowerKw !== null), displayPowerKw !== null),
+      flowRole:direction === 'out_of_storage' ? 'producer' : direction === 'into_storage' ? 'consumer' : 'inactive',
+      uxVisible:displayPowerKw !== null,
       socPct:soc.number,
       availableKwh:available.number,
       capacityKwh:capacity.number,
