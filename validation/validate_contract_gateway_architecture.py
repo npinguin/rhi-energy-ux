@@ -90,3 +90,47 @@ if "readEnergyPublicV2(this.contractGateway())" not in source_card:
 if failures:
     print('FAIL', ','.join(failures)); sys.exit(1)
 print('PASS canonical Energy V2 projection boundary')
+
+# V1 product decommissioning gate. Diagnostics may retain historical health names,
+# but src product code may not depend on frozen Energy V1 product sensors or script aliases.
+legacy_product_tokens = [
+    'sensor.energy_asset_index',
+    'sensor.energy_relationship_index',
+    'sensor.energy_command_index',
+    'sensor.energy_activity_index',
+    'sensor.energy_overview_experience',
+    'sensor.energy_planning_experience_index',
+    'sensor.energy_outlook_property_index',
+    'sensor.energy_solar_property_index',
+    'sensor.energy_grid_property_index',
+    'sensor.energy_battery_property_index',
+    'sensor.energy_consumption_property_index',
+    'sensor.energy_forecast_property_index',
+    'sensor.energy_pricing_property_index',
+    'sensor.energy_asset_metering_index',
+    'sensor.energy_consumer_property_index',
+    'sensor.energy_consumer_mix_index',
+    'sensor.energy_connection_property_index',
+    'sensor.energy_flexible_asset_index',
+    'sensor.energy_strategy_profile_index',
+    'sensor.energy_strategy_effective_index',
+    'sensor.energy_planning_index',
+    'sensor.energy_intelligence_property_index',
+    'sensor.energy_retrospective_event_index',
+    'sensor.energy_value_accounting_index',
+    'sensor.energy_public_editable_property_index',
+    'script.energy_write_public_property',
+    'script.energy_execute_public_command',
+]
+legacy_hits = []
+for full in (root/'src').rglob('*'):
+    if not full.is_file() or full.suffix not in {'.js','.json'}:
+        continue
+    source = full.read_text(encoding='utf-8')
+    for token in legacy_product_tokens:
+        if token in source:
+            legacy_hits.append(f'{full.relative_to(root)}:{token}')
+if legacy_hits:
+    print('FAIL legacy Energy V1 product dependency remains:', ','.join(legacy_hits))
+    sys.exit(1)
+print('PASS Energy UX product runtime is V2-only; legacy V1 product refs = 0')
