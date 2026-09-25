@@ -78,7 +78,7 @@ function selectEnergyValue(store, period='today') {
 }
 
 function selectEnergyMetering(store, period='today') {
-  // E0.15.47 publishes financial period actuals, not canonical period-energy
+  // E0.15.48 publishes financial period actuals, not canonical period-energy
   // metering detail. Fail closed instead of reconstructing Energy truth in UX.
   const id=String(period || 'today').toLowerCase();
   return Object.freeze({
