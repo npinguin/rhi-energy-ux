@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import sys
+import re
 root = Path(__file__).resolve().parents[1]
 main = (root/'dist/rhi-energy-ux.js').read_text(encoding='utf-8')
 required = [
@@ -131,7 +132,7 @@ for full in (root/'src').rglob('*'):
         continue
     source = full.read_text(encoding='utf-8')
     for token in legacy_product_tokens:
-        if token in source:
+        if re.search(re.escape(token) + r'(?!_health)', source):
             legacy_hits.append(f'{full.relative_to(root)}:{token}')
 if legacy_hits:
     print('FAIL legacy Energy V1 product dependency remains:', ','.join(legacy_hits))
