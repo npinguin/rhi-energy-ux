@@ -24,6 +24,6 @@ for (const forbidden of [
 
 if (!/ATTRIBUTION_PENDING:\s*'Waiting for trusted meter attribution'/.test(src)) throw new Error('pending mapping missing');
 if (!/NOT_APPLICABLE:\s*'Not applicable'/.test(src)) throw new Error('NA mapping missing');
-if (!/Canonical per-asset period energy is not published by E0\.15\.47/.test(src)) throw new Error('metering must fail closed when canonical evidence is absent');
+if (!/Canonical per-asset period energy is not published by E0\.15\.48/.test(src)) throw new Error('metering must fail closed when canonical evidence is absent');
 if (!/row\.visible/.test(src) || !/row\.enabled/.test(src)) throw new Error('backend-owned command presentation missing');
 console.log('PASS V2-only consumption, physical Flow and fail-closed Metering contracts');
