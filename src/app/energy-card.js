@@ -3218,31 +3218,6 @@
         source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
       });
     }
-      const rows=(v2.connections || []).map(value=>{
-        const row=objectFrom(value);
-        const id=String(firstDefined(row.connection_asset_id,row.asset_id,row.charger_asset_id,row.charger_id,row.connection_id,'') || '');
-        return Object.freeze({
-          ...row,
-          asset_id:id,
-          connection_asset_id:id,
-          display_name:firstDefined(row.display_name,row.connection_name,row.charger_name,rt.assetName(id),human(id)),
-          connected_consumer_id:String(firstDefined(row.connected_asset_id,row.connected_consumer_id,row.consumer_asset_id,row.vehicle_asset_id,'') || ''),
-          connection_state:String(firstDefined(row.connection_state,'') || ''),
-          operating_state:String(firstDefined(row.operating_state,'') || ''),
-          physical_power_kw:asNumber(firstDefined(row.power_kw,row.physical_power_kw,row.actual_power_kw,row.current_power_kw))
-        });
-      }).filter(row=>row.asset_id);
-      const powers=rows.map(row=>asNumber(row.physical_power_kw));
-      return Object.freeze({
-        available:v2.available,
-        rows,
-        totalPowerKw:powers.some(value=>value===null) ? null : powers.reduce((sum,value)=>sum+(value||0),0),
-        observedAt:'',
-        snapshotRevision:'',
-        sourceOwner:'RHI_ENERGY_PUBLIC_CONTRACT_V2.connections'
-      });
-    }
-
     flow(rt) {
       const pageVm = this.buildPageViewModel(rt, 'flow');
       const current = this.currentEnergyModel(rt);
