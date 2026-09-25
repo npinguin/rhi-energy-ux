@@ -445,7 +445,7 @@
           flexible:true,
           source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.objects'],
           metering_state:'UNAVAILABLE',
-          metering_reason:'Canonical per-asset period energy is not published by E0.15.47.'
+          metering_reason:'Canonical per-asset period energy is not published by E0.15.48.'
         };
       });
       return this._consumerMixRows;
@@ -462,7 +462,7 @@
         energy_kwh:null,
         energy_by_asset_kwh:{},
         health:'PARTIAL',
-        reason:'Canonical current flexible-asset truth is available; category/per-asset period energy is not published by E0.15.47.',
+        reason:'Canonical current flexible-asset truth is available; category/per-asset period energy is not published by E0.15.48.',
         source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.objects']
       };
       return this._consumerMixSummary;
@@ -810,7 +810,7 @@
           graph_support:false,
           bucket_support:false,
           measurement_state:'UNAVAILABLE',
-          reason:'Canonical metering energy is not published by E0.15.47.'
+          reason:'Canonical metering energy is not published by E0.15.48.'
         };
       }).sort((a,b)=>(a.selector_order||99)-(b.selector_order||99));
       return this._meteringPeriods;
@@ -3214,7 +3214,7 @@
         rows:Object.freeze([]),
         totalPowerKw:null,
         observedAt:'',
-        reason:'Canonical physical connection telemetry is not published by E0.15.47.',
+        reason:'Canonical physical connection telemetry is not published by E0.15.48.',
         source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
       });
     }
