@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "purpose": "Energy UX canonical V2 coverage against the released E0.15.47 contract model. Missing canonical truth is rendered unavailable and is never reconstructed from V1.",
+  "purpose": "Energy UX canonical V2 coverage against the released E0.15.48 contract model. Missing canonical truth is rendered unavailable and is never reconstructed from V1.",
   "target_contract": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-  "backend_baseline": "E0.15.47",
+  "backend_baseline": "E0.15.48",
   "architecture_model": "Mobility-equivalent: one HA adapter, normalized V2 store, pure selectors/projectors, screens as renderers.",
   "coverage": {
     "assets": {
@@ -68,7 +68,7 @@
       "selector": "selectEnergyMetering",
       "source": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
       "legacy_fallback": false,
-      "behavior": "E0.15.47 does not publish canonical period-energy metering detail; UX renders unavailable instead of reconstructing V1 metering truth."
+      "behavior": "E0.15.48 does not publish canonical period-energy metering detail; UX renders unavailable instead of reconstructing V1 metering truth."
     },
     "consumer_mix": {
       "status": "READY_FAIL_CLOSED",
