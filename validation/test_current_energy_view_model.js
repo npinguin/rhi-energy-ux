@@ -1,6 +1,7 @@
 const fs = require('fs');
 const vm = require('vm');
 
+const v2Source = fs.readFileSync('src/runtime/energy-v2-contract.js', 'utf8');
 const source = fs.readFileSync('src/domain/models/current-energy-view-model.js', 'utf8');
 const context = {
   console,
@@ -24,29 +25,55 @@ const context = {
   readLiveConsumptionContract: () => Object.freeze({siteConsumptionKw:2.7,homeConsumptionKw:2.6,flexibleLoadsKw:0.0})
 };
 vm.createContext(context);
+vm.runInContext(v2Source, context);
 vm.runInContext(source, context);
 
 function gatewayFor(state, signed, charge, discharge) {
-  const contracts = {
-    battery: {
-      state:'ready',
-      contract_visibility:'ux_safe',
-      properties_by_key: {
-        'battery.state': {value:state, health:'OK'},
-        'battery.power_kw': {value:signed, health:'OK'},
-        'battery.charge_power_kw': {value:charge, health:'OK'},
-        'battery.discharge_power_kw': {value:discharge, health:'OK'},
-        'battery.soc_pct': {value:38, health:'OK'},
-        'battery.available_kwh': {value:11.1, health:'OK'},
-        'battery.capacity_kwh': {value:29.2, health:'OK'},
-        'battery.health': {value:'OK', health:'OK'}
-      }
+  const objects = [
+    {
+      asset_id:'battery_system',
+      object_class:'battery_system',
+      properties:[
+        {property_key:'battery.state',value:state,resolution:{status:state === 'unavailable' ? 'UNAVAILABLE' : 'RESOLVED'}},
+        {property_key:'battery.power_kw',value:signed,resolution:{status:signed === null ? 'UNAVAILABLE' : 'RESOLVED'}},
+        {property_key:'battery.charge_power_kw',value:charge,resolution:{status:charge === null ? 'UNAVAILABLE' : 'RESOLVED'}},
+        {property_key:'battery.discharge_power_kw',value:discharge,resolution:{status:discharge === null ? 'UNAVAILABLE' : 'RESOLVED'}},
+        {property_key:'battery.soc_pct',value:38,resolution:{status:'RESOLVED'}},
+        {property_key:'battery.available_kwh',value:11.1,resolution:{status:'RESOLVED'}},
+        {property_key:'battery.capacity_kwh',value:29.2,resolution:{status:'RESOLVED'}},
+        {property_key:'battery.health',value:'OK',resolution:{status:'RESOLVED'}}
+      ]
     },
-    grid: {properties_by_key:{'grid_import.power_kw':{value:0},'grid_export.power_kw':{value:0.1},'grid.flow_direction':{value:'exporting'}}},
-    solar: {properties_by_key:{'solar.power_kw':{value:2.8}}},
-    consumption: {}
+    {
+      asset_id:'grid_connection',
+      object_class:'grid_connection',
+      properties:[
+        {property_key:'grid_import.power_kw',value:0,resolution:{status:'RESOLVED'}},
+        {property_key:'grid_export.power_kw',value:0.1,resolution:{status:'RESOLVED'}},
+        {property_key:'grid.flow_direction',value:'exporting',resolution:{status:'RESOLVED'}}
+      ]
+    },
+    {
+      asset_id:'solar_production',
+      object_class:'solar_production',
+      properties:[{property_key:'solar.power_kw',value:2.8,resolution:{status:'RESOLVED'}}]
+    }
+  ];
+  const attrs = {
+    contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+    contract_version:'2.0.0',
+    release:'E0.15.46',
+    objects,
+    profiles:[],
+    relationships:[],
+    planning:{},
+    intelligence:{},
+    summary:{}
   };
-  return { contract(key) { return {entityId:key,state:'ready',available:true,attributes:contracts[key] || {}}; } };
+  return { contract(key) {
+    if (key !== 'publicV2') throw new Error(`unexpected legacy contract read: ${key}`);
+    return {entityId:'sensor.rhi_energy_public_contract_v2',state:'OK',available:true,attributes:attrs,contractVersion:'2.0.0'};
+  } };
 }
 
 const cases = [
