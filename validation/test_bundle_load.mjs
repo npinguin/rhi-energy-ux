@@ -102,7 +102,7 @@ if (model.map(section => section.id).join('|') !== 'energy|intelligence|insights
 const energy = model.find(section => section.id === 'energy');
 const intelligence = model.find(section => section.id === 'intelligence');
 const insights = model.find(section => section.id === 'insights');
-if (energy.items.map(item => item.id).join('|') !== 'overview|flow|solar|battery|consumers') throw new Error('Energy navigation order drifted');
+if (energy.items.map(item => item.id).join('|') !== 'overview|flow|solar|battery|consumers|gas') throw new Error('Energy navigation order drifted');
 if (intelligence.items.map(item => item.id).join('|') !== 'strategy|operational-planning|tactical-planning|strategic-planning') throw new Error('Intelligence navigation order drifted');
 if (insights.items.map(item => item.id).join('|') !== 'metering|value|retrospective') throw new Error('Insights navigation order drifted');
 if (recreated.resolveNavigation('', '', 'solar').item !== 'solar') throw new Error('Solar must resolve to the Energy Solar tab');

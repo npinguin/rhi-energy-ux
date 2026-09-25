@@ -1,8 +1,8 @@
 {
-  "version": "3.98.1",
-  "candidate_tag": "v3.98.1",
+  "version": "3.99.0",
+  "candidate_tag": "v3.99.0",
   "candidate_sha": "pending",
-  "previous_release": "3.98.0",
+  "previous_release": "3.98.1",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -68,5 +68,9 @@
   "solar_tab_hardware_ownership": "NOT_EXECUTED",
   "operational_planning_no_hardware": "NOT_EXECUTED",
   "cross_tab_device_visual_coverage": "NOT_EXECUTED",
-  "solaredge_se10k_rwb_crisp_artwork": "NOT_EXECUTED"
+  "solaredge_se10k_rwb_crisp_artwork": "NOT_EXECUTED",
+  "gas_energy_tab": "NOT_EXECUTED",
+  "gas_hero_house_style": "NOT_EXECUTED",
+  "gas_native_ha_statistics_graph": "NOT_EXECUTED",
+  "gas_canonical_meter_truth": "NOT_EXECUTED"
 }
