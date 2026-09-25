@@ -3,9 +3,9 @@
   "ux_version": "4.0.0",
   "energy_contract": {
     "minimum": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-    "minimum_backend": "E0.15.47",
+    "minimum_backend": "E0.15.48",
     "tested_backend_releases": [
-      "E0.15.47"
+      "E0.15.48"
     ]
   },
   "deployment": {
