@@ -83,28 +83,40 @@ assert.equal(unsupported.contractSupported, false);
 assert.equal(unsupported.sources.length, 0);
 assert.equal(unsupported.reason, 'unsupported_planning_contract');
 
-const { readPlanningContract, normalizePlanningLaneTotals } = require('../src/domain/planning/planning-contract.js');
+const fs = require('fs');
+const vm = require('vm');
+const v2Source = fs.readFileSync('src/runtime/energy-v2-contract.js','utf8');
+const planningSource = fs.readFileSync('src/domain/planning/planning-contract.js','utf8');
+const planningContext = { firstDefined, asNumber, parseMaybeJson, objectFrom, Object, Array, Map, Set, String, Number, Boolean, JSON };
+vm.createContext(planningContext);
+vm.runInContext(v2Source + '\n' + planningSource + '\nthis.readPlanningContract=readPlanningContract; this.normalizePlanningLaneTotals=normalizePlanningLaneTotals;', planningContext);
+const { readPlanningContract, normalizePlanningLaneTotals } = planningContext;
 
 const planningGateway = {
-  contract: () => ({
-    entityId:'sensor.energy_planning_index',
-    contractVersion:'R1.89.44_CONTRACT',
-    available:true,
-    attributes:{
-      planning_today_totals_json: JSON.stringify({ planned_today_kwh: 3.2 }),
-      planning_tomorrow_totals_json: JSON.stringify({ planned_tomorrow_kwh: 4.7 }),
-      planning_combined_totals_json: JSON.stringify({ planned_horizon_kwh: 7.9 }),
-      planning_horizons_by_id: JSON.stringify({
-        D0:{ horizon_id:'D0', summary:{ lane_totals:{ consumers:{ flexible_loads_kwh:3.2, flexible_assets:[] } } }, buckets:[] },
-        D1:{ horizon_id:'D1', summary:{ lane_totals:{ consumers:{ flexible_loads_kwh:4.7, flexible_assets:[] } } }, buckets:[] }
-      })
-    }
-  })
+  contract:key=>{
+    if(key!=='publicV2') throw new Error('legacy planning contract access:'+key);
+    return {
+      entityId:'sensor.rhi_energy_public_contract_v2',
+      contractVersion:'2.0.0',
+      available:true,
+      attributes:{
+        contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+        contract_version:'2.0.0',
+        objects:[], profiles:[], relationships:[], commands:[], configuration:{}, intelligence:{}, overview:{}, activity:[], value_accounting:{}, layers:{planning_objects:[]},
+        planning:{
+          planning_horizons:{
+            D0:{ horizon_id:'D0', summary:{ lane_totals:{ consumers:{ flexible_loads_kwh:3.2, flexible_assets:[] } } }, buckets:[] },
+            D1:{ horizon_id:'D1', summary:{ lane_totals:{ consumers:{ flexible_loads_kwh:4.7, flexible_assets:[] } } }, buckets:[] }
+          }
+        }
+      }
+    };
+  }
 };
 const d1Contract = readPlanningContract(planningGateway, 'D1');
-assert.equal(d1Contract.planningTodayTotals.planned_today_kwh, 3.2);
-assert.equal(d1Contract.planningTomorrowTotals.planned_tomorrow_kwh, 4.7);
-assert.equal(d1Contract.planningCombinedTotals.planned_horizon_kwh, 7.9);
+assert.equal(normalizePlanningLaneTotals(d1Contract.planningTodayTotals).flexibleLoadsKwh, 3.2);
+assert.equal(normalizePlanningLaneTotals(d1Contract.planningTomorrowTotals).flexibleLoadsKwh, 4.7);
+assert.deepEqual(Object.keys(d1Contract.planningCombinedTotals), []);
 assert.equal(normalizePlanningLaneTotals(d1Contract.laneTotals).flexibleLoadsKwh, 4.7);
 
-console.log('PASS capability-based canonical lanes and bounded R1.79.3 compatibility');
+console.log('PASS canonical V2 planning lanes without frontend horizon-total derivation');

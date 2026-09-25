@@ -1,26 +1,26 @@
-# RHI Energy UX v3.99.0 — Gas insights TEST CANDIDATE
+# RHI Energy UX v4.0.0 — canonical V2 architecture TEST CANDIDATE
 
 ## Scope
 
-3.99.0 adds Gas as a first-class Energy domain while keeping electricity the primary Energy experience.
+4.0.0 makes Energy UX a V2-only product runtime using the same architecture model as Mobility.
 
-- Energy navigation order is now: Overview · Flow · Solar · Home Battery · Consumers · Gas.
-- Gas is deliberately the final Energy tab.
-- Adds a dedicated Gas hero in the existing Energy/Mobility presentation grammar.
-- Uses the canonical `gas_meter` logical asset and its published `gas.total_m3`, optional `gas.flow_m3_h`, health and source identity.
-- Does not invent gas-period totals in the frontend.
-- Embeds Home Assistant's native Statistics Graph for 30-day gas consumption history using the canonical total-increasing gas meter entity.
-- Shows the physical/canonical gas meter card beneath the history.
-- Uses a dedicated Gas visual fallback instead of reusing the generic Metering hero.
-- Preserves the current electricity-focused Flow, Solar, Battery, Consumers and planning information architecture.
+- uses `RHI_ENERGY_PUBLIC_CONTRACT_V2` as the sole Energy product-state contract;
+- introduces one Home Assistant-aware contract adapter, a normalized V2 store and pure product selectors/projectors;
+- routes Overview, Energy assets, Planning, Strategies, Pricing, Value, Activity and Commands through typed projections;
+- removes Energy V1 product-index and `script.energy_*` dependencies from UX product runtime;
+- keeps Energy domain truth backend-owned: Home Consumption, planning totals, value accounting, command readiness and configuration semantics are never reconstructed in screens;
+- preserves UX interaction state across backend refreshes;
+- fails closed when E0.15.48 does not publish canonical detail, notably period-energy Metering and physical charging-connection telemetry;
+- keeps diagnostic health entities observational only and outside product truth;
+- adds release-blocking anti-drift gates for V1 dependencies, raw contract access and selector-boundary bypass;
+- accepted technical debt: 0;
+- accepted feature debt: 0.
 
 ## Compatibility
 
-- Energy UX: 3.99.0
-- Required/tested Energy backend: E0.15.32
-- Energy contract: R1.89.44_CONTRACT
-- Rollback release: v3.98.1
-- Accepted technical debt: 0
-- Accepted feature debt: 0
+- Energy UX: 4.0.0
+- Required/tested Energy backend: E0.15.48
+- Product contract: RHI_ENERGY_PUBLIC_CONTRACT_V2
+- Rollback release: v3.99.0
 
-Target Home Assistant qualification remains mandatory before stable promotion.
+Target Home Assistant runtime qualification and rollback proof remain mandatory before stable promotion.

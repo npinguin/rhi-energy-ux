@@ -1,32 +1,5 @@
-// Canonical public UX interface registry. Product code never probes suffixes,
-  // aliases, internal resolution indexes, or diagnostics indexes.
-  const UX_INTERFACES = Object.freeze({
-    release: RELEASE_ENTITY,
-    pilotReadiness: 'sensor.energy_pilot_readiness',
-    publicV2: 'sensor.rhi_energy_public_contract_v2',
-    assets: 'sensor.energy_asset_index',
-    relationships: 'sensor.energy_relationship_index',
-    commands: 'sensor.energy_command_index',
-    activity: 'sensor.energy_activity_index',
-    overviewExperience: 'sensor.energy_overview_experience',
-    planningExperience: 'sensor.energy_planning_experience_index',
-    outlook: 'sensor.energy_outlook_property_index',
-    solar: 'sensor.energy_solar_property_index',
-    grid: 'sensor.energy_grid_property_index',
-    battery: 'sensor.energy_battery_property_index',
-    consumption: 'sensor.energy_consumption_property_index',
-    forecast: 'sensor.energy_forecast_property_index',
-    pricing: 'sensor.energy_pricing_property_index',
-    metering: 'sensor.energy_asset_metering_index',
-    consumer: 'sensor.energy_consumer_property_index',
-    consumerMix: 'sensor.energy_consumer_mix_index',
-    connection: 'sensor.energy_connection_property_index',
-    flexibleAssets: 'sensor.energy_flexible_asset_index',
-    strategyProfiles: 'sensor.energy_strategy_profile_index',
-    strategyEffective: 'sensor.energy_strategy_effective_index',
-    planning: 'sensor.energy_planning_index',
-    intelligence: 'sensor.energy_intelligence_property_index',
-    retrospective: 'sensor.energy_retrospective_event_index',
-    value: 'sensor.energy_value_accounting_index',
-    editableProperties: 'sensor.energy_public_editable_property_index'
-  });
+// Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
+// product-state entry point. Release/engineering entities are diagnostics only.
+const UX_INTERFACES = Object.freeze({
+  publicV2: 'sensor.rhi_energy_public_contract_v2'
+});

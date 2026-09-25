@@ -1,0 +1,90 @@
+{
+  "schema_version": 2,
+  "purpose": "Energy UX canonical V2 coverage against the released E0.15.48 contract model. Missing canonical truth is rendered unavailable and is never reconstructed from V1.",
+  "target_contract": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
+  "backend_baseline": "E0.15.48",
+  "architecture_model": "Mobility-equivalent: one HA adapter, normalized V2 store, pure selectors/projectors, screens as renderers.",
+  "coverage": {
+    "assets": {
+      "status": "READY",
+      "selector": "selectEnergyAsset",
+      "source": "objects",
+      "legacy_fallback": false
+    },
+    "relationships": {
+      "status": "READY",
+      "source": "relationships",
+      "legacy_fallback": false
+    },
+    "overview": {
+      "status": "READY",
+      "selector": "selectEnergyOverview",
+      "source": "overview",
+      "legacy_fallback": false
+    },
+    "planning": {
+      "status": "READY",
+      "selector": "selectEnergyPlanning",
+      "source": "planning",
+      "legacy_fallback": false
+    },
+    "strategies": {
+      "status": "READY",
+      "selector": "selectEnergyStrategies",
+      "source": "configuration.strategy",
+      "legacy_fallback": false
+    },
+    "pricing": {
+      "status": "READY",
+      "selector": "selectEnergyPricing",
+      "source": "configuration.pricing",
+      "legacy_fallback": false
+    },
+    "value": {
+      "status": "READY",
+      "selector": "selectEnergyValue",
+      "source": "value_accounting",
+      "legacy_fallback": false
+    },
+    "activity_history": {
+      "status": "READY",
+      "selector": "selectEnergyActivity",
+      "source": "activity",
+      "legacy_fallback": false
+    },
+    "commands": {
+      "status": "READY",
+      "selector": "selectEnergyCommands",
+      "source": "commands",
+      "legacy_fallback": false
+    },
+    "current_energy": {
+      "status": "READY",
+      "source": "objects[].properties",
+      "legacy_fallback": false
+    },
+    "metering": {
+      "status": "READY_FAIL_CLOSED",
+      "selector": "selectEnergyMetering",
+      "source": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
+      "legacy_fallback": false,
+      "behavior": "E0.15.48 does not publish canonical period-energy metering detail; UX renders unavailable instead of reconstructing V1 metering truth."
+    },
+    "consumer_mix": {
+      "status": "READY_FAIL_CLOSED",
+      "source": "objects",
+      "legacy_fallback": false,
+      "behavior": "Current flexible-asset facts may render; category/per-asset period energy remains unavailable unless canonically published."
+    }
+  },
+  "invariants": {
+    "legacy_product_references": 0,
+    "legacy_script_references": 0,
+    "raw_product_entity_reads_outside_adapter": 0,
+    "screens_reading_raw_contract": 0,
+    "screens_deriving_energy_domain_truth": 0,
+    "accepted_technical_debt": 0,
+    "accepted_feature_debt": 0
+  },
+  "merge_gate": "All product screens must render and all user actions must execute using only typed selectors/projectors over RHI_ENERGY_PUBLIC_CONTRACT_V2 plus rhi_energy.write_property / rhi_energy.invoke_command. Missing canonical truth must fail closed."
+}

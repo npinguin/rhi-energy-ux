@@ -1,3 +1,15 @@
+## 4.0.0 — canonical Energy V2 UX architecture
+
+- makes RHI_ENERGY_PUBLIC_CONTRACT_V2 the sole Energy product-state entrypoint;
+- introduces a normalized V2 store and pure selectors/projectors matching the Mobility architecture;
+- removes all Energy V1 product-index and legacy script dependencies from product runtime;
+- routes planning, overview, configuration, commands, activity and value through backend-owned V2 semantics;
+- preserves Home Assistant refresh interaction state while allowing canonical truth to update;
+- fails closed instead of reconstructing missing period-metering or physical-connection truth;
+- adds hard anti-drift validation for V1 references and raw contract bypasses;
+- requires and is tested against Energy E0.15.48;
+- preserves zero accepted technical and feature debt.
+
 ## 3.99.0 — Gas insights
 
 - adds Gas as the final Energy tab after Consumers, keeping electricity first;

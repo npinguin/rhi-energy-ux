@@ -4,6 +4,7 @@ const vm = require('vm');
 const files = [
   'src/runtime/public-interface-registry.js',
   'src/runtime/energy-contract-gateway.js',
+  'src/runtime/energy-v2-contract.js',
   'src/runtime/asset-profile-contract.js',
   'src/domain/models/flexible-asset-model.js'
 ];
