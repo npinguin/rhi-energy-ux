@@ -1,25 +1,20 @@
 // Canonical current-energy view model. Literal contract keys and direction
 // semantics are confined to this adapter so screen renderers cannot drift.
   function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
-    const envelope = gateway.contract(interfaceKey);
-    const attrs = envelope.attributes || {};
-    const byKey = parseMaybeJson(attrs.properties_by_key, attrs.properties_by_key || null);
-    const direct = byKey && typeof byKey === 'object' && !Array.isArray(byKey)
-      ? objectFrom(byKey[propertyKey])
-      : {};
-    const properties = parseMaybeJson(attrs.properties, attrs.properties || null);
-    const fromList = Array.isArray(properties)
-      ? objectFrom(properties.find(row => String(firstDefined(row?.key,row?.property_key,row?.property_id,'')) === propertyKey))
-      : {};
-    const row = Object.keys(direct).length ? direct : fromList;
+    // interfaceKey is retained in the signature for call-site stability while the
+    // canonical source is now exclusively RHI_ENERGY_PUBLIC_CONTRACT_V2.
+    const v2 = readEnergyPublicV2(gateway);
+    const row = v2.property(propertyKey);
+    const projected = v2.field(propertyKey);
     return Object.freeze({
-      envelope,
-      row,
-      value:firstDefined(rowValue(row, null), row.value, null),
-      number:asNumber(firstDefined(rowValue(row, null), row.value)),
-      text:String(firstDefined(rowValue(row, null), row.value, '') || ''),
-      health:String(firstDefined(row.status_label,row.measurement_state,row.availability,row.health,envelope.available ? 'AVAILABLE' : 'UNAVAILABLE')),
-      reason:String(firstDefined(row.degraded_reason,row.reason,row.health_reason,''))
+      envelope:v2.envelope,
+      row:row || {},
+      value:projected.value,
+      number:asNumber(projected.value),
+      text:String(projected.value ?? ''),
+      health:String(projected.state || 'unavailable').toUpperCase(),
+      reason:String(projected.reason || ''),
+      source:projected.source
     });
   }
 
