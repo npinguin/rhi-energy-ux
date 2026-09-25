@@ -1,8 +1,8 @@
 {
-  "version": "3.99.0",
-  "candidate_tag": "v3.99.0",
+  "version": "4.0.0",
+  "candidate_tag": "v4.0.0",
   "candidate_sha": "pending",
-  "previous_release": "3.98.1",
+  "previous_release": "3.99.0",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -72,5 +72,9 @@
   "gas_energy_tab": "NOT_EXECUTED",
   "gas_hero_house_style": "NOT_EXECUTED",
   "gas_native_ha_statistics_graph": "NOT_EXECUTED",
-  "gas_canonical_meter_truth": "NOT_EXECUTED"
+  "gas_canonical_meter_truth": "NOT_EXECUTED",
+  "energy_v2_only_product_runtime": "STATIC_PASS",
+  "legacy_energy_product_refs_zero": "STATIC_PASS",
+  "typed_selector_boundary": "STATIC_PASS",
+  "fail_closed_missing_canonical_truth": "STATIC_PASS"
 }
