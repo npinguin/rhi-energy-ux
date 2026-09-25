@@ -4,7 +4,7 @@ import sys
 root=Path(__file__).resolve().parents[1]
 source=(root/'dist/rhi-energy-ux.js').read_text(encoding='utf-8')
 checks={
-  'metering_screen_owner': "metering: 'sensor.energy_asset_metering_index'" in source and "metering: 'sensor.energy_metering_property_resolution_index'" not in source,
+  'metering_screen_owner': "function selectEnergyMetering" in source and "sensor.energy_asset_metering_index" not in source and "canonical_period_energy_not_published" in source,
   'consumer_power_text_scoped': 'consumerCard(rt, consumer)' in source and 'flowPhysicalConsumerCard' in source and 'escapeHtml(powerText)' in source,
   'charger_power_text_scoped': source.count("const powerText = power === null ? '—' : fmtKw(power);") >= 2,
   'zero_null_semantics': "power === null ? '—' : fmtKw(power)" in source,
