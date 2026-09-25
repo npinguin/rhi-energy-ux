@@ -152,6 +152,12 @@ for selector in (
         failures.append(f'missing_selector:{selector}')
 if 'rt.publicV2()' in source_card:
     failures.append('screen_reads_raw_v2_contract')
+
+if "contractGateway().state('retrospective')" in source_card or 'contractGateway().state("retrospective")' in source_card:
+    failures.append("retrospective_regressed_to_retired_v1_contract")
+if "retrospectiveState() {" not in source_card or "return null;" not in source_card[source_card.find("retrospectiveState() {"):source_card.find("retrospectiveParsed", source_card.find("retrospectiveState() {"))]:
+    failures.append("retrospective_missing_fail_closed_v2_behavior")
+
 if failures:
     print('FAIL', ','.join(failures)); sys.exit(1)
 print('PASS Energy screens consume typed projection boundary')
