@@ -114,9 +114,9 @@ const planningGateway = {
   }
 };
 const d1Contract = readPlanningContract(planningGateway, 'D1');
-assert.equal(d1Contract.planningTodayTotals.planned_today_kwh, 3.2);
-assert.equal(d1Contract.planningTomorrowTotals.planned_tomorrow_kwh, 4.7);
-assert.equal(d1Contract.planningCombinedTotals.planned_horizon_kwh, 7.9);
+assert.equal(normalizePlanningLaneTotals(d1Contract.planningTodayTotals).flexibleLoadsKwh, 3.2);
+assert.equal(normalizePlanningLaneTotals(d1Contract.planningTomorrowTotals).flexibleLoadsKwh, 4.7);
+assert.deepEqual(Object.keys(d1Contract.planningCombinedTotals), []);
 assert.equal(normalizePlanningLaneTotals(d1Contract.laneTotals).flexibleLoadsKwh, 4.7);
 
-console.log('PASS capability-based canonical lanes and bounded R1.79.3 compatibility');
+console.log('PASS canonical V2 planning lanes without frontend horizon-total derivation');
