@@ -65,14 +65,15 @@ if "sensor.energy_metering_property_index" in main:
     failures.append("legacy_metering_owner_reference")
 
 registry = (root/'src/runtime/public-interface-registry.js').read_text(encoding='utf-8')
-if "metering: 'sensor.energy_asset_metering_index'" not in registry:
-    failures.append("canonical_metering_owner_missing")
-if "pilotReadiness: 'sensor.energy_pilot_readiness'" not in registry:
-    failures.append("pilot_readiness_not_centralized")
+if "publicV2: 'sensor.rhi_energy_public_contract_v2'" not in registry:
+    failures.append("canonical_v2_entrypoint_missing")
+for legacy_key in ("assets:", "relationships:", "commands:", "planning:", "metering:", "value:", "editableProperties:"):
+    if legacy_key in registry:
+        failures.append(f"legacy_product_registry_key:{legacy_key}")
 
 if failures:
     print('FAIL', ','.join(failures)); sys.exit(1)
-print('PASS public interface ownership')
+print('PASS public interface ownership: one Energy product entrypoint')
 
 # Canonical V2 closure: migrated product meanings may not regress to V1 owners.
 source_card = (root/'src/app/energy-card.js').read_text(encoding='utf-8')
@@ -134,3 +135,20 @@ if legacy_hits:
     print('FAIL legacy Energy V1 product dependency remains:', ','.join(legacy_hits))
     sys.exit(1)
 print('PASS Energy UX product runtime is V2-only; legacy V1 product refs = 0')
+
+# Screens may consume EnergyRuntime/typed selectors only; raw V2 contract shape stays
+# inside the adapter/runtime boundary.
+selectors = (root/'src/domain/selectors/energy-selectors.js').read_text(encoding='utf-8')
+for selector in (
+    'selectEnergyOverview','selectEnergyAsset','selectEnergyPlanning',
+    'selectEnergyStrategies','selectEnergyPricing','selectEnergyValue',
+    'selectEnergyMetering','selectEnergyActivity','selectEnergyCommands',
+    'selectEnergyCoverage'
+):
+    if f'function {selector}' not in selectors:
+        failures.append(f'missing_selector:{selector}')
+if 'rt.publicV2()' in source_card:
+    failures.append('screen_reads_raw_v2_contract')
+if failures:
+    print('FAIL', ','.join(failures)); sys.exit(1)
+print('PASS Energy screens consume typed projection boundary')
