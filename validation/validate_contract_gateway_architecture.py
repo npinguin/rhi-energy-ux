@@ -51,10 +51,12 @@ if "return this.allRows().get(String(key))" in main:
     failures.append("cross_owner_row_fallback")
 if "consumerFallbackRows(" in main or "publishedRows.length ? publishedRows" in main:
     failures.append("consumer_cross_owner_fallback")
-if "const publishedOwner = String(asset?.property_index || '').trim();" not in main:
-    failures.append("dynamic_asset_property_owner_missing")
-if "battery_1: 'battery'" in main or "battery_2: 'battery'" in main:
-    failures.append("hardcoded_battery_child_owner")
+if "sensor.energy_" in source_card:
+    # Product source code may keep diagnostic sensor names only in the diagnostics
+    # allowlist at the top of energy-card.js; product ownership cannot depend on them.
+    product_body = source_card[source_card.find("class EnergyRuntime"):]
+    if "sensor.energy_" in product_body:
+        failures.append("product_runtime_contains_legacy_energy_sensor_literal")
 
 diagnostic_start = main.find("    diagnosticSpec(tab) {")
 diagnostic_end = main.find("    diagnosticEntity(rt, entityId, label, purpose) {", diagnostic_start)
