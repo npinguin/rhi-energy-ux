@@ -1,3 +1,13 @@
+## 3.99.0 — Gas insights
+
+- adds Gas as the final Energy tab after Consumers, keeping electricity first;
+- adds a dedicated Gas hero in the current house style;
+- consumes the canonical gas_meter logical asset and gas.total_m3 / optional gas.flow_m3_h without frontend estimation;
+- embeds Home Assistant's native Statistics Graph over the canonical total-increasing gas entity for gas history;
+- adds gas meter health/source identity and a dedicated Gas visual fallback;
+- adds release-blocking Gas navigation, hero, canonical-truth and HA-native-history coverage;
+- preserves Energy E0.15.32 / R1.89.44_CONTRACT and zero accepted technical/feature debt.
+
 ## 3.98.1 — tab ownership and device visual coverage
 
 - restores Energy → Solar as the actual Solar hardware/generation screen;
