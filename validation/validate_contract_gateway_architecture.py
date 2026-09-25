@@ -5,6 +5,7 @@ root = Path(__file__).resolve().parents[1]
 main = (root/'dist/rhi-energy-ux.js').read_text(encoding='utf-8')
 required = [
     root/'src/runtime/energy-contract-gateway.js',
+    root/'src/runtime/energy-v2-contract.js',
     root/'src/domain/planning/planning-contract.js',
     root/'src/domain/planning/planning-view-model.js',
 ]
@@ -72,3 +73,20 @@ if "pilotReadiness: 'sensor.energy_pilot_readiness'" not in registry:
 if failures:
     print('FAIL', ','.join(failures)); sys.exit(1)
 print('PASS public interface ownership')
+
+# Canonical V2 closure: migrated product meanings may not regress to V1 owners.
+source_card = (root/'src/app/energy-card.js').read_text(encoding='utf-8')
+current_model = (root/'src/domain/models/current-energy-view-model.js').read_text(encoding='utf-8')
+if "const entityId = this.interfaceEntity('assets')" in source_card:
+    failures.append('assets_regressed_to_v1_asset_index')
+if "const entityId = this.interfaceEntity('relationships')" in source_card:
+    failures.append('relationships_regressed_to_v1_relationship_index')
+if "gateway.contract(interfaceKey)" in current_model:
+    failures.append('current_energy_model_regressed_to_v1_property_contracts')
+if "readEnergyPublicV2(gateway)" not in current_model:
+    failures.append('current_energy_model_missing_v2_authority')
+if "readEnergyPublicV2(this.contractGateway())" not in source_card:
+    failures.append('energy_runtime_missing_v2_projection_boundary')
+if failures:
+    print('FAIL', ','.join(failures)); sys.exit(1)
+print('PASS canonical Energy V2 projection boundary')
