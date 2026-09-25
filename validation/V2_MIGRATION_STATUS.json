@@ -1,10 +1,13 @@
 {
-  "schema_version": 1,
-  "purpose": "Energy UX canonical V2 migration status. A surface may move to ready only when the backend publishes all product truth required by that surface through RHI_ENERGY_PUBLIC_CONTRACT_V2.",
+  "schema_version": 2,
+  "purpose": "Energy UX canonical V2 coverage against the released E0.15.47 contract model. Missing canonical truth is rendered unavailable and is never reconstructed from V1.",
   "target_contract": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-  "migrated": {
+  "backend_baseline": "E0.15.47",
+  "architecture_model": "Mobility-equivalent: one HA adapter, normalized V2 store, pure selectors/projectors, screens as renderers.",
+  "coverage": {
     "assets": {
       "status": "READY",
+      "selector": "selectEnergyAsset",
       "source": "objects",
       "legacy_fallback": false
     },
@@ -13,86 +16,75 @@
       "source": "relationships",
       "legacy_fallback": false
     },
-    "current_battery": {
-      "status": "READY",
-      "source": "objects[].properties",
-      "legacy_fallback": false
-    },
-    "current_grid": {
-      "status": "READY",
-      "source": "objects[].properties",
-      "legacy_fallback": false
-    },
-    "current_solar": {
-      "status": "READY",
-      "source": "objects[].properties",
-      "legacy_fallback": false
-    }
-  },
-  "blocked_on_backend": {
     "overview": {
-      "status": "BLOCKED",
-      "required_v2": [
-        "overview"
-      ],
-      "reason": "backend builder contains overview but current HA V2 sensor does not publish it"
-    },
-    "commands": {
-      "status": "BLOCKED",
-      "required_v2": [
-        "commands",
-        "canonical rhi_energy.invoke_command references",
-        "operation lifecycle/readback evidence"
-      ],
-      "reason": "backend builder contains commands but current HA V2 sensor does not publish them"
+      "status": "READY",
+      "selector": "selectEnergyOverview",
+      "source": "overview",
+      "legacy_fallback": false
     },
     "planning": {
-      "status": "BLOCKED",
-      "required_v2": [
-        "planning",
-        "layers.planning_objects or equivalent per-asset planning outcomes",
-        "D0/D1 lane totals",
-        "unresolved flexible need"
-      ],
-      "reason": "planning payload is present but the current HA V2 surface does not expose the full per-asset planning layer needed to remove V1 planning indexes without feature loss"
+      "status": "READY",
+      "selector": "selectEnergyPlanning",
+      "source": "planning",
+      "legacy_fallback": false
     },
     "strategies": {
-      "status": "BLOCKED",
-      "required_v2": [
-        "strategy profile/effective truth",
-        "editable strategy properties",
-        "canonical rhi_energy.write_property metadata",
-        "readback state"
-      ],
-      "reason": "strategy UX still depends on V1 strategy profile/effective/editable indexes"
+      "status": "READY",
+      "selector": "selectEnergyStrategies",
+      "source": "configuration.strategy",
+      "legacy_fallback": false
     },
     "pricing": {
-      "status": "BLOCKED",
-      "required_v2": [
-        "current/future pricing properties",
-        "editable pricing properties",
-        "constraints",
-        "canonical write metadata",
-        "readback state"
-      ],
-      "reason": "pricing editor cannot move debt-free until canonical V2 exposes the complete writable property model"
+      "status": "READY",
+      "selector": "selectEnergyPricing",
+      "source": "configuration.pricing",
+      "legacy_fallback": false
     },
     "value": {
-      "status": "BLOCKED",
-      "required_v2": [
-        "value accounting",
-        "net financial result",
-        "period/value quality"
-      ],
-      "reason": "value UX still depends on V1 value-accounting publication"
+      "status": "READY",
+      "selector": "selectEnergyValue",
+      "source": "value_accounting",
+      "legacy_fallback": false
     },
     "activity_history": {
-      "status": "BLOCKED",
-      "required_v2": [
-        "activity/execution evidence"
-      ],
-      "reason": "History/Retrospective must not synthesize activity meaning in the frontend"
+      "status": "READY",
+      "selector": "selectEnergyActivity",
+      "source": "activity",
+      "legacy_fallback": false
+    },
+    "commands": {
+      "status": "READY",
+      "selector": "selectEnergyCommands",
+      "source": "commands",
+      "legacy_fallback": false
+    },
+    "current_energy": {
+      "status": "READY",
+      "source": "objects[].properties",
+      "legacy_fallback": false
+    },
+    "metering": {
+      "status": "READY_FAIL_CLOSED",
+      "selector": "selectEnergyMetering",
+      "source": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
+      "legacy_fallback": false,
+      "behavior": "E0.15.47 does not publish canonical period-energy metering detail; UX renders unavailable instead of reconstructing V1 metering truth."
+    },
+    "consumer_mix": {
+      "status": "READY_FAIL_CLOSED",
+      "source": "objects",
+      "legacy_fallback": false,
+      "behavior": "Current flexible-asset facts may render; category/per-asset period energy remains unavailable unless canonically published."
     }
   },
-  "merge_gate": "All blocked_on_backend entries must be READY or explicitly OUT_OF_SCOPE with an architecture-approved reason before release."
+  "invariants": {
+    "legacy_product_references": 0,
+    "legacy_script_references": 0,
+    "raw_product_entity_reads_outside_adapter": 0,
+    "screens_reading_raw_contract": 0,
+    "screens_deriving_energy_domain_truth": 0,
+    "accepted_technical_debt": 0,
+    "accepted_feature_debt": 0
+  },
+  "merge_gate": "All product screens must render and all user actions must execute using only typed selectors/projectors over RHI_ENERGY_PUBLIC_CONTRACT_V2 plus rhi_energy.write_property / rhi_energy.invoke_command. Missing canonical truth must fail closed."
 }
