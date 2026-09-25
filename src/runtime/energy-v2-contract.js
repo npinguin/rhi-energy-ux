@@ -23,9 +23,13 @@ function readEnergyPublicV2(gateway) {
     target_asset_id:String(row.target_asset_id || row.to_asset_id || '')
   }));
   const commands = array(attrs.commands);
+  const activity = array(attrs.activity);
   const planning = object(attrs.planning);
   const intelligence = object(attrs.intelligence);
   const overview = object(attrs.overview);
+  const configuration = object(attrs.configuration);
+  const valueAccounting = object(attrs.value_accounting);
+  const layers = object(attrs.layers);
   const summary = object(attrs.summary);
   const objectById = new Map(objects.map(row => [String(row.asset_id || ''), row]).filter(([id]) => id));
   const profileById = new Map(profiles.map(row => [String(row.profile_id || ''), row]).filter(([id]) => id));
@@ -33,6 +37,25 @@ function readEnergyPublicV2(gateway) {
   const propertyRows = [];
   const propertyByKey = new Map();
   const propertyByAssetAndKey = new Map();
+  const configurationRows = [];
+  for (const [configurationKind, config] of Object.entries(configuration)) {
+    if (!config || typeof config !== 'object') continue;
+    const rows = array(config.properties || config.configured_properties || config.effective_properties);
+    for (const raw of rows) {
+      const key = String(raw.property_key || raw.property_id || raw.key || '');
+      if (!key) continue;
+      const row = Object.freeze({
+        asset_id:String(raw.asset_id || configurationKind),
+        configuration_kind:configurationKind,
+        ...raw,
+        property_id:String(raw.property_id || key),
+        property_key:key,
+        key
+      });
+      configurationRows.push(row);
+      if (!propertyByKey.has(key)) propertyByKey.set(key,row);
+    }
+  }
   for (const asset of objects) {
     const assetId = String(asset.asset_id || '');
     const rows = array(asset.properties);
@@ -81,10 +104,16 @@ function readEnergyPublicV2(gateway) {
     planning,
     intelligence,
     overview,
+    configuration,
+    valueAccounting,
+    activity,
+    layers,
     commands,
     objectById,
     profileById,
     propertyRows:Object.freeze(propertyRows),
+    configurationRows:Object.freeze(configurationRows),
+    allPropertyRows:Object.freeze([...propertyRows, ...configurationRows]),
     propertyByKey,
     propertyByAssetAndKey,
     object(assetId) { return objectById.get(String(assetId || '')) || null; },
