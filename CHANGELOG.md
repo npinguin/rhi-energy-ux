@@ -1,3 +1,11 @@
+## 4.0.1 — Retrospective V2 boundary hotfix
+
+- removes the last retired V1 Retrospective contract lookup from runtime;
+- fails closed when canonical retrospective evidence is not published by Energy V2;
+- prevents Overview rendering from failing on unavailable Retrospective evidence;
+- adds a regression gate against reintroducing the retired contract key;
+- preserves E0.15.48, V2-only product ownership, and zero accepted technical/feature debt.
+
 ## 4.0.0 — canonical Energy V2 UX architecture
 
 - makes RHI_ENERGY_PUBLIC_CONTRACT_V2 the sole Energy product-state entrypoint;
