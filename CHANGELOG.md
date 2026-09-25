@@ -7,7 +7,7 @@
 - preserves Home Assistant refresh interaction state while allowing canonical truth to update;
 - fails closed instead of reconstructing missing period-metering or physical-connection truth;
 - adds hard anti-drift validation for V1 references and raw contract bypasses;
-- requires and is tested against Energy E0.15.47;
+- requires and is tested against Energy E0.15.48;
 - preserves zero accepted technical and feature debt.
 
 ## 3.99.0 — Gas insights
