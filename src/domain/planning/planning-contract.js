@@ -21,69 +21,43 @@
   }
   function readPlanningContract(gateway, horizonId = 'D0') {
     const normalized = String(horizonId || 'D0').toUpperCase();
-    const contract = gateway.contract('planning');
-    const attrs = contract.attributes;
-    const planningAssets = planningRows(firstDefined(attrs.planning_assets_json, attrs.planning_assets));
-    const planningAssetsById = planningById(firstDefined(attrs.planning_assets_by_id, attrs.planning_assets_json));
-    const planningTodayTotals = planningObject(firstDefined(attrs.planning_today_totals_json, attrs.planning_today_totals));
-    const planningTomorrowTotals = planningObject(firstDefined(attrs.planning_tomorrow_totals_json, attrs.planning_tomorrow_totals));
-    const planningCombinedTotals = planningObject(firstDefined(attrs.planning_combined_totals_json, attrs.planning_combined_totals));
-    const horizonsById = planningById(firstDefined(
-      attrs.planning_horizons_by_id,
-      attrs.planning_horizons_json,
-      attrs.planning_horizons
-    ));
+    const v2 = readEnergyPublicV2(gateway);
+    const planning = planningObject(v2.planning);
+    const horizonsById = planningById(firstDefined(planning.planning_horizons, planning.planning_horizons_json));
     const horizon = planningObject(horizonsById[normalized] || horizonsById[normalized.toLowerCase()]);
     const summary = planningObject(firstDefined(horizon.summary, horizon.planning_summary));
-    const embeddedTotals = planningObject(firstDefined(
-      horizon.lane_totals,
-      horizon.lane_totals_json,
-      summary.lane_totals,
-      summary.lane_totals_json,
-      horizon.planning_totals,
-      horizon.planning_totals_json
-    ));
-    const typedById = planningById(firstDefined(attrs.planning_lane_totals_json, attrs.planning_lane_totals_by_id));
-    const typedTotals = planningObject(typedById[normalized] || typedById[normalized.toLowerCase()]);
-    const totalsById = planningById(firstDefined(
-      attrs.planning_horizon_totals_by_id,
-      attrs.planning_horizon_totals_json,
-      attrs.planning_horizon_totals
-    ));
-    const indexedTotals = planningObject(totalsById[normalized] || totalsById[normalized.toLowerCase()]);
-    const laneTotals = Object.keys(embeddedTotals).length
-      ? embeddedTotals
-      : (Object.keys(typedTotals).length ? typedTotals : indexedTotals);
-    const buckets = planningRows(firstDefined(
-      horizon.buckets_json,
-      horizon.buckets,
-      horizon.timeline_json,
-      horizon.timeline,
-      horizon.rows_json,
-      horizon.rows
-    )).map((row, index) => ({ bucket_id: row?.bucket_id || row?.id || `bucket_${index + 1}`, ...planningObject(row) }));
+    const laneTotals = planningObject(firstDefined(summary.lane_totals, horizon.lane_totals, horizon.planning_totals));
+    const buckets = planningRows(firstDefined(horizon.buckets, horizon.timeline, horizon.rows))
+      .map((row,index)=>({ bucket_id:row?.bucket_id || row?.id || `bucket_${index+1}`, ...planningObject(row) }));
+    const planningObjects = planningRows(v2.layers?.planning_objects);
+    const planningAssets = planningObjects.filter(row => String(row.asset_id || row.target_asset_id || ''));
+    const planningAssetsById = Object.fromEntries(planningAssets.map(row => [String(row.asset_id || row.target_asset_id), planningObject(row)]));
+    const d0 = planningObject(horizonsById.D0);
+    const d1 = planningObject(horizonsById.D1);
+    const d0Totals = planningObject(firstDefined(d0?.summary?.lane_totals, d0?.lane_totals));
+    const d1Totals = planningObject(firstDefined(d1?.summary?.lane_totals, d1?.lane_totals));
     return Object.freeze({
-      entityId: contract.entityId,
-      contractVersion: contract.contractVersion,
-      available: contract.available,
-      attrs,
+      entityId:v2.envelope.entityId,
+      contractVersion:v2.contractVersion,
+      available:v2.available,
+      attrs:planning,
       planningAssets,
       planningAssetsById,
-      planningTodayTotals,
-      planningTomorrowTotals,
-      planningCombinedTotals,
+      planningTodayTotals:d0Totals,
+      planningTomorrowTotals:d1Totals,
+      planningCombinedTotals:{},
       horizonsById,
-      horizonId: normalized,
+      horizonId:normalized,
       horizon,
       summary,
       laneTotals,
       buckets,
-      currentPlanningBucket: planningObject(attrs.current_planning_bucket),
-      currentActionIntent: planningObject(attrs.current_action_intent_json),
-      totalsSource: Object.keys(embeddedTotals).length ? 'horizon.summary.lane_totals'
-        : (Object.keys(typedTotals).length ? 'planning_lane_totals_json' : 'planning_horizon_totals_json')
+      currentPlanningBucket:{},
+      currentActionIntent:{},
+      totalsSource:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.planning_horizons.summary.lane_totals'
     });
   }
+
   function normalizePlanningLaneTotals(rawTotals = {}) {
     const totals = planningObject(rawTotals);
     const sources = planningObject(totals.sources);
