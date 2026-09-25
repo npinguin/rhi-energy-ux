@@ -451,77 +451,51 @@
     planningExperienceFor(assetId) {
       return this.planningExperienceRows().find(row => String(row.asset_id || row.target_asset_id || '') === String(assetId)) || null;
     }
-    consumerMixIndexEntity() {
-      return this.interfaceEntity('consumerMix');
-    }
+    consumerMixIndexEntity() { return this.publicV2().envelope.entityId; }
     consumerMixRows() {
       if (this._consumerMixRows) return this._consumerMixRows;
-      const entityId = this.consumerMixIndexEntity();
-      const attrs = this.attrs(entityId);
-      let rows = parseMaybeJson(attrs.assets_json, attrs.assets_json || null) || [];
-      const byId = parseMaybeJson(attrs.asset_summary_by_id, attrs.asset_summary_by_id || null);
-      if ((!Array.isArray(rows) || !rows.length) && byId && typeof byId === 'object' && !Array.isArray(byId)) {
-        rows = Object.entries(byId).map(([asset_id, row]) => ({ asset_id, ...objectFrom(row) }));
-      }
-      if (!Array.isArray(rows)) rows = [];
-      this._consumerMixRows = rows.map((raw, index) => {
-        const row = objectFrom(raw);
-        const assetId = row.asset_id || `consumer_mix_${index + 1}`;
+      const v2=this.publicV2();
+      const selectedId=String(v2.metering?.selected_period_id || 'today').toLowerCase();
+      const period=objectFrom(v2.metering?.periods?.[selectedId] || {});
+      const byAsset=objectFrom(period.flexible_assets_kwh || {});
+      this._consumerMixRows=(v2.flexibleAssets || []).map((raw,index)=>{
+        const row=objectFrom(raw);
+        const assetId=String(row.asset_id || `flexible_${index+1}`);
         return {
-          mix_row_id: row.mix_row_id || assetId,
-          entity_id: entityId,
-          asset_id: assetId,
-          consumer_id: row.consumer_id || row.consumer || '',
-          source_asset_id: row.source_asset_id || row.producer_asset_id || '',
-          producer_asset_id: row.producer_asset_id || row.source_asset_id || '',
-          flexible_asset_id: row.flexible_asset_id || row.target_asset_id || '',
-          visual_ref: row.visual_ref || '',
-          display_name: row.display_name || this.assetName(assetId),
-          category: row.category || 'other',
-          controllability: row.controllability || (asBool(row.flexible, false) ? 'flexible' : 'observed'),
-          current_power_kw: asNumber(row.current_power_kw),
-          energy_today_kwh: asNumber(row.energy_today_kwh),
-          expected_energy_kwh: asNumber(row.expected_energy_kwh),
-          solar_supplied_kwh: asNumber(row.solar_supplied_kwh),
-          battery_supplied_kwh: asNumber(row.battery_supplied_kwh),
-          grid_supplied_kwh: asNumber(row.grid_supplied_kwh),
-          low_cost_grid_kwh: asNumber(row.low_cost_grid_kwh),
-          other_grid_kwh: asNumber(row.other_grid_kwh),
-          cost_today_eur: asNumber(row.cost_today_eur),
-          average_cost_eur_per_kwh: asNumber(row.average_cost_eur_per_kwh),
-          avoided_grid_cost_eur: asNumber(row.avoided_grid_cost_eur),
-          solar_share_pct: asNumber(row.solar_share_pct),
-          battery_share_pct: asNumber(row.battery_share_pct),
-          grid_share_pct: asNumber(row.grid_share_pct),
-          low_cost_grid_share_pct: asNumber(row.low_cost_grid_share_pct),
-          status: row.planning_state || row.status || 'unknown',
-          health: row.health || 'unknown',
-          flexible: asBool(row.flexible, false),
-          storage: asBool(row.storage, false),
-          visible: asBool(firstDefined(row.visible, true), true),
-          source_refs: asArray(row.source_refs),
-          planning_title: row.planning_title || '',
-          planning_detail: row.planning_detail || ''
+          mix_row_id:assetId,
+          entity_id:v2.envelope.entityId,
+          ...row,
+          asset_id:assetId,
+          display_name:row.display_name || this.assetName(assetId),
+          category:row.asset_type || 'flexible_asset',
+          controllability:'FLEXIBLE',
+          current_power_kw:asNumber(row.power_kw),
+          energy_today_kwh:asNumber(byAsset[assetId]),
+          energy_need_kwh:asNumber(row.energy_to_target_kwh),
+          availability:row.availability_state || 'UNAVAILABLE',
+          visible:true,
+          flexible:true,
+          source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.flexible_assets','RHI_ENERGY_PUBLIC_CONTRACT_V2.metering']
         };
-      }).filter(row => row.visible !== false);
+      });
       return this._consumerMixRows;
     }
     consumerMixSummary() {
       if (this._consumerMixSummary) return this._consumerMixSummary;
-      const entityId = this.consumerMixIndexEntity();
-      const attrs = this.attrs(entityId);
-      const summary = objectFrom(parseMaybeJson(attrs.summary_json, attrs.summary_json || null) || {});
-      this._consumerMixSummary = {
-        current_power_kw: asNumber(summary.current_power_kw),
-        energy_today_kwh: asNumber(summary.energy_today_kwh),
-        solar_supplied_kwh: asNumber(summary.solar_supplied_kwh),
-        battery_supplied_kwh: asNumber(summary.battery_supplied_kwh),
-        grid_supplied_kwh: asNumber(summary.grid_supplied_kwh),
-        low_cost_grid_kwh: asNumber(summary.low_cost_grid_kwh),
-        cost_today_eur: asNumber(summary.cost_today_eur),
-        known_energy_need_kwh: asNumber(summary.known_energy_need_kwh),
-        health: summary.health || attrs.health || 'unknown',
-        source_refs: asArray(firstDefined(summary.source_refs, attrs.source_refs, []))
+      const v2=this.publicV2();
+      const selectedId=String(v2.metering?.selected_period_id || 'today').toLowerCase();
+      const period=objectFrom(v2.metering?.periods?.[selectedId] || {});
+      const rows=this.consumerMixRows();
+      const power=rows.map(row=>asNumber(row.current_power_kw));
+      const need=rows.map(row=>asNumber(row.energy_need_kwh)).filter(value=>value!==null);
+      this._consumerMixSummary={
+        current_power_kw:power.some(value=>value===null) ? null : power.reduce((sum,value)=>sum+(value||0),0),
+        known_energy_need_kwh:need.length ? need.reduce((sum,value)=>sum+value,0) : null,
+        asset_count:rows.length,
+        energy_kwh:asNumber(period.flexible_loads_energy_in_kwh),
+        energy_by_asset_kwh:objectFrom(period.flexible_assets_kwh || {}),
+        health:String(period.quality || (rows.length ? 'AVAILABLE' : 'UNAVAILABLE')),
+        source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.flexible_assets','RHI_ENERGY_PUBLIC_CONTRACT_V2.metering']
       };
       return this._consumerMixSummary;
     }
@@ -631,22 +605,13 @@
     }
     flexibleAssetIndexRows() {
       if (this._flexibleAssets) return this._flexibleAssets;
-      const canonicalEntity = this.interfaceEntity('flexibleAssets');
-      const canonicalRows = canonicalEntity ? this.flexibleProjectionRows(canonicalEntity) : [];
-      if (canonicalRows.length) {
-        const byId = new Map();
-        canonicalRows.forEach(row => {
-          const normalized = this.normalizeFlexibleAssetRow({ ...row, compatibility_fallback: false, contract_source: canonicalEntity });
-          if (!normalized.asset_id) return;
-          byId.set(String(normalized.asset_id), normalized);
-        });
-        this._flexibleAssetSource = 'canonical';
-        this._flexibleAssets = [...byId.values()];
-        return this._flexibleAssets;
-      }
-
-      this._flexibleAssetSource = 'unavailable';
-      this._flexibleAssets = [];
+      const v2=this.publicV2();
+      this._flexibleAssetSource='RHI_ENERGY_PUBLIC_CONTRACT_V2.flexible_assets';
+      this._flexibleAssets=(v2.flexibleAssets || []).map(row=>this.normalizeFlexibleAssetRow({
+        ...row,
+        compatibility_fallback:false,
+        contract_source:v2.envelope.entityId
+      })).filter(row=>row.asset_id);
       return this._flexibleAssets;
     }
     primaryFlexibleAssets() {
@@ -753,71 +718,31 @@
     strategyIntentRows() { return []; }
     strategyProfileRows() {
       if (this._strategyProfiles) return this._strategyProfiles;
-      const entityId = this.interfaceEntity('strategyProfiles');
-      const attrs = this.attrs(entityId);
-      let rows = parseMaybeJson(attrs.strategy_profiles_json, null)
-        || parseMaybeJson(attrs.strategy_profiles, null)
-        || parseMaybeJson(attrs.profiles_json, null)
-        || parseMaybeJson(attrs.profiles, null)
-        || parseMaybeJson(attrs.profile_rows_json, null)
-        || parseMaybeJson(attrs.profile_rows, null)
-        || parseMaybeJson(attrs.rows_json, null)
-        || parseMaybeJson(attrs.rows, null)
-        || [];
-      const byIdObject = parseMaybeJson(attrs.profiles_by_id, attrs.profiles_by_id || null)
-        || parseMaybeJson(attrs.strategy_profiles_by_id, attrs.strategy_profiles_by_id || null);
-      if ((!rows || (Array.isArray(rows) && !rows.length)) && byIdObject && typeof byIdObject === 'object' && !Array.isArray(byIdObject)) {
-        rows = Object.entries(byIdObject).map(([profile_id, row]) => ({ profile_id, ...objectFrom(row) }));
-      }
-      if (!Array.isArray(rows) && rows && typeof rows === 'object') rows = Object.entries(rows).map(([profile_id, row]) => ({ profile_id, ...objectFrom(row) }));
-      rows = Array.isArray(rows) ? rows : [];
-
-      // R1.64.2 also allows property-style strategy profile publication.
-      // UX groups these fields for display/editing, but never infers planning outcome from them.
-      const props = objectFrom(parseMaybeJson(attrs.properties_by_key, attrs.properties_by_key || {}));
-      const byProfile = new Map();
-      Object.entries(props || {}).forEach(([key, raw]) => {
-        const source = (raw && typeof raw === 'object') ? raw : {};
-        const value = source.value !== undefined ? source.value : raw;
-        const profileField = '(profile_label|display_name|name|profile_type|asset_type|flexible_type|mode|energy_control_mode|objective_mode|minimum_target_value|preferred_target_value|maximum_useful_value|target_unit|deadline|deadline_time|grid_policy|grid_use_policy|minimum_source_policy|preferred_source_policy|maximum_source_policy|surplus_policy|battery_policy|confidence_policy|stability|minimum_run_minutes|minimum_off_minutes|adjust_deadband_kw|temporary_import_allowed|temporary_import_limit_kw|essentiality_level|shed_allowed|reserve_target_pct|protected_reserve_pct|user_safe_label|user_summary_label|engineer_reason)';
-        const match = String(key).match(new RegExp(`^energy_strategy_profile\\.([^\\.]+)\\.${profileField}$`, 'i'))
-          || String(key).match(new RegExp(`^([^\\.]+)\\.energy_strategy_profile\\.${profileField}$`, 'i'))
-          || String(key).match(new RegExp(`^strategy_profile\\.([^\\.]+)\\.${profileField}$`, 'i'))
-          || String(key).match(new RegExp(`^([^\\.]+)\\.strategy_profile\\.${profileField}$`, 'i'));
-        if (!match) return;
-        const profileId = match[1];
-        const field = match[2];
-        const row = byProfile.get(profileId) || { profile_id: profileId, editable_field_rows: [] };
-        row[field] = value;
-        if (source && typeof source === 'object' && (asBool(source.editable, false) || String(source.access || '').toLowerCase() === 'editable')) {
-          row.editable_field_rows.push({ entity_id: entityId, key, property_key: key, profile_id: profileId, ...source });
-        }
-        byProfile.set(profileId, row);
-      });
-      rows.push(...byProfile.values());
-
-      const normalized = rows.map((row, i) => {
-        const nested = objectFrom(row.strategy_profile || row.profile || row.energy_strategy_profile || {});
-        const profileId = row.profile_id || row.strategy_profile_id || row.id || row.type_id || row.profile_type || row.asset_type || nested.profile_id || nested.profile_type || `strategy_profile_${i + 1}`;
-        const label = row.profile_label || row.display_name || row.name || row.label || nested.profile_label || nested.display_name || nested.name || human(profileId);
-        const editableFieldRows = asArray(row.editable_field_rows || nested.editable_field_rows || []).map(item => objectFrom(item)).filter(item => item.key || item.property_key);
-        return {
-          strategy_id: profileId,
-          profile_id: profileId,
-          entity_id: entityId,
-          contract_role: 'editable_strategy_profile',
-          ux_primary_behavior_source: false,
-          not_planning_outcome: true,
-          not_command_readiness: true,
-          ...row,
-          ...nested,
-          profile_id: profileId,
-          profile_label: label
+      const v2=this.publicV2();
+      const rows=asArray(v2.configuration?.strategy?.configured_properties);
+      const labels={home:'Home Intelligence',battery:'Home Battery',solar:'Solar',grid:'Grid',flexible_loads:'Flexible Loads',resilience:'Resilience'};
+      const groups=new Map();
+      rows.forEach(raw=>{
+        const row=objectFrom(raw);
+        const group=String(row.group || row.asset_id || 'home');
+        const current=groups.get(group) || {
+          strategy_id:group, profile_id:group, profile_type:group, asset_type:group,
+          profile_label:labels[group] || human(group),
+          display_name:labels[group] || human(group),
+          entity_id:v2.envelope.entityId,
+          contract_role:'editable_strategy_profile',
+          ux_primary_behavior_source:false,
+          not_planning_outcome:true,
+          not_command_readiness:true,
+          editable_field_rows:[],
+          properties:[]
         };
-      }).filter(row => row.profile_id);
-      const byId = new Map();
-      normalized.forEach(row => byId.set(String(row.profile_id), { ...(byId.get(String(row.profile_id)) || {}), ...row }));
-      this._strategyProfiles = [...byId.values()];
+        const normalized={ entity_id:v2.envelope.entityId, ...row, profile_id:group, strategy_profile_id:group };
+        current.properties.push(normalized);
+        if (canonicalEditableProperty(normalized)) current.editable_field_rows.push(normalized);
+        groups.set(group,current);
+      });
+      this._strategyProfiles=[...groups.values()];
       return this._strategyProfiles;
     }
     strategyProfileFor(profileId) {
@@ -826,53 +751,34 @@
       return this.strategyProfileRows().find(row => String(row.profile_id || '').toLowerCase() === wanted || String(row.profile_type || '').toLowerCase() === wanted || String(row.asset_type || '').toLowerCase() === wanted) || null;
     }
     strategyProfileEditableFieldRows(profile = {}) {
-      const profileId = String(profile.profile_id || profile.strategy_profile_id || profile.profile_type || profile.asset_type || '').trim().toLowerCase();
+      const profileId=String(profile.profile_id || profile.strategy_profile_id || '').trim().toLowerCase();
       if (!profileId) return [];
-      const entityId = this.interfaceEntity('strategyProfiles');
-      const attrs = this.attrs(entityId);
-      const canonical = objectFrom(parseMaybeJson(attrs.properties_by_key, attrs.properties_by_key || {}));
-      const profileText = `${profileId} ${profile.profile_type || ''} ${profile.asset_type || ''} ${profile.profile_label || ''} ${profile.display_name || ''} ${profile.name || ''}`.toLowerCase();
-      const domain = /battery|storage/.test(profileText) ? 'battery'
-        : /solar|surplus/.test(profileText) ? 'solar'
-        : /resilien|essential|shed/.test(profileText) ? 'resilience'
-        : /vehicle|charger|consumer|flexible|thermal|outdoor|load/.test(profileText) ? 'flexible_loads'
-        : '';
-      const aliases = {
-        battery: new Set(['battery','home_battery','storage']),
-        solar: new Set(['solar','solar_surplus']),
-        flexible_loads: new Set(['flexible_loads','generic_flexible_load','vehicle_energy','vehicle','consumer','thermal_flexible_load','outdoor_flexible_load']),
-        resilience: new Set(['resilience'])
+      const labels={
+        objective:'Objective', surplus_objective:'Objective', reserve_target_pct:'Minimum reserve',
+        minimum_target_value:'Minimum target', preferred_target_value:'Preferred target', maximum_useful_value:'Maximum useful',
+        deadline:'Default deadline', deadline_time:'Default deadline', grid_policy:'Grid policy', solar_policy:'Solar policy',
+        battery_policy:'Home Battery policy', surplus_policy:'Surplus policy', confidence_policy:'Confidence',
+        minimum_run_minutes:'Minimum run time', minimum_off_minutes:'Minimum off time', adjust_deadband_kw:'Deadband'
       };
-      const labelBySuffix = {
-        objective: 'Objective', surplus_objective: 'Objective', reserve_target_pct: 'Minimum reserve',
-        minimum_target_value: 'Minimum target', preferred_target_value: 'Preferred target', maximum_useful_value: 'Maximum useful',
-        deadline: 'Default deadline', deadline_time: 'Default deadline', grid_policy: 'Grid policy', solar_policy: 'Solar policy',
-        battery_policy: 'Home Battery policy', surplus_policy: 'Surplus policy', confidence_policy: 'Confidence',
-        minimum_run_minutes: 'Minimum run time', minimum_off_minutes: 'Minimum off time', adjust_deadband_kw: 'Deadband'
-      };
-      const orderBySuffix = {
-        objective: 10, surplus_objective: 10, minimum_target_value: 20, preferred_target_value: 30,
-        maximum_useful_value: 40, reserve_target_pct: 45, deadline: 50, deadline_time: 50,
-        grid_policy: 60, solar_policy: 70, battery_policy: 80, surplus_policy: 90,
-        confidence_policy: 100, minimum_run_minutes: 110, minimum_off_minutes: 120, adjust_deadband_kw: 130
-      };
-      return Object.entries(canonical)
-        .map(([key, raw]) => {
-          const source = objectFrom(raw);
-          return { entity_id: entityId, ...source, property_id:firstDefined(source.property_id,key), key:firstDefined(source.key,source.property_id,key), property_key:firstDefined(source.property_id,source.key,key) };
-        })
-        .filter(row => canonicalEditableProperty(row))
-        .filter(row => {
-          const rowProfile = String(firstDefined(row.profile_id,row.strategy_profile_id,'') || '').toLowerCase();
-          if (rowProfile && rowProfile === profileId) return true;
-          const subdomain = String(firstDefined(row.subdomain_id,row.domain_id,row.group_id,'') || '').toLowerCase();
-          return !!domain && aliases[domain]?.has(subdomain);
-        })
-        .map(row => {
-          const suffix = String(row.property_id || row.key || '').split('.').pop();
-          return { ...row, source_index:'sensor.energy_strategy_profile_index', contract_role:'canonical_strategy_property', profile_id:profileId, strategy_profile_id:profileId, field_key:suffix, display_name:firstDefined(row.display_name,row.label,labelBySuffix[suffix],human(suffix)), allowed_values:firstDefined(row.allowed_values,row.choices,objectFrom(row.constraints).allowed_values,[]), min:firstDefined(row.min,objectFrom(row.constraints).min,''), max:firstDefined(row.max,objectFrom(row.constraints).max,''), step:firstDefined(row.step,objectFrom(row.constraints).step,''), editable_reason:firstDefined(row.reason_text,row.reason_code,'Canonical public property is not writable'), order:firstDefined(row.order,orderBySuffix[suffix],999) };
-        })
-        .sort((a,b)=>Number(a.order||999)-Number(b.order||999));
+      return asArray(profile.editable_field_rows).map(row=>{
+        const key=String(row.property_id || row.key || row.property_key || '');
+        const suffix=key.split('.').pop();
+        return {
+          ...row,
+          entity_id:this.publicV2().envelope.entityId,
+          source_index:'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy',
+          contract_role:'canonical_strategy_property',
+          profile_id:profileId,
+          strategy_profile_id:profileId,
+          field_key:suffix,
+          display_name:firstDefined(row.display_name,row.label,labels[suffix],human(suffix)),
+          allowed_values:firstDefined(row.allowed_values,row.choices,objectFrom(row.constraints).allowed,[]),
+          min:firstDefined(row.min,objectFrom(row.constraints).min,''),
+          max:firstDefined(row.max,objectFrom(row.constraints).max,''),
+          step:firstDefined(row.step,objectFrom(row.constraints).step,''),
+          editable_reason:firstDefined(row.reason_text,row.reason_code,'Canonical public property is not writable')
+        };
+      });
     }
     strategyProfileEditableRowByKey(propertyKey) {
       const key = String(propertyKey || '');
@@ -885,61 +791,25 @@
     }
     effectiveStrategyRows() {
       if (this._effectiveStrategies) return this._effectiveStrategies;
-      const entityId = this.interfaceEntity('strategyEffective');
-      const attrs = this.attrs(entityId);
-      let rows = parseMaybeJson(attrs.current_policies_json, null)
-        || parseMaybeJson(attrs.current_policies, null)
-        || parseMaybeJson(attrs.policies_json, null)
-        || parseMaybeJson(attrs.policies, null)
-        || parseMaybeJson(attrs.effective_strategies_json, null)
-        || parseMaybeJson(attrs.effective_strategies, null)
-        || parseMaybeJson(attrs.asset_strategies_json, null)
-        || parseMaybeJson(attrs.asset_strategies, null)
-        || parseMaybeJson(attrs.strategy_rows_json, null)
-        || parseMaybeJson(attrs.strategy_rows, null)
-        || parseMaybeJson(attrs.rows_json, null)
-        || parseMaybeJson(attrs.rows, null)
-        || parseMaybeJson(attrs.assets_json, null)
-        || parseMaybeJson(attrs.assets, null)
-        || [];
-      if (!Array.isArray(rows) && rows && typeof rows === 'object') rows = Object.values(rows);
-      rows = Array.isArray(rows) ? rows : [];
-
-      // R1.64.0 stepwise design also allows property-style publication.
-      // This is still editable strategy/policy context, never a planning outcome.
-      const props = objectFrom(parseMaybeJson(attrs.properties_by_key, attrs.properties_by_key || {}));
-      const byAsset = new Map();
-      Object.entries(props || {}).forEach(([key, raw]) => {
-        const value = (raw && typeof raw === 'object' && raw.value !== undefined) ? raw.value : raw;
-        const strategyField = '(mode|energy_control_mode|objective_mode|policy_id|label|configured_state|effective_state|influence_state|reason_code|reason_label|source|overridden_by|affected_assets|evidence|minimum_target_value|preferred_target_value|maximum_useful_value|target_unit|deadline|deadline_time|grid_policy|grid_use_policy|surplus_policy|confidence_policy|stability|minimum_run_minutes|minimum_off_minutes|adjust_deadband_kw|essentiality_level|temporary_import_allowed|reserve_target_pct|protected_reserve_kwh|available_above_reserve_kwh|usable_above_reserve_kwh|support_allowed|support_blocked_reason|user_safe_label|engineer_reason)';
-        const match = String(key).match(new RegExp(`^(.+)\\.energy_strategy\\.${strategyField}$`, 'i'))
-          || String(key).match(new RegExp(`^energy_strategy\\.(.+)\\.${strategyField}$`, 'i'))
-          || String(key).match(new RegExp(`^(.+)\\.strategy\\.${strategyField}$`, 'i'));
-        if (!match) return;
-        const assetId = match[1];
-        const field = match[2];
-        const row = byAsset.get(assetId) || { asset_id: assetId };
-        row[field] = value;
-        byAsset.set(assetId, row);
-      });
-      rows.push(...byAsset.values());
-
-      const normalized = rows.map((row, i) => {
-        const nested = objectFrom(row.effective_strategy || row.energy_strategy || row.strategy || {});
-        return {
-          strategy_id: row.strategy_id || row.id || row.policy_id || `effective_strategy_${i + 1}`,
-          entity_id: entityId,
-          contract_role: 'editable_strategy_policy',
-          ux_primary_behavior_source: false,
-          ...row,
-          ...nested,
-          asset_id: row.asset_id || row.target_asset_id || row.flexible_asset_id || nested.asset_id || row.policy_id || nested.policy_id,
-          policy_id: row.policy_id || nested.policy_id || row.strategy_id || row.id
+      const v2=this.publicV2();
+      const rows=asArray(v2.configuration?.strategy?.effective_properties);
+      const byGroup=new Map();
+      rows.forEach(raw=>{
+        const row=objectFrom(raw);
+        const group=String(row.group || row.asset_id || 'home');
+        const current=byGroup.get(group) || {
+          strategy_id:group, policy_id:group, asset_id:group,
+          entity_id:v2.envelope.entityId,
+          contract_role:'effective_strategy_policy',
+          effective_state:v2.configuration?.strategy?.effective_state || 'UNAVAILABLE',
+          reason_code:v2.configuration?.strategy?.effective_reason || ''
         };
-      }).filter(row => row.asset_id || row.policy_id);
-      const byId = new Map();
-      normalized.forEach(row => { const key=String(row.policy_id || row.asset_id); byId.set(key, { ...(byId.get(key) || {}), ...row }); });
-      this._effectiveStrategies = [...byId.values()];
+        const key=String(row.property_id || row.key || row.property_key || '');
+        if(key) current[key]=row.value;
+        current.properties=[...(current.properties || []),row];
+        byGroup.set(group,current);
+      });
+      this._effectiveStrategies=[...byGroup.values()];
       return this._effectiveStrategies;
     }
     effectiveStrategyFor(assetId) {
@@ -1015,15 +885,13 @@
       }).filter(row => row.horizon_id);
     }
     outlookHorizons() {
-      if (this._outlookHorizons) return this._outlookHorizons;
-      const entityId = this.interfaceEntity('outlook');
-      this._outlookHorizons = entityId ? this.horizonRows(entityId, 'outlook') : [];
+      if (!this._outlookHorizons) this._outlookHorizons=this.planningHorizons();
       return this._outlookHorizons;
     }
     meteringHorizons() {
-      if (this._meteringHorizons) return this._meteringHorizons;
-      const entityId = this.interfaceEntity('metering');
-      this._meteringHorizons = entityId ? this.horizonRows(entityId, 'metering') : [];
+      if (!this._meteringHorizons) {
+        this._meteringHorizons=this.planningHorizons().map(row=>({ ...row, contract_kind:'metering_context' }));
+      }
       return this._meteringHorizons;
     }
     periodRows(entityId) {
@@ -1078,8 +946,28 @@
     }
     meteringPeriods() {
       if (this._meteringPeriods) return this._meteringPeriods;
-      const entityId = this.interfaceEntity('metering');
-      this._meteringPeriods = entityId ? this.periodRows(entityId) : [];
+      const v2=this.publicV2();
+      const periods=objectFrom(v2.metering?.periods || {});
+      const labels={today:'Today',day:'Today',week:'This week',month:'This month',year:'This year'};
+      const order={today:1,day:1,week:2,month:3,year:4};
+      this._meteringPeriods=Object.entries(periods).map(([period_id,raw])=>{
+        const row=objectFrom(raw);
+        const id=String(period_id).toLowerCase();
+        return {
+          entity_id:v2.envelope.entityId,
+          period_id:id,
+          label:labels[id] || human(id),
+          selector_order:order[id] || 99,
+          ...row,
+          summary:{
+            measured:row,
+            expected:{},
+            cost:objectFrom(v2.valueAccounting?.periods?.[id] || {}),
+            quality:{ period:row.quality || 'UNKNOWN' },
+            source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.metering']
+          }
+        };
+      }).sort((a,b)=>(a.selector_order||99)-(b.selector_order||99));
       return this._meteringPeriods;
     }
     valuePeriods() {
