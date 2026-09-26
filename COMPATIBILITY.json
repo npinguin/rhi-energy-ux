@@ -5,7 +5,7 @@
     "minimum": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
     "minimum_backend": "E0.15.52",
     "tested_backend_releases": [
-      "E0.15.56"
+      "E0.15.57"
     ],
     "required_contracts": [
       "RHI_ENERGY_PUBLIC_CONTRACT_V2",
