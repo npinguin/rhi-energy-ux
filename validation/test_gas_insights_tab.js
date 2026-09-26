@@ -6,7 +6,7 @@ const presentation = fs.readFileSync("src/app/presentation.js","utf8");
 const catalog = fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
 
 assert.match(presentation,/id:"consumers", label:"Consumers"[\s\S]*id:"gas", label:"Gas", view:"gas"/);
-assert.match(presentation,/gas: "heroes\\/gas-hero\\.webp"/);
+assert.match(presentation,/gas: "heroes\/gas-hero\.webp"/);
 assert.ok(fs.existsSync("src/assets/heroes/gas-hero.webp"),"missing Gas hero artwork");
 
 assert.match(app,/gas:\['consumer'\]/);
