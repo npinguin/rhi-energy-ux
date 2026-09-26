@@ -1945,7 +1945,10 @@
       const gridExport = balanceVm.gridExportKw;
       const batterySoc = balanceVm.battery.socPct;
       const assets = rt.primaryFlexibleAssets();
-      const activeAssets = assets.filter(a => (asNumber(firstDefined(a.power_kw, a.current_power_kw, a.actual_power_kw),0) || 0) > 0.05).length;
+      const activeAssets = assets.filter(a => {
+        const power = asNumber(firstDefined(a.power_kw, a.current_power_kw, a.actual_power_kw));
+        return power !== null && power > 0.05;
+      }).length;
       const outlook = this.selectedHorizon(rt.outlookHorizons(), this.selectedOutlookHorizonId) || {};
       const balance = asNumber(firstDefined(outlook.summary?.balance?.balance_kwh, outlook.summary?.balance?.outlook_balance_kwh, outlook.balance_kwh));
       const value = this.valuePeriodContext(rt);
@@ -1953,9 +1956,26 @@
       const conclusions = {
         overview: [siteDemand !== null ? `Site Consumption is ${fmtKw(siteDemand,'—')}.` : (homeDemand !== null ? `Home Consumption is ${fmtKw(homeDemand,'—')}; Site Consumption is unavailable.` : 'Site Consumption is unavailable.'), batterySoc !== null ? `Home Battery state of charge is ${fmtPct(batterySoc)}.` : 'Home Battery state of charge is unavailable.', 'Energy evidence'],
         outlook: [balance !== null ? `${this.horizonLabel(outlook)} has an expected balance of ${fmtKwh(balance)}.` : 'The selected forecast balance is unavailable.', 'Forecast values remain estimates and may change as conditions develop.', 'Forecast evidence'],
-        flow: [gridExport > 0.05 ? `The home is exporting ${fmtKw(gridExport)}.` : gridImport > 0.05 ? `The home is importing ${fmtKw(gridImport)}.` : 'The home is balanced locally.', `${fmtKw(solar)} solar is currently available.`, 'Flow evidence'],
-        solar: [(solar || 0) > 0.05 ? `Solar is currently producing ${fmtKw(solar)}.` : 'No meaningful solar production is visible now.', 'Flexible loads use the surplus currently available for them.', 'Solar evidence'],
-        battery: [batterySoc !== null ? `Storage is at ${fmtPct(batterySoc)}.` : 'Storage state is unavailable.', 'Reserve and available actions follow the active strategy.', 'Storage evidence'],
+        flow: [
+          balanceVm.grid.direction === 'exporting' && gridExport !== null ? `The home is exporting ${fmtKw(gridExport)}.`
+            : balanceVm.grid.direction === 'importing' && gridImport !== null ? `The home is importing ${fmtKw(gridImport)}.`
+            : balanceVm.grid.direction === 'balanced' ? 'The home is balanced locally.'
+            : 'Grid flow is unavailable.',
+          solar !== null ? `${fmtKw(solar)} solar is currently measured.` : 'Solar production is unavailable.',
+          'Flow evidence'
+        ],
+        solar: [
+          solar === null ? 'Solar production is unavailable.'
+            : solar > 0.05 ? `Solar is currently producing ${fmtKw(solar)}.`
+            : 'Solar is currently not producing meaningful power.',
+          solar === null ? 'No production conclusion is made without a canonical measurement.' : 'Flexible-load allocation follows the Energy planning contract.',
+          'Solar evidence'
+        ],
+        battery: [
+          batterySoc !== null ? `Storage is at ${fmtPct(batterySoc)}.` : 'Storage state is unavailable.',
+          'Reserve and available actions are shown only when published by the canonical Energy contract.',
+          'Storage evidence'
+        ],
         consumers: [`${assets.length} controllable assets are available; ${activeAssets} are active now.`, 'Attribution is shown when reliable allocation is available.', 'Consumer evidence'],
         strategies: ['Configured intent and effective strategy are shown separately.', 'The effective strategy can differ when current conditions require it.', 'Strategy evidence'],
         metering: (() => { const vm=this.buildMeteringPeriodViewModel(rt); const measured=[['solar production',vm.solar],['consumption',vm.consumption],['grid import',vm.gridImport],['grid export',vm.gridExport]].filter(([,value])=>value!==null); const lead=measured.length ? `${vm.label} ${measured[0][0]} is ${fmtKwh(measured[0][1])}.` : `${vm.label} measurements are unavailable.`; return [lead, `${vm.qualityLabel} measurement quality for the selected period.`, 'Measurement evidence']; })(),
@@ -2225,10 +2245,15 @@
       const flexPower = this.flexiblePowerNowKw(rt);
       const flexNeed = this.flexibleNeedKwh(rt);
       const decision = rt.decision();
-      const status = this.productStateLabel(decision.status || rt.value('energy_intelligence.status', 'observed'), 'Observed');
-      const recommendation = humanReason(decision.recommendation || rt.value('energy_intelligence.recommendation', 'No action needed'), 'No action needed');
+      const statusRaw = firstDefined(decision.status, rt.value('energy_intelligence.status', null));
+      const status = statusRaw === null ? 'Unavailable' : this.productStateLabel(statusRaw, 'Unavailable');
+      const recommendationRaw = firstDefined(decision.recommendation, rt.value('energy_intelligence.recommendation', null));
+      const recommendation = recommendationRaw === null ? 'Energy intelligence unavailable' : humanReason(recommendationRaw, 'Energy intelligence unavailable');
       const flowValue = current.grid.displayPowerKw;
-      const flowState = current.grid.direction === 'exporting' ? 'Exporting surplus' : current.grid.direction === 'importing' ? 'Importing from grid' : 'Balanced locally';
+      const flowState = current.grid.direction === 'exporting' ? 'Exporting surplus'
+        : current.grid.direction === 'importing' ? 'Importing from grid'
+        : current.grid.direction === 'balanced' ? 'Balanced locally'
+        : 'Grid flow unavailable';
       const batteryPower = current.battery.displayPowerKw;
       const batteryState = current.battery.label;
       const selectedContext = this.selectedHorizon(rt.outlookHorizons(), this.selectedOutlookHorizonId);
@@ -2250,7 +2275,7 @@
         overview: { image:hbEnergyHeroAsset('overview'), icon:'✦', eyebrow:'Energy overview', title:'Site Consumption', value:fmtKw(demand,'—'), unit:'current site demand', explanation:`${flowState} · ${fmtKw(solar)} solar · ${fmtKw(current.grid.displayPowerKw)} grid`, tone:'blue', metrics:[['☀','Solar now',fmtKw(solar),'Producing now'],['▣','Home Battery',fmtPct(batterySoc),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['↗','Solar remaining',fmtKwh(solarRemaining),'Forecast left today']] },
         outlook: { image:hbEnergyHeroAsset('outlook'), icon:'↗', eyebrow:'Energy outlook', title:`${contextLabel} outlook`, value:fmtKwh(contextSolar), unit:`solar forecast ${contextLabel.toLowerCase()}`, explanation:human(firstDefined(selectedContext?.summary?.reason, rt.value('energy_intelligence.outlook_reason','Forecast, demand and planning in one view'))), tone:'purple', metrics:[['☀',`${contextLabel} forecast`,fmtKwh(contextSolar),`Expected solar ${contextLabel.toLowerCase()}`],['↗',contextTomorrow?'Expected demand':'Remaining',contextTomorrow?fmtKwh(contextDemandTotal):fmtKwh(contextRemaining),contextTomorrow?'Known demand tomorrow':'Forecast left today'],['⌂','Demand',fmtKwh(contextDemandTotal),'Expected demand'],['✓','Balance',fmtKwh(contextBalanceTotal),'Supply minus demand']] },
         flow: { image:hbEnergyHeroAsset('flow'), icon:'⚡', eyebrow:'Live energy flow', title:flowState, value:fmtKw(flowValue), unit:current.grid.direction === 'exporting' ? 'to grid' : current.grid.direction === 'importing' ? 'from grid' : 'grid flow', explanation:`${fmtKw(solar)} solar · ${fmtKw(demand)} demand`, tone:'purple', metrics:[['☀','Solar',fmtKw(solar),'Supplying the home'],['▣','Home Battery',fmtKw(batteryPower),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['⌂','Demand',fmtKw(demand),'Home consumption']] },
-        solar: { image:hbEnergyHeroAsset('solar-generation'), icon:'☀', eyebrow:'Solar', title:(solar||0)>0.05?'Generating now':'Not generating', value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
+        solar: { image:hbEnergyHeroAsset('solar-generation'), icon:'☀', eyebrow:'Solar', title:solar===null?'Production unavailable':solar>0.05?'Generating now':'Not generating', value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
         battery: { image:hbEnergyHeroAsset('battery'), icon:'▣', eyebrow:'Home Battery', title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(this.batteryReservePct(rt)),'Protected minimum']] },
         consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Home Intelligence status']] },
         gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:'Gas', title:gas.asset ? 'Gas consumption' : 'Gas meter not connected', value:this.gasVolume(gas.totalM3), unit:'total meter reading', explanation:gas.asset ? 'Measured gas use, meter health and 30-day history.' : 'Connect one authoritative gas meter to start measured consumption history.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),gas.flowM3h===null?'Not measured':'Current measured flow'],['◫','Meter total',this.gasVolume(gas.totalM3),gas.totalM3===null?'Not measured':'Cumulative meter reading'],['↺','History',gas.totalEntityId?'30 days':'Not available',gas.totalEntityId?'Daily measured consumption':'Waiting for total meter'],['✓','Health',gas.asset?human(gas.health):'Not configured',gas.asset?'Gas meter health':'Authoritative source required']] },
@@ -2380,9 +2405,11 @@
       const batterySoc = balanceVm.battery.socPct;
       const reasonRaw = firstDefined(objectFrom(d.reason || {}).message, d.reason_label, rt.rawText('energy_intelligence.reason', null));
       const reasonCandidate = reasonRaw ? humanReason(reasonRaw, '') : '';
-      const reason = /residual|reconciliation|canonical|bucket|projection|not.?published|completed|unsustainable/i.test(reasonCandidate)
-        ? 'Current production, demand and grid exchange are being monitored against the active strategy.'
-        : (reasonCandidate || 'Current production, demand and grid exchange are being monitored against the active strategy.');
+      const reason = reasonCandidate
+        ? (/residual|reconciliation|canonical|bucket|projection|not.?published|completed|unsustainable/i.test(reasonCandidate)
+            ? 'Current production, demand and grid exchange are being evaluated from canonical Energy data.'
+            : reasonCandidate)
+        : 'No canonical Energy Intelligence explanation is currently published.';
       const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
       const reservePct = this.batteryReservePct(rt);
       const sourceRows = [];
@@ -2400,7 +2427,10 @@
         : `${contributors.length} active contributor${contributors.length===1?'':'s'}`;
       const gridDirection = balanceVm.grid.label;
       const gridValue = balanceVm.grid.displayPowerKw;
-      const recommendation = String(firstDefined(d.what_text, d.recommendation_text, d.recommendation, d.summary, 'Monitoring current energy flow') || 'Monitoring current energy flow');
+      const recommendationRaw = firstDefined(d.what_text, d.recommendation_text, d.recommendation, d.summary);
+      const recommendation = recommendationRaw === undefined || recommendationRaw === null || String(recommendationRaw).trim() === ''
+        ? 'Energy intelligence unavailable'
+        : String(recommendationRaw);
       return `${this.tabExperienceHeader(rt,'overview',pageVm)}
         <div class="overviewCoreGrid">
           <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon orange">☀</span><div><h2>Production & supply</h2><p>Energy available to the home now.</p></div></div>${sourceRows.join('') || `<div class="empty compact"><b>Supply unavailable</b><span>Current supply cannot be determined from canonical measurements.</span></div>`}</section>
