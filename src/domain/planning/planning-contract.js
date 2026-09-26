@@ -23,10 +23,19 @@
     const normalized = String(horizonId || 'D0').toUpperCase();
     const v2 = readEnergyPublicV2(gateway);
     const planning = planningObject(v2.planning);
-    const horizonsById = planningById(firstDefined(planning.planning_horizons, planning.planning_horizons_json));
+    const horizonsById = planningById(planning.horizons);
     const horizon = planningObject(horizonsById[normalized] || horizonsById[normalized.toLowerCase()]);
-    const summary = planningObject(firstDefined(horizon.summary, horizon.planning_summary));
-    const laneTotals = planningObject(firstDefined(summary.lane_totals, horizon.lane_totals, horizon.planning_totals));
+    const summary = horizon;
+    const laneTotals = planningObject({
+      required_kwh:horizon.required_kwh,
+      planned_kwh:horizon.planned_kwh,
+      executed_kwh:horizon.executed_kwh,
+      still_to_plan_kwh:horizon.still_to_plan_kwh,
+      flexible_required_kwh:horizon.flexible_required_kwh,
+      flexible_planned_kwh:horizon.flexible_planned_kwh,
+      flexible_executed_kwh:horizon.flexible_executed_kwh,
+      flexible_still_to_plan_kwh:horizon.flexible_still_to_plan_kwh
+    });
     const buckets = planningRows(firstDefined(horizon.buckets, horizon.timeline, horizon.rows))
       .map((row,index)=>({ bucket_id:row?.bucket_id || row?.id || `bucket_${index+1}`, ...planningObject(row) }));
     const planningObjects = planningRows(v2.layers?.planning_objects);
@@ -34,8 +43,8 @@
     const planningAssetsById = Object.fromEntries(planningAssets.map(row => [String(row.asset_id || row.target_asset_id), planningObject(row)]));
     const d0 = planningObject(horizonsById.D0);
     const d1 = planningObject(horizonsById.D1);
-    const d0Totals = planningObject(firstDefined(d0?.summary?.lane_totals, d0?.lane_totals));
-    const d1Totals = planningObject(firstDefined(d1?.summary?.lane_totals, d1?.lane_totals));
+    const d0Totals = planningObject(d0);
+    const d1Totals = planningObject(d1);
     return Object.freeze({
       entityId:v2.envelope.entityId,
       contractVersion:v2.contractVersion,
@@ -54,7 +63,7 @@
       buckets,
       currentPlanningBucket:{},
       currentActionIntent:{},
-      totalsSource:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.planning_horizons.summary.lane_totals'
+      totalsSource:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons'
     });
   }
 

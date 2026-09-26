@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.0.1';
+  const UX_VERSION = 'R4.0.2';
   const COMPANY_LOGO_ASSET = `/hacsfiles/rhi-energy-ux/assets/branding/company-logo.svg?v=${encodeURIComponent(UX_VERSION)}`;
 
   const HERO_IMAGE_BATTERY = 'data:image/webp;base64,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';
@@ -61,6 +61,8 @@ function readEnergyPublicV2(gateway) {
     const parsed = parseMaybeJson(value, value);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   };
+
+  const core = object(attrs.core);
   const objects = array(attrs.objects);
   const profiles = array(attrs.profiles);
   const relationships = array(attrs.relationships).map(row => Object.freeze({
@@ -79,10 +81,77 @@ function readEnergyPublicV2(gateway) {
   const valueAccounting = object(attrs.value_accounting);
   const layers = object(attrs.layers);
   const summary = object(attrs.summary);
+
+  const semantic = raw => {
+    const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {value:raw};
+    const resolution = source.resolution && typeof source.resolution === 'object' ? source.resolution : {};
+    const value = source.value !== undefined ? source.value : null;
+    const status = String(source.status || source.availability || resolution.status || (value !== null ? 'AVAILABLE' : 'UNAVAILABLE')).toUpperCase();
+    const quality = String(source.quality || (status === 'AVAILABLE' ? 'CANONICAL' : 'UNKNOWN')).toUpperCase();
+    const resolved = status === 'AVAILABLE' && value !== null && !['INVALID','STALE'].includes(quality);
+    return Object.freeze({
+      resolved,
+      value,
+      display:String(source.display ?? source.display_value ?? (value ?? '—')),
+      unit:String(source.unit || ''),
+      state:status.toLowerCase(),
+      status,
+      quality,
+      reason:String(source.reason || resolution.reason_code || source.reason_code || source.reason_text || ''),
+      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+      editable:source.write_supported === true || source.editable === true,
+      editor:source.editor || null,
+      constraints:source.constraints && typeof source.constraints === 'object' ? source.constraints : {},
+      write:source.write && typeof source.write === 'object' ? source.write : null,
+      operation:source.operation && typeof source.operation === 'object' ? source.operation : null,
+      raw:source
+    });
+  };
+
+  const coreField = (sectionName, fieldName) => {
+    const section = object(core[sectionName]);
+    const fields = object(section.fields);
+    if (fields[fieldName] !== undefined) return semantic(fields[fieldName]);
+    if (section[fieldName] && typeof section[fieldName] === 'object' && Object.prototype.hasOwnProperty.call(section[fieldName],'value')) {
+      return semantic(section[fieldName]);
+    }
+    if (Object.prototype.hasOwnProperty.call(section, fieldName)) {
+      const value = section[fieldName];
+      return semantic({
+        value,
+        unit:({power_kw:'kW',net_power_kw:'kW',import_power_kw:'kW',export_power_kw:'kW',attributed_power_kw:'kW',soc_pct:'%',reserve_target_pct:'%',capacity_kwh:'kWh',available_kwh:'kWh'})[fieldName] || null,
+        status:value === null || value === undefined ? 'UNAVAILABLE' : 'AVAILABLE',
+        quality:value === null || value === undefined ? 'UNKNOWN' : 'CANONICAL',
+        reason:value === null || value === undefined ? String(section.reason || '') : null
+      });
+    }
+    return semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:String(section.reason || 'canonical_field_not_published')});
+  };
+
+  const coreByKey = new Map([
+    ['battery.power_kw', coreField('battery','power_kw')],
+    ['battery.soc_pct', coreField('battery','soc_pct')],
+    ['battery.capacity_kwh', coreField('battery','capacity_kwh')],
+    ['battery.available_kwh', coreField('battery','available_kwh')],
+    ['battery.state', coreField('battery','state')],
+    ['battery.reserve_target_pct', coreField('battery','reserve_target_pct')],
+    ['solar.power_kw', coreField('solar','power_kw')],
+    ['grid.net_power_kw', coreField('grid','net_power_kw')],
+    ['grid_import.power_kw', coreField('grid','import_power_kw')],
+    ['grid_export.power_kw', coreField('grid','export_power_kw')],
+    ['grid.flow_direction', coreField('grid','flow_direction')],
+    ['site_consumption.power_kw', coreField('consumption','power_kw')],
+    ['home_consumption.power_kw', coreField('home','power_kw')],
+    ['flexible_loads.power_kw', coreField('flexible','power_kw')],
+    ['flexible_loads.attributed_power_kw', coreField('flexible','attributed_power_kw')]
+  ]);
+
+  const coreFlexible = object(core.flexible);
   const flexibleAssets = Object.freeze(
-    objects
-      .filter(row => String(row.asset_type || row.object_class || '').toLowerCase() === 'flexible_asset')
-      .map(row => Object.freeze({ ...row }))
+    (array(coreFlexible.assets).length ? array(coreFlexible.assets) : objects.filter(row => {
+      const type=String(row.asset_type || row.object_class || '').toLowerCase();
+      return type === 'flexible_load' || type === 'flexible_asset';
+    })).map(row => Object.freeze({ ...row }))
   );
   const planningObjects = Object.freeze(array(layers.planning_objects));
   const objectById = new Map(objects.map(row => [String(row.asset_id || ''), row]).filter(([id]) => id));
@@ -92,10 +161,8 @@ function readEnergyPublicV2(gateway) {
   const propertyByKey = new Map();
   const propertyByAssetAndKey = new Map();
   const configurationRows = [];
-  for (const [configurationKind, config] of Object.entries(configuration)) {
-    if (!config || typeof config !== 'object') continue;
-    const rows = array(config.properties || config.configured_properties || config.effective_properties);
-    for (const raw of rows) {
+  const addConfigurationRows = (configurationKind, rows) => {
+    for (const raw of array(rows)) {
       const key = String(raw.property_key || raw.property_id || raw.key || '');
       if (!key) continue;
       const row = Object.freeze({
@@ -109,11 +176,15 @@ function readEnergyPublicV2(gateway) {
       configurationRows.push(row);
       if (!propertyByKey.has(key)) propertyByKey.set(key,row);
     }
-  }
+  };
+  const pricing = object(configuration.pricing);
+  const strategy = object(configuration.strategy);
+  addConfigurationRows('pricing', pricing.properties);
+  addConfigurationRows('strategy', object(strategy.configured).properties || strategy.configured_properties);
+
   for (const asset of objects) {
     const assetId = String(asset.asset_id || '');
-    const rows = array(asset.properties);
-    for (const raw of rows) {
+    for (const raw of array(asset.properties)) {
       const key = String(raw.property_key || raw.property_id || raw.key || '');
       if (!key) continue;
       const row = Object.freeze({ asset_id:assetId, ...raw, property_key:key, key });
@@ -123,34 +194,13 @@ function readEnergyPublicV2(gateway) {
     }
   }
 
-  const field = row => {
-    const source = row && typeof row === 'object' ? row : {};
-    const resolution = source.resolution && typeof source.resolution === 'object' ? source.resolution : {};
-    const status = String(resolution.status || source.availability || source.status || (source.value !== undefined && source.value !== null ? 'RESOLVED' : 'UNAVAILABLE')).toUpperCase();
-    const resolved = ['RESOLVED','AVAILABLE','READY','OK'].includes(status) && source.value !== undefined && source.value !== null;
-    return Object.freeze({
-      resolved,
-      value: source.value ?? null,
-      display: String(source.display ?? source.display_value ?? (source.value ?? '—')),
-      unit: String(source.unit || ''),
-      state: status.toLowerCase(),
-      reason: String(resolution.reason_code || source.reason_code || source.reason || source.reason_text || ''),
-      source: 'RHI_ENERGY_PUBLIC_CONTRACT_V2',
-      quality: String(source.quality || ''),
-      editable: source.write_supported === true || source.editable === true,
-      editor: source.editor || null,
-      constraints: source.constraints && typeof source.constraints === 'object' ? source.constraints : {},
-      write: source.write && typeof source.write === 'object' ? source.write : null,
-      raw: source
-    });
-  };
-
   return Object.freeze({
     envelope,
-    available: envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2',
-    contractVersion: String(attrs.contract_version || envelope.contractVersion || ''),
-    release: String(attrs.release || ''),
-    health: String(envelope.state || 'UNKNOWN'),
+    available:envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+    contractVersion:String(attrs.contract_version || envelope.contractVersion || ''),
+    release:String(attrs.release || ''),
+    health:object(attrs.health).status || String(attrs.health || envelope.state || 'UNKNOWN'),
+    core,
     summary,
     objects,
     profiles,
@@ -172,13 +222,17 @@ function readEnergyPublicV2(gateway) {
     allPropertyRows:Object.freeze([...propertyRows, ...configurationRows]),
     propertyByKey,
     propertyByAssetAndKey,
+    coreByKey,
     object(assetId) { return objectById.get(String(assetId || '')) || null; },
     profile(profileId) { return profileById.get(String(profileId || '')) || null; },
     property(key, assetId = '') {
       const id = String(assetId || '');
       return id ? (propertyByAssetAndKey.get(`${id}::${String(key || '')}`) || null) : (propertyByKey.get(String(key || '')) || null);
     },
-    field(key, assetId = '') { return field(this.property(key, assetId)); }
+    field(key, assetId = '') {
+      if (!assetId && coreByKey.has(String(key || ''))) return coreByKey.get(String(key || ''));
+      return semantic(this.property(key, assetId));
+    }
   });
 }
 
@@ -229,35 +283,43 @@ function selectEnergyAsset(store, assetId) {
 function selectEnergyOverview(store) {
   const row=store?.overview && typeof store.overview === 'object' ? store.overview : {};
   return Object.freeze({
-    available:store?.available === true && Object.keys(row).length > 0,
-    status:String(row.status || row.product_status || row.state || 'UNAVAILABLE'),
+    available:store?.available === true,
+    status:String(row.status || row.product_status || row.state || store?.health || 'UNKNOWN'),
     primary:row.primary || row.primary_metric || null,
     summary:row.summary || {},
     flow:row.flow || {},
     conclusions:Array.isArray(row.conclusions) ? row.conclusions : [],
     reason:String(row.reason || row.product_reason || ''),
     raw:row,
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.overview'
+    core:store?.core || {},
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.core'
   });
 }
 
 function selectEnergyPlanning(store, horizon='D0') {
   const id=String(horizon || 'D0').toUpperCase();
   const planning=store?.planning && typeof store.planning === 'object' ? store.planning : {};
-  const horizons=planning.planning_horizons && typeof planning.planning_horizons === 'object'
-    ? planning.planning_horizons : {};
+  const horizons=planning.horizons && typeof planning.horizons === 'object' ? planning.horizons : {};
   const row=horizons[id] && typeof horizons[id] === 'object' ? horizons[id] : {};
-  const summary=row.summary && typeof row.summary === 'object' ? row.summary : {};
   return Object.freeze({
     available:store?.available === true && Object.keys(row).length > 0,
     horizon_id:id,
     horizon:row,
-    summary,
-    lane_totals:summary.lane_totals || row.lane_totals || {},
+    summary:row,
+    lane_totals:Object.freeze({
+      required_kwh:row.required_kwh ?? null,
+      planned_kwh:row.planned_kwh ?? null,
+      executed_kwh:row.executed_kwh ?? null,
+      still_to_plan_kwh:row.still_to_plan_kwh ?? null,
+      flexible_required_kwh:row.flexible_required_kwh ?? null,
+      flexible_planned_kwh:row.flexible_planned_kwh ?? null,
+      flexible_executed_kwh:row.flexible_executed_kwh ?? null,
+      flexible_still_to_plan_kwh:row.flexible_still_to_plan_kwh ?? null
+    }),
     buckets:Array.isArray(row.buckets) ? row.buckets : [],
-    flexible_plan:planning.flexible_plan || {},
+    flexible_plan:{},
     planning_objects:Array.isArray(store?.planningObjects) ? store.planningObjects : [],
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning'
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons'
   });
 }
 
@@ -265,43 +327,55 @@ function selectEnergyConfigurationProperties(store, scope) {
   const kind=String(scope || '').toLowerCase();
   const configuration=store?.configuration && typeof store.configuration === 'object' ? store.configuration : {};
   const section=configuration[kind] && typeof configuration[kind] === 'object' ? configuration[kind] : {};
-  const rows=section.properties || section.configured_properties || [];
+  if (kind === 'strategy') {
+    const configured=section.configured && typeof section.configured === 'object' ? section.configured : {};
+    const effective=section.effective && typeof section.effective === 'object' ? section.effective : {};
+    const rows=Array.isArray(configured.properties) ? configured.properties : [];
+    const effectiveRows=Array.isArray(effective.properties) ? effective.properties : [];
+    return Object.freeze({
+      available:store?.available === true && configured.status !== 'UNAVAILABLE',
+      scope:kind,
+      properties:Object.freeze(rows.map(row=>Object.freeze({...row}))),
+      effective_properties:Object.freeze(effectiveRows.map(row=>Object.freeze({...row}))),
+      effective_state:String(effective.status || 'UNAVAILABLE'),
+      effective_reason:String(effective.reason || ''),
+      runtime_overrides:Object.freeze((Array.isArray(effective.runtime_overrides) ? effective.runtime_overrides : []).map(row=>Object.freeze({...row}))),
+      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy'
+    });
+  }
+  const rows=Array.isArray(section.properties) ? section.properties : [];
   return Object.freeze({
     available:store?.available === true && Array.isArray(rows),
     scope:kind,
-    properties:Object.freeze((Array.isArray(rows) ? rows : []).map(row=>Object.freeze({...row}))),
-    effective_properties:Object.freeze((Array.isArray(section.effective_properties) ? section.effective_properties : []).map(row=>Object.freeze({...row}))),
-    effective_state:String(section.effective_state || section.availability || 'UNAVAILABLE'),
-    effective_reason:String(section.effective_reason || ''),
+    properties:Object.freeze(rows.map(row=>Object.freeze({...row}))),
+    effective_properties:Object.freeze([]),
+    effective_state:String(section.availability || section.status || 'UNAVAILABLE'),
+    effective_reason:String(section.reason || ''),
     source:`RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.${kind}`
   });
 }
 
-function selectEnergyStrategies(store) {
-  return selectEnergyConfigurationProperties(store,'strategy');
-}
-
-function selectEnergyPricing(store) {
-  return selectEnergyConfigurationProperties(store,'pricing');
-}
+function selectEnergyStrategies(store) { return selectEnergyConfigurationProperties(store,'strategy'); }
+function selectEnergyPricing(store) { return selectEnergyConfigurationProperties(store,'pricing'); }
 
 function selectEnergyValue(store, period='today') {
   const accounting=store?.valueAccounting && typeof store.valueAccounting === 'object' ? store.valueAccounting : {};
   const id=String(period || accounting.selected_period_id || 'today').toLowerCase();
   const periods=accounting.periods && typeof accounting.periods === 'object' ? accounting.periods : {};
   const row=periods[id] && typeof periods[id] === 'object' ? periods[id] : {};
+  const selectedId=String(accounting.selected_period_id || '').toLowerCase();
+  const netOutcome=accounting.net_financial_result && typeof accounting.net_financial_result === 'object' ? accounting.net_financial_result : {};
   return Object.freeze({
     available:store?.available === true && Object.keys(row).length > 0,
     period_id:id,
     value:row,
-    net_financial_result_eur:row.net_financial_result_eur ?? (id === String(accounting.selected_period_id || '').toLowerCase() ? accounting.net_financial_result_eur : null),
+    net_financial_result_eur:row.net_financial_result_eur ?? (id === selectedId ? netOutcome.value ?? accounting.net_financial_result_eur ?? null : null),
+    net_financial_result:id === selectedId ? netOutcome : {},
     source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.value_accounting'
   });
 }
 
 function selectEnergyMetering(store, period='today') {
-  // E0.15.48 publishes financial period actuals, not canonical period-energy
-  // metering detail. Fail closed instead of reconstructing Energy truth in UX.
   const id=String(period || 'today').toLowerCase();
   return Object.freeze({
     available:false,
@@ -339,22 +413,20 @@ function selectEnergyCoverage(store) {
     return !!value && typeof value === 'object' && Object.keys(value).length > 0;
   };
   const capabilities=Object.freeze({
+    core:present(store?.core) ? 'SUPPORTED' : 'UNAVAILABLE',
     assets:present(store?.objects) ? 'SUPPORTED' : 'UNAVAILABLE',
-    relationships:present(store?.relationships) ? 'SUPPORTED' : 'UNAVAILABLE',
-    overview:present(store?.overview) ? 'SUPPORTED' : 'UNAVAILABLE',
-    planning:present(store?.planning) ? 'SUPPORTED' : 'UNAVAILABLE',
+    relationships:Array.isArray(store?.relationships) ? 'SUPPORTED' : 'UNAVAILABLE',
+    planning:present(store?.planning?.horizons) ? 'SUPPORTED' : 'UNAVAILABLE',
     pricing:present(store?.configuration?.pricing) ? 'SUPPORTED' : 'UNAVAILABLE',
     strategies:present(store?.configuration?.strategy) ? 'SUPPORTED' : 'UNAVAILABLE',
     commands:Array.isArray(store?.commands) ? 'SUPPORTED' : 'UNAVAILABLE',
-    activity:Array.isArray(store?.activity) ? 'SUPPORTED' : 'UNAVAILABLE',
-    value_accounting:present(store?.valueAccounting) ? 'SUPPORTED' : 'UNAVAILABLE',
-    metering:'UNAVAILABLE'
+    value_accounting:present(store?.valueAccounting) ? 'SUPPORTED' : 'UNAVAILABLE'
   });
   return Object.freeze({
     complete:Object.values(capabilities).every(value=>value === 'SUPPORTED'),
     capabilities,
     unsupported:Object.freeze(Object.entries(capabilities).filter(([,v])=>v!=='SUPPORTED').map(([k])=>k)),
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.coverage'
   });
 }
 
@@ -390,7 +462,7 @@ const RHI_ENERGY_LOGICAL_VISUALS = Object.freeze([
   { id:"solar_optimizer.generic", asset_type:"solar_optimizer", label:"Solar optimizer", brand:"Generic", model:"PV optimizer", variant:"Optimizer", profile_patterns:["energy.solar_optimizer."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
   { id:"solar_forecast.provider", asset_type:"solar_forecast", label:"Solar forecast", brand:"Generic", model:"Forecast provider", variant:"Forecast", profile_patterns:["energy.solar_forecast."], package_path:"heroes/outlook-hero.webp", quality:"representative", selectable:true },
 
-  { id:"gas_meter.smart_meter", asset_type:"gas_meter", label:"Gas meter", brand:"Generic", model:"Smart gas meter", variant:"Meter", profile_patterns:["energy.gas_meter."], package_path:"heroes/gas-hero.svg", quality:"representative", selectable:true },
+  { id:"gas_meter.smart_meter", asset_type:"gas_meter", label:"Gas meter", brand:"Generic", model:"Smart gas meter", variant:"Meter", profile_patterns:["energy.gas_meter."], package_path:"heroes/gas-hero.webp", quality:"representative", selectable:true },
   { id:"price_source.market", asset_type:"price_source", label:"Energy price source", brand:"Generic", model:"Energy market", variant:"Price source", profile_patterns:["energy.price_source."], package_path:"heroes/pricing-hero.webp", quality:"representative", selectable:true },
   { id:"home_consumption.home", asset_type:"home_consumption", label:"Home consumption", brand:"Generic", model:"Home", variant:"Consumption", profile_patterns:["energy.home_consumption."], package_path:"heroes/consumers-hero.webp", quality:"representative", selectable:true },
 
@@ -679,24 +751,25 @@ function energyAssetPublicationGap(gateway, assetId = "") {
 
 // ---- src/runtime/consumption-contract.js ----
 // Canonical live consumption reader from RHI_ENERGY_PUBLIC_CONTRACT_V2.
-// Energy owns all balance semantics; the UX only selects already-resolved values.
+// Energy owns all balance semantics; the UX only selects already-resolved core values.
 function readLiveConsumptionContract(gateway) {
   const v2 = readEnergyPublicV2(gateway);
-  const read = key => v2.field(key);
-  const site = read('site_consumption.power_kw');
-  const home = read('home_consumption.power_kw');
-  const flexible = read('flexible_loads.power_kw');
+  const site = v2.field('site_consumption.power_kw');
+  const home = v2.field('home_consumption.power_kw');
+  const flexible = v2.field('flexible_loads.power_kw');
+  const attributed = v2.field('flexible_loads.attributed_power_kw');
   const contributors = (v2.flexibleAssets || []).map(row => Object.freeze({
     ...row,
     asset_id:String(row.asset_id || ''),
-    power_kw:asNumber(row.power_kw)
+    power_kw:asNumber(firstDefined(row.power_kw,row.current_power_kw,row.actual_power_kw))
   }));
-  const statusFor = field => String(field.state || (field.resolved ? 'resolved' : 'unavailable')).toUpperCase();
+  const statusFor = field => String(field.status || field.state || (field.resolved ? 'AVAILABLE' : 'UNAVAILABLE')).toUpperCase();
   return Object.freeze({
     envelope:v2.envelope,
     siteConsumptionKw:asNumber(site.value),
     homeConsumptionKw:asNumber(home.value),
     flexibleLoadsKw:asNumber(flexible.value),
+    attributedFlexibleLoadsKw:asNumber(attributed.value),
     flexibleLoadContributors:Object.freeze(contributors),
     siteStatus:statusFor(site),
     homeStatus:statusFor(home),
@@ -704,130 +777,128 @@ function readLiveConsumptionContract(gateway) {
     siteReason:String(site.reason || ''),
     homeReason:String(home.reason || ''),
     flexibleReason:String(flexible.reason || ''),
-    available:site.resolved || home.resolved || flexible.resolved,
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+    available:site.status === 'AVAILABLE' || home.status === 'AVAILABLE' || flexible.status === 'AVAILABLE',
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.core'
   });
 }
 
 // ---- src/domain/models/current-energy-view-model.js ----
 // Canonical current-energy view model. Literal contract keys and direction
 // semantics are confined to this adapter so screen renderers cannot drift.
-  function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
-    // interfaceKey is retained in the signature for call-site stability while the
-    // canonical source is now exclusively RHI_ENERGY_PUBLIC_CONTRACT_V2.
-    const v2 = readEnergyPublicV2(gateway);
-    const row = v2.property(propertyKey);
-    const projected = v2.field(propertyKey);
-    return Object.freeze({
-      envelope:v2.envelope,
-      row:row || {},
-      value:projected.value,
-      number:asNumber(projected.value),
-      text:String(projected.value ?? ''),
-      health:String(projected.state || 'unavailable').toUpperCase(),
-      reason:String(projected.reason || ''),
-      source:projected.source
-    });
+function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
+  // interfaceKey is retained in the signature for call-site stability while the
+  // canonical source is exclusively RHI_ENERGY_PUBLIC_CONTRACT_V2.
+  const v2 = readEnergyPublicV2(gateway);
+  const row = v2.property(propertyKey);
+  const projected = v2.field(propertyKey);
+  return Object.freeze({
+    envelope:v2.envelope,
+    row:row || projected.raw || {},
+    value:projected.value,
+    number:asNumber(projected.value),
+    text:String(projected.value ?? ''),
+    health:String(projected.status || projected.state || 'UNAVAILABLE').toUpperCase(),
+    quality:String(projected.quality || ''),
+    reason:String(projected.reason || ''),
+    source:projected.source
+  });
+}
+
+function canonicalBatteryState(value) {
+  const state = String(value || '').trim().toLowerCase();
+  if (['charging','charge'].includes(state)) return 'charging';
+  if (['discharging','discharge'].includes(state)) return 'discharging';
+  if (['idle','standby','available','ready'].includes(state)) return 'idle';
+  return state || 'unavailable';
+}
+
+function createBatteryCurrentFlowViewModel(gateway) {
+  const signed = readTypedPropertyContract(gateway, 'battery', 'battery.power_kw');
+  const stateProperty = readTypedPropertyContract(gateway, 'battery', 'battery.state');
+  const soc = readTypedPropertyContract(gateway, 'battery', 'battery.soc_pct');
+  const available = readTypedPropertyContract(gateway, 'battery', 'battery.available_kwh');
+  const capacity = readTypedPropertyContract(gateway, 'battery', 'battery.capacity_kwh');
+  const reserve = readTypedPropertyContract(gateway, 'battery', 'battery.reserve_target_pct');
+  const state = canonicalBatteryState(stateProperty.value);
+  const projectedPowerKw = signed.number === null ? null : Math.abs(signed.number);
+  let displayPowerKw = projectedPowerKw;
+  let signedFlowKw = signed.number;
+  let direction = 'unknown';
+  let label = 'Unavailable';
+  let detail = 'Battery flow unavailable';
+
+  if (state === 'charging') {
+    direction = 'into_storage';
+    label = 'Charging';
+    detail = 'Charging from Home Bus';
+    signedFlowKw = projectedPowerKw === null ? null : -projectedPowerKw;
+  } else if (state === 'discharging') {
+    direction = 'out_of_storage';
+    label = 'Discharging';
+    detail = 'Supplying the Home Bus';
+    signedFlowKw = projectedPowerKw;
+  } else if (state === 'idle') {
+    displayPowerKw = signed.number === null ? null : Math.abs(signed.number);
+    signedFlowKw = signed.number === null ? null : 0;
+    direction = 'idle';
+    label = 'Idle';
+    detail = 'No active battery flow';
   }
 
-  function canonicalBatteryState(value) {
-    const state = String(value || '').trim().toLowerCase();
-    if (['charging','charge'].includes(state)) return 'charging';
-    if (['discharging','discharge'].includes(state)) return 'discharging';
-    if (['idle','standby','available','ready'].includes(state)) return 'idle';
-    return state || 'unavailable';
-  }
+  const health = signed.health === 'AVAILABLE' && stateProperty.health === 'AVAILABLE' ? 'OK' : 'UNAVAILABLE';
+  return Object.freeze({
+    state,
+    health,
+    reason:String(firstDefined(signed.reason, stateProperty.reason, '')),
+    signedPowerKw:signed.number,
+    chargePowerKw:state === 'charging' ? projectedPowerKw : (signed.number === null ? null : 0),
+    dischargePowerKw:state === 'discharging' ? projectedPowerKw : (signed.number === null ? null : 0),
+    displayPowerKw,
+    signedFlowKw,
+    direction,
+    label,
+    detail,
+    flowRole:direction === 'out_of_storage' ? 'producer' : direction === 'into_storage' ? 'consumer' : 'inactive',
+    uxVisible:displayPowerKw !== null,
+    socPct:soc.number,
+    availableKwh:available.number,
+    capacityKwh:capacity.number,
+    reserveTargetPct:reserve.number,
+    valueAvailable:displayPowerKw !== null
+  });
+}
 
-  function createBatteryCurrentFlowViewModel(gateway) {
-    const signed = readTypedPropertyContract(gateway, 'battery', 'battery.power_kw');
-    const charge = readTypedPropertyContract(gateway, 'battery', 'battery.charge_power_kw');
-    const discharge = readTypedPropertyContract(gateway, 'battery', 'battery.discharge_power_kw');
-    const stateProperty = readTypedPropertyContract(gateway, 'battery', 'battery.state');
-    const soc = readTypedPropertyContract(gateway, 'battery', 'battery.soc_pct');
-    const available = readTypedPropertyContract(gateway, 'battery', 'battery.available_kwh');
-    const capacity = readTypedPropertyContract(gateway, 'battery', 'battery.capacity_kwh');
-    const healthProperty = readTypedPropertyContract(gateway, 'battery', 'battery.health');
-    const state = canonicalBatteryState(stateProperty.value);
-    const projectedPowerKw = signed.number === null ? null : Math.abs(signed.number);
-    let displayPowerKw = null;
-    let signedFlowKw = null;
-    let direction = 'unknown';
-    let label = 'Unavailable';
-    let detail = 'Battery flow unavailable';
+function createGridCurrentFlowViewModel(gateway) {
+  const netPower = readTypedPropertyContract(gateway, 'grid', 'grid.net_power_kw');
+  const importPower = readTypedPropertyContract(gateway, 'grid', 'grid_import.power_kw');
+  const exportPower = readTypedPropertyContract(gateway, 'grid', 'grid_export.power_kw');
+  const directionProperty = readTypedPropertyContract(gateway, 'grid', 'grid.flow_direction');
+  const rawDirection = String(firstDefined(directionProperty.value, '') || '').toLowerCase();
+  const direction = /export/.test(rawDirection) ? 'exporting' : /import/.test(rawDirection) ? 'importing' : /balanc|idle|none/.test(rawDirection) ? 'balanced' : 'unknown';
+  const displayPowerKw = direction === 'exporting' ? exportPower.number : direction === 'importing' ? importPower.number : direction === 'balanced' ? 0 : (netPower.number === null ? null : Math.abs(netPower.number));
+  return Object.freeze({
+    netPowerKw:netPower.number,
+    importPowerKw:importPower.number,
+    exportPowerKw:exportPower.number,
+    displayPowerKw,
+    direction,
+    label:direction === 'exporting' ? 'Exporting' : direction === 'importing' ? 'Importing' : direction === 'balanced' ? 'Balanced' : 'Unavailable'
+  });
+}
 
-    if (state === 'charging') {
-      displayPowerKw = firstDefined(charge.number, projectedPowerKw, signed.number === null ? null : Math.abs(Math.min(0, signed.number)));
-      displayPowerKw = asNumber(displayPowerKw);
-      signedFlowKw = displayPowerKw === null ? null : -Math.abs(displayPowerKw);
-      direction = 'into_storage';
-      label = 'Charging';
-      detail = 'Charging from Home Bus';
-    } else if (state === 'discharging') {
-      displayPowerKw = firstDefined(discharge.number, projectedPowerKw, signed.number === null ? null : Math.max(0, signed.number));
-      displayPowerKw = asNumber(displayPowerKw);
-      signedFlowKw = displayPowerKw === null ? null : Math.abs(displayPowerKw);
-      direction = 'out_of_storage';
-      label = 'Discharging';
-      detail = 'Supplying the Home Bus';
-    } else if (state === 'idle') {
-      displayPowerKw = 0;
-      signedFlowKw = 0;
-      direction = 'idle';
-      label = 'Idle';
-      detail = 'No active battery flow';
-    }
+function createSolarCurrentViewModel(gateway) {
+  const power = readTypedPropertyContract(gateway, 'solar', 'solar.power_kw');
+  return Object.freeze({ powerKw:power.number, health:power.health, reason:power.reason });
+}
 
-    const health = String(firstDefined(healthProperty.value, healthProperty.health, signed.value !== null ? 'OK' : 'UNAVAILABLE'));
-    return Object.freeze({
-      state,
-      health,
-      reason:String(firstDefined(healthProperty.reason, stateProperty.reason, '')),
-      signedPowerKw:signed.number,
-      chargePowerKw:charge.number,
-      dischargePowerKw:discharge.number,
-      displayPowerKw,
-      signedFlowKw,
-      direction,
-      label,
-      detail,
-      flowRole:direction === 'out_of_storage' ? 'producer' : direction === 'into_storage' ? 'consumer' : 'inactive',
-      uxVisible:displayPowerKw !== null,
-      socPct:soc.number,
-      availableKwh:available.number,
-      capacityKwh:capacity.number,
-      valueAvailable:displayPowerKw !== null
-    });
-  }
-
-  function createGridCurrentFlowViewModel(gateway) {
-    const importPower = readTypedPropertyContract(gateway, 'grid', 'grid_import.power_kw');
-    const exportPower = readTypedPropertyContract(gateway, 'grid', 'grid_export.power_kw');
-    const directionProperty = readTypedPropertyContract(gateway, 'grid', 'grid.flow_direction');
-    const rawDirection = String(firstDefined(directionProperty.value, '') || '').toLowerCase();
-    const direction = /export/.test(rawDirection) ? 'exporting' : /import/.test(rawDirection) ? 'importing' : 'balanced';
-    const displayPowerKw = direction === 'exporting' ? exportPower.number : direction === 'importing' ? importPower.number : 0;
-    return Object.freeze({
-      importPowerKw:importPower.number,
-      exportPowerKw:exportPower.number,
-      displayPowerKw,
-      direction,
-      label:direction === 'exporting' ? 'Exporting' : direction === 'importing' ? 'Importing' : 'Balanced'
-    });
-  }
-
-  function createSolarCurrentViewModel(gateway) {
-    const power = readTypedPropertyContract(gateway, 'solar', 'solar.power_kw');
-    return Object.freeze({ powerKw:power.number, health:power.health, reason:power.reason });
-  }
-
-  function createCurrentEnergyViewModel(gateway) {
-    return Object.freeze({
-      battery:createBatteryCurrentFlowViewModel(gateway),
-      grid:createGridCurrentFlowViewModel(gateway),
-      solar:createSolarCurrentViewModel(gateway),
-      consumption:readLiveConsumptionContract(gateway)
-    });
-  }
+function createCurrentEnergyViewModel(gateway) {
+  return Object.freeze({
+    battery:createBatteryCurrentFlowViewModel(gateway),
+    grid:createGridCurrentFlowViewModel(gateway),
+    solar:createSolarCurrentViewModel(gateway),
+    consumption:readLiveConsumptionContract(gateway)
+  });
+}
 
 // ---- src/domain/models/physical-flow-view-model.js ----
 // R1.89.39 physical-flow model. Consumers and physical connections are
@@ -1172,6 +1243,24 @@ function readEnergyCommandContract(gateway) {
         });
       };
       (v2.allPropertyRows || []).forEach(add);
+      // Core is the only authority for current home-energy facts. Expose the
+      // canonical SemanticValue fields through the existing row API so screens
+      // cannot fall back to object property indexes for aggregate truth.
+      for (const [key, field] of (v2.coreByKey || new Map()).entries()) {
+        add({
+          asset_id:'core',
+          property_id:key,
+          property_key:key,
+          key,
+          value:field.value,
+          unit:field.unit,
+          availability:field.status,
+          status:field.status,
+          quality:field.quality,
+          reason:field.reason,
+          source_type:'canonical_v2_core'
+        });
+      }
 
       // Preserve the existing view API without creating another truth source:
       // intelligence fields are direct projections of the canonical V2 object.
@@ -1566,7 +1655,7 @@ function readEnergyCommandContract(gateway) {
 
     planningHorizons() {
       const planning=this.publicV2().planning || {};
-      const horizons=planning.planning_horizons && typeof planning.planning_horizons === 'object' ? planning.planning_horizons : {};
+      const horizons=planning.horizons && typeof planning.horizons === 'object' ? planning.horizons : {};
       return Object.entries(horizons).map(([id,value])=>({ horizon_id:String(id).toUpperCase(), ...planningObject(value) }));
     }
     planningHorizon(id = 'D0') {
@@ -1625,7 +1714,7 @@ function readEnergyCommandContract(gateway) {
     strategyProfileRows() {
       if (this._strategyProfiles) return this._strategyProfiles;
       const v2=this.publicV2();
-      const rows=asArray(v2.configuration?.strategy?.configured_properties);
+      const rows=asArray(v2.configuration?.strategy?.configured?.properties);
       const labels={home:'Home Intelligence',battery:'Home Battery',solar:'Solar',grid:'Grid',flexible_loads:'Flexible Loads',resilience:'Resilience'};
       const groups=new Map();
       rows.forEach(raw=>{
@@ -1698,7 +1787,7 @@ function readEnergyCommandContract(gateway) {
     effectiveStrategyRows() {
       if (this._effectiveStrategies) return this._effectiveStrategies;
       const v2=this.publicV2();
-      const rows=asArray(v2.configuration?.strategy?.effective_properties);
+      const rows=asArray(v2.configuration?.strategy?.effective?.properties);
       const byGroup=new Map();
       rows.forEach(raw=>{
         const row=objectFrom(raw);
@@ -1707,8 +1796,8 @@ function readEnergyCommandContract(gateway) {
           strategy_id:group, policy_id:group, asset_id:group,
           entity_id:v2.envelope.entityId,
           contract_role:'effective_strategy_policy',
-          effective_state:v2.configuration?.strategy?.effective_state || 'UNAVAILABLE',
-          reason_code:v2.configuration?.strategy?.effective_reason || ''
+          effective_state:v2.configuration?.strategy?.effective?.status || 'UNAVAILABLE',
+          reason_code:v2.configuration?.strategy?.effective?.reason || ''
         };
         const key=String(row.property_id || row.key || row.property_key || '');
         if(key) current[key]=row.value;
@@ -2182,10 +2271,19 @@ class FlexibleAssetDomainModel {
     const normalized = String(horizonId || 'D0').toUpperCase();
     const v2 = readEnergyPublicV2(gateway);
     const planning = planningObject(v2.planning);
-    const horizonsById = planningById(firstDefined(planning.planning_horizons, planning.planning_horizons_json));
+    const horizonsById = planningById(planning.horizons);
     const horizon = planningObject(horizonsById[normalized] || horizonsById[normalized.toLowerCase()]);
-    const summary = planningObject(firstDefined(horizon.summary, horizon.planning_summary));
-    const laneTotals = planningObject(firstDefined(summary.lane_totals, horizon.lane_totals, horizon.planning_totals));
+    const summary = horizon;
+    const laneTotals = planningObject({
+      required_kwh:horizon.required_kwh,
+      planned_kwh:horizon.planned_kwh,
+      executed_kwh:horizon.executed_kwh,
+      still_to_plan_kwh:horizon.still_to_plan_kwh,
+      flexible_required_kwh:horizon.flexible_required_kwh,
+      flexible_planned_kwh:horizon.flexible_planned_kwh,
+      flexible_executed_kwh:horizon.flexible_executed_kwh,
+      flexible_still_to_plan_kwh:horizon.flexible_still_to_plan_kwh
+    });
     const buckets = planningRows(firstDefined(horizon.buckets, horizon.timeline, horizon.rows))
       .map((row,index)=>({ bucket_id:row?.bucket_id || row?.id || `bucket_${index+1}`, ...planningObject(row) }));
     const planningObjects = planningRows(v2.layers?.planning_objects);
@@ -2193,8 +2291,8 @@ class FlexibleAssetDomainModel {
     const planningAssetsById = Object.fromEntries(planningAssets.map(row => [String(row.asset_id || row.target_asset_id), planningObject(row)]));
     const d0 = planningObject(horizonsById.D0);
     const d1 = planningObject(horizonsById.D1);
-    const d0Totals = planningObject(firstDefined(d0?.summary?.lane_totals, d0?.lane_totals));
-    const d1Totals = planningObject(firstDefined(d1?.summary?.lane_totals, d1?.lane_totals));
+    const d0Totals = planningObject(d0);
+    const d1Totals = planningObject(d1);
     return Object.freeze({
       entityId:v2.envelope.entityId,
       contractVersion:v2.contractVersion,
@@ -2213,7 +2311,7 @@ class FlexibleAssetDomainModel {
       buckets,
       currentPlanningBucket:{},
       currentActionIntent:{},
-      totalsSource:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.planning_horizons.summary.lane_totals'
+      totalsSource:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons'
     });
   }
 
@@ -2272,9 +2370,7 @@ class FlexibleAssetDomainModel {
     const laneTotals = normalizePlanningLaneTotals(contract.laneTotals);
     const rows = contract.buckets.map(bucket => adaptPlanningBucket(bucket, contract.contractVersion));
     const quality = planningObject(contract.horizon.quality);
-    const contractSupported = rows.length
-      ? rows.every(row => row.contractSupported)
-      : /R1\.(79\.[34]|89\.)/.test(contract.contractVersion);
+    const contractSupported = contract.available === true && String(contract.contractVersion || '').startsWith('2.');
     const stateText = String(firstDefined(contract.horizon.state, contract.horizon.status, quality.health, contract.horizon.quality, '')).toLowerCase();
     return Object.freeze({
       horizonId: contract.horizonId,
@@ -2346,7 +2442,7 @@ const HB_ENERGY_HERO_ASSETS = Object.freeze({
   "solar-generation": "heroes/solar-hero.webp",
   battery: "heroes/battery-hero.webp",
   consumers: "heroes/consumers-hero.webp",
-  gas: "heroes/gas-hero.svg",
+  gas: "heroes/gas-hero.webp",
   strategy: "heroes/strategies-hero.webp",
   strategies: "heroes/strategies-hero.webp",
   intelligence: "heroes/intelligence-hero.webp",
@@ -3499,6 +3595,7 @@ function rhiEnergyVisualPickerStyles() {
       if (tab === 'solar') { const mode=String(this.automationModeValue(rt,'automation')||'automatic').toLowerCase(); /* shared automation quick action evolution keeps validation continuity: this.automationQuickAction(rt, mode, 'solar') */ controls = this.automationQuickInline(rt, mode) + jump('Solar plan','hi-body-solar') + jump('Flexible loads','solar-flexible-loads'); }
       if (tab === 'battery') controls = button('Energy flow','data-view="flow"') + button('Strategy','data-view="strategies"') + button('Tactical planning','data-view="planning"');
       if (tab === 'consumers') controls = `<label class="hiQuickSelect"><span>Group</span><select data-consumer-filter-select>${[['all','All'],['flexible','Flexible'],['fixed','Fixed'],['vehicles','Vehicles'],['heating','Heating'],['storage','Storage']].map(([id,label])=>`<option value="${id}"${this.consumerFilter===id?' selected':''}>${label}</option>`).join('')}</select></label>` + jump('Consumer list','consumer-list');
+      if (tab === 'gas') controls = jump('Usage history','gas-history') + jump('Gas meter','gas-meter');
       if (tab === 'strategies') controls = jump('Profiles','strategy-profiles') + jump('Effective strategy','strategy-effective');
       if (tab === 'metering') controls = this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId) + this.componentMeteringSort();
       if (tab === 'intelligence') { const mode=this.automationModeValue(rt, firstDefined(rt.decision()?.mode, rt.decision()?.automation_mode, 'Automatic')); controls = this.segmentedControl(['off','recommend','automatic'].map(value=>({value,label:human(value),active:String(mode).toLowerCase()===value,attrs:{'data-mode-value':value,'data-property-key':'energy_intelligence.automation_mode'}})), String(mode).toLowerCase(), 'mode') + jump('Recommendation','hi-body-intelligence') + jump('Why','intelligence-why'); }
@@ -3537,6 +3634,7 @@ function rhiEnergyVisualPickerStyles() {
         intelligence: [human(d.recommendation || 'No recommendation available.'), human(d.reason || 'No explanation available.'), 'Decision evidence'],
         value: [value.interpretation, value.attention, 'Financial evidence'],
         planning: ['The table shows only Planning-owned hourly allocations.', 'Unavailable hours remain empty rather than estimated.', 'Planning evidence'],
+        gas: (() => { const gas=this.gasModel(rt); return gas.asset ? [gas.totalM3 !== null ? `Gas meter total is ${this.gasVolume(gas.totalM3)}.` : 'Gas meter is connected; the total reading is not currently available.', gas.totalEntityId ? 'Measured daily consumption is available in the 30-day history.' : 'Consumption history will appear when the canonical total meter entity is available.', 'Gas evidence'] : ['Gas consumption is not measured yet.', 'Connect one authoritative total-increasing gas meter to enable measured usage and history.', 'Gas evidence']; })(),
         retrospective: ['Energy Intelligence reviewed its measurable performance.', 'Scores reflect published evidence coverage and never invent missing results.', 'Retrospective evidence']
       };
       const [title, support, action] = conclusions[tab] || ['Energy information is available.','Open Diagnostics for technical details.','Evidence'];
@@ -3827,7 +3925,7 @@ function rhiEnergyVisualPickerStyles() {
         solar: { image:hbEnergyHeroAsset('solar-generation'), icon:'☀', eyebrow:'Solar', title:(solar||0)>0.05?'Generating now':'Not generating', value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
         battery: { image:hbEnergyHeroAsset('battery'), icon:'▣', eyebrow:'Home Battery', title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(this.batteryReservePct(rt)),'Protected minimum']] },
         consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Home Intelligence status']] },
-        gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:'Gas', title:gas.asset ? 'Gas consumption' : 'Gas meter not configured', value:this.gasVolume(gas.totalM3), unit:'total meter reading', explanation:gas.asset ? `${human(gas.health)} · ${gas.source}` : 'Configure an authoritative gas meter source in RHI Energy.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),'Instantaneous flow when published'],['◫','Meter total',this.gasVolume(gas.totalM3),'Canonical total-increasing reading'],['✓','Health',human(gas.health),'Gas meter health'],['↺','History',gas.totalEntityId?'30 days':'Waiting for meter entity','HA long-term statistics']] },
+        gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:'Gas', title:gas.asset ? 'Gas consumption' : 'Gas meter not connected', value:this.gasVolume(gas.totalM3), unit:'total meter reading', explanation:gas.asset ? 'Measured gas use, meter health and 30-day history.' : 'Connect one authoritative gas meter to start measured consumption history.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),gas.flowM3h===null?'Not measured':'Current measured flow'],['◫','Meter total',this.gasVolume(gas.totalM3),gas.totalM3===null?'Not measured':'Cumulative meter reading'],['↺','History',gas.totalEntityId?'30 days':'Not available',gas.totalEntityId?'Daily measured consumption':'Waiting for total meter'],['✓','Health',gas.asset?human(gas.health):'Not configured',gas.asset?'Gas meter health':'Authoritative source required']] },
         strategies: { image:hbEnergyHeroAsset('strategies'), icon:'◎', eyebrow:'Strategies', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Configured intent and the strategy currently in effect', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
         'operational-planning': { image:hbEnergyHeroAsset('operational-planning'), icon:'◷', eyebrow:'Operational Planning', title:this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'), value:fmtKw(flexPower), unit:'managed power now', explanation:'Current flexible-load execution and next actions', tone:'purple', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Managed power now'],['⌂','Energy need',fmtKwh(flexNeed),'Known remaining need'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Current operational state'],['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'),'Energy control mode']] },
         metering: { image:hbEnergyHeroAsset('metering'), icon:'▥', eyebrow:'Metering', title:meteringContext.label, value:meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar), unit:'Solar production', explanation:`Measured energy flows this ${meteringContext.label.toLowerCase()}`, tone:'blue', metrics:[['▥','Consumption',meteringContext.consumption === null ? 'Unavailable' : fmtKwh(meteringContext.consumption),meteringContext.label],['☀','Solar',meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar),meteringContext.label],['↓','Grid import',meteringContext.gridImport === null ? 'Unavailable' : fmtKwh(meteringContext.gridImport),meteringContext.label],['↑','Grid export',meteringContext.gridExport === null ? 'Unavailable' : fmtKwh(meteringContext.gridExport),meteringContext.label]] },
@@ -4643,7 +4741,7 @@ function rhiEnergyVisualPickerStyles() {
     }
     energyHardwareStyles() {
       return `
-        .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceCard{max-width:720px}.gasMeterPanel .energyDeviceGrid{grid-template-columns:minmax(0,720px)}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasStatisticsHost{min-height:220px}}
+        .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceCard{max-width:720px}.gasMeterPanel .energyDeviceGrid{grid-template-columns:minmax(0,720px)}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasStatisticsHost{min-height:220px}}
 
         .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead,.solarStoryHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
         .energyDeviceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.energyDeviceCard{display:grid;grid-template-columns:126px minmax(0,1fr);gap:12px;border:1px solid #e5ebf3;background:#fff;border-radius:14px;padding:12px;min-height:166px}.energyDeviceVisual{height:138px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fbfdff,#f6f8fb);border-radius:11px;overflow:hidden}.energyDeviceVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.energyDeviceVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:5px;box-sizing:border-box}.energyDeviceBody{min-width:0}.energyDeviceTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.energyDeviceTop small{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.energyDeviceTop h3{font-size:13px;line-height:1.25;margin:3px 0 8px}.energyDeviceState{font-size:9px;background:#eef7f1;color:#3f7f5a;border-radius:999px;padding:5px 7px;white-space:nowrap}.energyDeviceConfig{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.energyDeviceConfig span{font-size:9px;color:#64748b;background:#f8fafc;border-radius:7px;padding:5px 6px}.energyDeviceConfig b{color:#334155;margin-right:4px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyDeviceFacts span{background:#f8fafc;border-radius:7px;padding:6px;min-width:0}.energyDeviceFacts small,.energyDeviceFacts b{display:block}.energyDeviceFacts small{font-size:8px;color:#64748b}.energyDeviceFacts b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.energyDeviceNoFacts{grid-column:1/-1}
@@ -5077,22 +5175,25 @@ function rhiEnergyVisualPickerStyles() {
     gas(rt) {
       const pageVm = this.buildPageViewModel(rt, 'gas');
       const gas = this.gasModel(rt);
-      if (!gas.asset) {
-        return `${this.tabExperienceHeader(rt,'gas',pageVm)}<section class="panel gasSetupPanel"><h2>Gas meter setup needed</h2><p>RHI Energy has no canonical gas meter yet. Configure the authoritative gas source first; the UX will not invent consumption history.</p></section>`;
-      }
-      const meter = this.energyDeviceStatusCard(rt, gas.asset, 'Gas meter');
-      const graph = gas.totalEntityId
-        ? `<section class="panel gasHistoryPanel"><div class="rhiUxSectionHead"><div><h2>Gas consumption history</h2><p>Native Home Assistant long-term statistics from the canonical total-increasing gas meter.</p></div><span>30 days</span></div><div class="gasStatisticsHost" data-gas-statistics-host data-entity-id="${escapeHtml(gas.totalEntityId)}"></div></section>`
-        : `<section class="panel gasHistoryPanel"><h2>Gas consumption history</h2><div class="empty"><b>Waiting for the canonical gas meter entity</b><span>History will use Home Assistant Statistics Graph as soon as the total-increasing gas entity is available.</span></div></section>`;
+      const hasMeter = !!gas.asset;
+      const meter = hasMeter ? this.energyDeviceStatusCard(rt, gas.asset, 'Gas meter') : '';
+      const historyAvailable = !!gas.totalEntityId;
+      const graph = historyAvailable
+        ? `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily measured gas use from Home Assistant long-term statistics on the canonical total-increasing meter.</p></div><span>Last 30 days</span></div><div class="gasStatisticsHost" data-gas-statistics-host data-entity-id="${escapeHtml(gas.totalEntityId)}"></div></section>`
+        : `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily gas consumption will appear here when a canonical total-increasing gas meter is available.</p></div></div><div class="empty"><b>No measured gas history yet</b><span>Connect the authoritative gas meter to enable Home Assistant long-term statistics. The UX never estimates missing consumption.</span></div></section>`;
+      const setupOrMeter = hasMeter
+        ? `<section class="panel gasMeterPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Gas meter</h2><p>Physical meter identity, source and canonical measurement health.</p></div></div>${meter}</section>`
+        : `<section class="panel gasSetupPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Connect your gas meter</h2><p>RHI Energy needs one authoritative gas source before it can show consumption history.</p></div></div><div class="gasSetupFacts"><div><small>Required</small><b>Total gas meter</b><span>A cumulative total-increasing reading in m³.</span></div><div><small>Optional</small><b>Live gas flow</b><span>An instantaneous m³/h reading when the source publishes it.</span></div><div><small>History</small><b>Home Assistant statistics</b><span>Daily changes are shown without frontend estimation.</span></div></div></section>`;
       return `${this.tabExperienceHeader(rt,'gas',pageVm)}<div class="gasPage">
-        <section class="gasKpiStrip">
-          <article><small>Flow now</small><b>${escapeHtml(this.gasFlow(gas.flowM3h))}</b></article>
-          <article><small>Total meter</small><b>${escapeHtml(this.gasVolume(gas.totalM3))}</b></article>
-          <article><small>Health</small><b>${escapeHtml(human(gas.health))}</b></article>
-          <article><small>Source</small><b>${escapeHtml(human(gas.source))}</b></article>
+        <section class="gasKpiStrip" aria-label="Gas consumption status">
+          <article><small>Flow now</small><b>${escapeHtml(this.gasFlow(gas.flowM3h))}</b><span>${gas.flowM3h === null ? 'Not measured' : 'Current measured gas flow'}</span></article>
+          <article><small>Meter total</small><b>${escapeHtml(this.gasVolume(gas.totalM3))}</b><span>${gas.totalM3 === null ? 'Not measured' : 'Cumulative meter reading'}</span></article>
+          <article><small>History</small><b>${historyAvailable ? '30 days' : 'Not available'}</b><span>${historyAvailable ? 'Daily measured consumption' : 'Waiting for total meter'}</span></article>
+          <article><small>Meter health</small><b>${escapeHtml(hasMeter ? human(gas.health) : 'Not configured')}</b><span>${hasMeter ? escapeHtml(human(gas.source)) : 'Authoritative source required'}</span></article>
         </section>
+        <section class="panel gasUseInfoPanel"><div class="rhiUxSectionHead"><div><h2>Your gas use</h2><p>Gas is treated as measured consumption: live flow when available, the cumulative meter total, and daily history from Home Assistant statistics.</p></div></div><div class="gasUseFacts"><article><span>🔥</span><div><small>Using gas now?</small><b>${gas.flowM3h === null ? 'Live flow is not measured' : (gas.flowM3h > 0 ? `Using ${this.gasFlow(gas.flowM3h)}` : 'No measured gas flow right now')}</b></div></article><article><span>◫</span><div><small>How much has the meter recorded?</small><b>${gas.totalM3 === null ? 'Meter total is not available' : this.gasVolume(gas.totalM3)}</b></div></article><article><span>↺</span><div><small>How is usage changing?</small><b>${historyAvailable ? 'See the measured 30-day history below' : 'History starts when the total meter is available'}</b></div></article></div></section>
         ${graph}
-        <section class="panel gasMeterPanel"><div class="rhiUxSectionHead"><div><h2>Gas meter</h2><p>Physical meter identity and canonical source facts.</p></div></div>${meter}</section>
+        ${setupOrMeter}
       </div>`;
     }
 

@@ -104,9 +104,9 @@ const planningGateway = {
         contract_version:'2.0.0',
         objects:[], profiles:[], relationships:[], commands:[], configuration:{}, intelligence:{}, overview:{}, activity:[], value_accounting:{}, layers:{planning_objects:[]},
         planning:{
-          planning_horizons:{
-            D0:{ horizon_id:'D0', summary:{ lane_totals:{ consumers:{ flexible_loads_kwh:3.2, flexible_assets:[] } } }, buckets:[] },
-            D1:{ horizon_id:'D1', summary:{ lane_totals:{ consumers:{ flexible_loads_kwh:4.7, flexible_assets:[] } } }, buckets:[] }
+          horizons:{
+            D0:{ horizon_id:'D0', required_kwh:12.4, planned_kwh:9.8, still_to_plan_kwh:2.6, flexible_required_kwh:5.8, flexible_planned_kwh:3.2, flexible_still_to_plan_kwh:2.6, status:'AVAILABLE', execution_status:'NOT_MEASURED' },
+            D1:{ horizon_id:'D1', required_kwh:14.1, planned_kwh:11.6, still_to_plan_kwh:2.5, flexible_required_kwh:7.2, flexible_planned_kwh:4.7, flexible_still_to_plan_kwh:2.5, status:'AVAILABLE' }
           }
         }
       }
@@ -119,4 +119,4 @@ assert.equal(normalizePlanningLaneTotals(d1Contract.planningTomorrowTotals).flex
 assert.deepEqual(Object.keys(d1Contract.planningCombinedTotals), []);
 assert.equal(normalizePlanningLaneTotals(d1Contract.laneTotals).flexibleLoadsKwh, 4.7);
 
-console.log('PASS canonical V2 planning lanes without frontend horizon-total derivation');
+console.log('PASS canonical V2 planning horizons without frontend total derivation');

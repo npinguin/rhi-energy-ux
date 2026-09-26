@@ -220,6 +220,24 @@
         });
       };
       (v2.allPropertyRows || []).forEach(add);
+      // Core is the only authority for current home-energy facts. Expose the
+      // canonical SemanticValue fields through the existing row API so screens
+      // cannot fall back to object property indexes for aggregate truth.
+      for (const [key, field] of (v2.coreByKey || new Map()).entries()) {
+        add({
+          asset_id:'core',
+          property_id:key,
+          property_key:key,
+          key,
+          value:field.value,
+          unit:field.unit,
+          availability:field.status,
+          status:field.status,
+          quality:field.quality,
+          reason:field.reason,
+          source_type:'canonical_v2_core'
+        });
+      }
 
       // Preserve the existing view API without creating another truth source:
       // intelligence fields are direct projections of the canonical V2 object.
@@ -614,7 +632,7 @@
 
     planningHorizons() {
       const planning=this.publicV2().planning || {};
-      const horizons=planning.planning_horizons && typeof planning.planning_horizons === 'object' ? planning.planning_horizons : {};
+      const horizons=planning.horizons && typeof planning.horizons === 'object' ? planning.horizons : {};
       return Object.entries(horizons).map(([id,value])=>({ horizon_id:String(id).toUpperCase(), ...planningObject(value) }));
     }
     planningHorizon(id = 'D0') {
@@ -673,7 +691,7 @@
     strategyProfileRows() {
       if (this._strategyProfiles) return this._strategyProfiles;
       const v2=this.publicV2();
-      const rows=asArray(v2.configuration?.strategy?.configured_properties);
+      const rows=asArray(v2.configuration?.strategy?.configured?.properties);
       const labels={home:'Home Intelligence',battery:'Home Battery',solar:'Solar',grid:'Grid',flexible_loads:'Flexible Loads',resilience:'Resilience'};
       const groups=new Map();
       rows.forEach(raw=>{
@@ -746,7 +764,7 @@
     effectiveStrategyRows() {
       if (this._effectiveStrategies) return this._effectiveStrategies;
       const v2=this.publicV2();
-      const rows=asArray(v2.configuration?.strategy?.effective_properties);
+      const rows=asArray(v2.configuration?.strategy?.effective?.properties);
       const byGroup=new Map();
       rows.forEach(raw=>{
         const row=objectFrom(raw);
@@ -755,8 +773,8 @@
           strategy_id:group, policy_id:group, asset_id:group,
           entity_id:v2.envelope.entityId,
           contract_role:'effective_strategy_policy',
-          effective_state:v2.configuration?.strategy?.effective_state || 'UNAVAILABLE',
-          reason_code:v2.configuration?.strategy?.effective_reason || ''
+          effective_state:v2.configuration?.strategy?.effective?.status || 'UNAVAILABLE',
+          reason_code:v2.configuration?.strategy?.effective?.reason || ''
         };
         const key=String(row.property_id || row.key || row.property_key || '');
         if(key) current[key]=row.value;
@@ -1909,6 +1927,7 @@
       if (tab === 'solar') { const mode=String(this.automationModeValue(rt,'automation')||'automatic').toLowerCase(); /* shared automation quick action evolution keeps validation continuity: this.automationQuickAction(rt, mode, 'solar') */ controls = this.automationQuickInline(rt, mode) + jump('Solar plan','hi-body-solar') + jump('Flexible loads','solar-flexible-loads'); }
       if (tab === 'battery') controls = button('Energy flow','data-view="flow"') + button('Strategy','data-view="strategies"') + button('Tactical planning','data-view="planning"');
       if (tab === 'consumers') controls = `<label class="hiQuickSelect"><span>Group</span><select data-consumer-filter-select>${[['all','All'],['flexible','Flexible'],['fixed','Fixed'],['vehicles','Vehicles'],['heating','Heating'],['storage','Storage']].map(([id,label])=>`<option value="${id}"${this.consumerFilter===id?' selected':''}>${label}</option>`).join('')}</select></label>` + jump('Consumer list','consumer-list');
+      if (tab === 'gas') controls = jump('Usage history','gas-history') + jump('Gas meter','gas-meter');
       if (tab === 'strategies') controls = jump('Profiles','strategy-profiles') + jump('Effective strategy','strategy-effective');
       if (tab === 'metering') controls = this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId) + this.componentMeteringSort();
       if (tab === 'intelligence') { const mode=this.automationModeValue(rt, firstDefined(rt.decision()?.mode, rt.decision()?.automation_mode, 'Automatic')); controls = this.segmentedControl(['off','recommend','automatic'].map(value=>({value,label:human(value),active:String(mode).toLowerCase()===value,attrs:{'data-mode-value':value,'data-property-key':'energy_intelligence.automation_mode'}})), String(mode).toLowerCase(), 'mode') + jump('Recommendation','hi-body-intelligence') + jump('Why','intelligence-why'); }
@@ -1947,6 +1966,7 @@
         intelligence: [human(d.recommendation || 'No recommendation available.'), human(d.reason || 'No explanation available.'), 'Decision evidence'],
         value: [value.interpretation, value.attention, 'Financial evidence'],
         planning: ['The table shows only Planning-owned hourly allocations.', 'Unavailable hours remain empty rather than estimated.', 'Planning evidence'],
+        gas: (() => { const gas=this.gasModel(rt); return gas.asset ? [gas.totalM3 !== null ? `Gas meter total is ${this.gasVolume(gas.totalM3)}.` : 'Gas meter is connected; the total reading is not currently available.', gas.totalEntityId ? 'Measured daily consumption is available in the 30-day history.' : 'Consumption history will appear when the canonical total meter entity is available.', 'Gas evidence'] : ['Gas consumption is not measured yet.', 'Connect one authoritative total-increasing gas meter to enable measured usage and history.', 'Gas evidence']; })(),
         retrospective: ['Energy Intelligence reviewed its measurable performance.', 'Scores reflect published evidence coverage and never invent missing results.', 'Retrospective evidence']
       };
       const [title, support, action] = conclusions[tab] || ['Energy information is available.','Open Diagnostics for technical details.','Evidence'];
@@ -2237,7 +2257,7 @@
         solar: { image:hbEnergyHeroAsset('solar-generation'), icon:'☀', eyebrow:'Solar', title:(solar||0)>0.05?'Generating now':'Not generating', value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
         battery: { image:hbEnergyHeroAsset('battery'), icon:'▣', eyebrow:'Home Battery', title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(this.batteryReservePct(rt)),'Protected minimum']] },
         consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Home Intelligence status']] },
-        gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:'Gas', title:gas.asset ? 'Gas consumption' : 'Gas meter not configured', value:this.gasVolume(gas.totalM3), unit:'total meter reading', explanation:gas.asset ? `${human(gas.health)} · ${gas.source}` : 'Configure an authoritative gas meter source in RHI Energy.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),'Instantaneous flow when published'],['◫','Meter total',this.gasVolume(gas.totalM3),'Canonical total-increasing reading'],['✓','Health',human(gas.health),'Gas meter health'],['↺','History',gas.totalEntityId?'30 days':'Waiting for meter entity','HA long-term statistics']] },
+        gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:'Gas', title:gas.asset ? 'Gas consumption' : 'Gas meter not connected', value:this.gasVolume(gas.totalM3), unit:'total meter reading', explanation:gas.asset ? 'Measured gas use, meter health and 30-day history.' : 'Connect one authoritative gas meter to start measured consumption history.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),gas.flowM3h===null?'Not measured':'Current measured flow'],['◫','Meter total',this.gasVolume(gas.totalM3),gas.totalM3===null?'Not measured':'Cumulative meter reading'],['↺','History',gas.totalEntityId?'30 days':'Not available',gas.totalEntityId?'Daily measured consumption':'Waiting for total meter'],['✓','Health',gas.asset?human(gas.health):'Not configured',gas.asset?'Gas meter health':'Authoritative source required']] },
         strategies: { image:hbEnergyHeroAsset('strategies'), icon:'◎', eyebrow:'Strategies', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Configured intent and the strategy currently in effect', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
         'operational-planning': { image:hbEnergyHeroAsset('operational-planning'), icon:'◷', eyebrow:'Operational Planning', title:this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'), value:fmtKw(flexPower), unit:'managed power now', explanation:'Current flexible-load execution and next actions', tone:'purple', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Managed power now'],['⌂','Energy need',fmtKwh(flexNeed),'Known remaining need'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Current operational state'],['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'),'Energy control mode']] },
         metering: { image:hbEnergyHeroAsset('metering'), icon:'▥', eyebrow:'Metering', title:meteringContext.label, value:meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar), unit:'Solar production', explanation:`Measured energy flows this ${meteringContext.label.toLowerCase()}`, tone:'blue', metrics:[['▥','Consumption',meteringContext.consumption === null ? 'Unavailable' : fmtKwh(meteringContext.consumption),meteringContext.label],['☀','Solar',meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar),meteringContext.label],['↓','Grid import',meteringContext.gridImport === null ? 'Unavailable' : fmtKwh(meteringContext.gridImport),meteringContext.label],['↑','Grid export',meteringContext.gridExport === null ? 'Unavailable' : fmtKwh(meteringContext.gridExport),meteringContext.label]] },
@@ -3053,7 +3073,7 @@
     }
     energyHardwareStyles() {
       return `
-        .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceCard{max-width:720px}.gasMeterPanel .energyDeviceGrid{grid-template-columns:minmax(0,720px)}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasStatisticsHost{min-height:220px}}
+        .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceCard{max-width:720px}.gasMeterPanel .energyDeviceGrid{grid-template-columns:minmax(0,720px)}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasStatisticsHost{min-height:220px}}
 
         .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead,.solarStoryHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
         .energyDeviceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.energyDeviceCard{display:grid;grid-template-columns:126px minmax(0,1fr);gap:12px;border:1px solid #e5ebf3;background:#fff;border-radius:14px;padding:12px;min-height:166px}.energyDeviceVisual{height:138px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fbfdff,#f6f8fb);border-radius:11px;overflow:hidden}.energyDeviceVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.energyDeviceVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:5px;box-sizing:border-box}.energyDeviceBody{min-width:0}.energyDeviceTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.energyDeviceTop small{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.energyDeviceTop h3{font-size:13px;line-height:1.25;margin:3px 0 8px}.energyDeviceState{font-size:9px;background:#eef7f1;color:#3f7f5a;border-radius:999px;padding:5px 7px;white-space:nowrap}.energyDeviceConfig{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.energyDeviceConfig span{font-size:9px;color:#64748b;background:#f8fafc;border-radius:7px;padding:5px 6px}.energyDeviceConfig b{color:#334155;margin-right:4px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyDeviceFacts span{background:#f8fafc;border-radius:7px;padding:6px;min-width:0}.energyDeviceFacts small,.energyDeviceFacts b{display:block}.energyDeviceFacts small{font-size:8px;color:#64748b}.energyDeviceFacts b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.energyDeviceNoFacts{grid-column:1/-1}
@@ -3487,22 +3507,25 @@
     gas(rt) {
       const pageVm = this.buildPageViewModel(rt, 'gas');
       const gas = this.gasModel(rt);
-      if (!gas.asset) {
-        return `${this.tabExperienceHeader(rt,'gas',pageVm)}<section class="panel gasSetupPanel"><h2>Gas meter setup needed</h2><p>RHI Energy has no canonical gas meter yet. Configure the authoritative gas source first; the UX will not invent consumption history.</p></section>`;
-      }
-      const meter = this.energyDeviceStatusCard(rt, gas.asset, 'Gas meter');
-      const graph = gas.totalEntityId
-        ? `<section class="panel gasHistoryPanel"><div class="rhiUxSectionHead"><div><h2>Gas consumption history</h2><p>Native Home Assistant long-term statistics from the canonical total-increasing gas meter.</p></div><span>30 days</span></div><div class="gasStatisticsHost" data-gas-statistics-host data-entity-id="${escapeHtml(gas.totalEntityId)}"></div></section>`
-        : `<section class="panel gasHistoryPanel"><h2>Gas consumption history</h2><div class="empty"><b>Waiting for the canonical gas meter entity</b><span>History will use Home Assistant Statistics Graph as soon as the total-increasing gas entity is available.</span></div></section>`;
+      const hasMeter = !!gas.asset;
+      const meter = hasMeter ? this.energyDeviceStatusCard(rt, gas.asset, 'Gas meter') : '';
+      const historyAvailable = !!gas.totalEntityId;
+      const graph = historyAvailable
+        ? `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily measured gas use from Home Assistant long-term statistics on the canonical total-increasing meter.</p></div><span>Last 30 days</span></div><div class="gasStatisticsHost" data-gas-statistics-host data-entity-id="${escapeHtml(gas.totalEntityId)}"></div></section>`
+        : `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily gas consumption will appear here when a canonical total-increasing gas meter is available.</p></div></div><div class="empty"><b>No measured gas history yet</b><span>Connect the authoritative gas meter to enable Home Assistant long-term statistics. The UX never estimates missing consumption.</span></div></section>`;
+      const setupOrMeter = hasMeter
+        ? `<section class="panel gasMeterPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Gas meter</h2><p>Physical meter identity, source and canonical measurement health.</p></div></div>${meter}</section>`
+        : `<section class="panel gasSetupPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Connect your gas meter</h2><p>RHI Energy needs one authoritative gas source before it can show consumption history.</p></div></div><div class="gasSetupFacts"><div><small>Required</small><b>Total gas meter</b><span>A cumulative total-increasing reading in m³.</span></div><div><small>Optional</small><b>Live gas flow</b><span>An instantaneous m³/h reading when the source publishes it.</span></div><div><small>History</small><b>Home Assistant statistics</b><span>Daily changes are shown without frontend estimation.</span></div></div></section>`;
       return `${this.tabExperienceHeader(rt,'gas',pageVm)}<div class="gasPage">
-        <section class="gasKpiStrip">
-          <article><small>Flow now</small><b>${escapeHtml(this.gasFlow(gas.flowM3h))}</b></article>
-          <article><small>Total meter</small><b>${escapeHtml(this.gasVolume(gas.totalM3))}</b></article>
-          <article><small>Health</small><b>${escapeHtml(human(gas.health))}</b></article>
-          <article><small>Source</small><b>${escapeHtml(human(gas.source))}</b></article>
+        <section class="gasKpiStrip" aria-label="Gas consumption status">
+          <article><small>Flow now</small><b>${escapeHtml(this.gasFlow(gas.flowM3h))}</b><span>${gas.flowM3h === null ? 'Not measured' : 'Current measured gas flow'}</span></article>
+          <article><small>Meter total</small><b>${escapeHtml(this.gasVolume(gas.totalM3))}</b><span>${gas.totalM3 === null ? 'Not measured' : 'Cumulative meter reading'}</span></article>
+          <article><small>History</small><b>${historyAvailable ? '30 days' : 'Not available'}</b><span>${historyAvailable ? 'Daily measured consumption' : 'Waiting for total meter'}</span></article>
+          <article><small>Meter health</small><b>${escapeHtml(hasMeter ? human(gas.health) : 'Not configured')}</b><span>${hasMeter ? escapeHtml(human(gas.source)) : 'Authoritative source required'}</span></article>
         </section>
+        <section class="panel gasUseInfoPanel"><div class="rhiUxSectionHead"><div><h2>Your gas use</h2><p>Gas is treated as measured consumption: live flow when available, the cumulative meter total, and daily history from Home Assistant statistics.</p></div></div><div class="gasUseFacts"><article><span>🔥</span><div><small>Using gas now?</small><b>${gas.flowM3h === null ? 'Live flow is not measured' : (gas.flowM3h > 0 ? `Using ${this.gasFlow(gas.flowM3h)}` : 'No measured gas flow right now')}</b></div></article><article><span>◫</span><div><small>How much has the meter recorded?</small><b>${gas.totalM3 === null ? 'Meter total is not available' : this.gasVolume(gas.totalM3)}</b></div></article><article><span>↺</span><div><small>How is usage changing?</small><b>${historyAvailable ? 'See the measured 30-day history below' : 'History starts when the total meter is available'}</b></div></article></div></section>
         ${graph}
-        <section class="panel gasMeterPanel"><div class="rhiUxSectionHead"><div><h2>Gas meter</h2><p>Physical meter identity and canonical source facts.</p></div></div>${meter}</section>
+        ${setupOrMeter}
       </div>`;
     }
 
