@@ -7,35 +7,43 @@ function selectEnergyAsset(store, assetId) {
 function selectEnergyOverview(store) {
   const row=store?.overview && typeof store.overview === 'object' ? store.overview : {};
   return Object.freeze({
-    available:store?.available === true && Object.keys(row).length > 0,
-    status:String(row.status || row.product_status || row.state || 'UNAVAILABLE'),
+    available:store?.available === true,
+    status:String(row.status || row.product_status || row.state || store?.health || 'UNKNOWN'),
     primary:row.primary || row.primary_metric || null,
     summary:row.summary || {},
     flow:row.flow || {},
     conclusions:Array.isArray(row.conclusions) ? row.conclusions : [],
     reason:String(row.reason || row.product_reason || ''),
     raw:row,
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.overview'
+    core:store?.core || {},
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.core'
   });
 }
 
 function selectEnergyPlanning(store, horizon='D0') {
   const id=String(horizon || 'D0').toUpperCase();
   const planning=store?.planning && typeof store.planning === 'object' ? store.planning : {};
-  const horizons=planning.planning_horizons && typeof planning.planning_horizons === 'object'
-    ? planning.planning_horizons : {};
+  const horizons=planning.horizons && typeof planning.horizons === 'object' ? planning.horizons : {};
   const row=horizons[id] && typeof horizons[id] === 'object' ? horizons[id] : {};
-  const summary=row.summary && typeof row.summary === 'object' ? row.summary : {};
   return Object.freeze({
     available:store?.available === true && Object.keys(row).length > 0,
     horizon_id:id,
     horizon:row,
-    summary,
-    lane_totals:summary.lane_totals || row.lane_totals || {},
+    summary:row,
+    lane_totals:Object.freeze({
+      required_kwh:row.required_kwh ?? null,
+      planned_kwh:row.planned_kwh ?? null,
+      executed_kwh:row.executed_kwh ?? null,
+      still_to_plan_kwh:row.still_to_plan_kwh ?? null,
+      flexible_required_kwh:row.flexible_required_kwh ?? null,
+      flexible_planned_kwh:row.flexible_planned_kwh ?? null,
+      flexible_executed_kwh:row.flexible_executed_kwh ?? null,
+      flexible_still_to_plan_kwh:row.flexible_still_to_plan_kwh ?? null
+    }),
     buckets:Array.isArray(row.buckets) ? row.buckets : [],
-    flexible_plan:planning.flexible_plan || {},
+    flexible_plan:{},
     planning_objects:Array.isArray(store?.planningObjects) ? store.planningObjects : [],
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning'
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons'
   });
 }
 
@@ -43,43 +51,55 @@ function selectEnergyConfigurationProperties(store, scope) {
   const kind=String(scope || '').toLowerCase();
   const configuration=store?.configuration && typeof store.configuration === 'object' ? store.configuration : {};
   const section=configuration[kind] && typeof configuration[kind] === 'object' ? configuration[kind] : {};
-  const rows=section.properties || section.configured_properties || [];
+  if (kind === 'strategy') {
+    const configured=section.configured && typeof section.configured === 'object' ? section.configured : {};
+    const effective=section.effective && typeof section.effective === 'object' ? section.effective : {};
+    const rows=Array.isArray(configured.properties) ? configured.properties : [];
+    const effectiveRows=Array.isArray(effective.properties) ? effective.properties : [];
+    return Object.freeze({
+      available:store?.available === true && configured.status !== 'UNAVAILABLE',
+      scope:kind,
+      properties:Object.freeze(rows.map(row=>Object.freeze({...row}))),
+      effective_properties:Object.freeze(effectiveRows.map(row=>Object.freeze({...row}))),
+      effective_state:String(effective.status || 'UNAVAILABLE'),
+      effective_reason:String(effective.reason || ''),
+      runtime_overrides:Object.freeze((Array.isArray(effective.runtime_overrides) ? effective.runtime_overrides : []).map(row=>Object.freeze({...row}))),
+      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy'
+    });
+  }
+  const rows=Array.isArray(section.properties) ? section.properties : [];
   return Object.freeze({
     available:store?.available === true && Array.isArray(rows),
     scope:kind,
-    properties:Object.freeze((Array.isArray(rows) ? rows : []).map(row=>Object.freeze({...row}))),
-    effective_properties:Object.freeze((Array.isArray(section.effective_properties) ? section.effective_properties : []).map(row=>Object.freeze({...row}))),
-    effective_state:String(section.effective_state || section.availability || 'UNAVAILABLE'),
-    effective_reason:String(section.effective_reason || ''),
+    properties:Object.freeze(rows.map(row=>Object.freeze({...row}))),
+    effective_properties:Object.freeze([]),
+    effective_state:String(section.availability || section.status || 'UNAVAILABLE'),
+    effective_reason:String(section.reason || ''),
     source:`RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.${kind}`
   });
 }
 
-function selectEnergyStrategies(store) {
-  return selectEnergyConfigurationProperties(store,'strategy');
-}
-
-function selectEnergyPricing(store) {
-  return selectEnergyConfigurationProperties(store,'pricing');
-}
+function selectEnergyStrategies(store) { return selectEnergyConfigurationProperties(store,'strategy'); }
+function selectEnergyPricing(store) { return selectEnergyConfigurationProperties(store,'pricing'); }
 
 function selectEnergyValue(store, period='today') {
   const accounting=store?.valueAccounting && typeof store.valueAccounting === 'object' ? store.valueAccounting : {};
   const id=String(period || accounting.selected_period_id || 'today').toLowerCase();
   const periods=accounting.periods && typeof accounting.periods === 'object' ? accounting.periods : {};
   const row=periods[id] && typeof periods[id] === 'object' ? periods[id] : {};
+  const selectedId=String(accounting.selected_period_id || '').toLowerCase();
+  const netOutcome=accounting.net_financial_result && typeof accounting.net_financial_result === 'object' ? accounting.net_financial_result : {};
   return Object.freeze({
     available:store?.available === true && Object.keys(row).length > 0,
     period_id:id,
     value:row,
-    net_financial_result_eur:row.net_financial_result_eur ?? (id === String(accounting.selected_period_id || '').toLowerCase() ? accounting.net_financial_result_eur : null),
+    net_financial_result_eur:row.net_financial_result_eur ?? (id === selectedId ? netOutcome.value ?? accounting.net_financial_result_eur ?? null : null),
+    net_financial_result:id === selectedId ? netOutcome : {},
     source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.value_accounting'
   });
 }
 
 function selectEnergyMetering(store, period='today') {
-  // E0.15.48 publishes financial period actuals, not canonical period-energy
-  // metering detail. Fail closed instead of reconstructing Energy truth in UX.
   const id=String(period || 'today').toLowerCase();
   return Object.freeze({
     available:false,
@@ -117,21 +137,19 @@ function selectEnergyCoverage(store) {
     return !!value && typeof value === 'object' && Object.keys(value).length > 0;
   };
   const capabilities=Object.freeze({
+    core:present(store?.core) ? 'SUPPORTED' : 'UNAVAILABLE',
     assets:present(store?.objects) ? 'SUPPORTED' : 'UNAVAILABLE',
-    relationships:present(store?.relationships) ? 'SUPPORTED' : 'UNAVAILABLE',
-    overview:present(store?.overview) ? 'SUPPORTED' : 'UNAVAILABLE',
-    planning:present(store?.planning) ? 'SUPPORTED' : 'UNAVAILABLE',
+    relationships:Array.isArray(store?.relationships) ? 'SUPPORTED' : 'UNAVAILABLE',
+    planning:present(store?.planning?.horizons) ? 'SUPPORTED' : 'UNAVAILABLE',
     pricing:present(store?.configuration?.pricing) ? 'SUPPORTED' : 'UNAVAILABLE',
     strategies:present(store?.configuration?.strategy) ? 'SUPPORTED' : 'UNAVAILABLE',
     commands:Array.isArray(store?.commands) ? 'SUPPORTED' : 'UNAVAILABLE',
-    activity:Array.isArray(store?.activity) ? 'SUPPORTED' : 'UNAVAILABLE',
-    value_accounting:present(store?.valueAccounting) ? 'SUPPORTED' : 'UNAVAILABLE',
-    metering:'UNAVAILABLE'
+    value_accounting:present(store?.valueAccounting) ? 'SUPPORTED' : 'UNAVAILABLE'
   });
   return Object.freeze({
     complete:Object.values(capabilities).every(value=>value === 'SUPPORTED'),
     capabilities,
     unsupported:Object.freeze(Object.entries(capabilities).filter(([,v])=>v!=='SUPPORTED').map(([k])=>k)),
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.coverage'
   });
 }
