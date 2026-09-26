@@ -26,7 +26,12 @@ for (const token of [
 assert.match(header,/metrics = \[\], quickActions = ""/);
 assert.match(header,/rhiUxQuickActionBar/);
 assert.match(app,/quickActions:this\\.quickActionBar\\(rt, tab\\) \\+ this\\.pageQuickActions\\(rt, tab\\)/);
-assert.match(app,/pageQuickActions\\(rt, tab\\)/);\nassert.doesNotMatch(app,/\\$\\{this\\.quickActionBar\\(rt, this\\.view\\)\\}/);\nassert.match(app,/return controls;/);\nassert.match(app,/publishedById = new Map/);\nassert.match(app,/energyAssetDetailDisclosure/);\nassert.match(app,/planningContextPanel/);
+assert.match(app,/pageQuickActions\(rt, tab\)/);
+assert.doesNotMatch(app,/\$\{this\.quickActionBar\(rt, this\.view\)\}/);
+assert.match(app,/return controls;/);
+assert.match(app,/publishedById = new Map/);
+assert.match(app,/energyAssetDetailDisclosure/);
+assert.match(app,/planningContextPanel/);
 assert.match(app,/rt\.visibleCommands\(\)/);
 assert.match(app,/createCommandActionModel\(command\)/);
 assert.match(app,/assetQuickActions\(rt, assetId/);
