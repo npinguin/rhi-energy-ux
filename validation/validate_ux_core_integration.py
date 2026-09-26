@@ -9,9 +9,9 @@ presentation=(ROOT/"src/app/presentation.js").read_text(encoding="utf-8")
 header=(ROOT/"src/ui/components/page-header.js").read_text(encoding="utf-8")
 card=(ROOT/"src/app/energy-card.js").read_text(encoding="utf-8")
 
-if meta.get("version")!="1.2.0":
+if meta.get("version")!="1.3.0":
     raise SystemExit("unexpected RHI UX Core version")
-if meta.get("source_commit")!="9c3f60942a1cf68ce30f33c68b532213d7868570":
+if meta.get("source_commit")!="0078ecae433892e90693014c3f34bec2c1bba62d":
     raise SystemExit("RHI UX Core source commit drift")
 if meta.get("runtime_dependency") is not False:
     raise SystemExit("RHI UX Core must be build-time only")
@@ -23,7 +23,7 @@ for required in ["vendor/rhi-ux-core.js","ui/components/page-header.js"]:
         raise SystemExit(f"missing bundled Core module: {required}")
 if mods.index("vendor/rhi-ux-core.js") > mods.index("ui/components/page-header.js"):
     raise SystemExit("RHI UX Core must load before page-header adapter")
-for symbol in ["rhiUxPageHero","rhiUxStatusGrid","rhiUxDomainShell","rhiUxTechnicalFooter","rhiUxCoreStyles"]:
+for symbol in ["rhiUxPageHero","rhiUxStatusGrid","rhiUxDomainShell","rhiUxTechnicalFooter","rhiUxCompanyBrand","rhiUxCoreStyles"]:
     if symbol not in vendor+presentation+header:
         raise SystemExit(f"missing Core integration symbol: {symbol}")
 start=card.find("tabExperienceHeader(rt")
@@ -40,4 +40,4 @@ if "rhiUxTechnicalFooter({" not in card:
 for legacy in ['<div class="navigationShell', '<footer class="hiRuntimeFooter rhiUxFooter"']:
     if legacy in card:
         raise SystemExit(f"legacy shared presentation markup still active: {legacy}")
-print("PASS Energy consumes pinned RHI UX Core 1.2.0 for shared shell/hero/status/footer without runtime coupling")
+if meta.get("branding_owner")!="rhi-ux-core":\n    raise SystemExit("company branding must be owned by RHI UX Core")\nprint("PASS Energy consumes pinned RHI UX Core 1.3.0 for shared shell/hero/status/footer/branding without runtime coupling")
