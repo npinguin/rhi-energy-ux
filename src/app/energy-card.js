@@ -294,48 +294,34 @@
       };
     }
     backendStatus() {
-      // R3.65.0: Product availability is owned by each domain interface.
-      // Engineering health is diagnostic evidence only and never suppresses valid product data.
-      const release = this.releaseState();
-      const diagnosticsNotes = [...ENGINEERING_DIAGNOSTICS, ...SUPPLEMENTAL_DIAGNOSTICS].map(entityId => {
-        const entity = this.rawState(entityId);
-        return { entityId, state: entity?.state ?? '' };
-      }).filter(item => !isIgnoredDiagnosticState(item.state) && !isOkHealth(item.state));
-      if (!release) {
-        return {
-          runtimeTrusted: false,
-          showMainWarning: false,
-          failedHardGates: [],
-          diagnosticsNotes,
-          statusText: 'Release contract unavailable · Product interfaces render their own availability',
-          warningText: ''
-        };
-      }
+      // Product trust is owned by the canonical public V2 transport. Optional
+      // diagnostic/release entities must never create a product-facing error.
+      const v2 = this.publicV2();
       return {
-        runtimeTrusted: true,
+        runtimeTrusted: v2.available === true,
         showMainWarning: false,
         failedHardGates: [],
-        diagnosticsNotes,
-        statusText: diagnosticsNotes.length
-          ? `Product contracts active · Diagnostics: ${labelHealthEntity(diagnosticsNotes[0].entityId)} ${normalizeHealthState(diagnosticsNotes[0].state)}`
-          : 'Product contracts active · Diagnostics OK',
+        diagnosticsNotes: [],
+        statusText: v2.available
+          ? 'Canonical Energy contract active'
+          : (v2.compatibilityReason || 'Canonical Energy contract unavailable'),
         warningText: ''
       };
     }
     footerModel() {
-      const release = this.release();
+      const v2 = this.publicV2();
       const backendStatus = this.backendStatus();
       return {
         uxVersion: UX_VERSION,
-        backendVersion: release.backend_release,
-        releaseContractEntity: RELEASE_ENTITY,
-        contractVersion: release.contract_version,
+        backendVersion: v2.release || 'Unknown',
+        releaseContractEntity: UX_INTERFACES.publicV2,
+        contractVersion: v2.contractVersion || 'Unknown',
         runtimeTrusted: backendStatus.runtimeTrusted,
-        failedHardGates: backendStatus.failedHardGates,
-        diagnosticsNotes: backendStatus.diagnosticsNotes,
+        failedHardGates: [],
+        diagnosticsNotes: [],
         statusText: backendStatus.statusText,
-        warningText: backendStatus.warningText,
-        showMainWarning: backendStatus.showMainWarning
+        warningText: '',
+        showMainWarning: false
       };
     }
     publicV2() {
@@ -4455,7 +4441,6 @@
     diagnosticSpec(tab) {
       const label=human(tab || 'overview');
       return [
-        [RELEASE_ENTITY,'Release compatibility','Candidate identity, backend baseline and release governance evidence'],
         [UX_INTERFACES.publicV2,'Energy Public V2',`${label} product truth through the single canonical Energy contract`]
       ];
     }
@@ -4474,11 +4459,9 @@
     releaseIssueModel(rt, tab, footer) {
       const rows = this.diagnosticSpec(tab).map(([entityId,label,purpose]) => this.diagnosticEntity(rt,entityId,label,purpose));
       const unavailable = rows.filter(row => !row.working);
-      const diagnostics = Array.isArray(footer.diagnosticsNotes) ? footer.diagnosticsNotes : [];
       const issues = [];
       unavailable.forEach(row => issues.push(`${row.label}: ${row.reason || row.state || 'Unavailable'}`));
-      diagnostics.forEach(row => issues.push(`${labelHealthEntity(row.entityId)}: ${normalizeHealthState(row.state)}`));
-      if (!footer.runtimeTrusted) issues.unshift('Runtime release contract is unavailable or not trusted.');
+      if (!footer.runtimeTrusted && !unavailable.length) issues.unshift('Canonical Energy contract is unavailable or incompatible.');
       if (!issues.length) return null;
       return {
         severity: footer.runtimeTrusted ? 'warning' : 'error',
