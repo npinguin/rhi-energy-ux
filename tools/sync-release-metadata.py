@@ -29,6 +29,10 @@ compat.setdefault("energy_contract", {})["minimum"] = product["contract"]
 compat["energy_contract"]["minimum_backend"] = product["minimum_backend"]
 compat["energy_contract"]["tested_backend_releases"] = [product["tested_backend"]]
 compat["energy_contract"]["required_contracts"] = list(product.get("required_contracts", []))
+compat["ux_core"] = {
+    **dict(product.get("ux_core") or {}),
+    "runtime_dependency": False,
+}
 write("COMPATIBILITY.json", compat)
 
 manifest = read("RELEASE_MANIFEST.json")
@@ -46,6 +50,10 @@ manifest["release_asset_policy"] = product["release_asset_policy"]
 manifest["hacs_repository_type"] = product["hacs_repository_type"]
 manifest["hacs_validation_category"] = product["hacs_validation_category"]
 manifest["required_contracts"] = list(product.get("required_contracts", []))
+manifest["ux_core"] = {
+    **dict(product.get("ux_core") or {}),
+    "runtime_dependency": False,
+}
 write("RELEASE_MANIFEST.json", manifest)
 
 status = read("release/RELEASE_STATUS.json")
@@ -56,6 +64,10 @@ status["contract"] = product["contract"]
 status["minimum_backend"] = product["minimum_backend"]
 status["tested_backend"] = product["tested_backend"]
 status["required_contracts"] = list(product.get("required_contracts", []))
+status["ux_core"] = {
+    **dict(product.get("ux_core") or {}),
+    "runtime_dependency": False,
+}
 write("release/RELEASE_STATUS.json", status)
 
 qualification = read("release/QUALIFICATION.json")
