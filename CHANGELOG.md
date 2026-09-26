@@ -1,3 +1,9 @@
+## 4.2.1 — canonical status ordering hotfix
+
+- enforces Hero → Status → Quick Actions through UX Core 1.4.1;
+- removes duplicate page-level status/KPI rows from Solar, Gas, Home Battery, Outlook and Tactical Planning;
+- adds anti-drift tests for both DOM order and duplicate status surfaces.
+
 ## 4.2.0 — unified Home Intelligence visual system
 
 - adopts RHI UX Core 1.4.0 as the single owner of shared typography and visual grammar;
