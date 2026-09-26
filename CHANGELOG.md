@@ -1,11 +1,11 @@
-## 4.1.1 — RHI UX Core 1.2 convergence
+## 4.1.1 — RHI UX Core 1.3 convergence
 
-- pins the exact RHI UX Core 1.2.0 source at commit `9c3f60942a1cf68ce30f33c68b532213d7868570`;
-- delegates the complete Energy domain shell/navigation frame to `rhiUxDomainShell` instead of maintaining a second shell implementation;
+- pins the exact RHI UX Core 1.3.0 source at commit `0078ecae433892e90693014c3f34bec2c1bba62d`;
+- delegates the complete Energy domain shell/navigation frame and canonical Robotix company branding to Core instead of maintaining local copies;
 - delegates the product-facing technical footer presentation to `rhiUxTechnicalFooter` while keeping Energy runtime issue evidence domain-owned;
 - keeps hero/status presentation on Core and preserves Energy Public V2 semantics, projections, writes and readback unchanged;
 - strengthens validation so a metadata-only Core bump or reintroduction of legacy shared markup fails closed;
-- keeps the package runtime-standalone: Core remains build-time vendored and bundled.
+- removes the Energy-local duplicate company logo asset/transport;\n- keeps the package runtime-standalone: Core remains build-time vendored and bundled.
 
 ## 4.1.0 — RHI UX Core baseline
 
