@@ -27,11 +27,14 @@ for entry in DIST.iterdir():
     if entry.name not in allowed_top:
         raise SystemExit(f"unexpected dist top-level entry: {entry.name}")
 
-for category in ("branding", "heroes"):
+for category in ("heroes",):
     if category not in manifest.get("asset_categories", []):
         raise SystemExit(f"package asset category missing: {category}")
     if not (DIST / "assets" / category).is_dir():
         raise SystemExit(f"dist asset category missing: {category}")
+
+if "branding" in manifest.get("asset_categories", []) or (DIST / "assets" / "branding").exists():
+    raise SystemExit("domain package must not own company branding; branding belongs to RHI UX Core")
 
 for row in manifest.get("files", []):
     path = DIST / row["path"]
