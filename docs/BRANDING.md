@@ -1,52 +1,16 @@
 # Robotix Home Intelligence — Company Brand Contract
 
-This package treats the Robotix company mark as a reusable product asset, not as module artwork.
+The canonical Robotix company mark is owned by **RHI UX Core**.
 
-## Canonical asset
-
-- Source of truth: `src/assets/branding/company-logo.svg`
-- Distribution copy: `dist/assets/branding/company-logo.svg`
-- Background: transparent
-- Primary company/building colour: `#0B4C86`
-- Slogan colour: `#5B95C8`
-- Slogan: `DomotiX · Network · Security`
-- Aspect ratio: preserved from the canonical SVG viewBox
-
-The asset must be copied unchanged when reused by another RHI module. Do not redraw it, recolour it, add a background, apply CSS filters, or reconstruct the text with local fonts.
-
-## Header slot contract
-
-The header owns layout; the asset owns brand geometry. Modules may tune only these CSS custom properties:
-
-```css
---rhi-company-area-min
---rhi-company-area-max
---rhi-company-logo-max-width
---rhi-company-logo-max-height
---rhi-company-logo-padding
---rhi-company-divider
-```
-
-The logo itself must remain:
-
-```css
-display: block;
-height: auto;
-object-fit: contain;
-object-position: center;
-```
-
-Desktop, tablet and mobile may override the shared slot tokens. They must not edit or crop the SVG.
+Energy must not copy, redraw, recolour, transport or independently validate the company logo. The pinned build-time Core snapshot provides `rhiUxCompanyBrand()` and the canonical inline SVG used by `rhiUxDomainShell()`.
 
 ## Ownership
 
-- Brand asset ownership: shared RHI UX convention
-- Module ownership: header placement and responsive slot sizing
-- Build ownership: canonical `src/assets/` tree → structured `dist/assets/` package synchronization
-- Branding validation ownership: canonical hash, source/dist parity, approved copy/colours, cache-safe runtime delivery and no runtime redraw/filter
-- Layout/navigation validation owns brand-slot geometry; branding tests do not own responsive sizing
-- Footer tests must not assert logo transport or artwork details
+- RHI UX Core owns the canonical company artwork, geometry and shared brand-slot presentation.
+- Energy owns only domain navigation metadata, state and Energy-specific composition.
+- Energy may not introduce `src/assets/branding/company-logo.svg`, a package-local company-logo URL, or a second branding hash.
+- Core remains build-time only; the Energy HACS artifact stays runtime-standalone.
 
-## Transfer to another module
+## Validation
 
-Copy the canonical SVG unchanged, keep the same validation principles, and reuse the `--rhi-company-*` slot contract. Module-specific active colours belong to the module navigation and must never modify the company mark.
+Energy validation is a boundary test: it verifies that the pinned Core declares `branding_owner: rhi-ux-core`, that the Core brand primitive is bundled, and that no Energy-local company-logo transport exists.
