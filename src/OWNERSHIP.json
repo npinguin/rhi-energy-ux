@@ -5,8 +5,8 @@
     "app": {
       "path": "src/app",
       "owns": [
+        "domain navigation model and UX Core shell adapter",
         "Energy custom element",
-        "shared shell",
         "navigation",
         "renderers",
         "package asset references",
