@@ -16,5 +16,5 @@ function rhiEnergyPageHeader({ sectionLabel = "Energy", itemLabel = "", title = 
     detail:detail || ""
   })));
   const actionsMarkup = quickActions ? `<section class="rhiUxQuickActionBar" aria-label="Quick actions"><small>Quick actions</small><div class="rhiUxQuickActions">${quickActions}</div></section>` : "";
-  return `<section class="rhiEnergyPageHeader ${rhiUxEscape(tone)}">${heroMarkup}${statusMarkup}${actionsMarkup}</section>`;
+  return `<section class="rhiEnergyPageHeader rhiUxPageStack ${rhiUxEscape(tone)}">${heroMarkup}${statusMarkup}${actionsMarkup}</section>`;
 }
