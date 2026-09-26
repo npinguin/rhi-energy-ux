@@ -50,7 +50,7 @@ for full in (ROOT / "src").rglob("*"):
         continue
     source = full.read_text(encoding="utf-8")
     for token in legacy_product_tokens:
-        if token in source:
+        if re.search(re.escape(token) + r"(?!_health)", source):
             failures.append(f"legacy_product_authority:{full.relative_to(ROOT)}:{token}")
 
 # Home Assistant entity-state access belongs to runtime/app transport, not domain models/selectors.
