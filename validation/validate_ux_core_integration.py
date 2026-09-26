@@ -9,7 +9,7 @@ presentation=(ROOT/"src/app/presentation.js").read_text(encoding="utf-8")
 header=(ROOT/"src/ui/components/page-header.js").read_text(encoding="utf-8")
 card=(ROOT/"src/app/energy-card.js").read_text(encoding="utf-8")
 
-if meta.get("version")!="1.3.1" or meta.get("source_commit")!="13fc1e1b07f3fcfe9aac960471b74cfd0e96a8b9":
+if meta.get("version")!="1.4.0" or meta.get("source_commit")!="50cf7e135c90af15cf34b4f41dfba78aa1a5fc5e":
     raise SystemExit("unexpected RHI UX Core pin")
 if meta.get("runtime_dependency") is not False or meta.get("branding_owner")!="rhi-ux-core":
     raise SystemExit("RHI UX Core ownership metadata drift")
@@ -24,4 +24,4 @@ for symbol in ["rhiUxPageHero","rhiUxStatusGrid","rhiUxCoreStyles","rhiUxCompany
     if symbol not in vendor+presentation+header+card: raise SystemExit(f"missing Core integration symbol: {symbol}")
 if "COMPANY_LOGO_ASSET" in card:
     raise SystemExit("Energy must not own company-logo transport")
-print("PASS Energy consumes pinned RHI UX Core 1.3.1 including canonical company branding without runtime coupling")
+print("PASS Energy consumes pinned RHI UX Core 1.4.0 including canonical company branding without runtime coupling")
