@@ -4,9 +4,7 @@
     const laneTotals = normalizePlanningLaneTotals(contract.laneTotals);
     const rows = contract.buckets.map(bucket => adaptPlanningBucket(bucket, contract.contractVersion));
     const quality = planningObject(contract.horizon.quality);
-    const contractSupported = rows.length
-      ? rows.every(row => row.contractSupported)
-      : /R1\.(79\.[34]|89\.)/.test(contract.contractVersion);
+    const contractSupported = contract.available === true && String(contract.contractVersion || '').startsWith('2.');
     const stateText = String(firstDefined(contract.horizon.state, contract.horizon.status, quality.health, contract.horizon.quality, '')).toLowerCase();
     return Object.freeze({
       horizonId: contract.horizonId,
