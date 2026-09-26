@@ -3773,10 +3773,19 @@
     consumers(rt) {
       const pageVm = this.buildPageViewModel(rt, 'consumers');
       const publishedRows = rt.consumerMixRows();
-      const rows = publishedRows;
       const summary = rt.consumerMixSummary();
-      const visibleRows = this.filterAndSortConsumers(rows);
       const domain = this.flexibleAssetDomain(rt);
+      const publishedById = new Map(publishedRows.map(row => [String(row.asset_id||row.consumer_id||row.id||''), row]));
+      const canonicalRows = domain.all().filter(vm => !vm.isStorage).map(vm => ({
+        ...(vm.raw || {}),
+        ...(publishedById.get(vm.id) || {}),
+        asset_id:vm.id,
+        participation_state:vm.participation,
+        operational_state:vm.operation
+      }));
+      const canonicalIds = new Set(canonicalRows.map(row => String(row.asset_id||row.consumer_id||row.id||'')));
+      const rows = canonicalRows.concat(publishedRows.filter(row => !canonicalIds.has(String(row.asset_id||row.consumer_id||row.id||''))));
+      const visibleRows = this.filterAndSortConsumers(rows);
       const participating = visibleRows.filter(row => { const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return !vm || (vm.isParticipating && !vm.isDisabled); });
       const disabled = visibleRows.filter(row => domain.byId(row.asset_id||row.consumer_id||row.id)?.isDisabled);
       const statuses = participating.map(row => {
