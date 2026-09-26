@@ -25,6 +25,10 @@ for (const token of [
 
 assert.match(header,/metrics = \[\], quickActions = ""/);
 assert.match(header,/rhiUxQuickActionBar/);
+assert.match(header,/rhiEnergyPageHeader rhiUxPageStack/);
+assert.match(core,/\.rhiUxPageStack>\.rhiUxPageHero\{order:1\}/);
+assert.match(core,/\.rhiUxPageStack>\.rhiUxStatusGrid\{order:2\}/);
+assert.match(core,/\.rhiUxPageStack>\.rhiUxQuickActionBar\{order:3\}/);
 assert.match(app,/quickActions:this\.pageQuickActions\(rt, tab\)/);
 assert.match(app,/pageQuickActions\(rt, tab\)/);
 assert.match(app,/rt\.visibleCommands\(\)/);
