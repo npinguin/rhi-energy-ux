@@ -32,7 +32,9 @@ branch
    → committed-dist equality
    → HACS validation
 → squash merge
-→ Publish HACS verifies complete committed dist package
+→ full Validate reruns on the exact main SHA
+→ Publish HACS is triggered only by successful main Validate
+→ Publish HACS verifies the complete committed dist package from that exact validated SHA
 → create or verify immutable tag
 → normal GitHub Release contains notes only and zero assets
 → immutable HACS-visible TEST CANDIDATE
