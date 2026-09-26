@@ -5,7 +5,7 @@ source = (root / 'dist' / 'rhi-energy-ux.js').read_text(encoding='utf-8')
 checks = {    'metering_records_owner': "function selectEnergyMetering" in source and "canonical_period_energy_not_published" in source,
     'metering_summary_quality_only': "metrics:Object.freeze({})" in source and "available:false" in source,
     'metering_no_summary_measured_projection': "firstDefined(selectedSummary.measured,selectedSummary.values" not in source,
-    'metering_zero_preserved': "const resolved = ['RESOLVED','AVAILABLE','READY','OK'].includes(status) && source.value !== undefined && source.value !== null;" in source,
+    'metering_zero_preserved': "const resolved = status === 'AVAILABLE' && value !== null" in source,
     'active_view_restored': "window.sessionStorage.getItem('homebrain.energy.active_view')" in source,
     'active_view_persisted': "window.sessionStorage.setItem('homebrain.energy.active_view', this.view)" in source,
     'render_coalesced': 'scheduleRender(immediate = false)' in source and '}, immediate ? 0 : 350);' in source,
