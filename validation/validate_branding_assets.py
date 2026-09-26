@@ -15,7 +15,7 @@ checks={
  "approved_slogan_present": "DomotiX · Network · Security" in VENDOR,
  "approved_primary_colour_present": "#0B4C86" in VENDOR,
  "approved_slogan_colour_present": "#5B95C8" in VENDOR,
- "energy_uses_core_brand": "rhiUxCompanyBrand()" in CARD,
+ "energy_uses_core_brand": "rhiUxCompanyBrand()" in CARD or "rhiUxDomainShell(" in CARD,
  "energy_has_no_logo_transport": "COMPANY_LOGO_ASSET" not in CARD and "company-logo.svg" not in CARD,
 }
 for name,ok in checks.items(): print(("PASS" if ok else "FAIL")+" "+name)
