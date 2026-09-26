@@ -13,5 +13,9 @@
   "hacs_package_root": "dist",
   "hacs_delivery_mode": "immutable_tag_dist_tree",
   "release_asset_policy": "none",
-  "version": "4.0.3"
+  "version": "4.0.3",
+  "required_contracts": [
+    "RHI_ENERGY_PUBLIC_CONTRACT_V2",
+    "RHI_ENERGY_CORE_V1"
+  ]
 }
