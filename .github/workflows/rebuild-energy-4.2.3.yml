@@ -1,0 +1,38 @@
+name: Rebuild Energy UX 4.2.3 candidate
+on:
+  push:
+    branches:
+      - release/4.2.3-information-density
+permissions:
+  contents: write
+jobs:
+  rebuild:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: release/4.2.3-information-density
+          fetch-depth: 0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run release:sync
+      - run: npm run build
+      - name: Commit deterministic candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json COMPATIBILITY.json RELEASE_MANIFEST.json release/product.json release/RELEASE_STATUS.json release/QUALIFICATION.json dist
+          if git diff --cached --quiet; then
+            echo "candidate already synchronized"
+            exit 0
+          fi
+          git commit -m "build: refresh Energy UX 4.2.3 candidate"
+          git push origin HEAD:release/4.2.3-information-density
