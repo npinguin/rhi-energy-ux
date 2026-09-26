@@ -1,201 +1,25 @@
 {
-  "version": 1,
+  "version": 2,
   "principle": "one invariant, one test owner",
-  "owners": {
-    "release_identity": {
-      "owner": "validation/validate_release_governance.py",
-      "owns": [
-        "package version",
-        "release descriptor alignment",
-        "publication lifecycle"
-      ],
-      "forbidden_in": {
-        "validation/validate_r3942_flow_contract.py": [
-          "UX_VERSION",
-          "package.json"
-        ],
-        "validation/validate_r3943_consumption_truth.py": [
-          "UX_VERSION",
-          "package.json"
-        ],
-        "validation/validate_r3944_stable_refresh.py": [
-          "UX_VERSION",
-          "package.json"
-        ],
-        "validation/validate_r3945_contract_clarity.py": [
-          "UX_VERSION",
-          "package.json"
-        ],
-        "validation/validate_r3946_current_energy_model.py": [
-          "UX_VERSION",
-          "package.json"
-        ],
-        "validation/validate_r3947_footer_runtime_guard.py": [
-          "UX_VERSION",
-          "package.json"
-        ]
-      }
-    },
-    "branding": {
-      "owner": "validation/validate_branding_assets.py",
-      "owns": [
-        "canonical artwork",
-        "brand delivery",
-        "source/dist parity"
-      ],
-      "forbidden_in": {
-        "validation/validate_shared_ux_footer.py": [
-          "company-logo.svg",
-          "COMPANY_LOGO",
-          "package-versioned URL"
-        ]
-      }
-    },
-    "footer_presentation": {
-      "owner": "validation/validate_shared_ux_footer.py",
-      "owns": [
-        "footer geometry",
-        "issue disclosure",
-        "visible release identity"
-      ]
-    },
-    "footer_runtime_data": {
-      "owner": "validation/validate_r3947_footer_runtime_guard.py",
-      "owns": [
-        "canonical footer runtime inputs",
-        "backend release ownership",
-        "diagnostic source safety"
-      ]
-    },
-    "navigation_and_stability": {
-      "owner": "validation/validate_r3944_stable_refresh.py",
-      "owns": [
-        "navigation structure",
-        "interaction persistence",
-        "stable render behavior"
-      ]
-    },
-    "flow": {
-      "owner": "validation/validate_r3942_flow_contract.py",
-      "owns": [
-        "physical flow projection and connection ownership"
-      ]
-    },
-    "consumption": {
-      "owner": "validation/validate_r3943_consumption_truth.py",
-      "owns": [
-        "home consumption and flexible-load truth"
-      ]
-    },
-    "current_energy_model": {
-      "owner": "validation/validate_r3946_current_energy_model.py",
-      "owns": [
-        "canonical current-energy and battery view model"
-      ]
-    },
-    "source_structure": {
-      "owner": "validation/validate_source_ownership.py",
-      "owns": [
-        "source folder ownership",
-        "source manifest completeness",
-        "legacy source tree removal",
-        "module insertion ownership"
-      ]
-    },
-    "asset_package": {
-      "owner": "validation/validate_asset_policy.py",
-      "owns": [
-        "asset path safety",
-        "asset extension policy",
-        "source/dist asset parity",
-        "runtime packaged asset references"
-      ]
-    },
-    "hacs_package": {
-      "owner": "validation/validate_hacs_package.py",
-      "owns": [
-        "dist package tree",
-        "HACS delivery mode",
-        "package manifest integrity",
-        "release asset single-file avoidance"
-      ]
-    },
-    "documentation": {
-      "owner": "validation/validate_documentation_drift.py",
-      "owns": [
-        "normative path currency",
-        "source/package terminology",
-        "migration-sequence documentation"
-      ]
-    },
-    "visual_presentation": {
-      "owner": "validation/validate_mobility_rc38_visual_parity.py",
-      "owns": [
-        "top-level hero geometry",
-        "top-level status-card hierarchy",
-        "quick-action presentation parity"
-      ]
-    },
-    "asset_profile_contract": {
-      "owner": "validation/test_asset_profile_contract.js",
-      "owns": [
-        "Energy Public V2 profile consumption",
-        "property publication completeness consumption",
-        "no display-name or power-based flexible-asset semantic inference"
-      ]
-    },
-    "energy_logical_visual_catalog": {
-      "owner": "validation/test_energy_visual_catalog.js",
-      "owns": [
-        "logical-device visual catalog type partitioning",
-        "profile-to-representative-image resolution",
-        "same-type visual picker safety",
-        "Energy UX visual preference persistence",
-        "producer-owned visual_ref precedence"
-      ]
-    },
-    "solar_hardware_experience": {
-      "owner": "validation/test_solar_hardware_experience.js",
-      "owns": [
-        "Solar hardware facts and visuals",
-        "panel to inverter to Home Bus explanatory path",
-        "non-invented solar versus grid battery source allocation"
-      ]
-    },
-    "battery_contributor_layout": {
-      "owner": "validation/test_battery_contributor_layout.js",
-      "owns": [
-        "Home Battery contributor body geometry",
-        "Home Battery contributor image containment",
-        "Home Battery hero preservation during body-only fixes"
-      ]
-    },
-    "solar_information_architecture": {
-      "owner": "validation/test_solar_information_architecture.js",
-      "owns": [
-        "Flow excludes hardware inventory",
-        "Planning excludes hardware inventory",
-        "Solar owns array inverter battery and support-device hierarchy",
-        "Solar zone panel visual choices"
-      ]
-    },
-    "tab_information_architecture_and_device_visuals": {
-      "owner": "validation/test_tab_ia_device_visuals.js",
-      "owns": [
-        "Solar navigation and hardware ownership",
-        "Operational Planning navigation and execution-only ownership",
-        "Energy and Mobility device visual coverage across tabs",
-        "SE10K RWB crisp artwork replacement"
-      ]
-    },
-    "gas_insights_tab": {
-      "owner": "validation/test_gas_insights_tab.js",
-      "owns": [
-        "Gas is final Energy tab",
-        "Gas hero asset and house-style header",
-        "canonical gas meter identity",
-        "HA-native statistics graph host"
-      ]
-    }
+  "active_owners": {
+    "architecture_boundary": "validation/validate_contract_gateway_architecture.py",
+    "release_identity": "validation/validate_release_governance.py",
+    "source_structure": "validation/validate_source_ownership.py",
+    "asset_package": "validation/validate_asset_policy.py",
+    "hacs_package": "validation/validate_hacs_package.py",
+    "branding": "validation/validate_branding_assets.py",
+    "renderer_integrity": "validation/validate_renderer_reference_integrity.py",
+    "public_v2_projection": "validation/test_energy_v2_projection.js",
+    "current_energy_model": "validation/test_current_energy_view_model.js",
+    "planning_contract": "validation/test_planning_contract.js",
+    "command_contract": "validation/test_command_contract.js",
+    "asset_profile_contract": "validation/test_asset_profile_contract.js",
+    "visual_catalog": "validation/test_energy_visual_catalog.js",
+    "gas_experience": "validation/test_gas_insights_tab.js"
+  },
+  "policy": {
+    "source_inspection": "negative_architecture_boundaries_only",
+    "positive_implementation_shape_tests": "forbidden_in_active_release_gate",
+    "historical_regression_files": "may_remain_for_forensics_but_are_not_release_authority"
   }
 }
