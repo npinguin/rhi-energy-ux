@@ -1,9 +1,9 @@
-// Vendored build-time snapshot of npinguin/rhi-ux-core 1.1.0
-// Source commit: 480eaef12955d56970ec172fdde6f5fe2e0ab9c6
+// Vendored build-time snapshot of npinguin/rhi-ux-core 1.2.0
+// Source commit: 9c3f60942a1cf68ce30f33c68b532213d7868570
 // Runtime dependency: none. This source is bundled into the Energy artifact.
-// RHI UX Core 1.1.0 — build-time presentation primitives only.
+// RHI UX Core 1.2.0 — build-time presentation primitives only.
 // No domain semantics or Home Assistant contract/entity knowledge belongs here.
-const RHI_UX_CORE_VERSION = "1.1.0";
+const RHI_UX_CORE_VERSION = "1.2.0";
 
 function rhiUxEscape(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -43,11 +43,11 @@ function rhiUxDomainShell({ product = "Home Intelligence", domain = "", modules 
   const selected = modules.find(row => String(row.id || "") === String(activeModule || "")) || modules[0] || { items:[] };
   const moduleButtons = modules.map(row => {
     const active = String(row.id || "") === String(selected.id || "");
-    return `<button type="button" class="rhiUxModuleTab${active ? " active" : ""}" data-rhi-module="${rhiUxEscape(row.id || "")}"${row.target ? ` data-target="${rhiUxEscape(row.target)}"` : ""}><span>${rhiUxEscape(row.label || row.id || "")}</span></button>`;
+    return `<button type="button" class="rhiUxModuleTab${active ? " active" : ""}" data-rhi-module="${rhiUxEscape(row.id || "")}"${row.target ? ` data-nav="${rhiUxEscape(row.target)}"` : ""}><span>${rhiUxEscape(row.label || row.id || "")}</span></button>`;
   }).join("");
   const itemButtons = (selected.items || []).map(row => {
     const active = String(row.id || "") === String(activeItem || "");
-    return `<button type="button" class="rhiUxDomainTab${active ? " active" : ""}" data-rhi-item="${rhiUxEscape(row.id || "")}"${row.target ? ` data-target="${rhiUxEscape(row.target)}"` : ""}><span>${rhiUxEscape(row.label || row.id || "")}</span></button>`;
+    return `<button type="button" class="rhiUxDomainTab${active ? " active" : ""}" data-rhi-item="${rhiUxEscape(row.id || "")}"${row.target ? ` data-nav="${rhiUxEscape(row.target)}"` : ""}><span>${rhiUxEscape(row.label || row.id || "")}</span></button>`;
   }).join("");
   return `<header class="rhiUxDomainShell"><div class="rhiUxProductArea"><div class="rhiUxDomainShellTop"><div class="rhiUxDomainIdentity"><span>${rhiUxEscape(product)}</span><strong>${rhiUxEscape(domain)}</strong></div><nav class="rhiUxModuleTabs" aria-label="Modules">${moduleButtons}</nav></div><div class="rhiUxDomainShellBottom"><nav class="rhiUxDomainTabs" aria-label="${rhiUxEscape(selected.label || domain || "Domain")} navigation">${itemButtons}</nav></div></div>${brandHtml ? `<div class="rhiUxCompanyBrand">${brandHtml}</div>` : ""}</header>`;
 }
