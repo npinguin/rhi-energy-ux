@@ -1,3 +1,11 @@
+## 4.0.4 — Public V2 runtime acceptance hotfix
+
+- removes the erroneous UX requirement for a non-published `contract_visibility=ux_safe` attribute on the canonical Public V2 sensor;
+- trusts only the exact canonical entity id, then validates `contract_id`, core contract id and required core sections inside the V2 adapter;
+- prevents Overview status cards from saying Solar is producing or forecast is available when those canonical values are unavailable;
+- adds an architecture gate preventing optional transport metadata from becoming a second product-availability authority;
+- preserves fail-closed null/unknown semantics and the v4.0.3 maintainability cleanup.
+
 ## 4.0.3 — Public V2 compatibility and test-governance simplification
 
 - closes the pilot-blocking backend compatibility gap and requires the canonical Public V2 core;

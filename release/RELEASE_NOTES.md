@@ -1,25 +1,17 @@
-# RHI Energy UX v4.0.3 — Public V2 compatibility closure TEST CANDIDATE
+# v4.0.4 — Public V2 runtime acceptance hotfix TEST CANDIDATE
 
-## Scope
+v4.0.4 fixes the target-runtime blocker exposed by Home Assistant testing of v4.0.3.
 
-4.0.3 fixes the pilot-blocking compatibility defect found in target Home Assistant after v4.0.2.
+The backend publishes the canonical entity `sensor.rhi_energy_public_contract_v2` without a `contract_visibility` attribute. v4.0.3 incorrectly required `contract_visibility=ux_safe` before allowing the exact canonical entity through the UX gateway, so the frontend reported “Energy Public V2: Entity Is Not Available” even when the backend-owned sensor was present.
 
-- corrects the minimum backend from E0.15.48 to E0.15.52, where the canonical Public V2 core/pilot contract is actually published;
-- validates the presence of RHI_ENERGY_CORE_V1 before treating the Energy product contract as renderable;
-- reports an explicit incompatible-backend state instead of rendering an apparently valid dashboard full of unavailable values;
-- preserves V2-only product ownership and does not fall back to legacy sensor.energy_* surfaces;
-- preserves null/unavailable semantics and prohibits missing data from becoming 0;
-- keeps E0.15.53 as the tested canonical-interface-authority backend;
-- accepted technical debt: 0;
-- accepted feature debt: 0.
+This release removes that duplicate transport gate. Runtime acceptance is now:
 
-## Compatibility
+`exact canonical entity id → contract_id validation → RHI_ENERGY_CORE_V1 validation → required core sections → projections`.
 
-- Energy UX: 4.0.3
-- Minimum Energy backend: E0.15.52
-- Tested Energy backend: E0.15.53
-- Product contract: RHI_ENERGY_PUBLIC_CONTRACT_V2
-- Required core contract: RHI_ENERGY_CORE_V1
-- Rollback release: v4.0.2
+It also removes misleading “Producing now” / forecast labels when Solar values are unavailable.
 
-Target Home Assistant runtime qualification and rollback proof remain mandatory before stable promotion.
+Required backend: E0.15.52+
+Tested backend: E0.15.53
+Rollback: v4.0.3
+
+Target Home Assistant runtime proof remains required before stable promotion.
