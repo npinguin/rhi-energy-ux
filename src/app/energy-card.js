@@ -2331,8 +2331,55 @@
         description:semanticDescription,
         hero:hbEnergyHeroAsset(heroKey),
         metrics:p.metrics,
+        quickActions:this.pageQuickActions(rt, tab),
         tone:p.tone
       });
+    }
+
+    pageQuickActions(rt, tab) {
+      const typeSets = {
+        overview:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer','solar_production','solar_array','solar_inverter','inverter']),
+        flow:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer']),
+        solar:new Set(['solar_production','solar_array','solar_inverter','inverter','battery_system','battery']),
+        battery:new Set(['battery_system','battery']),
+        consumers:new Set(['flexible_load','flexible_asset','consumer']),
+        gas:new Set(['gas_meter']),
+        strategies:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer','energy_system']),
+        'operational-planning':new Set(['flexible_load','flexible_asset','consumer','battery_system','battery']),
+        planning:new Set(['flexible_load','flexible_asset','consumer','battery_system','battery']),
+        'strategic-planning':new Set(['energy_system','battery_system','battery','flexible_load','flexible_asset','consumer']),
+        metering:new Set(['gas_meter','battery_system','battery','flexible_load','flexible_asset','consumer']),
+        value:new Set(['energy_system','battery_system','battery','flexible_load','flexible_asset','consumer']),
+        retrospective:new Set(['energy_system','battery_system','battery','flexible_load','flexible_asset','consumer'])
+      };
+      const allowed = typeSets[tab] || typeSets.overview;
+      const assets = new Map(rt.assets().map(asset => [String(asset.asset_id || ''), asset]));
+      const commands = rt.visibleCommands().filter(command => {
+        const target = String(command.target_asset_id || '');
+        const asset = assets.get(target);
+        const type = String(asset?.asset_type || asset?.object_class || '').toLowerCase();
+        return !target || !type || allowed.has(type);
+      });
+      const seen = new Set();
+      const models = [];
+      for (const command of commands) {
+        const model = createCommandActionModel(command);
+        if (!model) continue;
+        const semantic = `${model.targetAssetId || command.target_asset_id || ''}::${model.role || model.id}`;
+        if (seen.has(semantic)) continue;
+        seen.add(semantic);
+        models.push(model);
+        if (models.length >= 4) break;
+      }
+      return models.map(model => this.componentActionModelButton(model)).join('');
+    }
+
+    assetQuickActions(rt, assetId, limit = 3) {
+      const id = String(assetId || '');
+      if (!id) return '';
+      const models = rt.commandActionModelsForAsset(id).filter(Boolean).slice(0, limit);
+      if (!models.length) return '';
+      return `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${models.map(model => this.componentActionModelButton(model)).join('')}</div></div>`;
     }
     measuredAssetPower(asset = {}) {
       return asNumber(firstDefined(asset.actual_power_kw, asset.current_power_kw, asset.power_kw));
@@ -2929,6 +2976,103 @@
     energyAssetFacts(rt, asset = {}, limit = 4) {
       const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
       if (!id) return [];
+      const type = this.energyAssetType(asset);
+      const byType = {
+        battery:[
+          ['battery.soc_pct','State of charge'],
+          ['battery.power_kw','Power now'],
+          ['battery.available_kwh','Available energy'],
+          ['battery.capacity_kwh','Capacity'],
+          ['battery.state','State'],
+          ['battery.temperature_c','Temperature']
+        ],
+        battery_system:[
+          ['battery.soc_pct','State of charge'],
+          ['battery.power_kw','Power now'],
+          ['battery.available_kwh','Available energy'],
+          ['battery.capacity_kwh','Capacity'],
+          ['battery.reserve_target_pct','Reserve'],
+          ['battery.state','State']
+        ],
+        home_battery_system:[
+          ['battery.soc_pct','State of charge'],
+          ['battery.power_kw','Power now'],
+          ['battery.available_kwh','Available energy'],
+          ['battery.capacity_kwh','Capacity'],
+          ['battery.reserve_target_pct','Reserve'],
+          ['battery.state','State']
+        ],
+        solar_production:[
+          ['solar.power_kw','Production now'],
+          ['solar.energy_today_kwh','Produced today'],
+          ['solar.capacity_kwp','Installed capacity'],
+          ['solar.state','State']
+        ],
+        solar_array:[
+          ['solar.power_kw','Production now'],
+          ['solar.energy_today_kwh','Produced today'],
+          ['solar.capacity_kwp','Installed capacity'],
+          ['solar.state','State']
+        ],
+        solar_inverter:[
+          ['inverter.power_kw','Power now'],
+          ['solar.power_kw','Solar power'],
+          ['inverter.efficiency_pct','Efficiency'],
+          ['inverter.state','State']
+        ],
+        inverter:[
+          ['inverter.power_kw','Power now'],
+          ['solar.power_kw','Solar power'],
+          ['inverter.efficiency_pct','Efficiency'],
+          ['inverter.state','State']
+        ],
+        grid_connection:[
+          ['grid.net_power_kw','Grid power'],
+          ['grid_import.power_kw','Import'],
+          ['grid_export.power_kw','Export'],
+          ['grid.flow_direction','Direction']
+        ],
+        gas_meter:[
+          ['gas.flow_m3_h','Flow now'],
+          ['gas.total_m3','Meter total'],
+          ['gas.state','State']
+        ],
+        flexible_load:[
+          ['flexible_load.power_kw','Power now'],
+          ['flexible_load.energy_to_target_kwh','Energy needed'],
+          ['flexible_load.state','State'],
+          ['flexible_load.automation_mode','Automation']
+        ],
+        flexible_asset:[
+          ['flexible_load.power_kw','Power now'],
+          ['flexible_load.energy_to_target_kwh','Energy needed'],
+          ['flexible_load.state','State'],
+          ['flexible_load.automation_mode','Automation']
+        ],
+        consumer:[
+          ['consumer.power_kw','Power now'],
+          ['consumer.energy_today_kwh','Energy today'],
+          ['consumer.state','State']
+        ]
+      };
+      const candidates = byType[type] || [];
+      const facts = [];
+      const seen = new Set();
+      for (const [key,label] of candidates) {
+        if (seen.has(key)) continue;
+        const field = rt.assetField(id, key);
+        if (!field?.resolved) continue;
+        seen.add(key);
+        const value = field.display && field.display !== '—'
+          ? field.display
+          : (field.value === null || field.value === undefined ? '—' : `${field.value}${field.unit ? ` ${field.unit}` : ''}`);
+        facts.push({ label, value, status:field.status || field.quality || 'AVAILABLE', key });
+        if (facts.length >= limit) break;
+      }
+      return facts;
+    }, limit = 4) {
+      const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
+      if (!id) return [];
       const priority = ['state','operating_state','health','soc_pct','power_kw','current_power_kw','energy_today_kwh','production_today_kwh','capacity_kwh','available_kwh','voltage_v','current_a','temperature_c','efficiency_pct'];
       const rows = rt.rowsByAsset(id)
         .filter(row => row && !row.missing && rowValue(row, null) !== null)
@@ -2955,6 +3099,28 @@
       return facts;
     }
     energyDeviceStatusCard(rt, asset = {}, roleLabel = '') {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
+      const type = String(firstDefined(enriched.asset_type,enriched.object_class,'device') || 'device');
+      const profile = objectFrom(enriched.profile || {});
+      const profileLabel = firstDefined(profile.display_name,profile.label,profile.name,enriched.profile_id,'');
+      const facts = this.energyAssetFacts(rt,enriched,5);
+      const projection = id ? rt.assetProjection(id) : null;
+      const health = firstDefined(projection?.lifecycle?.state, enriched.health, enriched.status, '');
+      const publication = objectFrom(enriched.publication || {});
+      const configState = publication.complete === true ? 'Configured' : profileLabel ? 'Profiled' : 'Detected';
+      const actions = this.assetQuickActions(rt,id,3);
+      const details = facts.length
+        ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
+        : `<span class="energyDeviceNoFacts"><small>Status</small><b>Canonical live facts are not published for this device.</b></span>`;
+      return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
+        <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
+        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3></div><span class="energyDeviceState">${escapeHtml(health ? human(health) : configState)}</span></div>
+        <div class="energyDeviceConfig">${profileLabel ? `<span><b>Profile</b>${escapeHtml(human(profileLabel))}</span>` : ''}<span><b>Config</b>${escapeHtml(configState)}</span></div>
+        <div class="energyDeviceFacts">${details}</div>${actions}</div>
+      </article>`;
+    }, roleLabel = '') {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
@@ -3512,9 +3678,12 @@
       const name = rt.assetName(assetId);
       const soc = rt.assetNumber(assetId, 'battery.soc_pct');
       const power = rt.assetNumber(assetId, 'battery.power_kw');
+      const available = rt.assetNumber(assetId, 'battery.available_kwh');
+      const capacity = rt.assetNumber(assetId, 'battery.capacity_kwh');
       const state = String(rt.assetText(assetId, 'battery.state', '') || '').toLowerCase();
       const published = rt.asset(assetId) || {};
-      const health = rt.assetText(assetId, 'battery.health', published.health || published.status || 'UNKNOWN');
+      const projection = rt.assetProjection(assetId);
+      const health = firstDefined(projection?.lifecycle?.state, published.health, published.status, 'UNKNOWN');
       const asset = this.energyAssetContext(rt, published.asset_id ? published : { asset_id:assetId, display_name:name, asset_type:'battery' });
       const stateLabel = state === 'charging' ? 'Charging'
         : state === 'discharging' ? 'Discharging'
@@ -3526,7 +3695,13 @@
         : stateLabel === 'Discharging' ? 'Supplying energy to the Home Bus'
         : stateLabel === 'Idle' ? 'No active battery flow'
         : 'Battery flow is not currently available';
-      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorMeta"><span>Power now</span><b>${fmtKw(power, '—')}</b></div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div></article>`;
+      const quickFacts = [
+        ['Power now',fmtKw(power,'—')],
+        ['Available',available === null ? '' : fmtKwh(available)],
+        ['Capacity',capacity === null ? '' : fmtKwh(capacity)]
+      ].filter(([,value])=>value);
+      const actions = this.assetQuickActions(rt,assetId,3);
+      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorFacts">${quickFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div>${actions}</div></article>`;
     }
     gas(rt) {
       const pageVm = this.buildPageViewModel(rt, 'gas');
