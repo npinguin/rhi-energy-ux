@@ -102,13 +102,13 @@ function hbEnergyPresentationStyles() {
     .rhi-context-card{min-width:0;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm);padding:14px 16px}
     .rhi-data-list{display:grid;gap:6px}
     .rhi-data-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 10px;border:1px solid #EDF1F6;border-radius:var(--rhi-radius-sm);background:var(--rhi-color-surface-soft)}
-    .energyDeviceActions,.batteryContributorActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
-    .energyDeviceActions .hiAction,.batteryContributorActions .hiAction{min-height:32px;padding:6px 9px;font-size:10px}
-    .batteryContributorQuickFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
-    .batteryContributorQuickFacts span{min-width:0;padding:6px 7px;border-radius:8px;background:var(--rhi-color-surface-soft)}
-    .batteryContributorQuickFacts small,.batteryContributorQuickFacts b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .batteryContributorQuickFacts small{font-size:8.5px;color:var(--rhi-color-muted)}
-    .batteryContributorQuickFacts b{font-size:10.5px;margin-top:2px}
+    .energyAssetQuickActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+    .energyAssetQuickActions .hiAction{min-height:32px;padding:6px 9px;font-size:10px}
+    .batteryContributorFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+    .batteryContributorFacts span{min-width:0;padding:6px 7px;border-radius:8px;background:var(--rhi-color-surface-soft)}
+    .batteryContributorFacts small,.batteryContributorFacts b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .batteryContributorFacts small{font-size:8.5px;color:var(--rhi-color-muted)}
+    .batteryContributorFacts b{font-size:10.5px;margin-top:2px}
     @media(min-width:761px) and (max-width:1100px){
       .energyDeviceCard{grid-template-columns:104px minmax(0,1fr)!important}
       .energyDeviceVisual{height:118px!important}
@@ -123,13 +123,13 @@ function hbEnergyPresentationStyles() {
       .solarAggregateHead{grid-template-columns:82px minmax(0,1fr)!important}
       .solarAggregateVisual{height:82px!important}
       .solarAggregateCount{grid-column:2!important;justify-self:start!important}
-      .batteryContributorQuickFacts{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .batteryContributorFacts{grid-template-columns:repeat(2,minmax(0,1fr))}
     }
     @media(max-width:430px){
       .energyDeviceCard{grid-template-columns:76px minmax(0,1fr)!important}
       .energyDeviceVisual{height:84px!important}
       .energyDeviceConfig{display:none!important}
-      .batteryContributorQuickFacts{grid-template-columns:1fr 1fr}
+      .batteryContributorFacts{grid-template-columns:1fr 1fr}
     }
   `;
 }
