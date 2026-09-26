@@ -1,3 +1,15 @@
+## 4.1.3 — canonical Energy UX grammar and responsive asset experience
+
+- keeps the complete Energy / Intelligence / Insights tab set unchanged;
+- standardises page flow around hero → status → quick actions → focused body;
+- surfaces backend-published quick commands at page and asset level without inventing frontend commands;
+- replaces generic property-bag device facts with typed asset-scoped canonical V2 facts;
+- removes the remaining synthesized device-health lookup from product cards;
+- enriches physical battery cards with canonical SoC, power, available/capacity facts and quick actions when published;
+- adds same-type representative visual fallbacks for common Energy logical assets;
+- removes fixed-height battery-card clipping and strengthens desktop/tablet/phone image containment;
+- adds release-blocking UX grammar and responsive visual regression coverage.
+
 ## 4.1.2 — canonical multi-object Energy access
 
 - fixes Home Battery contributor discovery to traverse the canonical `battery_system` parent;
