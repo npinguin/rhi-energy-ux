@@ -35,7 +35,13 @@ const RHI_ENERGY_LOGICAL_VISUALS = Object.freeze([
 
   // Producer-domain flexible loads keep producer visual_ref when available. This
   // same-type fallback is only used when no producer visual identity is published.
-  { id:"flexible_load.generic", asset_type:"flexible_load", label:"Flexible load", brand:"Generic", model:"Controllable load", variant:"Flexible load", profile_patterns:["energy.flexible_load."], package_path:"heroes/consumers-hero.webp", quality:"generic_fallback", selectable:true }
+  { id:"flexible_load.generic", asset_type:"flexible_load", label:"Flexible load", brand:"Generic", model:"Controllable load", variant:"Flexible load", profile_patterns:["energy.flexible_load."], package_path:"heroes/consumers-hero.webp", quality:"generic_fallback", selectable:true },
+  { id:"flexible_asset.generic", asset_type:"flexible_asset", label:"Flexible asset", brand:"Generic", model:"Controllable asset", variant:"Flexible asset", profile_patterns:["energy.flexible_asset."], package_path:"heroes/consumers-hero.webp", quality:"representative", selectable:true },
+  { id:"consumer.generic", asset_type:"consumer", label:"Energy consumer", brand:"Generic", model:"Consumer", variant:"Load", profile_patterns:["energy.consumer."], package_path:"heroes/consumers-hero.webp", quality:"representative", selectable:true },
+  { id:"solar_array.generic", asset_type:"solar_array", label:"Solar array", brand:"Generic", model:"PV array", variant:"Array", profile_patterns:["energy.solar_array."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
+  { id:"inverter.generic", asset_type:"inverter", label:"Solar inverter", brand:"Generic", model:"Inverter", variant:"Inverter", profile_patterns:["energy.inverter."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
+  { id:"site_consumption.home", asset_type:"site_consumption", label:"Site consumption", brand:"Generic", model:"Home", variant:"Consumption", profile_patterns:["energy.site_consumption."], package_path:"heroes/consumers-hero.webp", quality:"representative", selectable:true },
+  { id:"energy_system.home", asset_type:"energy_system", label:"Home energy system", brand:"Generic", model:"Home energy system", variant:"System", profile_patterns:["energy.energy_system."], package_path:"heroes/overview-hero.webp", quality:"representative", selectable:true }
 ]);
 
 function rhiEnergyVisualCatalog() {
