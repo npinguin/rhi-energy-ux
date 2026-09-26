@@ -1,3 +1,14 @@
+## 4.0.2 — Gas consumption experience
+
+- replaces the placeholder Gas illustration with the Energy-family Viessmann Vitodens gas hero;
+- completes Gas as a measured-consumption experience instead of an empty setup screen;
+- adds clear live flow, cumulative meter, history and meter-health status;
+- keeps 30-day daily consumption on Home Assistant native long-term statistics;
+- adds useful fail-closed setup guidance when no canonical gas meter is configured;
+- never estimates missing gas consumption or converts unavailable measurements to zero;
+- adds Gas-specific quick actions and conclusion semantics;
+- preserves E0.15.48 / RHI_ENERGY_PUBLIC_CONTRACT_V2 and zero accepted technical/feature debt.
+
 ## 4.0.1 — Retrospective V2 boundary hotfix
 
 - removes the last retired V1 Retrospective contract lookup from runtime;
