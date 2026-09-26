@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -9,10 +10,18 @@ def read(rel):
 def write(rel, value):
     (ROOT / rel).write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
-pkg = read("package.json")
 product = read("release/product.json")
-version = str(pkg["version"])
+version = str(product["version"])
 tag = f"v{version}"
+
+pkg = read("package.json")
+pkg["version"] = version
+write("package.json", pkg)
+
+lock = read("package-lock.json")
+lock["version"] = version
+lock.setdefault("packages", {}).setdefault("", {})["version"] = version
+write("package-lock.json", lock)
 
 compat = read("COMPATIBILITY.json")
 compat["ux_version"] = version
@@ -29,7 +38,6 @@ manifest["energy_contract"] = product["contract"]
 manifest["minimum_backend"] = product["minimum_backend"]
 manifest["runtime_artifact"] = product["runtime_artifact"]
 manifest["runtime_checksum_artifact"] = product["runtime_checksum_artifact"]
-manifest.pop("build_manifest", None)
 manifest["package_manifest"] = product["package_manifest"]
 manifest["hacs_package_root"] = product["hacs_package_root"]
 manifest["hacs_delivery_mode"] = product["hacs_delivery_mode"]
@@ -50,19 +58,13 @@ qualification = read("release/QUALIFICATION.json")
 version_changed = qualification.get("version") != version
 qualification["version"] = version
 qualification["candidate_tag"] = tag
-qualification.setdefault("candidate_sha", "pending")
 qualification["previous_release"] = product["rollback_release"].removeprefix("v")
 if version_changed:
     qualification["candidate_sha"] = "pending"
     for key in list(qualification):
         if key in {"version","candidate_tag","candidate_sha","previous_release","known_accepted_technical_debt","known_accepted_feature_debt"}:
             continue
-        if key in {"runtime_proof","rollback_proof"}:
-            qualification[key] = "PENDING"
-        elif key == "release_decision":
-            qualification[key] = "BLOCKED"
-        else:
-            qualification[key] = "NOT_EXECUTED"
+        qualification[key] = "BLOCKED" if key == "release_decision" else ("PENDING" if key in {"runtime_proof","rollback_proof"} else "NOT_EXECUTED")
 write("release/QUALIFICATION.json", qualification)
 
 print(f"Synchronized Energy release metadata for {tag}")
