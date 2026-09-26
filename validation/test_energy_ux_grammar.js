@@ -62,6 +62,13 @@ assert.match(core,/\.rhiUxPageHeroArt\{position:absolute/);
 assert.match(core,/\.rhiUxStatusGrid\{/);
 assert.match(core,/\.rhiUxQuickActionBar/);
 assert.match(core,/--rhi-font-family:/);
+assert.match(core,/\.rhiUxPageStack>\.rhiUxPageHero\{order:1\}/);
+assert.match(core,/\.rhiUxPageStack>\.rhiUxStatusGrid\{order:2\}/);
+assert.match(core,/\.rhiUxPageStack>\.rhiUxQuickActionBar\{order:3\}/);
+assert.match(header,/rhiEnergyPageHeader rhiUxPageStack/);
+for (const duplicate of ['class="solarCompactSummaryRow"','class="gasUseFacts"','class="summaryRow four"','class="outlookSummaryStrip"','class="operationalSummaryGrid"']) {
+  assert.ok(!app.includes(duplicate), "duplicate page status surface remains: "+duplicate);
+}
 assert.doesNotMatch(presentation,/\.rhiUxPageHero\s*\{/);
 assert.doesNotMatch(presentation,/\.rhiUxStatusGrid\s*\{/);
 assert.doesNotMatch(presentation,/\.rhiUxQuickActionBar\s*\{/);
