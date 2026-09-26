@@ -20,7 +20,7 @@ assert.match(app,/period:'day'/);
 assert.match(app,/days_to_show:30/);
 assert.match(app,/Gas usage history/);
 assert.match(app,/Home Assistant long-term statistics/);
-assert.match(app,/Your gas use/);
+assert.match(app,/Meter context/);\nassert.match(app,/gasContextGrid/);\nassert.match(app,/Total entity/);
 assert.match(app,/No measured gas history yet/);
 assert.match(app,/Connect your gas meter/);
 assert.match(app,/The UX never estimates missing consumption/);
