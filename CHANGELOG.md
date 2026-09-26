@@ -1,3 +1,14 @@
+## 4.2.0 — unified Home Intelligence visual system
+
+- adopts RHI UX Core 1.4.0 as the single owner of shared typography and visual grammar;
+- standardises Energy hero images as background layers instead of split image panels;
+- keeps one canonical page status layer and removes duplicate Solar, Gas and Operational Planning top-status surfaces;
+- standardises status → Quick Actions ordering and Mobility-style Quick Action colours;
+- applies the Home Assistant font family through Core and removes local Energy font authority;
+- moves common body/card typography and styling to Core while keeping Energy semantics domain-owned;
+- adds an anti-drift release gate for typography, hero, status, Quick Actions and body ownership;
+- preserves immutable HACS packaging and runtime qualification as a separate gate.
+
 ## 4.1.3 — canonical Energy UX grammar and responsive asset experience
 
 - keeps the complete Energy / Intelligence / Insights tab set unchanged;
