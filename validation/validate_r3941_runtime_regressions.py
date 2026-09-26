@@ -13,7 +13,7 @@ checks={
   'battery_child_signed_semantics': "power < 0 ? 'Charging' : 'Discharging'" in source,
   'planning_horizon_local_labels': "Need entering today" in source and "Need entering tomorrow" in source and "Still after today" in source and "Still after tomorrow" in source,
   'canonical_property_write_gate': "meta.operationId === 'energy.property.write'" in source,
-  'strategy_profile_exact_membership': "const group=String(row.group || row.asset_id || 'home');" in source and "configuration?.strategy?.configured_properties" in source and "profile_id:group" in source,
+  'strategy_profile_exact_membership': "const group=String(row.group || row.asset_id || 'home');" in source and "configuration?.strategy?.configured?.properties" in source and "profile_id:group" in source,
 }
 failed=[k for k,v in checks.items() if not v]
 for k,v in checks.items(): print(('PASS' if v else 'FAIL'),k)
