@@ -146,9 +146,20 @@ function readEnergyPublicV2(gateway) {
     }
   }
 
+  const publicContractOk = envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2';
+  const coreContractOk = String(core.contract_id || '') === 'RHI_ENERGY_CORE_V1';
+  const compatibilityReason = !publicContractOk
+    ? 'public_v2_contract_unavailable'
+    : !coreContractOk
+      ? 'backend_missing_rhi_energy_core_v1_requires_e0_15_52_or_newer'
+      : '';
+
   return Object.freeze({
     envelope,
-    available:envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+    available:publicContractOk && coreContractOk,
+    publicContractOk,
+    coreContractOk,
+    compatibilityReason,
     contractVersion:String(attrs.contract_version || envelope.contractVersion || ''),
     release:String(attrs.release || ''),
     health:object(attrs.health).status || String(attrs.health || envelope.state || 'UNKNOWN'),
