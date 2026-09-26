@@ -64,6 +64,10 @@ for rel in [
     if re.search(r"\bhass\.states\b|\bthis\.hass\.states\b", source):
         failures.append(f"domain_direct_ha_access:{rel}")
 
+# Optional transport metadata may never become a second product-availability gate.
+if "contract_visibility" in card:
+    failures.append("optional_contract_visibility_must_not_gate_public_v2")
+
 # The public registry has exactly one Energy product entrypoint.
 registry = (ROOT / "src/runtime/public-interface-registry.js").read_text(encoding="utf-8")
 if "publicV2: 'sensor.rhi_energy_public_contract_v2'" not in registry:
