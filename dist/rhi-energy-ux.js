@@ -61,6 +61,8 @@ function readEnergyPublicV2(gateway) {
     const parsed = parseMaybeJson(value, value);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   };
+
+  const core = object(attrs.core);
   const objects = array(attrs.objects);
   const profiles = array(attrs.profiles);
   const relationships = array(attrs.relationships).map(row => Object.freeze({
@@ -79,10 +81,77 @@ function readEnergyPublicV2(gateway) {
   const valueAccounting = object(attrs.value_accounting);
   const layers = object(attrs.layers);
   const summary = object(attrs.summary);
+
+  const semantic = raw => {
+    const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {value:raw};
+    const resolution = source.resolution && typeof source.resolution === 'object' ? source.resolution : {};
+    const value = source.value !== undefined ? source.value : null;
+    const status = String(source.status || source.availability || resolution.status || (value !== null ? 'AVAILABLE' : 'UNAVAILABLE')).toUpperCase();
+    const quality = String(source.quality || (status === 'AVAILABLE' ? 'CANONICAL' : 'UNKNOWN')).toUpperCase();
+    const resolved = status === 'AVAILABLE' && value !== null && !['INVALID','STALE'].includes(quality);
+    return Object.freeze({
+      resolved,
+      value,
+      display:String(source.display ?? source.display_value ?? (value ?? '—')),
+      unit:String(source.unit || ''),
+      state:status.toLowerCase(),
+      status,
+      quality,
+      reason:String(source.reason || resolution.reason_code || source.reason_code || source.reason_text || ''),
+      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+      editable:source.write_supported === true || source.editable === true,
+      editor:source.editor || null,
+      constraints:source.constraints && typeof source.constraints === 'object' ? source.constraints : {},
+      write:source.write && typeof source.write === 'object' ? source.write : null,
+      operation:source.operation && typeof source.operation === 'object' ? source.operation : null,
+      raw:source
+    });
+  };
+
+  const coreField = (sectionName, fieldName) => {
+    const section = object(core[sectionName]);
+    const fields = object(section.fields);
+    if (fields[fieldName] !== undefined) return semantic(fields[fieldName]);
+    if (section[fieldName] && typeof section[fieldName] === 'object' && Object.prototype.hasOwnProperty.call(section[fieldName],'value')) {
+      return semantic(section[fieldName]);
+    }
+    if (Object.prototype.hasOwnProperty.call(section, fieldName)) {
+      const value = section[fieldName];
+      return semantic({
+        value,
+        unit:({power_kw:'kW',net_power_kw:'kW',import_power_kw:'kW',export_power_kw:'kW',attributed_power_kw:'kW',soc_pct:'%',reserve_target_pct:'%',capacity_kwh:'kWh',available_kwh:'kWh'})[fieldName] || null,
+        status:value === null || value === undefined ? 'UNAVAILABLE' : 'AVAILABLE',
+        quality:value === null || value === undefined ? 'UNKNOWN' : 'CANONICAL',
+        reason:value === null || value === undefined ? String(section.reason || '') : null
+      });
+    }
+    return semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:String(section.reason || 'canonical_field_not_published')});
+  };
+
+  const coreByKey = new Map([
+    ['battery.power_kw', coreField('battery','power_kw')],
+    ['battery.soc_pct', coreField('battery','soc_pct')],
+    ['battery.capacity_kwh', coreField('battery','capacity_kwh')],
+    ['battery.available_kwh', coreField('battery','available_kwh')],
+    ['battery.state', coreField('battery','state')],
+    ['battery.reserve_target_pct', coreField('battery','reserve_target_pct')],
+    ['solar.power_kw', coreField('solar','power_kw')],
+    ['grid.net_power_kw', coreField('grid','net_power_kw')],
+    ['grid_import.power_kw', coreField('grid','import_power_kw')],
+    ['grid_export.power_kw', coreField('grid','export_power_kw')],
+    ['grid.flow_direction', coreField('grid','flow_direction')],
+    ['site_consumption.power_kw', coreField('consumption','power_kw')],
+    ['home_consumption.power_kw', coreField('home','power_kw')],
+    ['flexible_loads.power_kw', coreField('flexible','power_kw')],
+    ['flexible_loads.attributed_power_kw', coreField('flexible','attributed_power_kw')]
+  ]);
+
+  const coreFlexible = object(core.flexible);
   const flexibleAssets = Object.freeze(
-    objects
-      .filter(row => String(row.asset_type || row.object_class || '').toLowerCase() === 'flexible_asset')
-      .map(row => Object.freeze({ ...row }))
+    (array(coreFlexible.assets).length ? array(coreFlexible.assets) : objects.filter(row => {
+      const type=String(row.asset_type || row.object_class || '').toLowerCase();
+      return type === 'flexible_load' || type === 'flexible_asset';
+    })).map(row => Object.freeze({ ...row }))
   );
   const planningObjects = Object.freeze(array(layers.planning_objects));
   const objectById = new Map(objects.map(row => [String(row.asset_id || ''), row]).filter(([id]) => id));
@@ -92,10 +161,8 @@ function readEnergyPublicV2(gateway) {
   const propertyByKey = new Map();
   const propertyByAssetAndKey = new Map();
   const configurationRows = [];
-  for (const [configurationKind, config] of Object.entries(configuration)) {
-    if (!config || typeof config !== 'object') continue;
-    const rows = array(config.properties || config.configured_properties || config.effective_properties);
-    for (const raw of rows) {
+  const addConfigurationRows = (configurationKind, rows) => {
+    for (const raw of array(rows)) {
       const key = String(raw.property_key || raw.property_id || raw.key || '');
       if (!key) continue;
       const row = Object.freeze({
@@ -109,11 +176,15 @@ function readEnergyPublicV2(gateway) {
       configurationRows.push(row);
       if (!propertyByKey.has(key)) propertyByKey.set(key,row);
     }
-  }
+  };
+  const pricing = object(configuration.pricing);
+  const strategy = object(configuration.strategy);
+  addConfigurationRows('pricing', pricing.properties);
+  addConfigurationRows('strategy', object(strategy.configured).properties || strategy.configured_properties);
+
   for (const asset of objects) {
     const assetId = String(asset.asset_id || '');
-    const rows = array(asset.properties);
-    for (const raw of rows) {
+    for (const raw of array(asset.properties)) {
       const key = String(raw.property_key || raw.property_id || raw.key || '');
       if (!key) continue;
       const row = Object.freeze({ asset_id:assetId, ...raw, property_key:key, key });
@@ -123,34 +194,13 @@ function readEnergyPublicV2(gateway) {
     }
   }
 
-  const field = row => {
-    const source = row && typeof row === 'object' ? row : {};
-    const resolution = source.resolution && typeof source.resolution === 'object' ? source.resolution : {};
-    const status = String(resolution.status || source.availability || source.status || (source.value !== undefined && source.value !== null ? 'RESOLVED' : 'UNAVAILABLE')).toUpperCase();
-    const resolved = ['RESOLVED','AVAILABLE','READY','OK'].includes(status) && source.value !== undefined && source.value !== null;
-    return Object.freeze({
-      resolved,
-      value: source.value ?? null,
-      display: String(source.display ?? source.display_value ?? (source.value ?? '—')),
-      unit: String(source.unit || ''),
-      state: status.toLowerCase(),
-      reason: String(resolution.reason_code || source.reason_code || source.reason || source.reason_text || ''),
-      source: 'RHI_ENERGY_PUBLIC_CONTRACT_V2',
-      quality: String(source.quality || ''),
-      editable: source.write_supported === true || source.editable === true,
-      editor: source.editor || null,
-      constraints: source.constraints && typeof source.constraints === 'object' ? source.constraints : {},
-      write: source.write && typeof source.write === 'object' ? source.write : null,
-      raw: source
-    });
-  };
-
   return Object.freeze({
     envelope,
-    available: envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2',
-    contractVersion: String(attrs.contract_version || envelope.contractVersion || ''),
-    release: String(attrs.release || ''),
-    health: String(envelope.state || 'UNKNOWN'),
+    available:envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+    contractVersion:String(attrs.contract_version || envelope.contractVersion || ''),
+    release:String(attrs.release || ''),
+    health:object(attrs.health).status || String(attrs.health || envelope.state || 'UNKNOWN'),
+    core,
     summary,
     objects,
     profiles,
@@ -172,13 +222,17 @@ function readEnergyPublicV2(gateway) {
     allPropertyRows:Object.freeze([...propertyRows, ...configurationRows]),
     propertyByKey,
     propertyByAssetAndKey,
+    coreByKey,
     object(assetId) { return objectById.get(String(assetId || '')) || null; },
     profile(profileId) { return profileById.get(String(profileId || '')) || null; },
     property(key, assetId = '') {
       const id = String(assetId || '');
       return id ? (propertyByAssetAndKey.get(`${id}::${String(key || '')}`) || null) : (propertyByKey.get(String(key || '')) || null);
     },
-    field(key, assetId = '') { return field(this.property(key, assetId)); }
+    field(key, assetId = '') {
+      if (!assetId && coreByKey.has(String(key || ''))) return coreByKey.get(String(key || ''));
+      return semantic(this.property(key, assetId));
+    }
   });
 }
 
@@ -229,35 +283,43 @@ function selectEnergyAsset(store, assetId) {
 function selectEnergyOverview(store) {
   const row=store?.overview && typeof store.overview === 'object' ? store.overview : {};
   return Object.freeze({
-    available:store?.available === true && Object.keys(row).length > 0,
-    status:String(row.status || row.product_status || row.state || 'UNAVAILABLE'),
+    available:store?.available === true,
+    status:String(row.status || row.product_status || row.state || store?.health || 'UNKNOWN'),
     primary:row.primary || row.primary_metric || null,
     summary:row.summary || {},
     flow:row.flow || {},
     conclusions:Array.isArray(row.conclusions) ? row.conclusions : [],
     reason:String(row.reason || row.product_reason || ''),
     raw:row,
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.overview'
+    core:store?.core || {},
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.core'
   });
 }
 
 function selectEnergyPlanning(store, horizon='D0') {
   const id=String(horizon || 'D0').toUpperCase();
   const planning=store?.planning && typeof store.planning === 'object' ? store.planning : {};
-  const horizons=planning.planning_horizons && typeof planning.planning_horizons === 'object'
-    ? planning.planning_horizons : {};
+  const horizons=planning.horizons && typeof planning.horizons === 'object' ? planning.horizons : {};
   const row=horizons[id] && typeof horizons[id] === 'object' ? horizons[id] : {};
-  const summary=row.summary && typeof row.summary === 'object' ? row.summary : {};
   return Object.freeze({
     available:store?.available === true && Object.keys(row).length > 0,
     horizon_id:id,
     horizon:row,
-    summary,
-    lane_totals:summary.lane_totals || row.lane_totals || {},
+    summary:row,
+    lane_totals:Object.freeze({
+      required_kwh:row.required_kwh ?? null,
+      planned_kwh:row.planned_kwh ?? null,
+      executed_kwh:row.executed_kwh ?? null,
+      still_to_plan_kwh:row.still_to_plan_kwh ?? null,
+      flexible_required_kwh:row.flexible_required_kwh ?? null,
+      flexible_planned_kwh:row.flexible_planned_kwh ?? null,
+      flexible_executed_kwh:row.flexible_executed_kwh ?? null,
+      flexible_still_to_plan_kwh:row.flexible_still_to_plan_kwh ?? null
+    }),
     buckets:Array.isArray(row.buckets) ? row.buckets : [],
-    flexible_plan:planning.flexible_plan || {},
+    flexible_plan:{},
     planning_objects:Array.isArray(store?.planningObjects) ? store.planningObjects : [],
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning'
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons'
   });
 }
 
@@ -265,43 +327,55 @@ function selectEnergyConfigurationProperties(store, scope) {
   const kind=String(scope || '').toLowerCase();
   const configuration=store?.configuration && typeof store.configuration === 'object' ? store.configuration : {};
   const section=configuration[kind] && typeof configuration[kind] === 'object' ? configuration[kind] : {};
-  const rows=section.properties || section.configured_properties || [];
+  if (kind === 'strategy') {
+    const configured=section.configured && typeof section.configured === 'object' ? section.configured : {};
+    const effective=section.effective && typeof section.effective === 'object' ? section.effective : {};
+    const rows=Array.isArray(configured.properties) ? configured.properties : [];
+    const effectiveRows=Array.isArray(effective.properties) ? effective.properties : [];
+    return Object.freeze({
+      available:store?.available === true && configured.status !== 'UNAVAILABLE',
+      scope:kind,
+      properties:Object.freeze(rows.map(row=>Object.freeze({...row}))),
+      effective_properties:Object.freeze(effectiveRows.map(row=>Object.freeze({...row}))),
+      effective_state:String(effective.status || 'UNAVAILABLE'),
+      effective_reason:String(effective.reason || ''),
+      runtime_overrides:Object.freeze((Array.isArray(effective.runtime_overrides) ? effective.runtime_overrides : []).map(row=>Object.freeze({...row}))),
+      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy'
+    });
+  }
+  const rows=Array.isArray(section.properties) ? section.properties : [];
   return Object.freeze({
     available:store?.available === true && Array.isArray(rows),
     scope:kind,
-    properties:Object.freeze((Array.isArray(rows) ? rows : []).map(row=>Object.freeze({...row}))),
-    effective_properties:Object.freeze((Array.isArray(section.effective_properties) ? section.effective_properties : []).map(row=>Object.freeze({...row}))),
-    effective_state:String(section.effective_state || section.availability || 'UNAVAILABLE'),
-    effective_reason:String(section.effective_reason || ''),
+    properties:Object.freeze(rows.map(row=>Object.freeze({...row}))),
+    effective_properties:Object.freeze([]),
+    effective_state:String(section.availability || section.status || 'UNAVAILABLE'),
+    effective_reason:String(section.reason || ''),
     source:`RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.${kind}`
   });
 }
 
-function selectEnergyStrategies(store) {
-  return selectEnergyConfigurationProperties(store,'strategy');
-}
-
-function selectEnergyPricing(store) {
-  return selectEnergyConfigurationProperties(store,'pricing');
-}
+function selectEnergyStrategies(store) { return selectEnergyConfigurationProperties(store,'strategy'); }
+function selectEnergyPricing(store) { return selectEnergyConfigurationProperties(store,'pricing'); }
 
 function selectEnergyValue(store, period='today') {
   const accounting=store?.valueAccounting && typeof store.valueAccounting === 'object' ? store.valueAccounting : {};
   const id=String(period || accounting.selected_period_id || 'today').toLowerCase();
   const periods=accounting.periods && typeof accounting.periods === 'object' ? accounting.periods : {};
   const row=periods[id] && typeof periods[id] === 'object' ? periods[id] : {};
+  const selectedId=String(accounting.selected_period_id || '').toLowerCase();
+  const netOutcome=accounting.net_financial_result && typeof accounting.net_financial_result === 'object' ? accounting.net_financial_result : {};
   return Object.freeze({
     available:store?.available === true && Object.keys(row).length > 0,
     period_id:id,
     value:row,
-    net_financial_result_eur:row.net_financial_result_eur ?? (id === String(accounting.selected_period_id || '').toLowerCase() ? accounting.net_financial_result_eur : null),
+    net_financial_result_eur:row.net_financial_result_eur ?? (id === selectedId ? netOutcome.value ?? accounting.net_financial_result_eur ?? null : null),
+    net_financial_result:id === selectedId ? netOutcome : {},
     source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.value_accounting'
   });
 }
 
 function selectEnergyMetering(store, period='today') {
-  // E0.15.48 publishes financial period actuals, not canonical period-energy
-  // metering detail. Fail closed instead of reconstructing Energy truth in UX.
   const id=String(period || 'today').toLowerCase();
   return Object.freeze({
     available:false,
@@ -339,22 +413,20 @@ function selectEnergyCoverage(store) {
     return !!value && typeof value === 'object' && Object.keys(value).length > 0;
   };
   const capabilities=Object.freeze({
+    core:present(store?.core) ? 'SUPPORTED' : 'UNAVAILABLE',
     assets:present(store?.objects) ? 'SUPPORTED' : 'UNAVAILABLE',
-    relationships:present(store?.relationships) ? 'SUPPORTED' : 'UNAVAILABLE',
-    overview:present(store?.overview) ? 'SUPPORTED' : 'UNAVAILABLE',
-    planning:present(store?.planning) ? 'SUPPORTED' : 'UNAVAILABLE',
+    relationships:Array.isArray(store?.relationships) ? 'SUPPORTED' : 'UNAVAILABLE',
+    planning:present(store?.planning?.horizons) ? 'SUPPORTED' : 'UNAVAILABLE',
     pricing:present(store?.configuration?.pricing) ? 'SUPPORTED' : 'UNAVAILABLE',
     strategies:present(store?.configuration?.strategy) ? 'SUPPORTED' : 'UNAVAILABLE',
     commands:Array.isArray(store?.commands) ? 'SUPPORTED' : 'UNAVAILABLE',
-    activity:Array.isArray(store?.activity) ? 'SUPPORTED' : 'UNAVAILABLE',
-    value_accounting:present(store?.valueAccounting) ? 'SUPPORTED' : 'UNAVAILABLE',
-    metering:'UNAVAILABLE'
+    value_accounting:present(store?.valueAccounting) ? 'SUPPORTED' : 'UNAVAILABLE'
   });
   return Object.freeze({
     complete:Object.values(capabilities).every(value=>value === 'SUPPORTED'),
     capabilities,
     unsupported:Object.freeze(Object.entries(capabilities).filter(([,v])=>v!=='SUPPORTED').map(([k])=>k)),
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.coverage'
   });
 }
 
@@ -679,24 +751,25 @@ function energyAssetPublicationGap(gateway, assetId = "") {
 
 // ---- src/runtime/consumption-contract.js ----
 // Canonical live consumption reader from RHI_ENERGY_PUBLIC_CONTRACT_V2.
-// Energy owns all balance semantics; the UX only selects already-resolved values.
+// Energy owns all balance semantics; the UX only selects already-resolved core values.
 function readLiveConsumptionContract(gateway) {
   const v2 = readEnergyPublicV2(gateway);
-  const read = key => v2.field(key);
-  const site = read('site_consumption.power_kw');
-  const home = read('home_consumption.power_kw');
-  const flexible = read('flexible_loads.power_kw');
+  const site = v2.field('site_consumption.power_kw');
+  const home = v2.field('home_consumption.power_kw');
+  const flexible = v2.field('flexible_loads.power_kw');
+  const attributed = v2.field('flexible_loads.attributed_power_kw');
   const contributors = (v2.flexibleAssets || []).map(row => Object.freeze({
     ...row,
     asset_id:String(row.asset_id || ''),
-    power_kw:asNumber(row.power_kw)
+    power_kw:asNumber(firstDefined(row.power_kw,row.current_power_kw,row.actual_power_kw))
   }));
-  const statusFor = field => String(field.state || (field.resolved ? 'resolved' : 'unavailable')).toUpperCase();
+  const statusFor = field => String(field.status || field.state || (field.resolved ? 'AVAILABLE' : 'UNAVAILABLE')).toUpperCase();
   return Object.freeze({
     envelope:v2.envelope,
     siteConsumptionKw:asNumber(site.value),
     homeConsumptionKw:asNumber(home.value),
     flexibleLoadsKw:asNumber(flexible.value),
+    attributedFlexibleLoadsKw:asNumber(attributed.value),
     flexibleLoadContributors:Object.freeze(contributors),
     siteStatus:statusFor(site),
     homeStatus:statusFor(home),
@@ -704,130 +777,128 @@ function readLiveConsumptionContract(gateway) {
     siteReason:String(site.reason || ''),
     homeReason:String(home.reason || ''),
     flexibleReason:String(flexible.reason || ''),
-    available:site.resolved || home.resolved || flexible.resolved,
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+    available:site.status === 'AVAILABLE' || home.status === 'AVAILABLE' || flexible.status === 'AVAILABLE',
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.core'
   });
 }
 
 // ---- src/domain/models/current-energy-view-model.js ----
 // Canonical current-energy view model. Literal contract keys and direction
 // semantics are confined to this adapter so screen renderers cannot drift.
-  function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
-    // interfaceKey is retained in the signature for call-site stability while the
-    // canonical source is now exclusively RHI_ENERGY_PUBLIC_CONTRACT_V2.
-    const v2 = readEnergyPublicV2(gateway);
-    const row = v2.property(propertyKey);
-    const projected = v2.field(propertyKey);
-    return Object.freeze({
-      envelope:v2.envelope,
-      row:row || {},
-      value:projected.value,
-      number:asNumber(projected.value),
-      text:String(projected.value ?? ''),
-      health:String(projected.state || 'unavailable').toUpperCase(),
-      reason:String(projected.reason || ''),
-      source:projected.source
-    });
+function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
+  // interfaceKey is retained in the signature for call-site stability while the
+  // canonical source is exclusively RHI_ENERGY_PUBLIC_CONTRACT_V2.
+  const v2 = readEnergyPublicV2(gateway);
+  const row = v2.property(propertyKey);
+  const projected = v2.field(propertyKey);
+  return Object.freeze({
+    envelope:v2.envelope,
+    row:row || projected.raw || {},
+    value:projected.value,
+    number:asNumber(projected.value),
+    text:String(projected.value ?? ''),
+    health:String(projected.status || projected.state || 'UNAVAILABLE').toUpperCase(),
+    quality:String(projected.quality || ''),
+    reason:String(projected.reason || ''),
+    source:projected.source
+  });
+}
+
+function canonicalBatteryState(value) {
+  const state = String(value || '').trim().toLowerCase();
+  if (['charging','charge'].includes(state)) return 'charging';
+  if (['discharging','discharge'].includes(state)) return 'discharging';
+  if (['idle','standby','available','ready'].includes(state)) return 'idle';
+  return state || 'unavailable';
+}
+
+function createBatteryCurrentFlowViewModel(gateway) {
+  const signed = readTypedPropertyContract(gateway, 'battery', 'battery.power_kw');
+  const stateProperty = readTypedPropertyContract(gateway, 'battery', 'battery.state');
+  const soc = readTypedPropertyContract(gateway, 'battery', 'battery.soc_pct');
+  const available = readTypedPropertyContract(gateway, 'battery', 'battery.available_kwh');
+  const capacity = readTypedPropertyContract(gateway, 'battery', 'battery.capacity_kwh');
+  const reserve = readTypedPropertyContract(gateway, 'battery', 'battery.reserve_target_pct');
+  const state = canonicalBatteryState(stateProperty.value);
+  const projectedPowerKw = signed.number === null ? null : Math.abs(signed.number);
+  let displayPowerKw = projectedPowerKw;
+  let signedFlowKw = signed.number;
+  let direction = 'unknown';
+  let label = 'Unavailable';
+  let detail = 'Battery flow unavailable';
+
+  if (state === 'charging') {
+    direction = 'into_storage';
+    label = 'Charging';
+    detail = 'Charging from Home Bus';
+    signedFlowKw = projectedPowerKw === null ? null : -projectedPowerKw;
+  } else if (state === 'discharging') {
+    direction = 'out_of_storage';
+    label = 'Discharging';
+    detail = 'Supplying the Home Bus';
+    signedFlowKw = projectedPowerKw;
+  } else if (state === 'idle') {
+    displayPowerKw = signed.number === null ? null : Math.abs(signed.number);
+    signedFlowKw = signed.number === null ? null : 0;
+    direction = 'idle';
+    label = 'Idle';
+    detail = 'No active battery flow';
   }
 
-  function canonicalBatteryState(value) {
-    const state = String(value || '').trim().toLowerCase();
-    if (['charging','charge'].includes(state)) return 'charging';
-    if (['discharging','discharge'].includes(state)) return 'discharging';
-    if (['idle','standby','available','ready'].includes(state)) return 'idle';
-    return state || 'unavailable';
-  }
+  const health = signed.health === 'AVAILABLE' && stateProperty.health === 'AVAILABLE' ? 'OK' : 'UNAVAILABLE';
+  return Object.freeze({
+    state,
+    health,
+    reason:String(firstDefined(signed.reason, stateProperty.reason, '')),
+    signedPowerKw:signed.number,
+    chargePowerKw:state === 'charging' ? projectedPowerKw : (signed.number === null ? null : 0),
+    dischargePowerKw:state === 'discharging' ? projectedPowerKw : (signed.number === null ? null : 0),
+    displayPowerKw,
+    signedFlowKw,
+    direction,
+    label,
+    detail,
+    flowRole:direction === 'out_of_storage' ? 'producer' : direction === 'into_storage' ? 'consumer' : 'inactive',
+    uxVisible:displayPowerKw !== null,
+    socPct:soc.number,
+    availableKwh:available.number,
+    capacityKwh:capacity.number,
+    reserveTargetPct:reserve.number,
+    valueAvailable:displayPowerKw !== null
+  });
+}
 
-  function createBatteryCurrentFlowViewModel(gateway) {
-    const signed = readTypedPropertyContract(gateway, 'battery', 'battery.power_kw');
-    const charge = readTypedPropertyContract(gateway, 'battery', 'battery.charge_power_kw');
-    const discharge = readTypedPropertyContract(gateway, 'battery', 'battery.discharge_power_kw');
-    const stateProperty = readTypedPropertyContract(gateway, 'battery', 'battery.state');
-    const soc = readTypedPropertyContract(gateway, 'battery', 'battery.soc_pct');
-    const available = readTypedPropertyContract(gateway, 'battery', 'battery.available_kwh');
-    const capacity = readTypedPropertyContract(gateway, 'battery', 'battery.capacity_kwh');
-    const healthProperty = readTypedPropertyContract(gateway, 'battery', 'battery.health');
-    const state = canonicalBatteryState(stateProperty.value);
-    const projectedPowerKw = signed.number === null ? null : Math.abs(signed.number);
-    let displayPowerKw = null;
-    let signedFlowKw = null;
-    let direction = 'unknown';
-    let label = 'Unavailable';
-    let detail = 'Battery flow unavailable';
+function createGridCurrentFlowViewModel(gateway) {
+  const netPower = readTypedPropertyContract(gateway, 'grid', 'grid.net_power_kw');
+  const importPower = readTypedPropertyContract(gateway, 'grid', 'grid_import.power_kw');
+  const exportPower = readTypedPropertyContract(gateway, 'grid', 'grid_export.power_kw');
+  const directionProperty = readTypedPropertyContract(gateway, 'grid', 'grid.flow_direction');
+  const rawDirection = String(firstDefined(directionProperty.value, '') || '').toLowerCase();
+  const direction = /export/.test(rawDirection) ? 'exporting' : /import/.test(rawDirection) ? 'importing' : /balanc|idle|none/.test(rawDirection) ? 'balanced' : 'unknown';
+  const displayPowerKw = direction === 'exporting' ? exportPower.number : direction === 'importing' ? importPower.number : direction === 'balanced' ? 0 : (netPower.number === null ? null : Math.abs(netPower.number));
+  return Object.freeze({
+    netPowerKw:netPower.number,
+    importPowerKw:importPower.number,
+    exportPowerKw:exportPower.number,
+    displayPowerKw,
+    direction,
+    label:direction === 'exporting' ? 'Exporting' : direction === 'importing' ? 'Importing' : direction === 'balanced' ? 'Balanced' : 'Unavailable'
+  });
+}
 
-    if (state === 'charging') {
-      displayPowerKw = firstDefined(charge.number, projectedPowerKw, signed.number === null ? null : Math.abs(Math.min(0, signed.number)));
-      displayPowerKw = asNumber(displayPowerKw);
-      signedFlowKw = displayPowerKw === null ? null : -Math.abs(displayPowerKw);
-      direction = 'into_storage';
-      label = 'Charging';
-      detail = 'Charging from Home Bus';
-    } else if (state === 'discharging') {
-      displayPowerKw = firstDefined(discharge.number, projectedPowerKw, signed.number === null ? null : Math.max(0, signed.number));
-      displayPowerKw = asNumber(displayPowerKw);
-      signedFlowKw = displayPowerKw === null ? null : Math.abs(displayPowerKw);
-      direction = 'out_of_storage';
-      label = 'Discharging';
-      detail = 'Supplying the Home Bus';
-    } else if (state === 'idle') {
-      displayPowerKw = 0;
-      signedFlowKw = 0;
-      direction = 'idle';
-      label = 'Idle';
-      detail = 'No active battery flow';
-    }
+function createSolarCurrentViewModel(gateway) {
+  const power = readTypedPropertyContract(gateway, 'solar', 'solar.power_kw');
+  return Object.freeze({ powerKw:power.number, health:power.health, reason:power.reason });
+}
 
-    const health = String(firstDefined(healthProperty.value, healthProperty.health, signed.value !== null ? 'OK' : 'UNAVAILABLE'));
-    return Object.freeze({
-      state,
-      health,
-      reason:String(firstDefined(healthProperty.reason, stateProperty.reason, '')),
-      signedPowerKw:signed.number,
-      chargePowerKw:charge.number,
-      dischargePowerKw:discharge.number,
-      displayPowerKw,
-      signedFlowKw,
-      direction,
-      label,
-      detail,
-      flowRole:direction === 'out_of_storage' ? 'producer' : direction === 'into_storage' ? 'consumer' : 'inactive',
-      uxVisible:displayPowerKw !== null,
-      socPct:soc.number,
-      availableKwh:available.number,
-      capacityKwh:capacity.number,
-      valueAvailable:displayPowerKw !== null
-    });
-  }
-
-  function createGridCurrentFlowViewModel(gateway) {
-    const importPower = readTypedPropertyContract(gateway, 'grid', 'grid_import.power_kw');
-    const exportPower = readTypedPropertyContract(gateway, 'grid', 'grid_export.power_kw');
-    const directionProperty = readTypedPropertyContract(gateway, 'grid', 'grid.flow_direction');
-    const rawDirection = String(firstDefined(directionProperty.value, '') || '').toLowerCase();
-    const direction = /export/.test(rawDirection) ? 'exporting' : /import/.test(rawDirection) ? 'importing' : 'balanced';
-    const displayPowerKw = direction === 'exporting' ? exportPower.number : direction === 'importing' ? importPower.number : 0;
-    return Object.freeze({
-      importPowerKw:importPower.number,
-      exportPowerKw:exportPower.number,
-      displayPowerKw,
-      direction,
-      label:direction === 'exporting' ? 'Exporting' : direction === 'importing' ? 'Importing' : 'Balanced'
-    });
-  }
-
-  function createSolarCurrentViewModel(gateway) {
-    const power = readTypedPropertyContract(gateway, 'solar', 'solar.power_kw');
-    return Object.freeze({ powerKw:power.number, health:power.health, reason:power.reason });
-  }
-
-  function createCurrentEnergyViewModel(gateway) {
-    return Object.freeze({
-      battery:createBatteryCurrentFlowViewModel(gateway),
-      grid:createGridCurrentFlowViewModel(gateway),
-      solar:createSolarCurrentViewModel(gateway),
-      consumption:readLiveConsumptionContract(gateway)
-    });
-  }
+function createCurrentEnergyViewModel(gateway) {
+  return Object.freeze({
+    battery:createBatteryCurrentFlowViewModel(gateway),
+    grid:createGridCurrentFlowViewModel(gateway),
+    solar:createSolarCurrentViewModel(gateway),
+    consumption:readLiveConsumptionContract(gateway)
+  });
+}
 
 // ---- src/domain/models/physical-flow-view-model.js ----
 // R1.89.39 physical-flow model. Consumers and physical connections are
@@ -1172,6 +1243,24 @@ function readEnergyCommandContract(gateway) {
         });
       };
       (v2.allPropertyRows || []).forEach(add);
+      // Core is the only authority for current home-energy facts. Expose the
+      // canonical SemanticValue fields through the existing row API so screens
+      // cannot fall back to object property indexes for aggregate truth.
+      for (const [key, field] of (v2.coreByKey || new Map()).entries()) {
+        add({
+          asset_id:'core',
+          property_id:key,
+          property_key:key,
+          key,
+          value:field.value,
+          unit:field.unit,
+          availability:field.status,
+          status:field.status,
+          quality:field.quality,
+          reason:field.reason,
+          source_type:'canonical_v2_core'
+        });
+      }
 
       // Preserve the existing view API without creating another truth source:
       // intelligence fields are direct projections of the canonical V2 object.
@@ -1566,7 +1655,7 @@ function readEnergyCommandContract(gateway) {
 
     planningHorizons() {
       const planning=this.publicV2().planning || {};
-      const horizons=planning.planning_horizons && typeof planning.planning_horizons === 'object' ? planning.planning_horizons : {};
+      const horizons=planning.horizons && typeof planning.horizons === 'object' ? planning.horizons : {};
       return Object.entries(horizons).map(([id,value])=>({ horizon_id:String(id).toUpperCase(), ...planningObject(value) }));
     }
     planningHorizon(id = 'D0') {
@@ -1625,7 +1714,7 @@ function readEnergyCommandContract(gateway) {
     strategyProfileRows() {
       if (this._strategyProfiles) return this._strategyProfiles;
       const v2=this.publicV2();
-      const rows=asArray(v2.configuration?.strategy?.configured_properties);
+      const rows=asArray(v2.configuration?.strategy?.configured?.properties);
       const labels={home:'Home Intelligence',battery:'Home Battery',solar:'Solar',grid:'Grid',flexible_loads:'Flexible Loads',resilience:'Resilience'};
       const groups=new Map();
       rows.forEach(raw=>{
@@ -1698,7 +1787,7 @@ function readEnergyCommandContract(gateway) {
     effectiveStrategyRows() {
       if (this._effectiveStrategies) return this._effectiveStrategies;
       const v2=this.publicV2();
-      const rows=asArray(v2.configuration?.strategy?.effective_properties);
+      const rows=asArray(v2.configuration?.strategy?.effective?.properties);
       const byGroup=new Map();
       rows.forEach(raw=>{
         const row=objectFrom(raw);
@@ -1707,8 +1796,8 @@ function readEnergyCommandContract(gateway) {
           strategy_id:group, policy_id:group, asset_id:group,
           entity_id:v2.envelope.entityId,
           contract_role:'effective_strategy_policy',
-          effective_state:v2.configuration?.strategy?.effective_state || 'UNAVAILABLE',
-          reason_code:v2.configuration?.strategy?.effective_reason || ''
+          effective_state:v2.configuration?.strategy?.effective?.status || 'UNAVAILABLE',
+          reason_code:v2.configuration?.strategy?.effective?.reason || ''
         };
         const key=String(row.property_id || row.key || row.property_key || '');
         if(key) current[key]=row.value;
@@ -2182,10 +2271,19 @@ class FlexibleAssetDomainModel {
     const normalized = String(horizonId || 'D0').toUpperCase();
     const v2 = readEnergyPublicV2(gateway);
     const planning = planningObject(v2.planning);
-    const horizonsById = planningById(firstDefined(planning.planning_horizons, planning.planning_horizons_json));
+    const horizonsById = planningById(planning.horizons);
     const horizon = planningObject(horizonsById[normalized] || horizonsById[normalized.toLowerCase()]);
-    const summary = planningObject(firstDefined(horizon.summary, horizon.planning_summary));
-    const laneTotals = planningObject(firstDefined(summary.lane_totals, horizon.lane_totals, horizon.planning_totals));
+    const summary = horizon;
+    const laneTotals = planningObject({
+      required_kwh:horizon.required_kwh,
+      planned_kwh:horizon.planned_kwh,
+      executed_kwh:horizon.executed_kwh,
+      still_to_plan_kwh:horizon.still_to_plan_kwh,
+      flexible_required_kwh:horizon.flexible_required_kwh,
+      flexible_planned_kwh:horizon.flexible_planned_kwh,
+      flexible_executed_kwh:horizon.flexible_executed_kwh,
+      flexible_still_to_plan_kwh:horizon.flexible_still_to_plan_kwh
+    });
     const buckets = planningRows(firstDefined(horizon.buckets, horizon.timeline, horizon.rows))
       .map((row,index)=>({ bucket_id:row?.bucket_id || row?.id || `bucket_${index+1}`, ...planningObject(row) }));
     const planningObjects = planningRows(v2.layers?.planning_objects);
@@ -2193,8 +2291,8 @@ class FlexibleAssetDomainModel {
     const planningAssetsById = Object.fromEntries(planningAssets.map(row => [String(row.asset_id || row.target_asset_id), planningObject(row)]));
     const d0 = planningObject(horizonsById.D0);
     const d1 = planningObject(horizonsById.D1);
-    const d0Totals = planningObject(firstDefined(d0?.summary?.lane_totals, d0?.lane_totals));
-    const d1Totals = planningObject(firstDefined(d1?.summary?.lane_totals, d1?.lane_totals));
+    const d0Totals = planningObject(d0);
+    const d1Totals = planningObject(d1);
     return Object.freeze({
       entityId:v2.envelope.entityId,
       contractVersion:v2.contractVersion,
@@ -2213,7 +2311,7 @@ class FlexibleAssetDomainModel {
       buckets,
       currentPlanningBucket:{},
       currentActionIntent:{},
-      totalsSource:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.planning_horizons.summary.lane_totals'
+      totalsSource:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons'
     });
   }
 
@@ -2272,9 +2370,7 @@ class FlexibleAssetDomainModel {
     const laneTotals = normalizePlanningLaneTotals(contract.laneTotals);
     const rows = contract.buckets.map(bucket => adaptPlanningBucket(bucket, contract.contractVersion));
     const quality = planningObject(contract.horizon.quality);
-    const contractSupported = rows.length
-      ? rows.every(row => row.contractSupported)
-      : /R1\.(79\.[34]|89\.)/.test(contract.contractVersion);
+    const contractSupported = contract.available === true && String(contract.contractVersion || '').startsWith('2.');
     const stateText = String(firstDefined(contract.horizon.state, contract.horizon.status, quality.health, contract.horizon.quality, '')).toLowerCase();
     return Object.freeze({
       horizonId: contract.horizonId,
@@ -2299,199 +2395,6 @@ class FlexibleAssetDomainModel {
       complete: contractSupported && !/incomplete|partial|unavailable/.test(stateText)
     });
   }
-
-  // ---- src/app/presentation.js ----
-// Energy presentation grammar.
-// Owns navigation metadata, tab hero assets, shared visual hierarchy and card primitives.
-// Domain semantics, calculations, actions and runtime truth remain backend/domain owned.
-
-const HB_ENERGY_NAVIGATION = Object.freeze([
-  {
-    id: "energy",
-    label: "Energy",
-    items: [
-      { id:"overview", label:"Overview", view:"overview", title:"Energy Overview", description:"Your home energy system at a glance." },
-      { id:"flow", label:"Flow", view:"flow", title:"Energy Flow", description:"See where energy is flowing right now." },
-      { id:"solar", label:"Solar", view:"solar", title:"Solar", description:"Solar generation, arrays, inverters and the relationship with storage." },
-      { id:"battery", label:"Home Battery", view:"battery", title:"Home Battery", description:"Storage state, capacity and contribution to the home." },
-      { id:"consumers", label:"Consumers", view:"consumers", title:"Consumers", description:"Where energy is used and which loads are controllable." },
-      { id:"gas", label:"Gas", view:"gas", title:"Gas", description:"Gas consumption, history and meter health." }
-    ]
-  },
-  {
-    id: "intelligence",
-    label: "Intelligence",
-    items: [
-      { id:"strategy", label:"Strategy", view:"strategies", title:"Strategy", description:"Strategy overview, effective policy and current runtime state." },
-      { id:"operational-planning", label:"Operational Planning", view:"operational-planning", title:"Operational Planning", description:"What should happen now and in the next hours." },
-      { id:"tactical-planning", label:"Tactical Planning", view:"planning", title:"Tactical Planning", description:"How energy is allocated across today and tomorrow." },
-      { id:"strategic-planning", label:"Strategic Planning", view:"strategic-planning", title:"Strategic Planning", description:"Longer-term energy goals, constraints and optimisation." }
-    ]
-  },
-  {
-    id: "insights",
-    label: "Insights",
-    items: [
-      { id:"metering", label:"Metering", view:"metering", title:"Metering", description:"Measured energy for the selected period." },
-      { id:"value", label:"Value", view:"value", title:"Value", description:"Financial impact of your energy system." },
-      { id:"retrospective", label:"Retrospective", view:"retrospective", title:"Retrospective", description:"How Home Intelligence performed and what can improve." }
-    ]
-  }
-]);
-
-const HB_ENERGY_HERO_ASSETS = Object.freeze({
-  overview: "heroes/overview-hero.webp",
-  flow: "heroes/flow-hero.webp",
-  solar: "heroes/solar-hero.webp",
-  "solar-generation": "heroes/solar-hero.webp",
-  battery: "heroes/battery-hero.webp",
-  consumers: "heroes/consumers-hero.webp",
-  gas: "heroes/gas-hero.webp",
-  strategy: "heroes/strategies-hero.webp",
-  strategies: "heroes/strategies-hero.webp",
-  intelligence: "heroes/intelligence-hero.webp",
-  "operational-planning": "heroes/planning-hero.webp",
-  outlook: "heroes/outlook-hero.webp",
-  "tactical-planning": "heroes/planning-hero.webp",
-  planning: "heroes/planning-hero.webp",
-  "strategic-planning": "heroes/strategies-hero.webp",
-  metering: "heroes/metering-hero.webp",
-  value: "heroes/value-hero.webp",
-  retrospective: "heroes/diagnostics-hero.webp"
-});
-
-const HB_ENERGY_PROFILE_ALIASES = Object.freeze({
-  "solar-generation": "solar",
-  planning: "outlook",
-  "strategic-planning": "strategies"
-});
-
-function hbEnergyAssetUrl(relativePath = "") {
-  const normalized = String(relativePath || "").replace(/^\/+/, "");
-  return `/hacsfiles/rhi-energy-ux/assets/${normalized}?v=${encodeURIComponent(UX_VERSION)}`;
-}
-
-function hbEnergyHeroAsset(tab = "overview") {
-  return hbEnergyAssetUrl(HB_ENERGY_HERO_ASSETS[tab] || HB_ENERGY_HERO_ASSETS.overview);
-}
-
-function hbEnergyProfileKey(tab = "overview") {
-  return HB_ENERGY_PROFILE_ALIASES[tab] || tab;
-}
-
-function hbEnergyPresentationStyles() {
-  return `
-    :host{
-      --rhi-page-max:1640px;
-      --rhi-page-pad-x:28px;
-      --rhi-page-pad-y:18px;
-      --rhi-space-1:4px;
-      --rhi-space-2:8px;
-      --rhi-space-3:12px;
-      --rhi-space-4:16px;
-      --rhi-radius-sm:10px;
-      --rhi-radius-md:14px;
-      --rhi-radius-lg:18px;
-      --rhi-line:#E4EAF2;
-      --rhi-ink:#0F172A;
-      --rhi-muted:#64748B;
-      --rhi-blue:#1467F5;
-      --rhi-surface:#FFFFFF;
-      --rhi-soft:#F8FAFC;
-      --rhi-shadow:0 12px 30px rgba(15,35,80,.055);
-      --rhi-card-gap:8px;
-    }
-
-    /* Mobility-parity page hero: copy left, product image right, compact status row below. */
-    .hiTabExperienceHeader{display:block!important;margin:0 0 10px!important}
-    .hiTabHero{
-      position:relative!important;
-      min-height:136px!important;
-      height:auto!important;
-      display:grid!important;
-      grid-template-columns:minmax(0,1.28fr) minmax(280px,.72fr)!important;
-      align-items:stretch!important;
-      gap:14px!important;
-      padding:0!important;
-      overflow:hidden!important;
-      border:1px solid #DDE6F0!important;
-      border-radius:var(--rhi-radius-lg) var(--rhi-radius-lg) 0 0!important;
-      background:linear-gradient(135deg,#F8FBFF 0%,#FFFFFF 52%,#EEF5FF 100%)!important;
-      box-shadow:var(--rhi-shadow)!important;
-    }
-    .hiTabHeroCopy{
-      position:relative!important;
-      z-index:2!important;
-      min-width:0!important;
-      max-width:820px!important;
-      padding:18px 0 18px 22px!important;
-      align-self:center!important;
-    }
-    .hiTabHeroCopy>small{display:block!important;margin:0 0 4px!important;font-size:9px!important;font-weight:760!important;letter-spacing:.13em!important;text-transform:uppercase!important;color:#5E6E84!important}
-    .hiTabHeroCopy h2{margin:0 0 5px!important;font-size:clamp(24px,2.2vw,34px)!important;line-height:1.02!important;letter-spacing:-.035em!important;color:var(--rhi-ink)!important;font-weight:680!important;text-shadow:none!important}
-    .hiTabPurpose{margin:0!important;max-width:720px!important;color:var(--rhi-muted)!important;font-size:11.5px!important;line-height:1.38!important;font-weight:520!important}
-    .hiTabLiveLine{margin-top:9px!important;display:flex!important;align-items:baseline!important;gap:7px!important;flex-wrap:wrap!important;color:#334155!important}
-    .hiTabLiveLine strong{font-size:10px!important;font-weight:650!important;color:#64748B!important}
-    .hiTabHeroValue{margin:0!important;font-size:18px!important;line-height:1!important;font-weight:720!important;letter-spacing:-.025em!important;color:#0F172A!important}
-    .hiTabLiveLine>span{font-size:10px!important;color:#64748B!important}
-    .hiTabHeroArt{position:relative!important;min-height:136px!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;overflow:hidden!important;pointer-events:none!important}
-    .hiTabHeroArt:before{content:""!important;position:absolute!important;inset:0!important;z-index:2!important;background:linear-gradient(90deg,rgba(255,255,255,.18),rgba(255,255,255,.02) 34%,rgba(238,245,255,.04))!important;pointer-events:none!important}
-    .hiTabHeroArt img{position:relative!important;z-index:1!important;width:100%!important;height:100%!important;min-height:136px!important;max-height:148px!important;object-fit:cover!important;object-position:center 56%!important;transform:scale(1.01)!important}
-    .hiTabHeroBadge{position:absolute!important;right:12px!important;bottom:10px!important;z-index:3!important;width:auto!important;max-width:220px!important;padding:0!important;background:transparent!important}
-    .hiTabSimpleBadge{display:inline-flex!important;align-items:center!important;gap:6px!important;width:max-content!important;max-width:220px!important;border-radius:999px!important;padding:5px 8px!important;background:rgba(255,255,255,.88)!important;border:1px solid rgba(255,255,255,.75)!important;box-shadow:0 7px 18px rgba(15,35,80,.08)!important;backdrop-filter:blur(8px)!important;font-size:9.5px!important;font-weight:700!important;white-space:nowrap!important}
-    .hiTabSimpleBadge:before{content:""!important;width:7px!important;height:7px!important;border-radius:50%!important;background:#94a3b8!important;flex:0 0 auto!important}
-    .hiTabSimpleBadge.ok:before{background:#22c55e!important}
-    .hiTabSimpleBadge.attention:before{background:#f59e0b!important}
-
-    /* One card grammar for compact facts across all Energy tabs. */
-    .hiTabStatusGrid,.rhi-fact-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:var(--rhi-card-gap)!important;padding:8px!important;border:1px solid var(--rhi-line)!important;border-top:0!important;border-radius:0 0 var(--rhi-radius-lg) var(--rhi-radius-lg)!important;background:#fff!important;box-shadow:var(--rhi-shadow)!important}
-    .hiTabStatusItem,.rhi-fact{min-width:0!important;min-height:58px!important;display:grid!important;grid-template-columns:30px minmax(0,1fr)!important;gap:8px!important;align-items:center!important;padding:9px 11px!important;border:1px solid #EDF1F6!important;border-radius:var(--rhi-radius-md)!important;background:var(--rhi-soft)!important;box-shadow:none!important}
-    .hiTabStatusIcon{width:30px!important;height:30px!important;border-radius:9px!important;display:grid!important;place-items:center!important;background:#fff!important;border:1px solid #E6EDF7!important;font-size:15px!important}
-    .hiTabStatusCopy{min-width:0!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;column-gap:6px!important;align-items:baseline!important}
-    .hiTabStatusCopy small{font-size:9.5px!important;line-height:1.1!important;color:#718096!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
-    .hiTabStatusCopy b{font-size:13px!important;line-height:1.1!important;font-weight:680!important;color:var(--rhi-ink)!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
-    .hiTabStatusCopy em{grid-column:1/-1!important;margin-top:2px!important;font-size:9px!important;line-height:1.15!important;font-style:normal!important;color:var(--rhi-muted)!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
-
-    .rhi-context-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:var(--rhi-card-gap)!important}
-    .rhi-context-card{min-width:0!important;border:1px solid var(--rhi-line)!important;border-radius:var(--rhi-radius-lg)!important;background:#fff!important;box-shadow:0 8px 22px rgba(15,35,80,.04)!important;padding:14px 16px!important}
-    .rhi-data-list{display:grid!important;gap:6px!important}
-    .rhi-data-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:12px!important;align-items:center!important;padding:9px 10px!important;border:1px solid #EDF1F6!important;border-radius:var(--rhi-radius-sm)!important;background:var(--rhi-soft)!important}
-
-    @media(max-width:1024px){
-      :host{--rhi-page-pad-x:18px;--rhi-page-pad-y:14px}
-      .hiTabHero{grid-template-columns:minmax(0,1fr) minmax(240px,.62fr)!important;min-height:142px!important}
-      .hiTabHeroCopy{padding:16px 0 16px 18px!important}
-      .hiTabHeroArt,.hiTabHeroArt img{min-height:142px!important}
-    }
-    @media(max-width:760px){
-      :host{--rhi-page-pad-x:10px;--rhi-page-pad-y:10px}
-      .hiTabHero{min-height:126px!important;grid-template-columns:minmax(0,1fr) minmax(118px,.42fr)!important;gap:2px!important;border-radius:16px 16px 0 0!important}
-      .hiTabHeroCopy{padding:13px 0 13px 13px!important}
-      .hiTabHeroCopy>small{font-size:8px!important;margin-bottom:3px!important}
-      .hiTabHeroCopy h2{font-size:23px!important;margin-bottom:4px!important}
-      .hiTabPurpose{font-size:10px!important;line-height:1.28!important;display:-webkit-box!important;-webkit-line-clamp:3!important;-webkit-box-orient:vertical!important;overflow:hidden!important}
-      .hiTabLiveLine{margin-top:7px!important}
-      .hiTabHeroArt,.hiTabHeroArt img{min-height:126px!important;max-height:126px!important}
-      .hiTabHeroArt img{object-position:62% center!important}
-      .hiTabHeroBadge{display:none!important}
-      .hiTabStatusGrid,.rhi-fact-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;border-radius:0 0 16px 16px!important}
-      .rhi-context-grid{grid-template-columns:1fr!important}
-    }
-    @media(max-width:430px){
-      :host{--rhi-page-pad-x:8px;--rhi-page-pad-y:8px}
-      .hiTabHero{min-height:118px!important;grid-template-columns:minmax(0,1fr) 110px!important}
-      .hiTabHeroCopy{padding:11px 0 11px 11px!important}
-      .hiTabHeroCopy h2{font-size:21px!important}
-      .hiTabPurpose{-webkit-line-clamp:2!important;font-size:9.5px!important}
-      .hiTabHeroArt,.hiTabHeroArt img{min-height:118px!important;max-height:118px!important}
-      .hiTabLiveLine strong{display:none!important}
-    }
-    @media(min-width:1440px){
-      .hiTabHero{grid-template-columns:minmax(0,1.36fr) minmax(360px,.64fr)!important}
-      .hiTabHeroArt img{object-position:55% center!important}
-    }
-  `;
-}
 
 // ---- src/ui/components/energy-visual-picker.js ----
 // Type-safe Energy logical-device image picker.
