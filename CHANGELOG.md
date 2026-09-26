@@ -1,3 +1,12 @@
+## 4.1.2 — canonical multi-object Energy access
+
+- fixes Home Battery contributor discovery to traverse the canonical `battery_system` parent;
+- reads physical battery properties by `asset_id + property_key` instead of synthesizing global keys;
+- preserves independent values when multiple batteries publish the same `battery.*` property keys;
+- makes generic physical power lookup asset-scoped for battery, inverter, grid-phase and flexible-load objects;
+- adds release-blocking two-battery collision and child-reachability regression coverage;
+- keeps backend contracts and Energy semantics backend-owned.
+
 ## 4.1.1 — Core-owned company branding
 
 - adopts pinned RHI UX Core 1.3.1;
