@@ -1,6 +1,6 @@
 ## 4.1.1 — Core-owned company branding
 
-- adopts pinned RHI UX Core 1.3.0;
+- adopts pinned RHI UX Core 1.3.1;
 - moves canonical Robotix.be company branding ownership to Core;
 - removes Energy-owned company-logo transport and local brand authority;
 - keeps Energy semantics, projections and interactions domain-owned;
