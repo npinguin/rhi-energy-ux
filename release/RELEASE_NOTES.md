@@ -1,21 +1,17 @@
-# v4.1.0 — RHI UX Core baseline TEST CANDIDATE
+# v4.1.1 — Core-owned company branding TEST CANDIDATE
 
-Energy UX consumes a pinned build-time snapshot of RHI UX Core 1.1.0.
+Energy UX consumes RHI UX Core 1.3.0 build-time and receives the canonical Robotix.be company brand from Core.
 
-Shared ownership:
-- Core: tokens, page hero, status grid and generic presentation primitives.
-- Energy: Public V2 contract, projections, domain semantics, screen composition and interactions.
+Ownership:
+- Core: canonical company logo, brand rendering/geometry, shared presentation primitives and tokens.
+- Energy: Energy semantics, Public V2 projections, screen composition and interactions.
 
-There is no Home Assistant runtime dependency on rhi-ux-core. Core is bundled into the Energy artifact.
+No separate rhi-ux-core Home Assistant resource is required. The Core snapshot is bundled into the Energy artifact.
 
 RHI UX Core source commit:
-`480eaef12955d56970ec172fdde6f5fe2e0ab9c6`
+`0078ecae433892e90693014c3f34bec2c1bba62d`
 
-Backend compatibility:
-- minimum E0.15.52
-- tested E0.15.53
-- Public V2 + RHI_ENERGY_CORE_V1 required
-
-Rollback: v4.0.4
+Backend compatibility remains unchanged: minimum E0.15.52, tested E0.15.53.
+Rollback: v4.1.0.
 
 Target Home Assistant runtime proof remains mandatory before stable promotion.
