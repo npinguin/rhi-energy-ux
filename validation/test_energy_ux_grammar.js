@@ -23,7 +23,7 @@ for (const token of [
 ]) assert.ok(presentation.includes(token), "missing existing tab "+token);
 
 assert.match(header,/metrics = \[\], quickActions = ""/);
-assert.match(header,/rhiEnergyQuickActions/);
+assert.match(header,/rhiUxQuickActionBar/);
 assert.match(app,/quickActions:this\.pageQuickActions\(rt, tab\)/);
 assert.match(app,/pageQuickActions\(rt, tab\)/);
 assert.match(app,/rt\.visibleCommands\(\)/);
