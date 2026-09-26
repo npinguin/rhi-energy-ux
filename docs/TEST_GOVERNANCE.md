@@ -77,3 +77,18 @@ Normal build budget: **2 builds per candidate**.
 5. Prefer behavior/contract assertions over incidental source expressions.
 6. Run `npm run validate`.
 7. Treat cross-owner failures as architecture findings, not as invitations to copy assertions.
+
+
+## Maintainability rule
+
+Tests MUST protect observable behavior, public contracts, or a true architecture boundary.
+
+Tests MUST NOT require a positive implementation expression, exact property-access syntax, exact renderer string, CSS declaration, or historical milestone shape merely because that is how the current implementation works.
+
+Source inspection is permitted only as a negative architecture boundary (for example: a forbidden legacy interface or forbidden direct dependency).
+
+Historical milestone validators are not part of the active release gate once equivalent behavior is covered by owned contract or UX tests.
+
+## Local-first rule
+
+`npm run preflight` is the mandatory developer gate and is intentionally identical to CI validation. GitHub Actions confirms a locally clean candidate; it is not the primary discovery loop.
