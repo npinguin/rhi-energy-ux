@@ -90,6 +90,12 @@ function hbEnergyPresentationStyles() {
       --rhi-card-gap:var(--rhi-space-2);
     }
     .rhiEnergyPageHeader{display:block;margin:0 0 10px}
+    .rhiEnergyQuickActions{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;margin:8px 0 2px;padding:9px 11px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm)}
+    .rhiEnergyQuickActions>small{font-size:9px;line-height:1;text-transform:uppercase;letter-spacing:.1em;color:var(--rhi-color-muted);font-weight:700;white-space:nowrap}
+    .rhiEnergyQuickActions .rhiUxQuickActions{margin:0;justify-content:flex-start}
+    .rhiEnergyQuickActions .hiAction{min-height:34px}
+    @media(max-width:760px){.rhiEnergyQuickActions{grid-template-columns:1fr;gap:6px;padding:8px 9px}.rhiEnergyQuickActions .rhiUxQuickActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.rhiEnergyQuickActions .hiAction{width:100%;min-width:0}}
+    @media(max-width:430px){.rhiEnergyQuickActions .rhiUxQuickActions{grid-template-columns:1fr 1fr}.rhiEnergyQuickActions>small{font-size:8.5px}}
     .rhi-context-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--rhi-space-2)}
     .rhi-context-card{min-width:0;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm);padding:14px 16px}
     .rhi-data-list{display:grid;gap:6px}
