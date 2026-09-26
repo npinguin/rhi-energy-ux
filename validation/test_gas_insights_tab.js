@@ -19,7 +19,12 @@ assert.match(app,/stat_types:\['change'\]/);
 assert.match(app,/period:'day'/);
 assert.match(app,/days_to_show:30/);
 assert.match(app,/Gas usage history/);
-assert.match(app,/Native Home Assistant long-term statistics/);\nassert.match(app,/Your gas use/);\nassert.match(app,/No measured gas history yet/);\nassert.match(app,/Connect your gas meter/);\nassert.match(app,/The UX never estimates missing consumption/);\n
+assert.match(app,/Native Home Assistant long-term statistics/);
+assert.match(app,/Your gas use/);
+assert.match(app,/No measured gas history yet/);
+assert.match(app,/Connect your gas meter/);
+assert.match(app,/The UX never estimates missing consumption/);
+
 assert.match(app,/energyDeviceStatusCard\(rt, gas\.asset, 'Gas meter'\)/);
 assert.match(app,/gas: \{ image:hbEnergyHeroAsset\('gas'\)/);
 assert.match(catalog,/gas_meter\.smart_meter[\s\S]*package_path:"heroes\\/gas-hero\\.webp"/);
