@@ -220,6 +220,24 @@
         });
       };
       (v2.allPropertyRows || []).forEach(add);
+      // Core is the only authority for current home-energy facts. Expose the
+      // canonical SemanticValue fields through the existing row API so screens
+      // cannot fall back to object property indexes for aggregate truth.
+      for (const [key, field] of (v2.coreByKey || new Map()).entries()) {
+        add({
+          asset_id:'core',
+          property_id:key,
+          property_key:key,
+          key,
+          value:field.value,
+          unit:field.unit,
+          availability:field.status,
+          status:field.status,
+          quality:field.quality,
+          reason:field.reason,
+          source_type:'canonical_v2_core'
+        });
+      }
 
       // Preserve the existing view API without creating another truth source:
       // intelligence fields are direct projections of the canonical V2 object.
@@ -614,7 +632,7 @@
 
     planningHorizons() {
       const planning=this.publicV2().planning || {};
-      const horizons=planning.planning_horizons && typeof planning.planning_horizons === 'object' ? planning.planning_horizons : {};
+      const horizons=planning.horizons && typeof planning.horizons === 'object' ? planning.horizons : {};
       return Object.entries(horizons).map(([id,value])=>({ horizon_id:String(id).toUpperCase(), ...planningObject(value) }));
     }
     planningHorizon(id = 'D0') {
@@ -673,7 +691,7 @@
     strategyProfileRows() {
       if (this._strategyProfiles) return this._strategyProfiles;
       const v2=this.publicV2();
-      const rows=asArray(v2.configuration?.strategy?.configured_properties);
+      const rows=asArray(v2.configuration?.strategy?.configured?.properties);
       const labels={home:'Home Intelligence',battery:'Home Battery',solar:'Solar',grid:'Grid',flexible_loads:'Flexible Loads',resilience:'Resilience'};
       const groups=new Map();
       rows.forEach(raw=>{
@@ -746,7 +764,7 @@
     effectiveStrategyRows() {
       if (this._effectiveStrategies) return this._effectiveStrategies;
       const v2=this.publicV2();
-      const rows=asArray(v2.configuration?.strategy?.effective_properties);
+      const rows=asArray(v2.configuration?.strategy?.effective?.properties);
       const byGroup=new Map();
       rows.forEach(raw=>{
         const row=objectFrom(raw);
@@ -755,8 +773,8 @@
           strategy_id:group, policy_id:group, asset_id:group,
           entity_id:v2.envelope.entityId,
           contract_role:'effective_strategy_policy',
-          effective_state:v2.configuration?.strategy?.effective_state || 'UNAVAILABLE',
-          reason_code:v2.configuration?.strategy?.effective_reason || ''
+          effective_state:v2.configuration?.strategy?.effective?.status || 'UNAVAILABLE',
+          reason_code:v2.configuration?.strategy?.effective?.reason || ''
         };
         const key=String(row.property_id || row.key || row.property_key || '');
         if(key) current[key]=row.value;
