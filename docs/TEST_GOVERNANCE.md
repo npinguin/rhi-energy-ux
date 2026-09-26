@@ -4,91 +4,57 @@ This document is normative for Energy UX engineering.
 
 ## Core rule
 
-**One invariant has exactly one test owner.**
+**One invariant has exactly one active test owner.**
 
-Tests follow the same ownership model as runtime code. A suite may rely on another owner's invariant, but it may not independently re-implement or freeze that invariant.
+The active ownership map is `validation/OWNERSHIP.json`. Historical validators may remain for forensic context without becoming release authority.
 
-The machine-readable map is `validation/OWNERSHIP.json`. The CI gate `validation/validate_test_ownership.py` detects known ownership leakage.
+## Active test layers
 
-## Active layers
+### Contract/domain behavior
 
-### Contract/domain tests
+Prove Public V2 normalization, current-energy semantics, planning, commands, configuration/write metadata, asset profiles and fail-closed null/unknown behavior.
 
-Own backend → UX normalization and semantics: command contracts, contract gateway behavior, physical flow, consumption truth, current-energy model, planning and related domain projections.
+### UX behavior
 
-These tests do not own package version, branding transport or release workflow behavior.
+Prove user-observable rendering, interaction and feature behavior. Tests must not freeze the private implementation used to achieve it.
 
-### UX behavior tests
+### Architecture boundary
 
-Own interaction persistence, stable refresh, navigation behavior and renderer integrity.
+Source inspection is allowed for negative dependency rules only:
 
-They may verify user-visible behavior but must not become a second owner for release identity or branding.
+- product renderers must not read Home Assistant source entities directly;
+- product renderers must not read the raw Public V2 object;
+- legacy `sensor.energy_*` product surfaces must not regain authority;
+- Energy semantics must stay in backend/projection layers, not screens.
 
-### Shared shell tests
+### Package/release
 
-Branding, footer presentation and footer runtime-data safety have explicit separate owners.
+Package tests own deterministic output, source/dist integrity and HACS installability. Release tests own projection from the single release descriptor and immutable publication.
 
-- branding owns canonical artwork and delivery;
-- footer presentation owns footer geometry/disclosure;
-- footer runtime-data owns canonical Energy values and backend release identity used by the footer.
+## Forbidden active-test patterns
 
-### Package tests
+Active release gates must not require exact helper names, positive source expressions, property-access syntax, renderer strings, CSS declarations, historical R3/R4 implementation shapes or duplicated assertions from another owner.
 
-Own HACS structure, generated bundle loadability, public-repository hygiene and committed distribution integrity.
+A behavior-preserving refactor must not require broad test rewrites.
 
-### Release tests
+## Capability compatibility
 
-Own package/release identity, immutable publication, qualification binding and workflow shape.
+Runtime compatibility is contract/capability based. Backend version numbers are release evidence only; they are not the runtime feature switch.
 
-## Historical regression names
+Required product capabilities are the Public V2 transport and canonical Energy core contract. Optional sections such as planning, pricing, strategy and value accounting fail closed independently when absent.
 
-Files named after older R3.94.x milestones may remain active when they still protect a useful invariant. Their filename does not give them authority over release identity. Version assertions belong only to release governance.
+## Qualification
 
-## Change rule
+`release/QUALIFICATION.json` contains only evidence that static CI cannot prove: target HA load/render, required contracts, real data, real write/readback, refresh/upgrade and rollback.
 
-If one local change causes unrelated owners to fail, first classify whether this is true cross-domain impact or test ownership drift.
-
-Do not update several tests merely to teach them the same new implementation.
-
-## Release/build rule
-
-The pull request owns complete candidate validation:
+## Local-first workflow
 
 ```text
-candidate build
-→ all owned suites
-→ deterministic second-build proof
-→ committed-dist equality
-→ HACS validation
+edit
+→ npm run preflight
+→ commit/push
+→ CI confirms
+→ publish immutable candidate
 ```
 
-After squash merge, publication verifies and publishes the exact committed artifact. It does not rebuild.
-
-Stable promotion qualifies/promotes the exact immutable candidate and does not rebuild.
-
-Normal build budget: **2 builds per candidate**.
-
-## Engineer checklist
-
-1. Identify the invariant that changed.
-2. Find its owner in `validation/OWNERSHIP.json`.
-3. Extend only that owner unless multiple product contracts truly changed.
-4. Remove duplicated release/version assertions from domain tests.
-5. Prefer behavior/contract assertions over incidental source expressions.
-6. Run `npm run validate`.
-7. Treat cross-owner failures as architecture findings, not as invitations to copy assertions.
-
-
-## Maintainability rule
-
-Tests MUST protect observable behavior, public contracts, or a true architecture boundary.
-
-Tests MUST NOT require a positive implementation expression, exact property-access syntax, exact renderer string, CSS declaration, or historical milestone shape merely because that is how the current implementation works.
-
-Source inspection is permitted only as a negative architecture boundary (for example: a forbidden legacy interface or forbidden direct dependency).
-
-Historical milestone validators are not part of the active release gate once equivalent behavior is covered by owned contract or UX tests.
-
-## Local-first rule
-
-`npm run preflight` is the mandatory developer gate and is intentionally identical to CI validation. GitHub Actions confirms a locally clean candidate; it is not the primary discovery loop.
+CI is confirmation rather than the primary discovery loop.
