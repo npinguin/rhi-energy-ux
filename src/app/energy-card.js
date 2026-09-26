@@ -1210,42 +1210,30 @@
     nav() {
       const sections = this.navigationModel();
       const active = this.activeNavigation();
-      const sectionIcon = {
-        energy:'<svg viewBox="0 0 24 24" focusable="false"><path d="M13.4 2 6.8 12h4.7L10.6 22l6.6-10h-4.7L13.4 2Z"/></svg>',
-        intelligence:'<svg viewBox="0 0 24 24" focusable="false"><path d="M9.5 4.2A3.6 3.6 0 0 0 5 7.6a3.4 3.4 0 0 0 .5 6.7A3.7 3.7 0 0 0 10 18a3.4 3.4 0 0 0 4.2 1.4 3.7 3.7 0 0 0 4.3-4.1 3.4 3.4 0 0 0 .6-6.6A3.7 3.7 0 0 0 14.6 5a3.4 3.4 0 0 0-5.1-.8Z"/><path d="M9 8.2c1 .1 1.8.8 2 1.8m4-1.6c-1 .1-1.8.8-2 1.8m-4.2 3.2c1 .1 1.8.8 2 1.8m4.2-1.8c-1 .1-1.8.8-2 1.8M12 7v10"/></svg>',
-        insights:'<svg viewBox="0 0 24 24" focusable="false"><path d="M4 20V11h4v9H4Zm6 0V6h4v14h-4Zm6 0V3h4v17h-4Z"/></svg>'
-      };
-      const itemIcon = {
-        overview:'<svg viewBox="0 0 24 24" focusable="false"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1v-8Z"/></svg>',
-        flow:'<svg viewBox="0 0 24 24" focusable="false"><path d="M5 7h10m0 0-3-3m3 3-3 3M19 17H9m0 0 3-3m-3 3 3 3"/></svg>',
-        solar:'<svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2M12 19.2v2M2.8 12h2M19.2 12h2M5.5 5.5l1.4 1.4M17.1 17.1l1.4 1.4M18.5 5.5l-1.4 1.4M6.9 17.1l-1.4 1.4"/></svg>',
-        battery:'<svg viewBox="0 0 24 24" focusable="false"><rect x="5" y="6.5" width="13" height="11" rx="2"/><path d="M18 10h2v4h-2M8 10h4v4H8"/></svg>',
-        consumers:'<svg viewBox="0 0 24 24" focusable="false"><path d="M8 4v5m8-5v5M6 9h12v3a6 6 0 0 1-12 0V9Zm6 9v3"/></svg>',
-        strategy:'<svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="7"/><path d="m12 8 3 3-5 5-3-3 5-5Z"/></svg>',
-        'operational-planning':'<svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="7"/><path d="M12 8v4l3 2"/></svg>',
-        'tactical-planning':'<svg viewBox="0 0 24 24" focusable="false"><path d="M5 5h14v14H5zM8 9h8M8 13h5"/></svg>',
-        'strategic-planning':'<svg viewBox="0 0 24 24" focusable="false"><path d="M5 18 9 9l4 4 6-8M15 5h4v4"/></svg>',
-        metering:'<svg viewBox="0 0 24 24" focusable="false"><path d="M5 19V9h3v10H5Zm5 0V5h3v14h-3Zm5 0v-7h3v7h-3Z"/></svg>',
-        value:'<svg viewBox="0 0 24 24" focusable="false"><path d="M16.5 7.5A5.5 5.5 0 1 0 16.5 16.5M6.5 10h7M6.5 14h7"/></svg>',
-        retrospective:'<svg viewBox="0 0 24 24" focusable="false"><path d="M5 8V4m0 0h4M5 4l3 3a7 7 0 1 1-2 5"/></svg>'
-      };
-      const sectionNav = sections.map(section => `<button class="navSectionTab ${active.section === section.id ? 'active' : ''}" data-nav-section="${escapeHtml(section.id)}"><span class="navSectionIcon" aria-hidden="true">${sectionIcon[section.id] || ''}</span><span>${escapeHtml(section.label)}</span></button>`).join('');
-      const currentSection = sections.find(section => section.id === active.section) || sections[0];
-      const itemNav = currentSection.items.map(item => `<button class="navItemTab ${active.item === item.id ? 'active' : ''}" data-nav-section="${escapeHtml(currentSection.id)}" data-nav-item="${escapeHtml(item.id)}"><span class="navItemIcon" aria-hidden="true">${itemIcon[item.id] || ''}</span><span>${escapeHtml(item.label)}</span></button>`).join('');
-      return `<div class="navigationShell nav-${escapeHtml(active.section)}">
-        <div class="navProductArea">
-          <div class="navPrimaryRow">
-            <div class="navBrand" aria-label="Home Intelligence Energie">
-              <span class="navBrandCopy"><b>Home Intelligence</b><small>ENERGIE</small></span>
-            </div>
-            <nav class="navSections" aria-label="Energy sections">${sectionNav}</nav>
-          </div>
-          <nav class="tabs navItems" aria-label="${escapeHtml(currentSection.label)}">${itemNav}</nav>
-        </div>
-        <div class="navCompany" aria-label="Robotix.be · DomotiX · Network · Security">${rhiUxCompanyBrand()}</div>
-      </div>`;
+      const modules = sections.map(section => ({
+        id:section.id,
+        label:section.label,
+        items:section.items.map(item => ({ id:item.id, label:item.label }))
+      }));
+      return `<div class="rhiEnergyNav rhiEnergyNav-${escapeHtml(active.section)}">${rhiUxDomainShell({
+        product:'Home Intelligence',
+        domain:'ENERGIE',
+        modules,
+        activeModule:active.section,
+        activeItem:active.item
+      })}</div>`;
     }
     onClick(event) {
+      const coreModule = event.target.closest('[data-rhi-module]');
+      if (coreModule) {
+        this.selectNavigation(coreModule.dataset.rhiModule || 'energy', '');
+        return;
+      }
+      const coreItem = event.target.closest('[data-rhi-item]');
+      if (coreItem) {
+        this.selectNavigation(this.navSection, coreItem.dataset.rhiItem || '');
+        return;
+      }
       const visualBackdrop = event.target.closest('[data-energy-visual-backdrop]');
       if (visualBackdrop && event.target === visualBackdrop) {
         this.energyVisualPickerAssetId = '';
@@ -2974,6 +2962,74 @@
       };
     }
     energyAssetFacts(rt, asset = {}, limit = 4) {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id, enriched.id, '') || '');
+      if (!id) return [];
+      const type = this.energyAssetType(enriched);
+      const specsByType = {
+        battery:[
+          ['State','battery.state'],['State of charge','battery.soc_pct'],['Power now','battery.power_kw'],
+          ['Available energy','battery.available_kwh'],['Capacity','battery.capacity_kwh'],['Reserve','battery.reserve_target_pct'],
+          ['Temperature','battery.temperature_c']
+        ],
+        battery_system:[
+          ['State','battery.state'],['State of charge','battery.soc_pct'],['Power now','battery.power_kw'],
+          ['Available energy','battery.available_kwh'],['Capacity','battery.capacity_kwh'],['Reserve','battery.reserve_target_pct']
+        ],
+        home_battery_system:[
+          ['State','battery.state'],['State of charge','battery.soc_pct'],['Power now','battery.power_kw'],
+          ['Available energy','battery.available_kwh'],['Capacity','battery.capacity_kwh'],['Reserve','battery.reserve_target_pct']
+        ],
+        solar_inverter:[
+          ['Power now','inverter.power_kw'],['Solar power','solar.power_kw'],['State','inverter.state'],
+          ['Efficiency','inverter.efficiency_pct'],['Temperature','inverter.temperature_c']
+        ],
+        solar_production:[
+          ['Power now','solar.power_kw'],['Energy today','solar.energy_today_kwh'],['State','solar.state']
+        ],
+        solar_panel:[
+          ['Power now','solar.power_kw'],['Energy today','solar.energy_today_kwh'],['State','solar.state']
+        ],
+        solar_optimizer:[
+          ['Power now','optimizer.power_kw'],['State','optimizer.state'],['Voltage','optimizer.voltage_v']
+        ],
+        backup_interface:[
+          ['State','backup_interface.state'],['Power now','backup_interface.power_kw'],['Grid state','backup_interface.grid_state']
+        ],
+        grid_connection:[
+          ['Grid','grid.net_power_kw'],['Import','grid_import.power_kw'],['Export','grid_export.power_kw'],['Direction','grid.flow_direction']
+        ],
+        gas_meter:[
+          ['Total','gas.total_m3'],['Flow now','gas.flow_m3_h']
+        ],
+        flexible_load:[
+          ['Power now','flexible_load.power_kw'],['Energy need','flexible_load.energy_to_target_kwh'],
+          ['State','flexible_load.state'],['Automation','flexible_load.automation_mode']
+        ]
+      };
+      const specs = specsByType[type] || [];
+      const facts = [];
+      for (const [label,key] of specs) {
+        const field = rt.assetField(id, key);
+        if (!field?.resolved) continue;
+        facts.push({ label, value:field.display || String(field.value ?? '—'), status:field.status || field.quality || 'AVAILABLE', key });
+        if (facts.length >= limit) return facts;
+      }
+      // Unknown device types may still expose canonical rows. Keep this only as a
+      // conservative fallback; known product asset types never use property roulette.
+      if (!specs.length) {
+        const rows = rt.rowsByAsset(id)
+          .filter(row => row && !row.missing && rowValue(row, null) !== null)
+          .filter(row => !/alias|deprecated|diagnostic|debug/i.test(`${row.source_type || ''} ${row.migration_role || ''} ${row.key || row.property_key || ''}`))
+          .slice(0, limit);
+        return rows.map(row => ({
+          label:human(String(firstDefined(row.display_name,row.label,row.property_key,row.key,'Fact'))),
+          value:rowDisplayValue(row,'—'),
+          status:rowStatusLabel(row)
+        }));
+      }
+      return facts;
+    }, limit = 4) {
       const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
       if (!id) return [];
       const type = this.energyAssetType(asset);
@@ -3078,6 +3134,27 @@
     }
 
     energyDeviceStatusCard(rt, asset = {}, roleLabel = '') {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
+      const type = String(firstDefined(enriched.asset_type,enriched.object_class,'device') || 'device');
+      const profile = objectFrom(enriched.profile || {});
+      const profileLabel = firstDefined(profile.display_name,profile.label,profile.name,enriched.profile_id,'');
+      const facts = this.energyAssetFacts(rt,enriched,6);
+      const healthField = rt.assetField(id, `${type}.health`);
+      const health = firstDefined(healthField?.resolved ? healthField.value : null, enriched.health, enriched.status, '');
+      const publication = objectFrom(enriched.publication || {});
+      const configState = publication.complete === true ? 'Configured' : profileLabel ? 'Profiled' : 'Detected';
+      const actionModels = rt.commandActionModelsForAsset(id).filter(model => model?.visible !== false).slice(0,3);
+      const actions = actionModels.map(model => this.componentActionModelButton(model)).filter(Boolean).join('');
+      return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
+        <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
+        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3></div><span class="energyDeviceState">${escapeHtml(health ? human(health) : configState)}</span></div>
+        <div class="energyDeviceConfig">${profileLabel ? `<span><b>Profile</b>${escapeHtml(human(profileLabel))}</span>` : ''}<span><b>Config</b>${escapeHtml(configState)}</span></div>
+        <div class="energyDeviceFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span class="energyDeviceNoFacts"><small>Status</small><b>No product facts published for this asset</b></span>`}</div>
+        ${actions ? `<div class="energyDeviceActions">${actions}</div>` : ''}</div>
+      </article>`;
+    }, roleLabel = '') {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
@@ -3641,12 +3718,11 @@
       const name = rt.assetName(assetId);
       const soc = rt.assetNumber(assetId, 'battery.soc_pct');
       const power = rt.assetNumber(assetId, 'battery.power_kw');
-      const available = rt.assetNumber(assetId, 'battery.available_kwh');
-      const capacity = rt.assetNumber(assetId, 'battery.capacity_kwh');
       const state = String(rt.assetText(assetId, 'battery.state', '') || '').toLowerCase();
       const published = rt.asset(assetId) || {};
-      const projection = rt.assetProjection(assetId);
-      const health = firstDefined(projection?.lifecycle?.state, published.health, published.status, 'UNKNOWN');
+      const health = rt.assetText(assetId, 'battery.health', published.health || published.status || 'UNKNOWN');
+      const available = rt.assetNumber(assetId, 'battery.available_kwh');
+      const capacity = rt.assetNumber(assetId, 'battery.capacity_kwh');
       const asset = this.energyAssetContext(rt, published.asset_id ? published : { asset_id:assetId, display_name:name, asset_type:'battery' });
       const stateLabel = state === 'charging' ? 'Charging'
         : state === 'discharging' ? 'Discharging'
@@ -3658,13 +3734,9 @@
         : stateLabel === 'Discharging' ? 'Supplying energy to the Home Bus'
         : stateLabel === 'Idle' ? 'No active battery flow'
         : 'Battery flow is not currently available';
-      const quickFacts = [
-        ['Power now',fmtKw(power,'—')],
-        ['Available',available === null ? '' : fmtKwh(available)],
-        ['Capacity',capacity === null ? '' : fmtKwh(capacity)]
-      ].filter(([,value])=>value);
-      const actions = this.assetQuickActions(rt,assetId,3);
-      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorFacts">${quickFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div>${actions}</div></article>`;
+      const actionModels = rt.commandActionModelsForAsset(assetId).filter(model => model?.visible !== false).slice(0,2);
+      const actions = actionModels.map(model => this.componentActionModelButton(model)).filter(Boolean).join('');
+      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorQuickFacts"><span><small>Power now</small><b>${fmtKw(power, '—')}</b></span>${available !== null ? `<span><small>Available</small><b>${fmtKwh(available)}</b></span>` : ''}${capacity !== null ? `<span><small>Capacity</small><b>${fmtKwh(capacity)}</b></span>` : ''}</div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div>${actions ? `<div class="batteryContributorActions">${actions}</div>` : ''}<div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div></article>`;
     }
     gas(rt) {
       const pageVm = this.buildPageViewModel(rt, 'gas');
