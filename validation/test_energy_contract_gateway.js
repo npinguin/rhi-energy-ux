@@ -29,7 +29,7 @@ const states = {
       contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
       contract_version:'2.0.0',
       release:'E0.15.52',
-      core:{},
+      core:{contract_id:'RHI_ENERGY_CORE_V1',},
       objects:[], profiles:[], relationships:[],
       configuration:{}, intelligence:{}, overview:{}, commands:[], activity:[],
       value_accounting:{}, layers:{planning_objects:[]},
