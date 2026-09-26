@@ -1210,42 +1210,30 @@
     nav() {
       const sections = this.navigationModel();
       const active = this.activeNavigation();
-      const sectionIcon = {
-        energy:'<svg viewBox="0 0 24 24" focusable="false"><path d="M13.4 2 6.8 12h4.7L10.6 22l6.6-10h-4.7L13.4 2Z"/></svg>',
-        intelligence:'<svg viewBox="0 0 24 24" focusable="false"><path d="M9.5 4.2A3.6 3.6 0 0 0 5 7.6a3.4 3.4 0 0 0 .5 6.7A3.7 3.7 0 0 0 10 18a3.4 3.4 0 0 0 4.2 1.4 3.7 3.7 0 0 0 4.3-4.1 3.4 3.4 0 0 0 .6-6.6A3.7 3.7 0 0 0 14.6 5a3.4 3.4 0 0 0-5.1-.8Z"/><path d="M9 8.2c1 .1 1.8.8 2 1.8m4-1.6c-1 .1-1.8.8-2 1.8m-4.2 3.2c1 .1 1.8.8 2 1.8m4.2-1.8c-1 .1-1.8.8-2 1.8M12 7v10"/></svg>',
-        insights:'<svg viewBox="0 0 24 24" focusable="false"><path d="M4 20V11h4v9H4Zm6 0V6h4v14h-4Zm6 0V3h4v17h-4Z"/></svg>'
-      };
-      const itemIcon = {
-        overview:'<svg viewBox="0 0 24 24" focusable="false"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1v-8Z"/></svg>',
-        flow:'<svg viewBox="0 0 24 24" focusable="false"><path d="M5 7h10m0 0-3-3m3 3-3 3M19 17H9m0 0 3-3m-3 3 3 3"/></svg>',
-        solar:'<svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2M12 19.2v2M2.8 12h2M19.2 12h2M5.5 5.5l1.4 1.4M17.1 17.1l1.4 1.4M18.5 5.5l-1.4 1.4M6.9 17.1l-1.4 1.4"/></svg>',
-        battery:'<svg viewBox="0 0 24 24" focusable="false"><rect x="5" y="6.5" width="13" height="11" rx="2"/><path d="M18 10h2v4h-2M8 10h4v4H8"/></svg>',
-        consumers:'<svg viewBox="0 0 24 24" focusable="false"><path d="M8 4v5m8-5v5M6 9h12v3a6 6 0 0 1-12 0V9Zm6 9v3"/></svg>',
-        strategy:'<svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="7"/><path d="m12 8 3 3-5 5-3-3 5-5Z"/></svg>',
-        'operational-planning':'<svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="7"/><path d="M12 8v4l3 2"/></svg>',
-        'tactical-planning':'<svg viewBox="0 0 24 24" focusable="false"><path d="M5 5h14v14H5zM8 9h8M8 13h5"/></svg>',
-        'strategic-planning':'<svg viewBox="0 0 24 24" focusable="false"><path d="M5 18 9 9l4 4 6-8M15 5h4v4"/></svg>',
-        metering:'<svg viewBox="0 0 24 24" focusable="false"><path d="M5 19V9h3v10H5Zm5 0V5h3v14h-3Zm5 0v-7h3v7h-3Z"/></svg>',
-        value:'<svg viewBox="0 0 24 24" focusable="false"><path d="M16.5 7.5A5.5 5.5 0 1 0 16.5 16.5M6.5 10h7M6.5 14h7"/></svg>',
-        retrospective:'<svg viewBox="0 0 24 24" focusable="false"><path d="M5 8V4m0 0h4M5 4l3 3a7 7 0 1 1-2 5"/></svg>'
-      };
-      const sectionNav = sections.map(section => `<button class="navSectionTab ${active.section === section.id ? 'active' : ''}" data-nav-section="${escapeHtml(section.id)}"><span class="navSectionIcon" aria-hidden="true">${sectionIcon[section.id] || ''}</span><span>${escapeHtml(section.label)}</span></button>`).join('');
-      const currentSection = sections.find(section => section.id === active.section) || sections[0];
-      const itemNav = currentSection.items.map(item => `<button class="navItemTab ${active.item === item.id ? 'active' : ''}" data-nav-section="${escapeHtml(currentSection.id)}" data-nav-item="${escapeHtml(item.id)}"><span class="navItemIcon" aria-hidden="true">${itemIcon[item.id] || ''}</span><span>${escapeHtml(item.label)}</span></button>`).join('');
-      return `<div class="navigationShell nav-${escapeHtml(active.section)}">
-        <div class="navProductArea">
-          <div class="navPrimaryRow">
-            <div class="navBrand" aria-label="Home Intelligence Energie">
-              <span class="navBrandCopy"><b>Home Intelligence</b><small>ENERGIE</small></span>
-            </div>
-            <nav class="navSections" aria-label="Energy sections">${sectionNav}</nav>
-          </div>
-          <nav class="tabs navItems" aria-label="${escapeHtml(currentSection.label)}">${itemNav}</nav>
-        </div>
-        <div class="navCompany" aria-label="Robotix.be · DomotiX · Network · Security">${rhiUxCompanyBrand()}</div>
-      </div>`;
+      const modules = sections.map(section => ({
+        id:section.id,
+        label:section.label,
+        items:section.items.map(item => ({ id:item.id, label:item.label }))
+      }));
+      return `<div class="rhiEnergyNav rhiEnergyNav-${escapeHtml(active.section)}">${rhiUxDomainShell({
+        product:'Home Intelligence',
+        domain:'ENERGIE',
+        modules,
+        activeModule:active.section,
+        activeItem:active.item
+      })}</div>`;
     }
     onClick(event) {
+      const coreModule = event.target.closest('[data-rhi-module]');
+      if (coreModule) {
+        this.selectNavigation(coreModule.dataset.rhiModule || 'energy', '');
+        return;
+      }
+      const coreItem = event.target.closest('[data-rhi-item]');
+      if (coreItem) {
+        this.selectNavigation(this.navSection, coreItem.dataset.rhiItem || '');
+        return;
+      }
       const visualBackdrop = event.target.closest('[data-energy-visual-backdrop]');
       if (visualBackdrop && event.target === visualBackdrop) {
         this.energyVisualPickerAssetId = '';
