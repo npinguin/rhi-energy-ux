@@ -5358,6 +5358,7 @@ function rhiEnergyVisualPickerStyles() {
         ? `<section class="panel gasMeterPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Gas meter</h2><p>Physical meter identity, source and canonical measurement health.</p></div></div>${meter}</section>`
         : `<section class="panel gasSetupPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Connect your gas meter</h2><p>RHI Energy needs one authoritative gas source before it can show consumption history.</p></div></div><div class="gasSetupFacts"><div><small>Required</small><b>Total gas meter</b><span>A cumulative total-increasing reading in m³.</span></div><div><small>Optional</small><b>Live gas flow</b><span>An instantaneous m³/h reading when the source publishes it.</span></div><div><small>History</small><b>Home Assistant statistics</b><span>Daily changes are shown without frontend estimation.</span></div></div></section>`;
       return `${this.tabExperienceHeader(rt,'gas',pageVm)}<div class="gasPage">
+        <section class="panel gasUseInfoPanel"><div class="rhiUxSectionHead"><div><h2>Your gas use</h2><p>Live flow, cumulative meter total and history are summarized once in the canonical status row above. Detailed history and meter information remain below.</p></div></div></section>
         ${graph}
         ${setupOrMeter}
       </div>`;
