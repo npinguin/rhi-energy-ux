@@ -357,6 +357,28 @@
     }
     asset(assetId) { return this.assets().find(a => String(a.asset_id || '') === String(assetId)) || null; }
     assetName(assetId) { return this.asset(assetId)?.display_name || human(assetId, '—'); }
+    assetField(assetId, propertyKey) {
+      return this.publicV2().field(String(propertyKey || ''), String(assetId || ''));
+    }
+    assetValue(assetId, propertyKey, fallback = null) {
+      const field = this.assetField(assetId, propertyKey);
+      return field?.resolved === true ? field.value : fallback;
+    }
+    assetNumber(assetId, propertyKey) {
+      return asNumber(this.assetValue(assetId, propertyKey, null));
+    }
+    assetText(assetId, propertyKey, fallback = '') {
+      const value = this.assetValue(assetId, propertyKey, fallback);
+      return value === undefined || value === null || value === '' ? fallback : String(value);
+    }
+    childrenOfType(parentAssetId, childType = '') {
+      const wanted = String(childType || '').toLowerCase();
+      return this.containsChildren(parentAssetId).filter(id => {
+        if (!wanted) return true;
+        const asset = this.asset(id) || {};
+        return [asset.asset_type, asset.object_class].some(value => String(value || '').toLowerCase() === wanted);
+      });
+    }
     commandContract() {
       if (!this._commandContract) this._commandContract = readEnergyCommandContract(this.contractGateway());
       return this._commandContract;
@@ -659,16 +681,18 @@
     }
     powerForAsset(assetId) {
       const id = String(assetId || '');
-      const candidates = [
-        `${id}.power_kw`,
-        `${id}.current_power_kw`,
-        `${id}.import_power_kw`,
-        `${id}.export_power_kw`,
-        `${id}.charge_power_kw`,
-        `${id}.discharge_power_kw`
-      ];
+      const asset = this.asset(id) || {};
+      const type = String(asset.asset_type || asset.object_class || '').toLowerCase();
+      const candidatesByType = {
+        battery: ['battery.power_kw','battery.charge_power_kw','battery.discharge_power_kw'],
+        inverter: ['inverter.power_kw','solar.power_kw'],
+        solar_inverter: ['solar.power_kw','inverter.power_kw'],
+        grid_phase: ['grid_phase.power_kw'],
+        flexible_load: ['flexible_load.power_kw','flexible_load.current_power_kw']
+      };
+      const candidates = candidatesByType[type] || ['power_kw'];
       for (const key of candidates) {
-        const n = this.number(key);
+        const n = this.assetNumber(id, key);
         if (n !== null) return n;
       }
       return null;
@@ -3486,11 +3510,12 @@
     }
     batteryChildCard(rt, assetId) {
       const name = rt.assetName(assetId);
-      const soc = rt.number(`${assetId}.soc_pct`);
-      const power = rt.number(`${assetId}.power_kw`);
-      const state = String(rt.rawText(`${assetId}.state`, '') || '').toLowerCase();
-      const health = rt.rawText(`${assetId}.health`, 'UNKNOWN');
-      const asset = this.energyAssetContext(rt, rt.asset(assetId) || { asset_id:assetId, display_name:name, asset_type:'battery' });
+      const soc = rt.assetNumber(assetId, 'battery.soc_pct');
+      const power = rt.assetNumber(assetId, 'battery.power_kw');
+      const state = String(rt.assetText(assetId, 'battery.state', '') || '').toLowerCase();
+      const published = rt.asset(assetId) || {};
+      const health = rt.assetText(assetId, 'battery.health', published.health || published.status || 'UNKNOWN');
+      const asset = this.energyAssetContext(rt, published.asset_id ? published : { asset_id:assetId, display_name:name, asset_type:'battery' });
       const stateLabel = state === 'charging' ? 'Charging'
         : state === 'discharging' ? 'Discharging'
         : state === 'idle' ? 'Idle'
@@ -3538,7 +3563,10 @@
       const charge = batteryVm.chargePowerKw;
       const discharge = batteryVm.dischargePowerKw;
       const state = batteryVm.label;
-      const children = rt.containsChildren('battery').filter(id => id !== 'battery');
+      const batterySystem = rt.assets().find(asset => ['battery_system','home_battery_system'].includes(String(asset.asset_type || asset.object_class || '').toLowerCase())) || rt.asset('battery_system');
+      const children = batterySystem
+        ? rt.childrenOfType(String(batterySystem.asset_id || 'battery_system'), 'battery')
+        : rt.assets().filter(asset => String(asset.asset_type || asset.object_class || '').toLowerCase() === 'battery').map(asset => String(asset.asset_id || '')).filter(Boolean);
       return `${this.tabExperienceHeader(rt,'battery',pageVm)}<div class="batteryPage">
         <div class="summaryRow four">${this.metric('▣','Battery SoC',fmtPct(soc),`${fmtKwh(available)} available`,'green',rt.statusForKeys(['battery.soc_pct','battery.available_kwh']))}${this.metric('↔','Battery Power',fmtKw(power,'0.0 kW'),human(state),'purple',rt.statusForKeys('battery.power_kw'))}${this.metric('↑','Discharge',fmtKw(discharge,'0.0 kW'),'To home bus','orange')}${this.metric('↓','Charge',fmtKw(charge,'0.0 kW'),'From solar/grid','blue')}</div>
         <div class="batteryGrid batteryGridTwoUp">
