@@ -2396,7 +2396,7 @@ class FlexibleAssetDomainModel {
     });
   }
 
-// ---- src/app/presentation.js ----
+  // ---- src/app/presentation.js ----
 // Energy presentation grammar.
 // Owns navigation metadata, tab hero assets, shared visual hierarchy and card primitives.
 // Domain semantics, calculations, actions and runtime truth remain backend/domain owned.
