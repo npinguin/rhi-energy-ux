@@ -5,6 +5,7 @@ const app = fs.readFileSync("src/app/energy-card.js","utf8");
 const header = fs.readFileSync("src/ui/components/page-header.js","utf8");
 const presentation = fs.readFileSync("src/app/presentation.js","utf8");
 const catalog = fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
+const core = fs.readFileSync("src/vendor/rhi-ux-core.js","utf8");
 
 for (const token of [
   'id:"overview", label:"Overview"',
@@ -55,8 +56,15 @@ for (const token of [
 
 assert.match(app,/@media\(max-width:1100px\)/);
 assert.match(app,/@media\(max-width:720px\)/);
-assert.match(presentation,/@media\(max-width:760px\)/);
-assert.match(presentation,/@media\(max-width:430px\)/);
+assert.match(core,/@media\(max-width:760px\)/);
+assert.match(core,/@media\(max-width:430px\)/);
+assert.match(core,/\.rhiUxPageHeroArt\{position:absolute/);
+assert.match(core,/\.rhiUxStatusGrid\{/);
+assert.match(core,/\.rhiUxQuickActionBar/);
+assert.match(core,/--rhi-font-family:/);
+assert.doesNotMatch(presentation,/\.rhiUxPageHero\s*\{/);
+assert.doesNotMatch(presentation,/\.rhiUxStatusGrid\s*\{/);
+assert.doesNotMatch(presentation,/\.rhiUxQuickActionBar\s*\{/);
 assert.match(app,/object-fit:contain/);
 assert.ok(app.includes('rhiUxDomainShell({'));
 assert.match(app,/domain:'ENERGIE'/);
