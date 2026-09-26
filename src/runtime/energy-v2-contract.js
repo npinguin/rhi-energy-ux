@@ -148,8 +148,14 @@ function readEnergyPublicV2(gateway) {
 
   const publicContractOk = envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2';
   const coreContractOk = String(core.contract_id || '') === 'RHI_ENERGY_CORE_V1';
+  const requiredCoreSections = Object.freeze(['battery','solar','grid','consumption','home','flexible']);
+  const missingCoreSections = Object.freeze(requiredCoreSections.filter(section => !Object.prototype.hasOwnProperty.call(core, section)));
+  const coreShapeOk = missingCoreSections.length === 0;
   const capabilities = Object.freeze({
-    core:coreContractOk,
+    core:coreContractOk && coreShapeOk,
+    core_contract:coreContractOk,
+    core_sections:coreShapeOk,
+    missing_core_sections:missingCoreSections,
     assets:Array.isArray(objects),
     relationships:Array.isArray(relationships),
     planning:Object.keys(object(planning.horizons)).length > 0,
@@ -162,13 +168,17 @@ function readEnergyPublicV2(gateway) {
     ? 'public_v2_contract_unavailable'
     : !coreContractOk
       ? 'required_core_contract_missing'
-      : '';
+      : !coreShapeOk
+        ? `required_core_sections_missing:${missingCoreSections.join(',')}`
+        : '';
 
   return Object.freeze({
     envelope,
-    available:publicContractOk && coreContractOk,
+    available:publicContractOk && coreContractOk && coreShapeOk,
     publicContractOk,
     coreContractOk,
+    coreShapeOk,
+    missingCoreSections,
     capabilities,
     compatibilityReason,
     contractVersion:String(attrs.contract_version || envelope.contractVersion || ''),
