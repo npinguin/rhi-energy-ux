@@ -1,6 +1,6 @@
 // Energy presentation grammar.
-// Owns navigation metadata, tab hero assets, shared visual hierarchy and card primitives.
-// Domain semantics, calculations, actions and runtime truth remain backend/domain owned.
+// Owns Energy navigation metadata, tab hero assets and domain-local composition adapters.
+// Shared shell/hero/status/footer presentation belongs to RHI UX Core; domain semantics, calculations, actions and runtime truth remain backend/domain owned.
 
 const HB_ENERGY_NAVIGATION = Object.freeze([
   {
