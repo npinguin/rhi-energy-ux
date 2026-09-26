@@ -3718,11 +3718,12 @@
       const name = rt.assetName(assetId);
       const soc = rt.assetNumber(assetId, 'battery.soc_pct');
       const power = rt.assetNumber(assetId, 'battery.power_kw');
-      const state = String(rt.assetText(assetId, 'battery.state', '') || '').toLowerCase();
-      const published = rt.asset(assetId) || {};
-      const health = rt.assetText(assetId, 'battery.health', published.health || published.status || 'UNKNOWN');
       const available = rt.assetNumber(assetId, 'battery.available_kwh');
       const capacity = rt.assetNumber(assetId, 'battery.capacity_kwh');
+      const state = String(rt.assetText(assetId, 'battery.state', '') || '').toLowerCase();
+      const published = rt.asset(assetId) || {};
+      const projection = rt.assetProjection(assetId);
+      const health = firstDefined(projection?.lifecycle?.state, published.health, published.status, 'UNKNOWN');
       const asset = this.energyAssetContext(rt, published.asset_id ? published : { asset_id:assetId, display_name:name, asset_type:'battery' });
       const stateLabel = state === 'charging' ? 'Charging'
         : state === 'discharging' ? 'Discharging'
@@ -3734,9 +3735,13 @@
         : stateLabel === 'Discharging' ? 'Supplying energy to the Home Bus'
         : stateLabel === 'Idle' ? 'No active battery flow'
         : 'Battery flow is not currently available';
-      const actionModels = rt.commandActionModelsForAsset(assetId).filter(model => model?.visible !== false).slice(0,2);
-      const actions = actionModels.map(model => this.componentActionModelButton(model)).filter(Boolean).join('');
-      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorQuickFacts"><span><small>Power now</small><b>${fmtKw(power, '—')}</b></span>${available !== null ? `<span><small>Available</small><b>${fmtKwh(available)}</b></span>` : ''}${capacity !== null ? `<span><small>Capacity</small><b>${fmtKwh(capacity)}</b></span>` : ''}</div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div>${actions ? `<div class="batteryContributorActions">${actions}</div>` : ''}<div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div></article>`;
+      const quickFacts = [
+        ['Power now',fmtKw(power,'—')],
+        ['Available',available === null ? '' : fmtKwh(available)],
+        ['Capacity',capacity === null ? '' : fmtKwh(capacity)]
+      ].filter(([,value])=>value);
+      const actions = this.assetQuickActions(rt,assetId,3);
+      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorFacts">${quickFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div>${actions}</div></article>`;
     }
     gas(rt) {
       const pageVm = this.buildPageViewModel(rt, 'gas');
