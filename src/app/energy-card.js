@@ -1941,7 +1941,7 @@
       if (tab === 'planning') controls = `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">Today</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">Tomorrow</button></div>` + jump('Flexible loads','planning-flexible-loads');
       if (tab === 'value') controls = this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId, 'value') + jump('Breakdown','value-breakdown') + jump('Consumer allocation','value-consumers');
       if (!controls) controls = button('Overview','data-view="overview"') + button('Energy flow','data-view="flow"');
-      return `<section class="hiQuickActionBar" aria-label="Quick actions"><small>Quick actions</small><div class="hiQuickActionItems">${controls}</div></section>`;
+      return controls;
     }
 
     understandingFooter(rt, tab) {
@@ -2319,7 +2319,7 @@
         description:semanticDescription,
         hero:hbEnergyHeroAsset(heroKey),
         metrics:p.metrics,
-        quickActions:this.pageQuickActions(rt, tab),
+        quickActions:this.quickActionBar(rt, tab) + this.pageQuickActions(rt, tab),
         tone:p.tone
       });
     }
@@ -4645,7 +4645,7 @@
       const headerEnd = body.indexOf(marker);
       if (headerEnd < 0) return body;
       const split = headerEnd + marker.length;
-      return `${body.slice(0, split)}${this.quickActionBar(rt, this.view)}<div id="hi-body-${escapeHtml(this.view)}">${body.slice(split)}</div>${this.understandingFooter(rt, this.view)}`;
+      return `${body.slice(0, split)}<div id="hi-body-${escapeHtml(this.view)}">${body.slice(split)}</div>${this.understandingFooter(rt, this.view)}`;
     }
     patchDomNode(current, next) {
       if (!current || !next) return;
