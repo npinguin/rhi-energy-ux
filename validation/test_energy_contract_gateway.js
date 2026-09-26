@@ -58,7 +58,7 @@ const gateway = context.createEnergyContractGateway(host);
 const contract = context.readPlanningContract(gateway, 'D1');
 const totals = context.normalizePlanningLaneTotals(contract.laneTotals);
 if (contract.entityId !== 'sensor.rhi_energy_public_contract_v2') throw new Error('wrong V2 owner');
-if (contract.totalsSource !== 'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.planning_horizons.summary.lane_totals') throw new Error('wrong totals source');
+if (contract.totalsSource !== 'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons') throw new Error('wrong totals source');
 if (totals.solarKwh !== 63.7 || totals.gridOutKwh !== 31.368) throw new Error('canonical totals lost');
 if (totals.gridInKwh !== 0) throw new Error('known zero lost');
 if (totals.flexibleAssetsById.vehicle_carole.energy_kwh !== 36.4) throw new Error('asset total lost');
