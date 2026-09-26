@@ -1,19 +1,15 @@
-# v4.2.0 — Unified Home Intelligence UX TEST CANDIDATE
+# v4.2.1 — Energy header/status hotfix TEST CANDIDATE
 
-Energy now consumes the shared RHI UX Core 1.4.0 visual system instead of maintaining page-level variants of the same product grammar.
+This hotfix closes the remaining visual drift found after v4.2.0.
 
 Changes:
-- standardises the Energy hero on the shared background-image hero used across Home Intelligence;
-- keeps exactly one page status layer and removes obsolete duplicate KPI/status strips from Solar, Gas and Operational Planning;
-- places status before Quick Actions on every shared Energy header;
-- aligns Quick Actions to the shared Mobility-style blue primary / outlined secondary treatment;
-- moves font-family, typography scale, shared hero/status/action styling and body grammar to RHI UX Core;
-- applies the Home Assistant font authority through Core instead of a local Inter stack;
-- keeps domain semantics and data ownership in Energy while shared look-and-feel stays Core-owned;
-- adds a release-blocking shared-visual-ownership check to prevent local typography and shared-component drift;
-- keeps the HACS package self-contained through the pinned build-time Core snapshot.
+- enforces the canonical Core page stack as Hero → Status → Quick Actions;
+- updates Energy to RHI UX Core 1.4.1, where the page order is an explicit CSS invariant;
+- removes duplicate headline/status surfaces from Solar, Gas, Home Battery, Outlook and Tactical Planning;
+- keeps page detail and domain-specific body content, but prevents a second KPI/status row from appearing below the canonical status layer;
+- extends release-blocking visual ownership checks so these duplicate surfaces cannot be reintroduced silently.
 
-RHI UX Core: 1.4.0 at 50cf7e135c90af15cf34b4f41dfba78aa1a5fc5e.
-Rollback: v4.1.4.
+RHI UX Core: 1.4.1 at 7e035980b690719ff9c05876e905322194d52df2.
+Rollback: v4.2.0.
 
-Target Home Assistant rendering, functional journeys, refresh/restart, upgrade and rollback proof remain mandatory before stable promotion.
+Target Home Assistant rendering and runtime qualification remain separate evidence gates.
