@@ -13,6 +13,8 @@ function readEnergyPublicV2(gateway) {
     const parsed = parseMaybeJson(value, value);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   };
+
+  const core = object(attrs.core);
   const objects = array(attrs.objects);
   const profiles = array(attrs.profiles);
   const relationships = array(attrs.relationships).map(row => Object.freeze({
@@ -31,10 +33,77 @@ function readEnergyPublicV2(gateway) {
   const valueAccounting = object(attrs.value_accounting);
   const layers = object(attrs.layers);
   const summary = object(attrs.summary);
+
+  const semantic = raw => {
+    const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {value:raw};
+    const resolution = source.resolution && typeof source.resolution === 'object' ? source.resolution : {};
+    const value = source.value !== undefined ? source.value : null;
+    const status = String(source.status || source.availability || resolution.status || (value !== null ? 'AVAILABLE' : 'UNAVAILABLE')).toUpperCase();
+    const quality = String(source.quality || (status === 'AVAILABLE' ? 'CANONICAL' : 'UNKNOWN')).toUpperCase();
+    const resolved = status === 'AVAILABLE' && value !== null && !['INVALID','STALE'].includes(quality);
+    return Object.freeze({
+      resolved,
+      value,
+      display:String(source.display ?? source.display_value ?? (value ?? '—')),
+      unit:String(source.unit || ''),
+      state:status.toLowerCase(),
+      status,
+      quality,
+      reason:String(source.reason || resolution.reason_code || source.reason_code || source.reason_text || ''),
+      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+      editable:source.write_supported === true || source.editable === true,
+      editor:source.editor || null,
+      constraints:source.constraints && typeof source.constraints === 'object' ? source.constraints : {},
+      write:source.write && typeof source.write === 'object' ? source.write : null,
+      operation:source.operation && typeof source.operation === 'object' ? source.operation : null,
+      raw:source
+    });
+  };
+
+  const coreField = (sectionName, fieldName) => {
+    const section = object(core[sectionName]);
+    const fields = object(section.fields);
+    if (fields[fieldName] !== undefined) return semantic(fields[fieldName]);
+    if (section[fieldName] && typeof section[fieldName] === 'object' && Object.prototype.hasOwnProperty.call(section[fieldName],'value')) {
+      return semantic(section[fieldName]);
+    }
+    if (Object.prototype.hasOwnProperty.call(section, fieldName)) {
+      const value = section[fieldName];
+      return semantic({
+        value,
+        unit:({power_kw:'kW',net_power_kw:'kW',import_power_kw:'kW',export_power_kw:'kW',attributed_power_kw:'kW',soc_pct:'%',reserve_target_pct:'%',capacity_kwh:'kWh',available_kwh:'kWh'})[fieldName] || null,
+        status:value === null || value === undefined ? 'UNAVAILABLE' : 'AVAILABLE',
+        quality:value === null || value === undefined ? 'UNKNOWN' : 'CANONICAL',
+        reason:value === null || value === undefined ? String(section.reason || '') : null
+      });
+    }
+    return semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:String(section.reason || 'canonical_field_not_published')});
+  };
+
+  const coreByKey = new Map([
+    ['battery.power_kw', coreField('battery','power_kw')],
+    ['battery.soc_pct', coreField('battery','soc_pct')],
+    ['battery.capacity_kwh', coreField('battery','capacity_kwh')],
+    ['battery.available_kwh', coreField('battery','available_kwh')],
+    ['battery.state', coreField('battery','state')],
+    ['battery.reserve_target_pct', coreField('battery','reserve_target_pct')],
+    ['solar.power_kw', coreField('solar','power_kw')],
+    ['grid.net_power_kw', coreField('grid','net_power_kw')],
+    ['grid_import.power_kw', coreField('grid','import_power_kw')],
+    ['grid_export.power_kw', coreField('grid','export_power_kw')],
+    ['grid.flow_direction', coreField('grid','flow_direction')],
+    ['site_consumption.power_kw', coreField('consumption','power_kw')],
+    ['home_consumption.power_kw', coreField('home','power_kw')],
+    ['flexible_loads.power_kw', coreField('flexible','power_kw')],
+    ['flexible_loads.attributed_power_kw', coreField('flexible','attributed_power_kw')]
+  ]);
+
+  const coreFlexible = object(core.flexible);
   const flexibleAssets = Object.freeze(
-    objects
-      .filter(row => String(row.asset_type || row.object_class || '').toLowerCase() === 'flexible_asset')
-      .map(row => Object.freeze({ ...row }))
+    (array(coreFlexible.assets).length ? array(coreFlexible.assets) : objects.filter(row => {
+      const type=String(row.asset_type || row.object_class || '').toLowerCase();
+      return type === 'flexible_load' || type === 'flexible_asset';
+    })).map(row => Object.freeze({ ...row }))
   );
   const planningObjects = Object.freeze(array(layers.planning_objects));
   const objectById = new Map(objects.map(row => [String(row.asset_id || ''), row]).filter(([id]) => id));
@@ -44,10 +113,8 @@ function readEnergyPublicV2(gateway) {
   const propertyByKey = new Map();
   const propertyByAssetAndKey = new Map();
   const configurationRows = [];
-  for (const [configurationKind, config] of Object.entries(configuration)) {
-    if (!config || typeof config !== 'object') continue;
-    const rows = array(config.properties || config.configured_properties || config.effective_properties);
-    for (const raw of rows) {
+  const addConfigurationRows = (configurationKind, rows) => {
+    for (const raw of array(rows)) {
       const key = String(raw.property_key || raw.property_id || raw.key || '');
       if (!key) continue;
       const row = Object.freeze({
@@ -61,11 +128,15 @@ function readEnergyPublicV2(gateway) {
       configurationRows.push(row);
       if (!propertyByKey.has(key)) propertyByKey.set(key,row);
     }
-  }
+  };
+  const pricing = object(configuration.pricing);
+  const strategy = object(configuration.strategy);
+  addConfigurationRows('pricing', pricing.properties);
+  addConfigurationRows('strategy', object(strategy.configured).properties || strategy.configured_properties);
+
   for (const asset of objects) {
     const assetId = String(asset.asset_id || '');
-    const rows = array(asset.properties);
-    for (const raw of rows) {
+    for (const raw of array(asset.properties)) {
       const key = String(raw.property_key || raw.property_id || raw.key || '');
       if (!key) continue;
       const row = Object.freeze({ asset_id:assetId, ...raw, property_key:key, key });
@@ -75,34 +146,13 @@ function readEnergyPublicV2(gateway) {
     }
   }
 
-  const field = row => {
-    const source = row && typeof row === 'object' ? row : {};
-    const resolution = source.resolution && typeof source.resolution === 'object' ? source.resolution : {};
-    const status = String(resolution.status || source.availability || source.status || (source.value !== undefined && source.value !== null ? 'RESOLVED' : 'UNAVAILABLE')).toUpperCase();
-    const resolved = ['RESOLVED','AVAILABLE','READY','OK'].includes(status) && source.value !== undefined && source.value !== null;
-    return Object.freeze({
-      resolved,
-      value: source.value ?? null,
-      display: String(source.display ?? source.display_value ?? (source.value ?? '—')),
-      unit: String(source.unit || ''),
-      state: status.toLowerCase(),
-      reason: String(resolution.reason_code || source.reason_code || source.reason || source.reason_text || ''),
-      source: 'RHI_ENERGY_PUBLIC_CONTRACT_V2',
-      quality: String(source.quality || ''),
-      editable: source.write_supported === true || source.editable === true,
-      editor: source.editor || null,
-      constraints: source.constraints && typeof source.constraints === 'object' ? source.constraints : {},
-      write: source.write && typeof source.write === 'object' ? source.write : null,
-      raw: source
-    });
-  };
-
   return Object.freeze({
     envelope,
-    available: envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2',
-    contractVersion: String(attrs.contract_version || envelope.contractVersion || ''),
-    release: String(attrs.release || ''),
-    health: String(envelope.state || 'UNKNOWN'),
+    available:envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+    contractVersion:String(attrs.contract_version || envelope.contractVersion || ''),
+    release:String(attrs.release || ''),
+    health:object(attrs.health).status || String(attrs.health || envelope.state || 'UNKNOWN'),
+    core,
     summary,
     objects,
     profiles,
@@ -124,13 +174,17 @@ function readEnergyPublicV2(gateway) {
     allPropertyRows:Object.freeze([...propertyRows, ...configurationRows]),
     propertyByKey,
     propertyByAssetAndKey,
+    coreByKey,
     object(assetId) { return objectById.get(String(assetId || '')) || null; },
     profile(profileId) { return profileById.get(String(profileId || '')) || null; },
     property(key, assetId = '') {
       const id = String(assetId || '');
       return id ? (propertyByAssetAndKey.get(`${id}::${String(key || '')}`) || null) : (propertyByKey.get(String(key || '')) || null);
     },
-    field(key, assetId = '') { return field(this.property(key, assetId)); }
+    field(key, assetId = '') {
+      if (!assetId && coreByKey.has(String(key || ''))) return coreByKey.get(String(key || ''));
+      return semantic(this.property(key, assetId));
+    }
   });
 }
 
