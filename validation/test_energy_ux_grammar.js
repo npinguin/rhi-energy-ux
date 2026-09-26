@@ -58,7 +58,7 @@ assert.match(app,/@media\(max-width:720px\)/);
 assert.match(presentation,/@media\(max-width:760px\)/);
 assert.match(presentation,/@media\(max-width:430px\)/);
 assert.match(app,/object-fit:contain/);
-assert.match(app,/rhiUxDomainShell\\(\\{/);
+assert.ok(app.includes('rhiUxDomainShell({'));
 assert.match(app,/domain:'ENERGIE'/);
 assert.match(app,/data-rhi-module/);
 assert.match(app,/data-rhi-item/);
