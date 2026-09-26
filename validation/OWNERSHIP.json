@@ -15,7 +15,8 @@
     "command_contract": "validation/test_command_contract.js",
     "asset_profile_contract": "validation/test_asset_profile_contract.js",
     "visual_catalog": "validation/test_energy_visual_catalog.js",
-    "gas_experience": "validation/test_gas_insights_tab.js"
+    "gas_experience": "validation/test_gas_insights_tab.js",
+    "ux_core_integration": "validation/validate_ux_core_integration.py"
   },
   "policy": {
     "source_inspection": "negative_architecture_boundaries_only",
