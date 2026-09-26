@@ -1,21 +1,19 @@
-# v4.1.3 — Energy UX grammar and responsive asset experience TEST CANDIDATE
+# v4.2.0 — Unified Home Intelligence UX TEST CANDIDATE
 
-Energy UX keeps all existing tabs while aligning each screen around a more consistent product hierarchy: status, quick details, quick commands, focused body content and asset-level drill-down.
+Energy now consumes the shared RHI UX Core 1.4.0 visual system instead of maintaining page-level variants of the same product grammar.
 
 Changes:
-- preserves every existing Energy, Intelligence and Insights tab;
-- adds a canonical quick-action slot below page status using only backend-published commands;
-- adds asset-level quick commands where the canonical command contract publishes them;
-- replaces generic property-bag device summaries with typed asset-scoped canonical facts;
-- removes remaining synthesized health lookup from product cards;
-- enriches physical Home Battery cards without fixed-height clipping;
-- expands representative same-type visual fallbacks for Energy assets;
-- strengthens responsive image/card behavior for desktop, tablet and phone;
-- adds release-blocking grammar and responsive-visual tests.
+- standardises the Energy hero on the shared background-image hero used across Home Intelligence;
+- keeps exactly one page status layer and removes obsolete duplicate KPI/status strips from Solar, Gas and Operational Planning;
+- places status before Quick Actions on every shared Energy header;
+- aligns Quick Actions to the shared Mobility-style blue primary / outlined secondary treatment;
+- moves font-family, typography scale, shared hero/status/action styling and body grammar to RHI UX Core;
+- applies the Home Assistant font authority through Core instead of a local Inter stack;
+- keeps domain semantics and data ownership in Energy while shared look-and-feel stays Core-owned;
+- adds a release-blocking shared-visual-ownership check to prevent local typography and shared-component drift;
+- keeps the HACS package self-contained through the pinned build-time Core snapshot.
 
-No backend semantics are reconstructed in the UX. RHI UX Core remains pinned to 1.3.1.
+RHI UX Core: 1.4.0 at 50cf7e135c90af15cf34b4f41dfba78aa1a5fc5e.
+Rollback: v4.1.4.
 
-Backend compatibility: minimum E0.15.52.
-Rollback: v4.1.2.
-
-Target Home Assistant runtime, Planning/Intelligence, write/readback and rollback proof remain mandatory before stable promotion.
+Target Home Assistant rendering, functional journeys, refresh/restart, upgrade and rollback proof remain mandatory before stable promotion.
