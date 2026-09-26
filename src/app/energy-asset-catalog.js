@@ -29,7 +29,7 @@ const RHI_ENERGY_LOGICAL_VISUALS = Object.freeze([
   { id:"solar_optimizer.generic", asset_type:"solar_optimizer", label:"Solar optimizer", brand:"Generic", model:"PV optimizer", variant:"Optimizer", profile_patterns:["energy.solar_optimizer."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
   { id:"solar_forecast.provider", asset_type:"solar_forecast", label:"Solar forecast", brand:"Generic", model:"Forecast provider", variant:"Forecast", profile_patterns:["energy.solar_forecast."], package_path:"heroes/outlook-hero.webp", quality:"representative", selectable:true },
 
-  { id:"gas_meter.smart_meter", asset_type:"gas_meter", label:"Gas meter", brand:"Generic", model:"Smart gas meter", variant:"Meter", profile_patterns:["energy.gas_meter."], package_path:"heroes/gas-hero.svg", quality:"representative", selectable:true },
+  { id:"gas_meter.smart_meter", asset_type:"gas_meter", label:"Gas meter", brand:"Generic", model:"Smart gas meter", variant:"Meter", profile_patterns:["energy.gas_meter."], package_path:"heroes/gas-hero.webp", quality:"representative", selectable:true },
   { id:"price_source.market", asset_type:"price_source", label:"Energy price source", brand:"Generic", model:"Energy market", variant:"Price source", profile_patterns:["energy.price_source."], package_path:"heroes/pricing-hero.webp", quality:"representative", selectable:true },
   { id:"home_consumption.home", asset_type:"home_consumption", label:"Home consumption", brand:"Generic", model:"Home", variant:"Consumption", profile_patterns:["energy.home_consumption."], package_path:"heroes/consumers-hero.webp", quality:"representative", selectable:true },
 
