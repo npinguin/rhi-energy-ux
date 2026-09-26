@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "ux_version": "4.1.3",
+  "ux_version": "4.1.4",
   "energy_contract": {
     "minimum": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
     "minimum_backend": "E0.15.52",

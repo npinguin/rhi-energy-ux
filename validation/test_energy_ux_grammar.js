@@ -58,5 +58,9 @@ assert.match(app,/@media\(max-width:720px\)/);
 assert.match(presentation,/@media\(max-width:760px\)/);
 assert.match(presentation,/@media\(max-width:430px\)/);
 assert.match(app,/object-fit:contain/);
+assert.ok(app.includes('rhiUxDomainShell({'));
+assert.match(app,/domain:'ENERGIE'/);
+assert.match(app,/data-rhi-module/);
+assert.match(app,/data-rhi-item/);
 
 console.log("PASS Energy canonical page/asset grammar, quick commands, visuals and responsive coverage");

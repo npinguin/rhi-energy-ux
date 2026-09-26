@@ -110,9 +110,10 @@ if (recreated.resolveNavigation('', '', 'operational-planning').item !== 'operat
 if (recreated.resolveNavigation('', '', 'planning').item !== 'tactical-planning') throw new Error('legacy Planning must migrate to Tactical Planning');
 if (recreated.resolveNavigation('', '', 'intelligence').item !== 'strategy') throw new Error('legacy Intelligence must migrate to Strategy');
 const navMarkup = recreated.nav();
-if (!/navSections/.test(navMarkup) || !/navItems/.test(navMarkup)) throw new Error('two navigation layers not rendered');
-if (!/navBrand/.test(navMarkup) || !/Home Intelligence/.test(navMarkup)) throw new Error('premium navigation brand not rendered inside shared frame');
-if (!/navSectionIcon/.test(navMarkup)) throw new Error('primary navigation icons not rendered');
+if (!/rhiUxModuleTabs/.test(navMarkup) || !/rhiUxDomainTabs/.test(navMarkup)) throw new Error('shared Core two-level navigation not rendered');
+if (!/rhiUxDomainIdentity/.test(navMarkup) || !/Home Intelligence/.test(navMarkup) || !/ENERGIE/.test(navMarkup)) throw new Error('shared Core domain identity not rendered');
+if (!/rhiUxCompanyBrand/.test(navMarkup)) throw new Error('shared Core company brand not rendered');
+if (!/data-rhi-module/.test(navMarkup) || !/data-rhi-item/.test(navMarkup)) throw new Error('shared Core navigation routing hooks missing');
 
 const unavailableSelector = recreated.componentScopeSelector({
   context: 'outlook',

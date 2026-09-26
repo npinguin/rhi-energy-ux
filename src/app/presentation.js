@@ -89,6 +89,8 @@ function hbEnergyPresentationStyles() {
       --rhi-shadow:var(--rhi-shadow-md);
       --rhi-card-gap:var(--rhi-space-2);
     }
+    .rhiEnergyNav-intelligence .rhiUxDomainShell{--rhi-nav-active-bg:#F1EDFF;--rhi-nav-active-border:#DFD5FB;--rhi-nav-active-text:#5A38B3}
+    .rhiEnergyNav-insights .rhiUxDomainShell{--rhi-nav-active-bg:#E7F7F4;--rhi-nav-active-border:#CDEBE6;--rhi-nav-active-text:#176E67}
     .rhiEnergyPageHeader{display:block;margin:0 0 10px}
     .rhiEnergyQuickActions{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;margin:8px 0 2px;padding:9px 11px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm)}
     .rhiEnergyQuickActions>small{font-size:9px;line-height:1;text-transform:uppercase;letter-spacing:.1em;color:var(--rhi-color-muted);font-weight:700;white-space:nowrap}
