@@ -2331,8 +2331,55 @@
         description:semanticDescription,
         hero:hbEnergyHeroAsset(heroKey),
         metrics:p.metrics,
+        quickActions:this.pageQuickActions(rt, tab),
         tone:p.tone
       });
+    }
+
+    pageQuickActions(rt, tab) {
+      const typeSets = {
+        overview:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer','solar_production','solar_array','solar_inverter','inverter']),
+        flow:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer']),
+        solar:new Set(['solar_production','solar_array','solar_inverter','inverter','battery_system','battery']),
+        battery:new Set(['battery_system','battery']),
+        consumers:new Set(['flexible_load','flexible_asset','consumer']),
+        gas:new Set(['gas_meter']),
+        strategies:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer','energy_system']),
+        'operational-planning':new Set(['flexible_load','flexible_asset','consumer','battery_system','battery']),
+        planning:new Set(['flexible_load','flexible_asset','consumer','battery_system','battery']),
+        'strategic-planning':new Set(['energy_system','battery_system','battery','flexible_load','flexible_asset','consumer']),
+        metering:new Set(['gas_meter','battery_system','battery','flexible_load','flexible_asset','consumer']),
+        value:new Set(['energy_system','battery_system','battery','flexible_load','flexible_asset','consumer']),
+        retrospective:new Set(['energy_system','battery_system','battery','flexible_load','flexible_asset','consumer'])
+      };
+      const allowed = typeSets[tab] || typeSets.overview;
+      const assets = new Map(rt.assets().map(asset => [String(asset.asset_id || ''), asset]));
+      const commands = rt.visibleCommands().filter(command => {
+        const target = String(command.target_asset_id || '');
+        const asset = assets.get(target);
+        const type = String(asset?.asset_type || asset?.object_class || '').toLowerCase();
+        return !target || !type || allowed.has(type);
+      });
+      const seen = new Set();
+      const models = [];
+      for (const command of commands) {
+        const model = createCommandActionModel(command);
+        if (!model) continue;
+        const semantic = `${model.targetAssetId || command.target_asset_id || ''}::${model.role || model.id}`;
+        if (seen.has(semantic)) continue;
+        seen.add(semantic);
+        models.push(model);
+        if (models.length >= 4) break;
+      }
+      return models.map(model => this.componentActionModelButton(model)).join('');
+    }
+
+    assetQuickActions(rt, assetId, limit = 3) {
+      const id = String(assetId || '');
+      if (!id) return '';
+      const models = rt.commandActionModelsForAsset(id).filter(Boolean).slice(0, limit);
+      if (!models.length) return '';
+      return `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${models.map(model => this.componentActionModelButton(model)).join('')}</div></div>`;
     }
     measuredAssetPower(asset = {}) {
       return asNumber(firstDefined(asset.actual_power_kw, asset.current_power_kw, asset.power_kw));
@@ -2929,31 +2976,107 @@
     energyAssetFacts(rt, asset = {}, limit = 4) {
       const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
       if (!id) return [];
-      const priority = ['state','operating_state','health','soc_pct','power_kw','current_power_kw','energy_today_kwh','production_today_kwh','capacity_kwh','available_kwh','voltage_v','current_a','temperature_c','efficiency_pct'];
-      const rows = rt.rowsByAsset(id)
-        .filter(row => row && !row.missing && rowValue(row, null) !== null)
-        .filter(row => !/alias|deprecated|diagnostic|debug/i.test(`${row.source_type || ''} ${row.migration_role || ''} ${row.key || row.property_key || ''}`))
-        .map(row => {
-          const key = String(firstDefined(row.key,row.property_key,row.property_id,'') || '');
-          const suffix = key.split('.').pop();
-          const rank = priority.indexOf(suffix);
-          return { row, key, suffix, rank:rank < 0 ? 999 : rank };
-        })
-        .sort((a,b)=>a.rank-b.rank || a.key.localeCompare(b.key));
-      const seen = new Set();
+      const type = this.energyAssetType(asset);
+      const byType = {
+        battery:[
+          ['battery.soc_pct','State of charge'],
+          ['battery.power_kw','Power now'],
+          ['battery.available_kwh','Available energy'],
+          ['battery.capacity_kwh','Capacity'],
+          ['battery.state','State'],
+          ['battery.temperature_c','Temperature']
+        ],
+        battery_system:[
+          ['battery.soc_pct','State of charge'],
+          ['battery.power_kw','Power now'],
+          ['battery.available_kwh','Available energy'],
+          ['battery.capacity_kwh','Capacity'],
+          ['battery.reserve_target_pct','Reserve'],
+          ['battery.state','State']
+        ],
+        home_battery_system:[
+          ['battery.soc_pct','State of charge'],
+          ['battery.power_kw','Power now'],
+          ['battery.available_kwh','Available energy'],
+          ['battery.capacity_kwh','Capacity'],
+          ['battery.reserve_target_pct','Reserve'],
+          ['battery.state','State']
+        ],
+        solar_production:[
+          ['solar.power_kw','Production now'],
+          ['solar.energy_today_kwh','Produced today'],
+          ['solar.capacity_kwp','Installed capacity'],
+          ['solar.state','State']
+        ],
+        solar_array:[
+          ['solar.power_kw','Production now'],
+          ['solar.energy_today_kwh','Produced today'],
+          ['solar.capacity_kwp','Installed capacity'],
+          ['solar.state','State']
+        ],
+        solar_panel:[
+          ['solar.power_kw','Production now'],
+          ['solar.energy_today_kwh','Produced today'],
+          ['solar.state','State']
+        ],
+        solar_inverter:[
+          ['inverter.power_kw','Power now'],
+          ['solar.power_kw','Solar power'],
+          ['inverter.efficiency_pct','Efficiency'],
+          ['inverter.state','State']
+        ],
+        inverter:[
+          ['inverter.power_kw','Power now'],
+          ['solar.power_kw','Solar power'],
+          ['inverter.efficiency_pct','Efficiency'],
+          ['inverter.state','State']
+        ],
+        grid_connection:[
+          ['grid.net_power_kw','Grid power'],
+          ['grid_import.power_kw','Import'],
+          ['grid_export.power_kw','Export'],
+          ['grid.flow_direction','Direction']
+        ],
+        gas_meter:[
+          ['gas.flow_m3_h','Flow now'],
+          ['gas.total_m3','Meter total'],
+          ['gas.state','State']
+        ],
+        flexible_load:[
+          ['flexible_load.power_kw','Power now'],
+          ['flexible_load.energy_to_target_kwh','Energy needed'],
+          ['flexible_load.state','State'],
+          ['flexible_load.automation_mode','Automation']
+        ],
+        flexible_asset:[
+          ['flexible_load.power_kw','Power now'],
+          ['flexible_load.energy_to_target_kwh','Energy needed'],
+          ['flexible_load.state','State'],
+          ['flexible_load.automation_mode','Automation']
+        ],
+        consumer:[
+          ['consumer.power_kw','Power now'],
+          ['consumer.energy_today_kwh','Energy today'],
+          ['consumer.state','State']
+        ]
+      };
+      const candidates = byType[type] || [];
       const facts = [];
-      for (const item of rows) {
-        if (seen.has(item.suffix)) continue;
-        seen.add(item.suffix);
-        facts.push({
-          label:human(item.suffix),
-          value:rowDisplayValue(item.row,'—'),
-          status:rowStatusLabel(item.row)
-        });
+      const seen = new Set();
+      for (const [key,label] of candidates) {
+        if (seen.has(key)) continue;
+        const field = rt.assetField(id, key);
+        if (!field?.resolved) continue;
+        seen.add(key);
+        const value = field.display && field.display !== '—'
+          ? field.display
+          : (field.value === null || field.value === undefined ? '—' : `${field.value}${field.unit ? ` ${field.unit}` : ''}`);
+        facts.push({ label, value, status:field.status || field.quality || 'AVAILABLE', key });
         if (facts.length >= limit) break;
       }
       return facts;
     }
+
     energyDeviceStatusCard(rt, asset = {}, roleLabel = '') {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
@@ -2961,17 +3084,23 @@
       const type = String(firstDefined(enriched.asset_type,enriched.object_class,'device') || 'device');
       const profile = objectFrom(enriched.profile || {});
       const profileLabel = firstDefined(profile.display_name,profile.label,profile.name,enriched.profile_id,'');
-      const facts = this.energyAssetFacts(rt,enriched,4);
-      const health = firstDefined(rt.rawText(`${id}.health`,''), enriched.health, enriched.status, '');
+      const facts = this.energyAssetFacts(rt,enriched,5);
+      const projection = id ? rt.assetProjection(id) : null;
+      const health = firstDefined(projection?.lifecycle?.state, enriched.health, enriched.status, '');
       const publication = objectFrom(enriched.publication || {});
       const configState = publication.complete === true ? 'Configured' : profileLabel ? 'Profiled' : 'Detected';
+      const actions = this.assetQuickActions(rt,id,3);
+      const details = facts.length
+        ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
+        : `<span class="energyDeviceNoFacts"><small>Status</small><b>Canonical live facts are not published for this device.</b></span>`;
       return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
         <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
         <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3></div><span class="energyDeviceState">${escapeHtml(health ? human(health) : configState)}</span></div>
         <div class="energyDeviceConfig">${profileLabel ? `<span><b>Profile</b>${escapeHtml(human(profileLabel))}</span>` : ''}<span><b>Config</b>${escapeHtml(configState)}</span></div>
-        <div class="energyDeviceFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span class="energyDeviceNoFacts"><small>Status</small><b>Published device · no additional live facts</b></span>`}</div></div>
+        <div class="energyDeviceFacts">${details}</div>${actions}</div>
       </article>`;
     }
+
     energyAssetType(asset = {}) {
       return String(firstDefined(asset.asset_type,asset.object_class,'') || '').trim().toLowerCase();
     }
@@ -3099,10 +3228,10 @@
         .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceCard{max-width:720px}.gasMeterPanel .energyDeviceGrid{grid-template-columns:minmax(0,720px)}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasStatisticsHost{min-height:220px}}
 
         .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead,.solarStoryHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
-        .energyDeviceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.energyDeviceCard{display:grid;grid-template-columns:126px minmax(0,1fr);gap:12px;border:1px solid #e5ebf3;background:#fff;border-radius:14px;padding:12px;min-height:166px}.energyDeviceVisual{height:138px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fbfdff,#f6f8fb);border-radius:11px;overflow:hidden}.energyDeviceVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.energyDeviceVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:5px;box-sizing:border-box}.energyDeviceBody{min-width:0}.energyDeviceTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.energyDeviceTop small{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.energyDeviceTop h3{font-size:13px;line-height:1.25;margin:3px 0 8px}.energyDeviceState{font-size:9px;background:#eef7f1;color:#3f7f5a;border-radius:999px;padding:5px 7px;white-space:nowrap}.energyDeviceConfig{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.energyDeviceConfig span{font-size:9px;color:#64748b;background:#f8fafc;border-radius:7px;padding:5px 6px}.energyDeviceConfig b{color:#334155;margin-right:4px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyDeviceFacts span{background:#f8fafc;border-radius:7px;padding:6px;min-width:0}.energyDeviceFacts small,.energyDeviceFacts b{display:block}.energyDeviceFacts small{font-size:8px;color:#64748b}.energyDeviceFacts b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.energyDeviceNoFacts{grid-column:1/-1}
+        .energyDeviceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.energyDeviceCard{display:grid;grid-template-columns:126px minmax(0,1fr);gap:12px;border:1px solid #e5ebf3;background:#fff;border-radius:14px;padding:12px;min-height:166px}.energyDeviceVisual{height:138px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fbfdff,#f6f8fb);border-radius:11px;overflow:hidden}.energyDeviceVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.energyDeviceVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:5px;box-sizing:border-box}.energyDeviceBody{min-width:0}.energyDeviceTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.energyDeviceTop small{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.energyDeviceTop h3{font-size:13px;line-height:1.25;margin:3px 0 8px}.energyDeviceState{font-size:9px;background:#eef7f1;color:#3f7f5a;border-radius:999px;padding:5px 7px;white-space:nowrap}.energyDeviceConfig{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.energyDeviceConfig span{font-size:9px;color:#64748b;background:#f8fafc;border-radius:7px;padding:5px 6px}.energyDeviceConfig b{color:#334155;margin-right:4px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyDeviceFacts span{background:#f8fafc;border-radius:7px;padding:6px;min-width:0}.energyDeviceFacts small,.energyDeviceFacts b{display:block}.energyDeviceFacts small{font-size:8px;color:#64748b}.energyDeviceFacts b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.energyDeviceNoFacts{grid-column:1/-1}.energyAssetQuickActions{grid-column:1/-1;display:grid;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid #edf1f6}.energyAssetQuickActions>small{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700}.energyAssetQuickActions>div{display:flex;gap:6px;flex-wrap:wrap}.energyAssetQuickActions .hiAction{min-height:30px;padding:0 9px;font-size:9.5px}
         .solarProductionStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 12px}.solarProductionStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:10px 12px}.solarProductionStrip small,.solarProductionStrip b{display:block}.solarProductionStrip small{font-size:9px;color:#64748b}.solarProductionStrip b{font-size:15px;margin-top:3px}.managedAssetIdentity,.strategyAssetIdentity,.meteringAssetIdentity,.effectivePolicyIdentity{display:flex;align-items:center;gap:8px;min-width:0}.managedAssetIdentity>div,.strategyAssetIdentity>div,.meteringAssetIdentity>span{min-width:0}.meteringAssetIdentity b,.meteringAssetIdentity small{display:block}.effectivePolicyIdentity b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.solarHardwareExperience{display:grid;gap:12px;margin:12px 0}.solarHardwareSection{margin:0}.solarHardwareSectionHead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}.solarHardwareSectionHead h2{margin:0 0 4px}.solarHardwareSectionHead p{margin:0;color:#64748b;font-size:11px}.solarHardwareSectionHead>span,.solarAggregateCount{font-size:10px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}.solarAggregateCard{border:1px solid #e5ebf3;border-radius:14px;padding:12px;background:#fff}.solarAggregateCard+.solarAggregateCard{margin-top:10px}.solarAggregateHead{display:grid;grid-template-columns:116px minmax(0,1fr) auto;gap:12px;align-items:center}.solarAggregateVisual{height:104px;display:flex;align-items:center;justify-content:center;background:#f8fafc;border-radius:11px;overflow:hidden}.solarAggregateVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.solarAggregateVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:6px;box-sizing:border-box}.solarAggregateCopy small,.solarSystemSummary small{font-size:9px;font-weight:750;color:#64748b;letter-spacing:.08em}.solarAggregateCopy h3,.solarSystemSummary h3{margin:3px 0 5px;font-size:15px}.solarAggregateCopy p,.solarSystemSummary p{margin:0;color:#64748b;font-size:10.5px;line-height:1.4}.solarAggregateFacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.solarAggregateFacts span{min-width:96px;background:#f8fafc;border-radius:8px;padding:7px 8px}.solarAggregateFacts small,.solarAggregateFacts b{display:block}.solarAggregateFacts small{font-size:8px;color:#64748b}.solarAggregateFacts b{font-size:10px;margin-top:2px}.solarChildGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}.solarSystemSummary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start}.solarUnassignedPanels{margin-top:12px}.solarUnassignedPanels h3{font-size:12px;margin:0 0 6px}
                 .solarStoryHead{align-items:center}.solarStoryHead small{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#d97706;font-weight:750}.solarStoryHead h2{margin:3px 0}.solarStoryRoute{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}.solarStoryRoute span{font-size:10px;font-weight:700;padding:6px 9px;border-radius:999px;background:#fff7ed;border:1px solid #fed7aa}.solarStoryRoute i{font-style:normal;color:#94a3b8}.solarAnswerGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.solarAnswerGrid article{background:#f8fafc;border:1px solid #edf1f6;border-radius:10px;padding:10px}.solarAnswerGrid small{display:block;color:#64748b;font-size:9px;margin-bottom:4px}.solarAnswerGrid b{font-size:11px;line-height:1.4;font-weight:650}.solarWhereAnswer{margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:11px 12px}.solarWhereAnswer span{display:block;color:#9a5b17;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}.solarWhereAnswer b{display:block;margin-top:3px;font-size:11.5px;line-height:1.4}
-        @media(max-width:1100px){.energyDeviceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.solarAnswerGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.solarChildGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.energyDeviceGrid{grid-template-columns:1fr}.energyDeviceCard{grid-template-columns:104px minmax(0,1fr)}.energyDeviceVisual{height:118px}.solarStoryHead{display:block}.solarStoryRoute{justify-content:flex-start;margin-top:10px}.solarAnswerGrid{grid-template-columns:1fr}.solarChildGrid{grid-template-columns:1fr}.solarAggregateHead{grid-template-columns:92px minmax(0,1fr)}.solarAggregateCount{grid-column:2}.solarAggregateVisual{height:88px}.solarSystemSummary{grid-template-columns:1fr}}
+        @media(max-width:1100px){.energyDeviceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.energyDeviceCard{grid-template-columns:112px minmax(0,1fr)}.energyDeviceVisual{height:128px}.solarAnswerGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.solarChildGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.energyDeviceGrid{grid-template-columns:1fr}.energyDeviceCard{grid-template-columns:96px minmax(0,1fr);gap:10px;padding:10px;min-height:142px}.energyDeviceVisual{height:112px}.energyDeviceFacts{grid-template-columns:repeat(2,minmax(0,1fr))}.energyAssetQuickActions>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.energyAssetQuickActions .hiAction{width:100%;min-width:0}.solarStoryHead{display:block}.solarStoryRoute{justify-content:flex-start;margin-top:10px}.solarAnswerGrid{grid-template-columns:1fr}.solarChildGrid{grid-template-columns:1fr}.solarAggregateHead{grid-template-columns:92px minmax(0,1fr)}.solarAggregateCount{grid-column:2}.solarAggregateVisual{height:88px}.solarSystemSummary{grid-template-columns:1fr}}
         @media(max-width:720px){.solarProductionStrip{grid-template-columns:repeat(2,minmax(0,1fr))}}
       `;
     }
@@ -3512,9 +3641,12 @@
       const name = rt.assetName(assetId);
       const soc = rt.assetNumber(assetId, 'battery.soc_pct');
       const power = rt.assetNumber(assetId, 'battery.power_kw');
+      const available = rt.assetNumber(assetId, 'battery.available_kwh');
+      const capacity = rt.assetNumber(assetId, 'battery.capacity_kwh');
       const state = String(rt.assetText(assetId, 'battery.state', '') || '').toLowerCase();
       const published = rt.asset(assetId) || {};
-      const health = rt.assetText(assetId, 'battery.health', published.health || published.status || 'UNKNOWN');
+      const projection = rt.assetProjection(assetId);
+      const health = firstDefined(projection?.lifecycle?.state, published.health, published.status, 'UNKNOWN');
       const asset = this.energyAssetContext(rt, published.asset_id ? published : { asset_id:assetId, display_name:name, asset_type:'battery' });
       const stateLabel = state === 'charging' ? 'Charging'
         : state === 'discharging' ? 'Discharging'
@@ -3526,7 +3658,13 @@
         : stateLabel === 'Discharging' ? 'Supplying energy to the Home Bus'
         : stateLabel === 'Idle' ? 'No active battery flow'
         : 'Battery flow is not currently available';
-      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorMeta"><span>Power now</span><b>${fmtKw(power, '—')}</b></div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div></article>`;
+      const quickFacts = [
+        ['Power now',fmtKw(power,'—')],
+        ['Available',available === null ? '' : fmtKwh(available)],
+        ['Capacity',capacity === null ? '' : fmtKwh(capacity)]
+      ].filter(([,value])=>value);
+      const actions = this.assetQuickActions(rt,assetId,3);
+      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorFacts">${quickFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div>${actions}</div></article>`;
     }
     gas(rt) {
       const pageVm = this.buildPageViewModel(rt, 'gas');
@@ -5013,9 +5151,9 @@
 .chargingConnectionGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.chargingConnectionGrid>.empty{grid-column:1/-1}
 .flowDetailsGrid.flowDetailsGridTwoUp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}.flowDetailsGrid.flowDetailsGridTwoUp>.panel{min-width:0;height:100%}
 .flowConnectionCard,.flowPhysicalConsumerCard{display:grid;grid-template-columns:auto minmax(0,1fr) 76px;align-items:center;gap:10px;min-height:64px;padding:9px 10px;margin:6px 0;border:1px solid var(--line);border-radius:10px;background:#fff;box-sizing:border-box}.flowAssetVisual{width:54px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#f5f7fa;overflow:hidden}.flowAssetVisual img{display:block;max-width:50px;max-height:42px;object-fit:contain}.flowConnectionCard>div,.flowPhysicalConsumerCard>div{min-width:0}.flowConnectionCard b,.flowPhysicalConsumerCard b{display:block;font-size:12.5px;line-height:1.2;font-weight:600}.flowConnectionCard span,.flowPhysicalConsumerCard span{display:block;margin-top:3px;font-size:10.5px;line-height:1.25;color:var(--muted);white-space:normal}.flowConnectionCard strong,.flowPhysicalConsumerCard strong{min-width:76px;text-align:right;font-size:12.5px;line-height:1.2;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.flowConnectionCard small{display:block;margin-top:4px;font-size:9.5px;color:var(--muted)}
-.batteryContributorList{display:grid;gap:10px}.batteryContributorCard{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:stretch;min-height:132px;max-height:156px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#fff,#fbfcfe);overflow:hidden}.batteryContributorVisual{display:flex;align-items:center;justify-content:center;padding:10px;background:linear-gradient(180deg,#f7f9fb,#eef2f5);overflow:hidden}.batteryContributorVisual .assetVisual{width:88px!important;height:108px!important;max-width:88px!important;max-height:108px!important;padding:5px!important;box-sizing:border-box!important;border:0!important;background:transparent!important;overflow:hidden!important}.batteryContributorVisual .assetVisual img{display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;object-position:center center!important}.batteryContributorBody{min-width:0;padding:13px 14px;display:flex;flex-direction:column;justify-content:center;gap:7px}.batteryContributorHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.batteryContributorHeader>div{min-width:0}.batteryContributorHeader b{display:block;font-size:14px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}.batteryContributorHeader strong{flex:0 0 auto;font-size:22px;line-height:1;font-variant-numeric:tabular-nums}.batteryHealth{display:inline-flex;margin-top:5px;padding:3px 7px;border-radius:999px;background:#eef8f2;color:#2f6d4b;font-size:10px;font-weight:700}.batteryContributorMeta{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#526178}.batteryContributorMeta b{font-size:12px;color:#172033;font-variant-numeric:tabular-nums}.batteryContributorState{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;min-width:0}.batteryContributorState span{font-size:10.5px;font-weight:700;color:#265c3b;white-space:nowrap}.batteryContributorState small{min-width:0;font-size:10px;line-height:1.25;color:var(--muted);white-space:normal}.batteryContributorCard .bar{margin-top:2px}
-@media(max-width:1050px){.overviewCoreGrid{grid-template-columns:1fr 1fr}.overviewDecisionPanel{grid-column:1/-1;grid-row:1}.chargingConnectionGrid{grid-template-columns:1fr}.batteryContributorCard{grid-template-columns:104px minmax(0,1fr);max-height:150px}.batteryContributorVisual .assetVisual{width:80px!important;height:102px!important;max-width:80px!important;max-height:102px!important}}
-@media(max-width:700px){.overviewCoreGrid,.overviewSupportFacts{grid-template-columns:1fr}.overviewDecisionPanel{grid-column:auto;grid-row:auto}.overviewHouseHero{height:220px;min-height:220px}.overviewEnergyRow{grid-template-columns:28px minmax(0,1fr) 76px}.overviewEnergyRow>strong{min-width:76px}.overviewEnergyRow.child{margin-left:12px}.batteryContributorCard{grid-template-columns:88px minmax(0,1fr);min-height:112px;max-height:138px}.batteryContributorVisual{padding:7px}.batteryContributorVisual .assetVisual{width:68px!important;height:88px!important;max-width:68px!important;max-height:88px!important;padding:3px!important}.batteryContributorBody{padding:11px 12px}.batteryContributorHeader b{font-size:13px}.batteryContributorHeader strong{font-size:20px}.batteryContributorState small{font-size:9.5px}}
+.batteryContributorList{display:grid;gap:10px}.batteryContributorCard{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:stretch;min-height:148px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#fff,#fbfcfe);overflow:hidden}.batteryContributorVisual{display:flex;align-items:center;justify-content:center;padding:10px;background:linear-gradient(180deg,#f7f9fb,#eef2f5);overflow:hidden}.batteryContributorVisual .assetVisual{width:88px!important;height:108px!important;max-width:88px!important;max-height:108px!important;padding:5px!important;box-sizing:border-box!important;border:0!important;background:transparent!important;overflow:hidden!important}.batteryContributorVisual .assetVisual img{display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;object-position:center center!important}.batteryContributorBody{min-width:0;padding:13px 14px;display:flex;flex-direction:column;justify-content:center;gap:7px}.batteryContributorHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.batteryContributorHeader>div{min-width:0}.batteryContributorHeader b{display:block;font-size:14px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}.batteryContributorHeader strong{flex:0 0 auto;font-size:22px;line-height:1;font-variant-numeric:tabular-nums}.batteryHealth{display:inline-flex;margin-top:5px;padding:3px 7px;border-radius:999px;background:#eef8f2;color:#2f6d4b;font-size:10px;font-weight:700}.batteryContributorMeta{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#526178}.batteryContributorMeta b{font-size:12px;color:#172033;font-variant-numeric:tabular-nums}.batteryContributorFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.batteryContributorFacts span{min-width:0;padding:6px 7px;border-radius:8px;background:#f8fafc}.batteryContributorFacts small,.batteryContributorFacts b{display:block}.batteryContributorFacts small{font-size:8px;color:#64748b}.batteryContributorFacts b{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.batteryContributorState{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;min-width:0}.batteryContributorState span{font-size:10.5px;font-weight:700;color:#265c3b;white-space:nowrap}.batteryContributorState small{min-width:0;font-size:10px;line-height:1.25;color:var(--muted);white-space:normal}.batteryContributorCard .bar{margin-top:2px}
+@media(max-width:1050px){.overviewCoreGrid{grid-template-columns:1fr 1fr}.overviewDecisionPanel{grid-column:1/-1;grid-row:1}.chargingConnectionGrid{grid-template-columns:1fr}.batteryContributorCard{grid-template-columns:104px minmax(0,1fr)}.batteryContributorVisual .assetVisual{width:80px!important;height:102px!important;max-width:80px!important;max-height:102px!important}.batteryContributorFacts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.overviewCoreGrid,.overviewSupportFacts{grid-template-columns:1fr}.overviewDecisionPanel{grid-column:auto;grid-row:auto}.overviewHouseHero{height:220px;min-height:220px}.overviewEnergyRow{grid-template-columns:28px minmax(0,1fr) 76px}.overviewEnergyRow>strong{min-width:76px}.overviewEnergyRow.child{margin-left:12px}.batteryContributorCard{grid-template-columns:88px minmax(0,1fr);min-height:126px}.batteryContributorVisual{padding:7px}.batteryContributorVisual .assetVisual{width:68px!important;height:88px!important;max-width:68px!important;max-height:88px!important;padding:3px!important}.batteryContributorBody{padding:11px 12px}.batteryContributorHeader b{font-size:13px}.batteryContributorHeader strong{font-size:20px}.batteryContributorState{grid-template-columns:1fr}.batteryContributorState small{font-size:9.5px}.batteryContributorFacts{grid-template-columns:repeat(2,minmax(0,1fr))}.batteryContributorFacts span:last-child:nth-child(odd){grid-column:1/-1}}
 
       @media(max-width:700px){.flowDetailsGrid.flowDetailsGridTwoUp,.chargingConnectionGrid{grid-template-columns:1fr}}
 
