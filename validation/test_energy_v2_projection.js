@@ -20,7 +20,7 @@ const states = {
       contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
       contract_version:'2.0.0',
       release:'E0.15.52',
-      core:{
+      core:{contract_id:'RHI_ENERGY_CORE_V1',
         battery:{status:'AVAILABLE',fields:{
           power_kw:{value:-1.2,unit:'kW',status:'AVAILABLE',quality:'CANONICAL',reason:null},
           soc_pct:{value:72,unit:'%',status:'AVAILABLE',quality:'CANONICAL',reason:null},
