@@ -1,3 +1,12 @@
+## 4.1.0 — RHI UX Core baseline
+
+- adopts pinned RHI UX Core 1.1.0 as a build-time-only presentation foundation;
+- moves the shared page hero and status-grid markup onto Core primitives;
+- replaces duplicate Energy header design tokens with the shared --rhi-* vocabulary;
+- keeps Energy semantics and Public V2 projections domain-owned;
+- adds an integration gate preventing runtime coupling to rhi-ux-core;
+- preserves the 4.0.4 Public V2 runtime fix and fail-closed data semantics.
+
 ## 4.0.4 — Public V2 runtime acceptance hotfix
 
 - removes the erroneous UX requirement for a non-published `contract_visibility=ux_safe` attribute on the canonical Public V2 sensor;

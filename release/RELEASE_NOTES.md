@@ -1,17 +1,21 @@
-# v4.0.4 — Public V2 runtime acceptance hotfix TEST CANDIDATE
+# v4.1.0 — RHI UX Core baseline TEST CANDIDATE
 
-v4.0.4 fixes the target-runtime blocker exposed by Home Assistant testing of v4.0.3.
+Energy UX consumes a pinned build-time snapshot of RHI UX Core 1.1.0.
 
-The backend publishes the canonical entity `sensor.rhi_energy_public_contract_v2` without a `contract_visibility` attribute. v4.0.3 incorrectly required `contract_visibility=ux_safe` before allowing the exact canonical entity through the UX gateway, so the frontend reported “Energy Public V2: Entity Is Not Available” even when the backend-owned sensor was present.
+Shared ownership:
+- Core: tokens, page hero, status grid and generic presentation primitives.
+- Energy: Public V2 contract, projections, domain semantics, screen composition and interactions.
 
-This release removes that duplicate transport gate. Runtime acceptance is now:
+There is no Home Assistant runtime dependency on rhi-ux-core. Core is bundled into the Energy artifact.
 
-`exact canonical entity id → contract_id validation → RHI_ENERGY_CORE_V1 validation → required core sections → projections`.
+RHI UX Core source commit:
+`480eaef12955d56970ec172fdde6f5fe2e0ab9c6`
 
-It also removes misleading “Producing now” / forecast labels when Solar values are unavailable.
+Backend compatibility:
+- minimum E0.15.52
+- tested E0.15.53
+- Public V2 + RHI_ENERGY_CORE_V1 required
 
-Required backend: E0.15.52+
-Tested backend: E0.15.53
-Rollback: v4.0.3
+Rollback: v4.0.4
 
-Target Home Assistant runtime proof remains required before stable promotion.
+Target Home Assistant runtime proof remains mandatory before stable promotion.

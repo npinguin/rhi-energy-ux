@@ -37,7 +37,9 @@
     {
       "placeholder": "// __RHI_PRESENTATION_MODULES__",
       "modules": [
+        "vendor/rhi-ux-core.js",
         "app/presentation.js",
+        "ui/components/page-header.js",
         "ui/components/energy-visual-picker.js"
       ]
     }

@@ -2303,19 +2303,15 @@
       const semanticTitle = navItem?.title || p.title;
       const semanticDescription = navItem?.description || p.explanation;
       const heroKey = navItem?.id || tab;
-      return `<section class="hiTabExperienceHeader ${escapeHtml(p.tone)}" data-nav-section="${escapeHtml(this.navSection || '')}" data-nav-item="${escapeHtml(this.navItem || '')}">
-        <div class="hiTabHero" data-view="${escapeHtml(tab)}">
-          <div class="hiTabHeroCopy">
-            <small>${escapeHtml((navSection?.label || 'Energy') + ' / ' + (navItem?.label || p.eyebrow))}</small>
-            <h2>${escapeHtml(semanticTitle)}</h2>
-            <p class="hiTabPurpose">${escapeHtml(semanticDescription)}</p>
-          </div>
-          <div class="hiTabHeroArt" aria-hidden="true">
-            <img src="${escapeHtml(hbEnergyHeroAsset(heroKey))}" alt="">
-          </div>
-        </div>
-        <div class="hiTabStatusGrid" aria-label="${escapeHtml(semanticTitle)} status">${p.metrics.map(([icon,label,value,meaning])=>`<article class="hiTabStatusItem"><span class="hiTabStatusIcon" aria-hidden="true">${escapeHtml(icon || '•')}</span><div class="hiTabStatusCopy"><small>${escapeHtml(label)}</small><b>${escapeHtml(value ?? '—')}</b><em>${escapeHtml(meaning || '')}</em></div></article>`).join('')}</div>
-      </section>`;
+      return rhiEnergyPageHeader({
+        sectionLabel:navSection?.label || 'Energy',
+        itemLabel:navItem?.label || p.eyebrow,
+        title:semanticTitle,
+        description:semanticDescription,
+        hero:hbEnergyHeroAsset(heroKey),
+        metrics:p.metrics,
+        tone:p.tone
+      });
     }
     measuredAssetPower(asset = {}) {
       return asNumber(firstDefined(asset.actual_power_kw, asset.current_power_kw, asset.power_kw));
