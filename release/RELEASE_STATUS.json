@@ -13,7 +13,7 @@
   "target_runtime_proof": "see release/QUALIFICATION.json",
   "rollback": "immutable GitHub/HACS version selection",
   "stable_promotion": "blocked_until_qualification_pass",
-  "tested_backend": "E0.15.56",
+  "tested_backend": "E0.15.57",
   "required_contracts": [
     "RHI_ENERGY_PUBLIC_CONTRACT_V2",
     "RHI_ENERGY_CORE_V1"
