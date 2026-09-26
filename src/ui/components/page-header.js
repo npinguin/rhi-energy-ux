@@ -1,6 +1,6 @@
 // Energy domain adapter onto shared RHI UX Core presentation primitives.
 // Domain semantics arrive fully interpreted through pageViewModel.
-function rhiEnergyPageHeader({ sectionLabel = "Energy", itemLabel = "", title = "", description = "", hero = "", metrics = [], tone = "" } = {}) {
+function rhiEnergyPageHeader({ sectionLabel = "Energy", itemLabel = "", title = "", description = "", hero = "", metrics = [], quickActions = "", tone = "" } = {}) {
   const eyebrow = [sectionLabel, itemLabel].filter(Boolean).join(" / ");
   const heroMarkup = rhiUxPageHero({
     eyebrow,
@@ -15,5 +15,6 @@ function rhiEnergyPageHeader({ sectionLabel = "Energy", itemLabel = "", title = 
     value:value ?? "—",
     detail:detail || ""
   })));
-  return `<section class="rhiEnergyPageHeader ${rhiUxEscape(tone)}">${heroMarkup}${statusMarkup}</section>`;
+  const actionsMarkup = quickActions ? `<div class="rhiEnergyQuickActions"><small>Quick actions</small><div class="rhiUxQuickActions">${quickActions}</div></div>` : "";
+  return `<section class="rhiEnergyPageHeader ${rhiUxEscape(tone)}">${heroMarkup}${statusMarkup}${actionsMarkup}</section>`;
 }
