@@ -1,17 +1,21 @@
-# v4.1.2 — Canonical multi-object access TEST CANDIDATE
+# v4.1.3 — Energy UX grammar and responsive asset experience TEST CANDIDATE
 
-Energy UX now renders physical Home Battery contributors from the canonical Public V2 object graph.
+Energy UX keeps all existing tabs while aligning each screen around a more consistent product hierarchy: status, quick details, quick commands, focused body content and asset-level drill-down.
 
 Changes:
-- discovers battery contributors beneath the published `battery_system` parent;
-- resolves physical properties with the canonical `asset_id + property_key` identity;
-- prevents duplicate property keys from two batteries from masking each other;
-- routes shared physical power access through asset-scoped lookups;
-- adds release-blocking multi-battery collision and reachability tests.
+- preserves every existing Energy, Intelligence and Insights tab;
+- adds a canonical quick-action slot below page status using only backend-published commands;
+- adds asset-level quick commands where the canonical command contract publishes them;
+- replaces generic property-bag device summaries with typed asset-scoped canonical facts;
+- removes remaining synthesized health lookup from product cards;
+- enriches physical Home Battery cards without fixed-height clipping;
+- expands representative same-type visual fallbacks for Energy assets;
+- strengthens responsive image/card behavior for desktop, tablet and phone;
+- adds release-blocking grammar and responsive-visual tests.
 
-No backend semantic reconstruction was added. RHI UX Core remains pinned to 1.3.1 at `13fc1e1b07f3fcfe9aac960471b74cfd0e96a8b9`.
+No backend semantics are reconstructed in the UX. RHI UX Core remains pinned to 1.3.1.
 
-Backend compatibility: minimum E0.15.52; tested E0.15.56.
-Rollback: v4.1.1.
+Backend compatibility: minimum E0.15.52.
+Rollback: v4.1.2.
 
-Target Home Assistant runtime proof remains mandatory before stable promotion.
+Target Home Assistant runtime, Planning/Intelligence, write/readback and rollback proof remain mandatory before stable promotion.
