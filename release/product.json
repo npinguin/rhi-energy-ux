@@ -2,7 +2,7 @@
   "product": "rhi-energy-ux",
   "contract": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
   "minimum_backend": "E0.15.52",
-  "tested_backend": "E0.15.56",
+  "tested_backend": "E0.15.57",
   "stage": "test_candidate",
   "rollback_release": "v4.1.2",
   "runtime_artifact": "dist/rhi-energy-ux.js",
