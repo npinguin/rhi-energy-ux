@@ -3014,6 +3014,11 @@
           ['solar.capacity_kwp','Installed capacity'],
           ['solar.state','State']
         ],
+        solar_panel:[
+          ['solar.power_kw','Production now'],
+          ['solar.energy_today_kwh','Produced today'],
+          ['solar.state','State']
+        ],
         solar_inverter:[
           ['inverter.power_kw','Power now'],
           ['solar.power_kw','Solar power'],
@@ -3070,34 +3075,8 @@
         if (facts.length >= limit) break;
       }
       return facts;
-    }, limit = 4) {
-      const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
-      if (!id) return [];
-      const priority = ['state','operating_state','health','soc_pct','power_kw','current_power_kw','energy_today_kwh','production_today_kwh','capacity_kwh','available_kwh','voltage_v','current_a','temperature_c','efficiency_pct'];
-      const rows = rt.rowsByAsset(id)
-        .filter(row => row && !row.missing && rowValue(row, null) !== null)
-        .filter(row => !/alias|deprecated|diagnostic|debug/i.test(`${row.source_type || ''} ${row.migration_role || ''} ${row.key || row.property_key || ''}`))
-        .map(row => {
-          const key = String(firstDefined(row.key,row.property_key,row.property_id,'') || '');
-          const suffix = key.split('.').pop();
-          const rank = priority.indexOf(suffix);
-          return { row, key, suffix, rank:rank < 0 ? 999 : rank };
-        })
-        .sort((a,b)=>a.rank-b.rank || a.key.localeCompare(b.key));
-      const seen = new Set();
-      const facts = [];
-      for (const item of rows) {
-        if (seen.has(item.suffix)) continue;
-        seen.add(item.suffix);
-        facts.push({
-          label:human(item.suffix),
-          value:rowDisplayValue(item.row,'—'),
-          status:rowStatusLabel(item.row)
-        });
-        if (facts.length >= limit) break;
-      }
-      return facts;
     }
+
     energyDeviceStatusCard(rt, asset = {}, roleLabel = '') {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
@@ -3120,24 +3099,8 @@
         <div class="energyDeviceConfig">${profileLabel ? `<span><b>Profile</b>${escapeHtml(human(profileLabel))}</span>` : ''}<span><b>Config</b>${escapeHtml(configState)}</span></div>
         <div class="energyDeviceFacts">${details}</div>${actions}</div>
       </article>`;
-    }, roleLabel = '') {
-      const enriched = this.energyAssetContext(rt, asset);
-      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
-      const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
-      const type = String(firstDefined(enriched.asset_type,enriched.object_class,'device') || 'device');
-      const profile = objectFrom(enriched.profile || {});
-      const profileLabel = firstDefined(profile.display_name,profile.label,profile.name,enriched.profile_id,'');
-      const facts = this.energyAssetFacts(rt,enriched,4);
-      const health = firstDefined(rt.rawText(`${id}.health`,''), enriched.health, enriched.status, '');
-      const publication = objectFrom(enriched.publication || {});
-      const configState = publication.complete === true ? 'Configured' : profileLabel ? 'Profiled' : 'Detected';
-      return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
-        <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
-        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3></div><span class="energyDeviceState">${escapeHtml(health ? human(health) : configState)}</span></div>
-        <div class="energyDeviceConfig">${profileLabel ? `<span><b>Profile</b>${escapeHtml(human(profileLabel))}</span>` : ''}<span><b>Config</b>${escapeHtml(configState)}</span></div>
-        <div class="energyDeviceFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span class="energyDeviceNoFacts"><small>Status</small><b>Published device · no additional live facts</b></span>`}</div></div>
-      </article>`;
     }
+
     energyAssetType(asset = {}) {
       return String(firstDefined(asset.asset_type,asset.object_class,'') || '').trim().toLowerCase();
     }
