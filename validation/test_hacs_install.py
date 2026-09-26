@@ -50,12 +50,14 @@ try:
             raise SystemExit(f"bundle URL has no installed asset: {rel}")
 
     for required in (
-        "assets/branding/company-logo.svg",
         "assets/heroes/overview-hero.webp",
         "assets/heroes/flow-hero.webp",
     ):
         if not (install / required).is_file():
             raise SystemExit(f"required installed asset missing: {required}")
+
+    if (install / "assets" / "branding").exists():
+        raise SystemExit("domain HACS package must not ship company branding; branding belongs to RHI UX Core")
 
     print(f"PASS HACS tagged-release install simulation (zero release assets -> dist tree): {len(manifest.get('files', []))} files, {len(refs)} asset URLs resolved")
 finally:
