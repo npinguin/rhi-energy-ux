@@ -82,3 +82,17 @@ if(!reserve.editable || reserve.write?.service!=='rhi_energy.write_property') th
 const asset=context.createEnergyAssetProjection(v2,'battery_system');
 if(asset.identity.display_name!=='Home Battery' || asset.controls.length!==1) throw new Error('asset projection incomplete');
 console.log('PASS canonical Energy V2 core + object projection reader');
+
+const incompleteGateway={contract(key){
+  if(key!=='publicV2') throw new Error('legacy contract access:'+key);
+  return {entityId:'sensor.rhi_energy_public_contract_v2',state:'OK',available:true,attributes:{
+    contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+    contract_version:'2.0.0',
+    release:'E0.15.53',
+    core:{contract_id:'RHI_ENERGY_CORE_V1',battery:{},solar:{},grid:{},consumption:{},home:{}}
+  },contractVersion:'2.0.0'};
+}};
+const incomplete=context.readEnergyPublicV2(incompleteGateway);
+if(incomplete.available) throw new Error('V2 must fail closed when required core sections are missing');
+if(!String(incomplete.compatibilityReason).includes('flexible')) throw new Error('missing core capability reason must identify absent sections');
+console.log('PASS required Energy core capability set fails closed');
