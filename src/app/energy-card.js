@@ -3065,6 +3065,27 @@
       return facts;
     }
 
+    energyAssetDetailDisclosure(rt, asset = {}) {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      if (!id) return '';
+      const profile = objectFrom(enriched.profile || {});
+      const publication = objectFrom(enriched.publication || {});
+      const projection = rt.assetProjection(id) || {};
+      const lifecycle = objectFrom(projection.lifecycle || {});
+      const parentId = this.energyAssetParentId(enriched);
+      const rows = [
+        ['Asset id', id],
+        ['Type', human(firstDefined(enriched.asset_type,enriched.object_class,'device'))],
+        ['Parent', parentId || '—'],
+        ['Profile', firstDefined(profile.display_name,profile.label,profile.name,enriched.profile_id,'—')],
+        ['Lifecycle', firstDefined(lifecycle.state,enriched.health,enriched.status,'—')],
+        ['Publication', publication.complete === true ? 'Complete' : publication.complete === false ? 'Incomplete' : 'Unknown'],
+        ['Source', firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'—')]
+      ];
+      const missing = Array.isArray(publication.missing) ? publication.missing : Array.isArray(publication.missing_fields) ? publication.missing_fields : [];
+      return `<details class="energyAssetDetails"><summary>Details</summary><div class="energyAssetDetailGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value ?? '—'))}</b></span>`).join('')}${missing.length ? `<span class="wide"><small>Missing publication fields</small><b>${escapeHtml(missing.join(' · '))}</b></span>` : ''}</div></details>`;
+    }
     energyDeviceStatusCard(rt, asset = {}, roleLabel = '') {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
@@ -3085,7 +3106,7 @@
         <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
         <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3></div><span class="energyDeviceState">${escapeHtml(health ? human(health) : configState)}</span></div>
         <div class="energyDeviceConfig">${profileLabel ? `<span><b>Profile</b>${escapeHtml(human(profileLabel))}</span>` : ''}<span><b>Config</b>${escapeHtml(configState)}</span></div>
-        <div class="energyDeviceFacts">${details}</div>${actions}</div>
+        <div class="energyDeviceFacts">${details}</div>${this.energyAssetDetailDisclosure(rt,enriched)}${actions}</div>
       </article>`;
     }
 
@@ -3112,6 +3133,7 @@
           <span class="solarAggregateCount">${childPanels.length ? `${childPanels.length} panel record${childPanels.length===1?'':'s'}` : 'Array'}</span>
         </div>
         <div class="solarAggregateFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span><small>Status</small><b>Published array · no additional live facts</b></span>`}</div>
+        ${this.energyAssetDetailDisclosure(rt,enriched)}
         ${childPanels.length ? `<div class="solarChildGrid">${childPanels.map(panel=>this.energyDeviceStatusCard(rt,panel,'Solar panel')).join('')}</div>` : ''}
       </article>`;
     }
