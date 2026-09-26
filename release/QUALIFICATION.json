@@ -1,8 +1,8 @@
 {
-  "version": "4.2.1",
-  "candidate_tag": "v4.2.1",
-  "candidate_sha": "23a64545aa73b000e7e2353ac9dd8fc21ab9ccb2",
-  "previous_release": "4.2.0",
+  "version": "4.2.2",
+  "candidate_tag": "v4.2.2",
+  "candidate_sha": "pending",
+  "previous_release": "4.2.1",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
