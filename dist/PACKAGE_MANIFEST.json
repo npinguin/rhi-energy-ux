@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "product": "rhi-energy-ux",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "source_manifest_schema": 1,
   "hacs_package_root": "dist",
   "hacs_filename": "rhi-energy-ux.js",
@@ -11,7 +11,7 @@
     "heroes",
     "mobility"
   ],
-  "runtime_sha256": "48e4dd129e276badec91b4e0af904139ccdda640018e062096bf67e5ef5b761d",
+  "runtime_sha256": "d648799183c4789a4abeb995ebc6ce5f48701a01096e73e1bf0d556560797c03",
   "files": [
     {
       "path": "assets/energy/byd_lvs_20.webp",
@@ -155,7 +155,7 @@
     },
     {
       "path": "rhi-energy-ux.js",
-      "bytes": 811348
+      "bytes": 808841
     },
     {
       "path": "rhi-energy-ux.js.sha256",

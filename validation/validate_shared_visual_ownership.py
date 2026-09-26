@@ -19,7 +19,7 @@ for path, text in texts.items():
         errors.append(f"{rel}: --rhi-font-* tokens are UX Core-owned")
 
 card = texts.get(SRC / "app" / "energy-card.js", "")
-for obsolete in ("planningKpiStrip", "gasKpiStrip", "solarProductionStrip"):
+for obsolete in ("planningKpiStrip", "gasKpiStrip", "solarProductionStrip", "solarCompactSummaryRow", "gasUseFacts", "summaryRow four", "outlookSummaryStrip", "operationalSummaryGrid"):
     if f'class="{obsolete}' in card or f"class='{obsolete}" in card:
         errors.append(f"src/app/energy-card.js: obsolete duplicate top status surface {obsolete} remains")
 if '<main class="energy rhiUxDomainBody rhi-ux-root">' not in card:
@@ -31,6 +31,14 @@ if any(i < 0 for i in order) or order != sorted(order):
     errors.append("page-header.js: canonical order must be hero -> status -> quick actions")
 if "rhiUxQuickActionBar" not in header:
     errors.append("page-header.js: page actions must use Core quick-action bar")
+if "rhiUxPageStack" not in header:
+    errors.append("page-header.js: canonical Core page stack class is required")
+return_start = header.find('return `<section class="rhiEnergyPageHeader')
+if return_start >= 0:
+    rendered = header[return_start:]
+    positions = [rendered.find("${heroMarkup}"), rendered.find("${statusMarkup}"), rendered.find("${actionsMarkup}")]
+    if any(i < 0 for i in positions) or positions != sorted(positions):
+        errors.append("page-header.js: rendered DOM order must be hero -> status -> quick actions")
 
 if errors:
     raise SystemExit("\n".join(errors))

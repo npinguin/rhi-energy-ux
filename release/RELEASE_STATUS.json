@@ -1,6 +1,6 @@
 {
   "product": "rhi-energy-ux",
-  "source_candidate_version": "4.2.0",
+  "source_candidate_version": "4.2.1",
   "stage": "test_candidate",
   "publication_authority": "github_releases",
   "publication_status": "derive_from_github_release",
@@ -20,8 +20,8 @@
   ],
   "ux_core": {
     "package": "rhi-ux-core",
-    "version": "1.4.0",
-    "source_commit": "50cf7e135c90af15cf34b4f41dfba78aa1a5fc5e",
+    "version": "1.4.1",
+    "source_commit": "7e035980b690719ff9c05876e905322194d52df2",
     "runtime_dependency": false,
     "branding_owner": "rhi-ux-core"
   }
