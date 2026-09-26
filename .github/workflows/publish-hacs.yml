@@ -1,19 +1,16 @@
 name: Publish HACS
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'dist/**'
-      - 'hacs.json'
-      - 'COMPATIBILITY.json'
-      - 'RELEASE_MANIFEST.json'
-      - 'release/RELEASE_NOTES.md'
-      - '.github/workflows/publish-hacs.yml'
+  workflow_run:
+    workflows: ["Validate"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: write
+
+env:
+  CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 concurrency:
   group: ${{ github.repository }}-publish-candidate
@@ -21,6 +18,10 @@ concurrency:
 
 jobs:
   verify:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     name: Verify validated HACS package
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -29,6 +30,7 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
+          ref: ${{ env.CANDIDATE_SHA }}
       - name: Set up Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
@@ -97,6 +99,7 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
+          ref: ${{ env.CANDIDATE_SHA }}
       - name: Set up Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
@@ -129,7 +132,7 @@ jobs:
             cmp /tmp/rhi-energy-existing-tag/package.json package.json
             echo "Immutable tag ${TAG} already exists with identical package bytes and HACS metadata."
           else
-            TAG_SHA="$GITHUB_SHA"
+            TAG_SHA="$CANDIDATE_SHA"
             git tag "${TAG}" "$TAG_SHA"
             git push origin "${TAG}"
           fi
