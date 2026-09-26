@@ -328,6 +328,16 @@
       if (!this._publicV2) this._publicV2 = readEnergyPublicV2(this.contractGateway());
       return this._publicV2;
     }
+    contractCompatibility() {
+      const v2=this.publicV2();
+      return Object.freeze({
+        available:v2.available === true,
+        reason:String(v2.compatibilityReason || ''),
+        release:String(v2.release || ''),
+        contractVersion:String(v2.contractVersion || ''),
+        capabilities:v2.capabilities || {}
+      });
+    }
     contractEntityId() { return this.publicV2().envelope.entityId; }
     assetProjection(assetId) { return selectEnergyAsset(this.publicV2(), assetId); }
     overviewProjection() { return selectEnergyOverview(this.publicV2()); }
@@ -2356,13 +2366,13 @@
     }
     overview(rt) {
       const pageVm = this.buildPageViewModel(rt, 'overview');
-      const v2 = this.publicV2();
-      if (!v2.available && v2.compatibilityReason) {
+      const compatibility = rt.contractCompatibility();
+      if (!compatibility.available && compatibility.reason) {
         return `${this.tabExperienceHeader(rt,'overview',pageVm)}
           <section class="panel" style="padding:18px">
-            <h2 style="margin:0 0 8px">Energy backend contract not compatible</h2>
-            <p style="margin:0 0 8px">This UX requires the canonical Energy V2 core published by backend E0.15.52 or newer.</p>
-            <p style="margin:0;color:var(--muted)">Detected backend: ${escapeHtml(v2.release || 'unknown')} · ${escapeHtml(v2.compatibilityReason)}</p>
+            <h2 style="margin:0 0 8px">Energy contract unavailable</h2>
+            <p style="margin:0 0 8px">The canonical Energy product contract or required core capability is not available.</p>
+            <p style="margin:0;color:var(--muted)">Backend: ${escapeHtml(compatibility.release || 'unknown')} · ${escapeHtml(compatibility.reason)}</p>
           </section>`;
       }
       const d = rt.decision();
