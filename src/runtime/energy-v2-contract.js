@@ -148,10 +148,20 @@ function readEnergyPublicV2(gateway) {
 
   const publicContractOk = envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2';
   const coreContractOk = String(core.contract_id || '') === 'RHI_ENERGY_CORE_V1';
+  const capabilities = Object.freeze({
+    core:coreContractOk,
+    assets:Array.isArray(objects),
+    relationships:Array.isArray(relationships),
+    planning:Object.keys(object(planning.horizons)).length > 0,
+    pricing:Object.keys(pricing).length > 0,
+    strategy:Object.keys(strategy).length > 0,
+    value_accounting:Object.keys(valueAccounting).length > 0,
+    commands:Array.isArray(commands)
+  });
   const compatibilityReason = !publicContractOk
     ? 'public_v2_contract_unavailable'
     : !coreContractOk
-      ? 'backend_missing_rhi_energy_core_v1_requires_e0_15_52_or_newer'
+      ? 'required_core_contract_missing'
       : '';
 
   return Object.freeze({
@@ -159,6 +169,7 @@ function readEnergyPublicV2(gateway) {
     available:publicContractOk && coreContractOk,
     publicContractOk,
     coreContractOk,
+    capabilities,
     compatibilityReason,
     contractVersion:String(attrs.contract_version || envelope.contractVersion || ''),
     release:String(attrs.release || ''),
