@@ -1,3 +1,12 @@
+## 4.2.3 — information density and single action bar
+
+- fixes legacy Quick Actions injection and keeps one canonical action bar;
+- restores canonical flexible assets to Consumers;
+- adds compact hardware provenance/details;
+- restores Gas source/entity context;
+- adds Tactical Planning context and explicit empty-state reasoning;
+- keeps shared Hero/Status/Quick Actions styling Core-owned.
+
 ## 4.2.1 — canonical status ordering hotfix
 
 - enforces Hero → Status → Quick Actions through UX Core 1.4.1;

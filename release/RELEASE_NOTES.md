@@ -1,15 +1,17 @@
-# v4.2.1 — Energy header/status hotfix TEST CANDIDATE
+# v4.2.3 — Information density and single-action-bar correction TEST CANDIDATE
 
-This hotfix closes the remaining visual drift found after v4.2.0.
+This release corrects the remaining Energy UX regression visible in 4.2.1/4.2.2.
 
-Changes:
-- enforces the canonical Core page stack as Hero → Status → Quick Actions;
-- updates Energy to RHI UX Core 1.4.1, where the page order is an explicit CSS invariant;
-- removes duplicate headline/status surfaces from Solar, Gas, Home Battery, Outlook and Tactical Planning;
-- keeps page detail and domain-specific body content, but prevents a second KPI/status row from appearing below the canonical status layer;
-- extends release-blocking visual ownership checks so these duplicate surfaces cannot be reintroduced silently.
+- removes the legacy render-time Quick Actions injection that was inserted after the first closing section and therefore appeared between Hero and Status;
+- merges contextual navigation controls and executable commands into one canonical Core-owned Quick Actions bar;
+- preserves Hero → Status → Quick Actions → Body as the only page-header composition;
+- restores Consumers from the full canonical flexible-asset domain, not only consumer-mix rows;
+- restores compact asset provenance/details for Solar and other hardware cards;
+- restores Gas meter/source/entity context without duplicating the status summary;
+- adds Tactical Planning context (horizon, state, bucket count, participating loads, confidence and reason) while keeping missing hourly allocations fail-closed;
+- adds release-blocking tests so a second page-level Quick Actions bar cannot return.
 
-RHI UX Core: 1.4.1 at 7e035980b690719ff9c05876e905322194d52df2.
-Rollback: v4.2.0.
+Rollback: v4.2.2.
 
-Target Home Assistant rendering and runtime qualification remain separate evidence gates.
+Target Home Assistant render, functional journey, refresh/restart, upgrade and rollback proof remain separate runtime qualification gates.
+

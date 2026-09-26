@@ -43,6 +43,8 @@ for (const phrase of ["Solar arrays","Inverter system","Battery system","Solar s
   assert.ok(app.includes(phrase), "missing Solar hierarchy section "+phrase);
 }
 assert.match(app,/energyAssetParentId/);
+assert.match(app,/energyAssetDetailDisclosure/);
+assert.match(app,/Missing publication fields/);
 assert.match(app,/Aggregate storage state with the physical batteries shown underneath/);
 assert.match(catalog,/solar_production\.sunpower_x21_335_blk/);
 assert.match(catalog,/solar_production\.jinkosolar_jkm435n_54hl4r/);
