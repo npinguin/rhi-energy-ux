@@ -294,53 +294,49 @@
       };
     }
     backendStatus() {
-      // R3.65.0: Product availability is owned by each domain interface.
-      // Engineering health is diagnostic evidence only and never suppresses valid product data.
-      const release = this.releaseState();
-      const diagnosticsNotes = [...ENGINEERING_DIAGNOSTICS, ...SUPPLEMENTAL_DIAGNOSTICS].map(entityId => {
-        const entity = this.rawState(entityId);
-        return { entityId, state: entity?.state ?? '' };
-      }).filter(item => !isIgnoredDiagnosticState(item.state) && !isOkHealth(item.state));
-      if (!release) {
-        return {
-          runtimeTrusted: false,
-          showMainWarning: false,
-          failedHardGates: [],
-          diagnosticsNotes,
-          statusText: 'Release contract unavailable · Product interfaces render their own availability',
-          warningText: ''
-        };
-      }
+      // Product trust is owned by the canonical public V2 transport. Optional
+      // diagnostic/release entities must never create a product-facing error.
+      const v2 = this.publicV2();
       return {
-        runtimeTrusted: true,
+        runtimeTrusted: v2.available === true,
         showMainWarning: false,
         failedHardGates: [],
-        diagnosticsNotes,
-        statusText: diagnosticsNotes.length
-          ? `Product contracts active · Diagnostics: ${labelHealthEntity(diagnosticsNotes[0].entityId)} ${normalizeHealthState(diagnosticsNotes[0].state)}`
-          : 'Product contracts active · Diagnostics OK',
+        diagnosticsNotes: [],
+        statusText: v2.available
+          ? 'Canonical Energy contract active'
+          : (v2.compatibilityReason || 'Canonical Energy contract unavailable'),
         warningText: ''
       };
     }
     footerModel() {
-      const release = this.release();
+      const v2 = this.publicV2();
       const backendStatus = this.backendStatus();
       return {
         uxVersion: UX_VERSION,
-        backendVersion: release.backend_release,
-        releaseContractEntity: RELEASE_ENTITY,
-        contractVersion: release.contract_version,
+        backendVersion: v2.release || 'Unknown',
+        releaseContractEntity: UX_INTERFACES.publicV2,
+        contractVersion: v2.contractVersion || 'Unknown',
         runtimeTrusted: backendStatus.runtimeTrusted,
-        failedHardGates: backendStatus.failedHardGates,
-        diagnosticsNotes: backendStatus.diagnosticsNotes,
+        failedHardGates: [],
+        diagnosticsNotes: [],
         statusText: backendStatus.statusText,
-        warningText: backendStatus.warningText,
-        showMainWarning: backendStatus.showMainWarning
+        warningText: '',
+        showMainWarning: false
       };
     }
     publicV2() {
       if (!this._publicV2) this._publicV2 = readEnergyPublicV2(this.contractGateway());
       return this._publicV2;
+    }
+    contractCompatibility() {
+      const v2=this.publicV2();
+      return Object.freeze({
+        available:v2.available === true,
+        reason:String(v2.compatibilityReason || ''),
+        release:String(v2.release || ''),
+        contractVersion:String(v2.contractVersion || ''),
+        capabilities:v2.capabilities || {}
+      });
     }
     contractEntityId() { return this.publicV2().envelope.entityId; }
     assetProjection(assetId) { return selectEnergyAsset(this.publicV2(), assetId); }
@@ -2370,6 +2366,15 @@
     }
     overview(rt) {
       const pageVm = this.buildPageViewModel(rt, 'overview');
+      const compatibility = rt.contractCompatibility();
+      if (!compatibility.available && compatibility.reason) {
+        return `${this.tabExperienceHeader(rt,'overview',pageVm)}
+          <section class="panel" style="padding:18px">
+            <h2 style="margin:0 0 8px">Energy contract unavailable</h2>
+            <p style="margin:0 0 8px">The canonical Energy product contract or required core capability is not available.</p>
+            <p style="margin:0;color:var(--muted)">Backend: ${escapeHtml(compatibility.release || 'unknown')} · ${escapeHtml(compatibility.reason)}</p>
+          </section>`;
+      }
       const d = rt.decision();
       const balanceVm = this.canonicalLiveEnergyBalance(rt);
       const batterySoc = balanceVm.battery.socPct;
@@ -2398,9 +2403,9 @@
       const recommendation = String(firstDefined(d.what_text, d.recommendation_text, d.recommendation, d.summary, 'Monitoring current energy flow') || 'Monitoring current energy flow');
       return `${this.tabExperienceHeader(rt,'overview',pageVm)}
         <div class="overviewCoreGrid">
-          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon orange">☀</span><div><h2>Production & supply</h2><p>Energy available to the home now.</p></div></div>${sourceRows.join('') || `<div class="empty compact"><b>No active supply</b><span>No measured source is active right now.</span></div>`}</section>
-          <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(reason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>Grid</small><b>${escapeHtml(fmtKw(gridValue,'0.0 kW'))} ${escapeHtml(gridDirection)}</b></div><div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div></div></div></section>
-          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>Consumption</h2><p>Site demand and its active components.</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'})}${contributorRows}${balanceVm.battery.direction === 'into_storage' && balanceVm.battery.displayPowerKw !== null ? this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}) : ''}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${this.overviewEnergyRow({icon:'',label:gridDirection === 'Exporting' ? 'Grid Export' : gridDirection === 'Importing' ? 'Grid Import' : 'Grid',subtitle:'Grid boundary',value:fmtKw(gridValue,'0.0 kW'),variant:'boundary'})}</section>
+          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon orange">☀</span><div><h2>Production & supply</h2><p>Energy available to the home now.</p></div></div>${sourceRows.join('') || `<div class="empty compact"><b>Supply unavailable</b><span>Current supply cannot be determined from canonical measurements.</span></div>`}</section>
+          <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(reason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>Grid</small><b>${escapeHtml(fmtKw(gridValue,'—'))} ${escapeHtml(gridDirection)}</b></div><div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div></div></div></section>
+          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>Consumption</h2><p>Site demand and its active components.</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'})}${contributorRows}${balanceVm.battery.direction === 'into_storage' && balanceVm.battery.displayPowerKw !== null ? this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}) : ''}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${this.overviewEnergyRow({icon:'',label:gridDirection === 'Exporting' ? 'Grid Export' : gridDirection === 'Importing' ? 'Grid Import' : 'Grid',subtitle:'Grid boundary',value:fmtKw(gridValue,'—'),variant:'boundary'})}</section>
         </div>
         <div class="bottomInsights overviewSupportFacts"><div class="insight"><span>Solar remaining today</span><b>${fmtKwh(solarRemaining)}</b><small>Forecast left</small></div><div class="insight"><span>Home Battery reserve</span><b>${reservePct===null?'Not available':fmtPct(reservePct)}</b><small>${reservePct===null?'Reserve setting unavailable':'Protected minimum'}</small></div></div>${this.overviewExperiencePanel(rt)}`;
     }
@@ -4446,7 +4451,6 @@
     diagnosticSpec(tab) {
       const label=human(tab || 'overview');
       return [
-        [RELEASE_ENTITY,'Release compatibility','Candidate identity, backend baseline and release governance evidence'],
         [UX_INTERFACES.publicV2,'Energy Public V2',`${label} product truth through the single canonical Energy contract`]
       ];
     }
@@ -4465,11 +4469,9 @@
     releaseIssueModel(rt, tab, footer) {
       const rows = this.diagnosticSpec(tab).map(([entityId,label,purpose]) => this.diagnosticEntity(rt,entityId,label,purpose));
       const unavailable = rows.filter(row => !row.working);
-      const diagnostics = Array.isArray(footer.diagnosticsNotes) ? footer.diagnosticsNotes : [];
       const issues = [];
       unavailable.forEach(row => issues.push(`${row.label}: ${row.reason || row.state || 'Unavailable'}`));
-      diagnostics.forEach(row => issues.push(`${labelHealthEntity(row.entityId)}: ${normalizeHealthState(row.state)}`));
-      if (!footer.runtimeTrusted) issues.unshift('Runtime release contract is unavailable or not trusted.');
+      if (!footer.runtimeTrusted && !unavailable.length) issues.unshift('Canonical Energy contract is unavailable or incompatible.');
       if (!issues.length) return null;
       return {
         severity: footer.runtimeTrusted ? 'warning' : 'error',

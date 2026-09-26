@@ -1,3 +1,13 @@
+## 4.0.3 — Public V2 compatibility and test-governance simplification
+
+- closes the pilot-blocking backend compatibility gap and requires the canonical Public V2 core;
+- makes Public V2 the only product-health authority used by the footer;
+- removes historical milestone/source-shape validators from the active release path;
+- keeps behavior/contract tests and true negative architecture boundaries as release gates;
+- makes release/product.json the single release identity owner and projects version/backend/rollback metadata through release:sync;
+- reduces qualification to target-runtime evidence instead of duplicating the static test catalog;
+- adds npm run preflight as the local CI-parity gate.
+
 ## 4.0.2 — Gas consumption experience
 
 - replaces the placeholder Gas illustration with the Energy-family Viessmann Vitodens gas hero;

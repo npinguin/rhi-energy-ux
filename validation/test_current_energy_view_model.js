@@ -24,7 +24,7 @@ function gatewayFor(state, signed) {
   const sem=(value,unit=null)=>({value,unit,status:value===null?'UNAVAILABLE':'AVAILABLE',quality:value===null?'UNKNOWN':'CANONICAL',reason:value===null?'not_available':null});
   const attrs={
     contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',contract_version:'2.0.0',release:'E0.15.52',
-    core:{
+    core:{contract_id:'RHI_ENERGY_CORE_V1',
       battery:{status:available?'AVAILABLE':'UNAVAILABLE',fields:{
         state:sem(state==='unavailable'?null:state),power_kw:sem(signed,'kW'),soc_pct:sem(38,'%'),available_kwh:sem(11.1,'kWh'),capacity_kwh:sem(29.2,'kWh'),reserve_target_pct:sem(20,'%')
       },contributors:[]},

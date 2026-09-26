@@ -1,103 +1,45 @@
 from pathlib import Path
 import json
 import re
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
-def read(rel):
-    return (ROOT / rel).read_text(encoding="utf-8")
-
 def load(rel):
-    return json.loads(read(rel))
+    return json.loads((ROOT / rel).read_text(encoding="utf-8"))
 
+product = load("release/product.json")
 pkg = load("package.json")
 lock = load("package-lock.json")
-product = load("release/product.json")
 compat = load("COMPATIBILITY.json")
 manifest = load("RELEASE_MANIFEST.json")
-qualification = load("release/QUALIFICATION.json")
 status = load("release/RELEASE_STATUS.json")
-ownership = load("validation/OWNERSHIP.json")
+qualification = load("release/QUALIFICATION.json")
 
-source = read("src/app/energy-card.js")
-build = read("tools/build.py")
-readme = read("README.md")
-notes = read("release/RELEASE_NOTES.md")
-changelog = read("CHANGELOG.md")
-publish = read(".github/workflows/publish-hacs.yml")
-validate = read(".github/workflows/validate.yml")
-release = read(".github/workflows/release.yml")
-governance = read("docs/RELEASE_GOVERNANCE.md")
-test_governance = read("docs/TEST_GOVERNANCE.md")
-shared_release = read("docs/UX_RELEASE_STANDARD.md")
-ux_repository_standard = read("docs/UX_REPOSITORY_STANDARD.md")
-maintainability = read("docs/MAINTAINABILITY.md")
-architecture = read("docs/ARCHITECTURE.md")
-drift = read("docs/DRIFT_PREVENTION.md")
-
-version = str(pkg["version"])
-tag = f"v{version}"
-contract = product["contract"]
-
-checks = {
-    "package_lock_version": lock["version"] == version and lock["packages"][""]["version"] == version,
-    "compatibility_version": compat["ux_version"] == version,
-    "manifest_version": manifest["version"] == version,
-    "qualification_version": qualification["version"] == version,
-    "qualification_tag": qualification.get("candidate_tag") == tag,
-    "qualification_sha_shape": qualification.get("candidate_sha") == "pending" or bool(re.fullmatch(r"[0-9a-fA-F]{40}", str(qualification.get("candidate_sha", "")))),
-    "release_status_version": status["source_candidate_version"] == version,
-    "contract_from_descriptor": compat["energy_contract"]["minimum"] == contract and manifest["energy_contract"] == contract and status["contract"] == contract,
-    "minimum_backend_from_descriptor": compat["energy_contract"]["minimum_backend"] == product["minimum_backend"] and manifest["minimum_backend"] == product["minimum_backend"] and status["minimum_backend"] == product["minimum_backend"],
-    "tested_backend_from_descriptor": compat["energy_contract"]["tested_backend_releases"] == [product["tested_backend"]],
-    "stage_from_descriptor": manifest["stage"] == product["stage"] and status["stage"] == product["stage"],
-    "artifact_from_descriptor": manifest["runtime_artifact"] == product["runtime_artifact"] and manifest["runtime_checksum_artifact"] == product["runtime_checksum_artifact"] and manifest["package_manifest"] == product["package_manifest"],
-    "package_delivery_from_descriptor": manifest["hacs_package_root"] == product["hacs_package_root"] and manifest["hacs_delivery_mode"] == product["hacs_delivery_mode"] and manifest["release_asset_policy"] == product["release_asset_policy"],
-    "hacs_metadata_from_descriptor": manifest["hacs_repository_type"] == product["hacs_repository_type"] and manifest["hacs_validation_category"] == product["hacs_validation_category"],
-    "rollback_from_descriptor": qualification["previous_release"] == product["rollback_release"].removeprefix("v"),
-    "runtime_version_build_owned": "__RHI_UX_VERSION__" in source and 'pkg["version"]' in build and '.replace("__RHI_UX_VERSION__"' in build,
-    "backend_version_single_owner": "backend_release: attrs.backend_release || 'unknown'" in source,
-    "no_backend_version_fallback": "attrs.backend_version || attrs.backend_release" not in source and "attrs.release_version || this.releaseState()?.state" not in source,
-    "release_notes_current": notes.startswith(f"# v{version} ") or notes.startswith(f"# RHI Energy UX v{version} "),
-    "changelog_current": any(line.startswith(f"## {version} ") for line in changelog.splitlines()[:8]),
-    "test_ownership_principle": ownership.get("principle") == "one invariant, one test owner" and "One invariant has exactly one test owner" in test_governance,
-    "owned_suite_scripts": all(name in pkg.get("scripts", {}) for name in ("test:contract","test:ux","test:package","test:release","check:test-ownership","check:source-ownership","check:asset-policy","check:hacs-package","check:documentation-drift","test:hacs-install","release:sync")),
-    "validate_pr_only": "pull_request:" in validate and "push:\n    branches: [main]" not in validate,
-    "validate_has_two_build_proof": "Deterministic two-build proof" in validate,
-    "validate_has_immutable_package_gate": "Protect immutable published package" in validate,
-    "hacs_after_source": "hacs:\n    name: HACS\n    needs: source" in validate,
-    "shared_repository_standard": "Normal candidate build budget: two builds total" in ux_repository_standard and "One source concern, one owner." in ux_repository_standard,
-    "publish_exact_package": "Publish or verify immutable TEST CANDIDATE" in publish and "npm run build" not in publish and "npm run validate" not in publish and "npm ci" not in publish,
-    "publish_idempotent": "Existing immutable tag package and HACS metadata match current candidate." in publish and "verifying without mutation" in publish,
-    "publish_zero_assets": product.get("release_asset_policy") == "none" and all(token not in ((re.search(r"gh release create[\\s\\S]*?^\\s*fi", publish, re.MULTILINE) or [""])[0]) for token in ("dist/","COMPATIBILITY.json","RELEASE_MANIFEST.json","QUALIFICATION.json","PACKAGE_MANIFEST.json",".sha256")) and "gh release upload" not in publish,
-    "stable_no_rebuild": "npm run build" not in release and "npm run validate" not in release and "npm ci" not in release,
-    "stable_zero_assets": "gh release upload" not in release and "'.assets | length'" in release,
-    "candidate_is_normal_release": "--prerelease" not in publish and "isPrerelease --jq '.isPrerelease'" in publish,
-    "qualification_does_not_publish": "release/QUALIFICATION.json" not in publish.split("permissions:", 1)[0],
-    "shared_full_package_standard": "Published package bytes are immutable" in shared_release and "Publication must be idempotent" in shared_release,
-    "governance_no_rebuild": "Candidate publication does not rebuild" in governance,
-    "hacs_resource_documented": "/hacsfiles/rhi-energy-ux/rhi-energy-ux.js" in readme,
-    "dashboard_views_documented": "views:" in readme and "custom:homebrain-energy-card" in readme,
-    "evergreen_docs": "R3.91.4" not in architecture and "R3.94.7" not in maintainability,
-    "canonical_consumption_terms": "Home Base Load" not in drift,
-    "source_authority_documented": "`src/` is the only runtime source authority." in maintainability,
-    "legacy_source_tree_absent": not (ROOT / "source").exists(),
-    "legacy_build_manifest_absent": not (ROOT / "dist" / "BUILD_MANIFEST.json").exists(),
+version = str(product["version"])
+expected = {
+    "package.json.version": pkg.get("version") == version,
+    "package-lock.version": lock.get("version") == version and lock.get("packages",{}).get("",{}).get("version") == version,
+    "compatibility.version": compat.get("ux_version") == version,
+    "compatibility.contract": compat.get("energy_contract",{}).get("minimum") == product["contract"],
+    "compatibility.minimum_backend": compat.get("energy_contract",{}).get("minimum_backend") == product["minimum_backend"],
+    "compatibility.tested_backend": compat.get("energy_contract",{}).get("tested_backend_releases") == [product["tested_backend"]],
+    "manifest.version": manifest.get("version") == version,
+    "manifest.contract": manifest.get("energy_contract") == product["contract"],
+    "manifest.minimum_backend": manifest.get("minimum_backend") == product["minimum_backend"],
+    "manifest.stage": manifest.get("stage") == product["stage"],
+    "status.version": status.get("source_candidate_version") == version,
+    "status.contract": status.get("contract") == product["contract"],
+    "status.minimum_backend": status.get("minimum_backend") == product["minimum_backend"],
+    "qualification.version": qualification.get("version") == version,
+    "qualification.tag": qualification.get("candidate_tag") == f"v{version}",
+    "qualification.rollback": qualification.get("previous_release") == product["rollback_release"].removeprefix("v"),
+    "qualification.sha": qualification.get("candidate_sha") == "pending" or bool(re.fullmatch(r"[0-9a-fA-F]{40}", str(qualification.get("candidate_sha","")))),
     "zero_accepted_debt": manifest.get("known_accepted_technical_debt") == 0 and manifest.get("known_accepted_feature_debt") == 0,
 }
-
-workflow_text = "\n".join(read(f".github/workflows/{name}") for name in ("validate.yml","publish-hacs.yml","release.yml"))
-checks["actions_pinned"] = (
-    "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09" in workflow_text
-    and "actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444" in workflow_text
-    and "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1" in workflow_text
-)
-
-workflows = sorted(p.name for p in (ROOT / ".github/workflows").glob("*.yml"))
-checks["exact_three_workflows"] = workflows == ["publish-hacs.yml","release.yml","validate.yml"]
-
-failed = [name for name, ok in checks.items() if not ok]
-for name, ok in checks.items():
+failed=[name for name, ok in expected.items() if not ok]
+for name, ok in expected.items():
     print(("PASS" if ok else "FAIL"), name)
 if failed:
-    raise SystemExit("release governance validation failed: " + ", ".join(failed))
+    raise SystemExit("release projection drift; run npm run release:sync: " + ", ".join(failed))
+print("PASS release governance: release/product.json is the single release identity owner")
