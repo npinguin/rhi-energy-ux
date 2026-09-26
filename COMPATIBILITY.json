@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "ux_version": "4.1.0",
+  "ux_version": "4.1.1",
   "energy_contract": {
     "minimum": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
     "minimum_backend": "E0.15.52",
@@ -19,8 +19,8 @@
   },
   "ux_core": {
     "package": "rhi-ux-core",
-    "version": "1.1.0",
-    "source_commit": "480eaef12955d56970ec172fdde6f5fe2e0ab9c6",
+    "version": "1.2.0",
+    "source_commit": "9c3f60942a1cf68ce30f33c68b532213d7868570",
     "runtime_dependency": false
   }
 }
