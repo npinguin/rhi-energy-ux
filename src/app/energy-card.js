@@ -3504,7 +3504,7 @@
       const recommendation = firstDefined(d.recommendation, d.advice, rt.rawText('energy_intelligence.recommendation', null), 'Observe');
       const targetId = firstDefined(d.recommended_target_asset_id, rt.value('energy_intelligence.recommended_target_asset_id', null), '');
       const assetDomain = this.flexibleAssetDomain(rt);
-      const loads = assetDomain.all().filter(vm => !vm.isStorage).map(vm => vm.raw);
+      const loads = assetDomain.consumerAssets().map(vm => vm.raw);
       const participating = loads.filter(load => !assetDomain.byId(load.asset_id)?.isDisabled);
       const disabled = loads.filter(load => assetDomain.byId(load.asset_id)?.isDisabled);
       const cards = participating.map(load => this.operationalLoadCard(rt, load, recommendation, targetId)).join('');
@@ -3550,7 +3550,7 @@
       const gridBalance = gridImport !== null && gridExport !== null ? gridImport-gridExport : null;
       const confidence = human(firstDefined(quality.confidence,horizon.confidence,'Not available'));
       const basis = human(firstDefined(supply.solar_basis,supply.forecast_basis,isTomorrow?'Full day forecast':'Remaining forecast'));
-      const planningRows = this.flexibleAssetDomain(rt).all().filter(vm => !vm.isDisabled && !vm.isStorage).map(vm => {
+      const planningRows = this.flexibleAssetDomain(rt).consumerAssets().filter(vm => !vm.isDisabled).map(vm => {
         const load=vm.raw||{}; const id=load.asset_id||load.flexible_asset_id||''; const planning=load.energy_planning||rt.planningOutcomeFor(id)||{};
         const amount=asNumber(firstDefined(planning.planned_today_kwh,planning.scheduled_kwh,planning.known_need_kwh,planning.energy_to_target_kwh,load.energy_to_target_kwh,load.required_energy_kwh));
         return amount===null?null:`<div class="outlookChildRow">${this.assetVisual(load,{size:'xs',fallbackIcon:this.flexibleAssetIcon(load)})}<b>${escapeHtml(load.display_name||rt.assetName(id)||human(id))}</b><strong>${escapeHtml(fmtKwh(amount))}</strong></div>`;
@@ -4238,7 +4238,7 @@
       const summary = rt.consumerMixSummary();
       const domain = this.flexibleAssetDomain(rt);
       const publishedById = new Map(publishedRows.map(row => [String(row.asset_id||row.consumer_id||row.id||''), row]));
-      const canonicalRows = domain.all().filter(vm => !vm.isStorage).map(vm => {
+      const canonicalRows = domain.consumerAssets().map(vm => {
         const raw = vm.raw || {};
         const published = publishedById.get(vm.id) || {};
         return {
@@ -4318,7 +4318,7 @@
         ${profilePicker || `<section class="panel"><h2>No strategy profiles published</h2><p>Waiting for canonical V2 strategy configuration.</p></section>`}
         <div class="profileEditorColumn">${selected ? this.strategyProfileCard(rt, selected) : ''}</div>
         <section class="panel effectivePolicyPreview"><h2>Current policy effect${selected ? ` · ${escapeHtml(this.profileUserLabel(selected))}` : ''}</h2><p>Configured, effective and influencing policy state.</p><div class="effectivePolicyList">${effectiveRows || `<div class="empty"><b>No effective strategy published</b><span>Waiting for canonical V2 effective strategy.</span></div>`}</div></section>
-        <section class="panel strategyParticipation"><h2>Participating assets</h2><p>The same central participation model used across Energy.</p><div class="effectivePolicyList">${this.flexibleAssetDomain(rt).all().filter(vm=>!vm.isStorage).map(vm=>`<div class="planningTransparencyRow"><div class="strategyAssetIdentity">${this.assetVisual(vm.raw,{size:'xs',fallbackIcon:this.flexibleAssetIcon(vm.raw)})}<div><b>${escapeHtml(rt.assetName(vm.id))}</b><span>${escapeHtml(vm.isDisabled?'Excluded from planning':'Included in flexible planning')}</span></div></div><strong>${escapeHtml(human(vm.participation))}</strong></div>`).join('') || `<div class="empty"><b>No flexible assets published</b></div>`}</div></section>
+        <section class="panel strategyParticipation"><h2>Participating assets</h2><p>The same central participation model used across Energy.</p><div class="effectivePolicyList">${this.flexibleAssetDomain(rt).consumerAssets().map(vm=>`<div class="planningTransparencyRow"><div class="strategyAssetIdentity">${this.assetVisual(vm.raw,{size:'xs',fallbackIcon:this.flexibleAssetIcon(vm.raw)})}<div><b>${escapeHtml(rt.assetName(vm.id))}</b><span>${escapeHtml(vm.isDisabled?'Excluded from planning':'Included in flexible planning')}</span></div></div><strong>${escapeHtml(human(vm.participation))}</strong></div>`).join('') || `<div class="empty"><b>No flexible assets published</b></div>`}</div></section>
       </div>`;
     }
 
@@ -4675,7 +4675,7 @@
         row.asset_id, row.consumer_id, row.consumer, row.source_asset_id,
         row.producer_asset_id, row.flexible_asset_id, row.target_asset_id
       ].map(v=>String(v||'').trim()).filter(Boolean);
-      const flexible = this.flexibleAssetDomain(rt).all().map(vm=>vm.raw || {});
+      const flexible = this.flexibleAssetDomain(rt).consumerAssets().map(vm=>vm.raw || {});
       const mix = rt.consumerMixRows?.() || [];
       const aliases = (asset)=>[
         asset.asset_id, asset.consumer_id, asset.consumer, asset.source_asset_id,
@@ -4898,8 +4898,9 @@
     }
     buildPlanningViewModel(rt) {
       const horizonId = this.selectedPlanningHorizonId || 'D0';
-      const domainAssets = this.flexibleAssetDomain(rt).all();
-      const assets = domainAssets.filter(vm => !vm.isDisabled && !vm.isStorage).map(vm => vm.raw);
+      const domain = this.flexibleAssetDomain(rt);
+      const domainAssets = domain.all();
+      const assets = domain.consumerAssets().filter(vm => !vm.isDisabled).map(vm => vm.raw);
       const storage = domainAssets.find(vm => vm.isStorage && !vm.isDisabled)?.raw || null;
       return createPlanningViewModel({ gateway: rt.contractGateway(), horizonId, flexibleAssets: assets, storage });
     }
