@@ -95,16 +95,23 @@
       // core.flexible.assets owns participation/planning semantics, while objects[]
       // carries richer producer identity such as visual_ref and charger linkage.
       // No semantic inference or cross-domain lookup is performed here.
+      const candidateVisualRefs = [
+        asset.visual_ref,
+        context.asset?.visual_ref
+      ].map(value => String(value || '').trim()).filter(Boolean);
+      const producerVisualRef = candidateVisualRefs.find(ref => !ref.startsWith('energy.logical.'))
+        || candidateVisualRefs[0]
+        || '';
       const materialized = context.asset
         ? {
             ...context.asset,
             ...asset,
-            // Producer identity from core.flexible.assets remains authoritative for
-            // cross-domain assets. Energy object context may enrich, never overwrite it.
+            // Prefer explicit producer/domain identity over any Energy-local
+            // presentation ref, regardless of which canonical V2 view supplied it.
             asset_id:id,
-            visual_ref:String(firstDefined(asset.visual_ref, context.asset.visual_ref, '') || '')
+            visual_ref:producerVisualRef
           }
-        : { ...asset, asset_id:id };
+        : { ...asset, asset_id:id, visual_ref:producerVisualRef };
       const participation = this.participationState(materialized, planning);
       return {
         id,
