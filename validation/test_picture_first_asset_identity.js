@@ -2,6 +2,8 @@ const fs = require('fs');
 
 const card = fs.readFileSync('src/app/energy-card.js','utf8');
 
+// Future producer visuals must require zero product-specific Energy mapping.
+
 const required = [
   'assetVisual(asset = {}',
   'assetIdentityChip(asset = {}',
