@@ -50,6 +50,14 @@ const runtime = {
     effective_connection_id:'charger_driveway',
     connection_state:'asset_connected'
   },{
+    asset_id:'vehicle_waiting',
+    source_asset_kind:'vehicle',
+    asset_type:'vehicle',
+    participation_state:'participating',
+    planning_input_ready:false,
+    current_power_kw:0,
+    visual_ref:'mobility.vehicle.generic.waiting'
+  },{
     asset_id:'charger_driveway',
     source_asset_kind:'charger',
     asset_type:'charger',
@@ -72,11 +80,12 @@ assert.equal(asset.raw.display_name,'VW ID4');
 assert.equal(asset.raw.effective_connection_id,'charger_driveway');
 assert.equal(asset.visualRef,'mobility.vehicle.volkswagen.id4.2024-2026.ev.costa-azul','canonical producer visual_ref must win over generic flexible projection');
 assert.equal(asset.raw.current_power_kw,0);
-assert.equal(domain.all().length,2);
-assert.equal(domain.consumerFacing().length,1,'charger infrastructure must not become a managed consumer');
+assert.equal(domain.all().length,3);
+assert.equal(domain.consumerFacing().length,2,'real vehicles remain consumer-facing even when temporarily not plan-ready');
 assert.equal(domain.infrastructure().length,1,'technical charger fallback remains represented as infrastructure');
 assert.equal(domain.infrastructure()[0].id,'charger_driveway');
-assert.equal(domain.planningParticipants().length,1,'only the vehicle is a planning participant');
+assert.equal(domain.planningParticipants().length,1,'only planning-ready managed consumers are Tactical participants');
+assert.equal(domain.consumerFacing().find(vm=>vm.id==='vehicle_waiting').isInfrastructure,false);
 assert.equal(domain.planningRows()[0].asset_id,'vehicle_id4');
 assert.equal(domain.physicalFlowParticipants()[0].id,'vehicle_id4');
 assert.equal(domain.physicalFlowParticipants().length,1,'charger-linked idle vehicle must remain in physical topology');
