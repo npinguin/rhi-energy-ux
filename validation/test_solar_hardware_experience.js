@@ -56,3 +56,17 @@ assert.match(app,/object-fit:contain/);
 assert.match(app,/object-position:center/);
 
 console.log("PASS Solar hardware experience: facts + visuals + measured-flow Q&A");
+
+
+const hierarchyStart = app.indexOf("\n    solarHardwareExperience(rt)");
+const hierarchyEnd = app.indexOf("\n    solarEnergyStory(rt)", hierarchyStart);
+const hierarchy = app.slice(hierarchyStart, hierarchyEnd);
+assert.match(app,/solarStringLink/);
+assert.match(app,/solarInverterCard/);
+assert.match(hierarchy,/stringsForInverter/);
+assert.match(hierarchy,/unassignedArrays/);
+assert.doesNotMatch(hierarchy,/const zoneCards = arrays\.map/);
+assert.doesNotMatch(hierarchy,/'Solar zones'/);
+assert.match(app,/SOLAR STRING/);
+assert.match(app,/data-solar-string/);
+assert.match(app,/Canonical parent relation links this string to its inverter/);
