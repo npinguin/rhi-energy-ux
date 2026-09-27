@@ -3,9 +3,9 @@
   "ux_version": "4.3.5",
   "energy_contract": {
     "minimum": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-    "minimum_backend": "E0.15.69",
+    "minimum_backend": "E0.15.71",
     "tested_backend_releases": [
-      "E0.15.69"
+      "E0.15.71"
     ],
     "required_contracts": [
       "RHI_ENERGY_PUBLIC_CONTRACT_V2",
@@ -20,13 +20,13 @@
   },
   "ux_core": {
     "package": "rhi-ux-core",
-    "version": "1.5.0",
-    "source_commit": "667b6f4274ffd0855d51444cb2eb27891a5ab398",
+    "version": "1.5.1",
+    "source_commit": "26629d0eb8b64c3928c9db7ee7c3c44e64de476f",
     "runtime_dependency": false,
     "branding_owner": "rhi-ux-core"
   },
   "foundation": {
-    "minimum_release": "F1.8.23",
+    "minimum_release": "F1.8.25",
     "visual_registry_contract": "RHI_VISUAL_ASSET_REGISTRY_V1",
     "minimum_contract_version": "1.1.0"
   },
