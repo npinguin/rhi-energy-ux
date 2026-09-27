@@ -36,6 +36,8 @@ const runtime = {
   primaryFlexibleAssets: () => [{
     asset_id:'vehicle_id4',
     participation_state:'participating',
+    visual_ref:'energy.flexible_load.generic',
+    source_domain:'rhi_energy',
     current_power_kw:0
   }],
   planningIndexRows: () => [{asset_id:'vehicle_id4',planned_today_kwh:5.4}],
@@ -48,7 +50,8 @@ const domain = new context.FlexibleAssetDomainModel(runtime);
 const asset = domain.all()[0];
 assert.equal(asset.raw.display_name,'VW ID4');
 assert.equal(asset.raw.charger_asset_id,'charger_driveway');
-assert.equal(asset.visualRef,'mobility.vehicle.volkswagen.id4.2024-2026.ev.costa-azul');
+assert.equal(asset.visualRef,'mobility.vehicle.volkswagen.id4.2024-2026.ev.costa-azul','producer object visual_ref must override generic flexible projection');
+assert.equal(asset.raw.source_domain,'','generic flexible projection must not relabel producer ownership when canonical producer source is absent');
 assert.equal(asset.raw.current_power_kw,0);
 assert.equal(domain.planningRows()[0].asset_id,'vehicle_id4');
 assert.equal(domain.physicalFlowParticipants()[0].id,'vehicle_id4');
