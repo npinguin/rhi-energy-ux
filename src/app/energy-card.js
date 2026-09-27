@@ -3385,13 +3385,89 @@
       });
       return [...byId.values()];
     }
-    canonicalConnectionSnapshot(_rt) {
+    canonicalConnectionSnapshot(rt) {
+      // Connection materialization is projection-only: consume explicit public
+      // V2 asset links/relationships and asset-scoped measurements. Do not infer
+      // charger assignments from names and do not recalculate Energy aggregates.
+      const rows = new Map();
+      const assetType = asset => String(firstDefined(asset?.asset_type, asset?.object_class, '') || '').trim().toLowerCase();
+      const isCharger = asset => /(^|_)(charger|charging_point|charge_point)(_|$)/.test(assetType(asset));
+      const materialize = (chargerId, consumerId = '', relationship = {}) => {
+        const chargerKey = String(chargerId || '').trim();
+        const consumerKey = String(consumerId || '').trim();
+        if (!chargerKey) return;
+        const charger = rt.asset(chargerKey) || {};
+        const consumer = consumerKey ? (rt.asset(consumerKey) || {}) : {};
+        const power = asNumber(firstDefined(
+          charger.actual_power_kw,
+          charger.current_power_kw,
+          charger.power_kw,
+          rt.number(`${chargerKey}.actual_power_kw`),
+          rt.number(`${chargerKey}.current_power_kw`),
+          rt.number(`${chargerKey}.power_kw`)
+        ));
+        const row = {
+          ...charger,
+          asset_id:chargerKey,
+          connection_asset_id:chargerKey,
+          connected_consumer_id:consumerKey,
+          connected_consumer_visual_ref:String(firstDefined(consumer.visual_ref, '') || ''),
+          connection_state:String(firstDefined(
+            relationship.connection_state,
+            relationship.state,
+            charger.connection_state,
+            consumer.connection_state,
+            consumer.connected === true ? 'connected' : ''
+          ) || ''),
+          operating_state:String(firstDefined(
+            charger.operating_state,
+            charger.operation_state,
+            consumer.operating_state,
+            consumer.operation_state,
+            ''
+          ) || ''),
+          physical_power_kw:power,
+          visual_ref:String(firstDefined(charger.visual_ref, '') || ''),
+          source_relationship_id:String(firstDefined(relationship.relationship_id, relationship.id, '') || '')
+        };
+        rows.set(`${chargerKey}::${consumerKey}`, row);
+      };
+
+      // Flexible assets may publish their exact execution/charger target directly.
+      this.flexibleAssetDomain(rt).all()
+        .filter(vm => !vm.isDisabled && !vm.isStorage)
+        .forEach(vm => {
+          const asset = vm.raw || {};
+          const chargerId = firstDefined(
+            asset.effective_charger,
+            asset.charger_asset_id,
+            asset.connection_asset_id,
+            asset.execution_target_asset_id,
+            ''
+          );
+          if (chargerId) materialize(chargerId, vm.id, { connection_state:asset.connection_state });
+        });
+
+      // Public connected_to relationships remain authoritative when present.
+      rt.connectedRelationships().forEach(relationship => {
+        const fromId = String(firstDefined(relationship.from_asset_id, relationship.source_asset_id, '') || '');
+        const toId = String(firstDefined(relationship.to_asset_id, relationship.target_asset_id, '') || '');
+        if (!fromId || !toId) return;
+        const from = rt.asset(fromId) || {};
+        const to = rt.asset(toId) || {};
+        if (isCharger(from)) materialize(fromId, toId, relationship);
+        else if (isCharger(to)) materialize(toId, fromId, relationship);
+      });
+
+      const projected = Object.freeze([...rows.values()].map(row => Object.freeze(row)));
+      const observedAt = projected.map(row => String(firstDefined(row.observed_at, row.updated_at, '') || '')).filter(Boolean).sort().pop() || '';
       return Object.freeze({
-        available:false,
-        rows:Object.freeze([]),
+        available:rt.publicV2().available === true,
+        rows:projected,
+        // Deliberately not derived from row power: Energy aggregate truth stays backend-owned.
         totalPowerKw:null,
-        observedAt:'',
-        reason:'Canonical physical connection telemetry is not published by E0.15.48.',
+        observedAt,
+        reason:projected.length ? '' : 'No explicit charging connection is currently published.',
         source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
       });
     }
