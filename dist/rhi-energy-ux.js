@@ -6902,9 +6902,7 @@ function rhiEnergyVisualPickerStyles() {
         const model = { ...p, title:'Solar generation', badgeText:'Structure ready', badgeTone:'neutral' };
         return `${this.tabExperienceHeader(rt,'solar-generation',model)}<section class="panel navigationPlaceholder"><small>ENERGY DOMAIN</small><h2>Solar generation content follows in the next screen pass</h2><p>The navigation and premium header are now in their final structural location. Inverter, panel and storage-link content is intentionally not moved into this release.</p></section>`;
       }
-      const p = this.buildPageViewModel(rt, 'intelligence');
-      const model = { ...p, image:hbEnergyHeroAsset('intelligence'), icon:'◇', title:'Strategic planning', value:'—', unit:'longer-term horizon', explanation:'Longer-term goals, constraints and optimisation', badgeText:'Structure ready', badgeTone:'neutral', metrics:[['◎','Horizon','—','Longer-term'],['◇','Goals','—','Not migrated yet'],['◫','Constraints','—','Not migrated yet'],['↗','Optimisation','—','Not migrated yet']] };
-      return `${this.tabExperienceHeader(rt,'strategic-planning',model)}<section class="panel navigationPlaceholder"><small>INTELLIGENCE</small><h2>Strategic planning content follows in the next screen pass</h2><p>The navigation position is established without inventing or relocating strategic planning semantics in this release.</p></section>`;
+      return `<section class="panel navigationPlaceholder"><h2>${escapeHtml(human(view))}</h2><p>This navigation target has no dedicated renderer.</p></section>`;
     }
     placeholder(rt) {
       return `<section class="panel cleanPlaceholder"><h2>${escapeHtml(this.title())}</h2><p>This screen is outside the current clean rewrite scope. All V1 screens are active on the R1.56 public contract runtime.</p><div class="softBox"><b>Migration scope</b><span>Metering, Intelligence and Value are now clean active screens. Style cleanup stays for the final polish round.</span></div></section>`;
