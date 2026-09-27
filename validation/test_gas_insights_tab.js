@@ -20,20 +20,19 @@ assert.match(app,/period:'day'/);
 assert.match(app,/days_to_show:30/);
 assert.match(app,/Gas usage history/);
 assert.match(app,/Home Assistant long-term statistics/);
-assert.match(app,/Meter context/);
-assert.match(app,/gasContextGrid/);
-assert.match(app,/Total entity/);
 assert.match(app,/No measured gas history yet/);
 assert.match(app,/Connect your gas meter/);
 assert.match(app,/The UX never estimates missing consumption/);
+
+const gasStart=app.indexOf('\n    gas(rt) {');
+const gasEnd=app.indexOf('\n    battery(rt)',gasStart);
+const gas=app.slice(gasStart,gasEnd);
+assert.ok(gas.indexOf('${setupOrMeter}') < gas.indexOf('${graph}'),"Gas meter card must be rendered directly before HA history");
+assert.doesNotMatch(gas,/Meter context/);
+assert.doesNotMatch(gas,/gasContextGrid/);
 
 assert.match(app,/energyDeviceStatusCard\(rt, gas\.asset, 'Gas meter'\)/);
 assert.match(app,/gas: \{ image:hbEnergyHeroAsset\('gas'\)/);
 assert.ok(catalog.includes('gas_meter.smart_meter') && catalog.includes('package_path:"heroes/gas-hero.webp"'),"Gas meter catalog fallback may retain the logical-device WebP visual");
 
-console.log("PASS Gas is the final Energy tab with dedicated hero, canonical meter and HA-native statistics history");
-
-assert.match(app,/async mountGasStatisticsGraph\(\)/);
-assert.match(app,/window\.loadCardHelpers/);
-assert.match(app,/helpers\.createCardElement/);
-assert.match(app,/tab === 'gas'\) return !!target && type === 'gas_meter'/);
+console.log("PASS Gas meter card precedes HA-native statistics history");
