@@ -14,17 +14,18 @@ Read in this order:
 1. `README.md`
 2. `docs/ARCHITECTURE.md`
 3. `docs/RELEASE_GOVERNANCE.md`
-- `docs/UX_REPOSITORY_STANDARD.md`
-4. `docs/SOURCE_PACKAGE_GOVERNANCE.md`
-5. `src/OWNERSHIP.json`
-6. `src/manifest.json`
-7. `docs/TEST_GOVERNANCE.md`
-8. `validation/OWNERSHIP.json`
-9. `docs/DRIFT_PREVENTION.md`
-10. `docs/BRANDING.md`
-11. `docs/UX_FOOTER_STANDARD.md`
-12. `release/product.json`
-13. `release/QUALIFICATION.json`
+4. `docs/UX_REPOSITORY_STANDARD.md`
+5. `docs/SOURCE_PACKAGE_GOVERNANCE.md`
+6. `src/OWNERSHIP.json`
+7. `src/manifest.json`
+8. `docs/TEST_GOVERNANCE.md`
+9. `validation/OWNERSHIP.json`
+10. `docs/DRIFT_PREVENTION.md`
+11. `docs/BRANDING.md`
+12. `docs/HACS_PLUGIN_STANDARD.md`
+13. `docs/UX_FOOTER_STANDARD.md`
+14. `release/product.json`
+15. `release/QUALIFICATION.json`
 
 ## Product boundary
 
@@ -84,7 +85,7 @@ branch
 → squash merge
 → verify complete committed dist package
 → create or verify immutable tag (no rebuild)
-→ normal GitHub Release with evidence assets only
+→ normal GitHub Release with zero release assets
 → HACS-visible TEST CANDIDATE
 → target HA runtime + rollback proof
 → qualification bound to exact tag/SHA
