@@ -1121,6 +1121,7 @@
         retrospective:['retrospective']
       };
       const keys = ['release', ...(byView[this.view] || [])];
+      if (UX_INTERFACES.visualRegistry) keys.push('visualRegistry');
       return [...new Set(keys.map(key => UX_INTERFACES[key]).filter(Boolean))];
     }
     runtimeSignature() {
@@ -3510,7 +3511,7 @@
         consumerId ? (rt.assetName(consumerId) || human(consumerId)) : '',
         operatingState ? human(operatingState) : ''
       ].filter(Boolean).join(' · ');
-      const visual = typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(charger.visual_ref) : null;
+      const visual = typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(charger.visual_ref, rt.hass, 'card') : null;
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
       return `<div class="flowConnectionCard">${art}<div><b>${escapeHtml(charger.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(context || 'Connection state unavailable')}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
@@ -3526,7 +3527,7 @@
       const charger = firstDefined(consumer.effective_charger, consumer.charger_asset_id, consumer.connection_asset_id, consumer.execution_target_asset_id, '');
       const requested = asNumber(firstDefined(consumer.requested_power_kw_effective, consumer.requested_power_kw));
       const state = charging ? 'Charging' : active || (power !== null && power > 0.05) ? 'Active' : connected ? 'Connected' : available ? 'Available' : 'Unavailable';
-      const visual = typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(consumer.visual_ref) : null;
+      const visual = typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(consumer.visual_ref, rt.hass, 'card') : null;
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
       return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(state)}${charger ? ` · ${escapeHtml(rt.assetName(charger) || human(charger))}` : ''}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
@@ -4653,18 +4654,32 @@
       return out;
     }
 
+    planningAssetKind(asset = {}) {
+      const visualRef = String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
+      const registered = visualRef && typeof rhiVisualRegistryEntry === 'function'
+        ? rhiVisualRegistryEntry(this._hass || {}, visualRef)
+        : null;
+      return String(firstDefined(
+        registered?.asset_type,
+        asset.producer_asset_type,
+        asset.object_class,
+        asset.asset_type,
+        asset.flexible_role,
+        ''
+      ) || '').trim().toLowerCase();
+    }
     planningAssetIcon(asset = {}) {
-      const text = `${asset.asset_type || ''} ${asset.flexible_role || ''} ${asset.name || asset.display_name || ''}`.toLowerCase();
-      if (/battery|storage/.test(text)) return '🔋';
-      if (/car|vehicle|ev/.test(text)) return '🚘';
-      if (/charger|wallbox|sideway/.test(text)) return '⚡';
+      const kind = this.planningAssetKind(asset);
+      if (/battery|storage/.test(kind)) return '🔋';
+      if (/vehicle/.test(kind)) return '🚘';
+      if (/charger|charging_point|charge_point/.test(kind)) return '⚡';
       return '◆';
     }
     planningAssetTone(asset = {}) {
-      const text = `${asset.asset_type || ''} ${asset.flexible_role || ''} ${asset.name || asset.display_name || ''}`.toLowerCase();
-      if (/battery|storage/.test(text)) return 'green';
-      if (/charger|wallbox|sideway/.test(text)) return 'orange';
-      if (/car|vehicle|ev/.test(text)) return 'purple';
+      const kind = this.planningAssetKind(asset);
+      if (/battery|storage/.test(kind)) return 'green';
+      if (/charger|charging_point|charge_point/.test(kind)) return 'orange';
+      if (/vehicle/.test(kind)) return 'purple';
       return 'blue';
     }
     planningIconBadge(icon, tone = 'blue', extra = '') {
@@ -4676,13 +4691,18 @@
     assetVisual(asset = {}, { size = 'md', fallbackIcon = '◆', decorative = true } = {}) {
       const visualRef = String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
       const resolved = typeof resolveEnergyAssetVisual === 'function'
-        ? resolveEnergyAssetVisual(asset)
-        : (visualRef && typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(visualRef) : null);
+        ? resolveEnergyAssetVisual(asset, this._hass || {}, size === 'lg' ? 'detail' : 'card')
+        : (visualRef && typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(visualRef, this._hass || {}, 'card') : null);
       const label = this.planningAssetName(asset);
       const assetId = String(firstDefined(asset.asset_id, asset.id, '') || '').trim();
       const assetType = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
       const pickerChoices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(assetType) : [];
-      const canPick = !!assetId && !visualRef.startsWith('mobility.') && pickerChoices.length > 0;
+      const registeredVisual = visualRef && typeof rhiVisualRegistryEntry === 'function'
+        ? rhiVisualRegistryEntry(this._hass || {}, visualRef)
+        : null;
+      const canPick = !!assetId
+        && (!registeredVisual || ['rhi_energy','energy'].includes(String(registeredVisual.owner_domain || '')))
+        && pickerChoices.length > 0;
       const pickerAttrs = canPick
         ? ` data-energy-visual-open="${escapeHtml(assetId)}" role="button" tabindex="0" title="Choose representative image"`
         : '';
