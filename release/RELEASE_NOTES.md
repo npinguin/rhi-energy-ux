@@ -1,15 +1,13 @@
-# v4.2.6 — Gas hero and information-detail closure TEST CANDIDATE
+# v4.2.7 — Gas hero binary integrity TEST CANDIDATE
 
-This release closes the remaining visible Energy UX issues after the 4.2.x convergence work.
+This hotfix preserves the 4.2.6 UX-detail closure and fixes the remaining Gas hero rendering failure.
 
-- fixes the Gas hero to use the approved packaged `gas-hero.webp` artwork;
-- rejects the obsolete SVG transport so the hero cannot silently drift back;
-- preserves Hero → Status → one Page Controls bar → Body as the only page composition;
-- keeps the single status layer and single page-controls surface introduced in the prior releases;
-- when canonical live facts are unavailable for a physical Energy device, keeps relevant Source, Profile, Parent and Publication context visible directly in the card instead of collapsing to one generic unavailable message;
-- retains the deeper expandable Details disclosure for asset id, type, lifecycle, publication evidence and missing fields;
-- keeps backend-owned runtime truth authoritative and does not invent missing telemetry.
+- replaces the corrupt file that carried a `.webp` extension without valid WebP bytes;
+- packages the approved Gas hero as a real RIFF/WEBP image;
+- adds a release-blocking magic-byte check so an invalid WebP cannot pass validation again;
+- preserves the 4.2.6 single page-controls surface, Hero → Status → Page Controls → Body order and richer physical-device detail context;
+- keeps runtime truth backend-owned and does not invent missing telemetry.
 
-Rollback: v4.2.5.
+Rollback: v4.2.6.
 
-Target Home Assistant render, desktop/iPad proof, functional journey, refresh/restart, upgrade and rollback proof remain separate runtime qualification gates.
+Target Home Assistant render, iPad/desktop proof, functional journey, refresh/restart, upgrade and rollback proof remain separate runtime qualification gates.
