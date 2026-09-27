@@ -21,19 +21,24 @@ for (const obsolete of [
 for (const required of [
   'solarValueFlow',
   'Solar',
-  'Home',
   'Battery',
+  'Home',
   'Grid',
   'fmtKw(solar',
   'fmtKw(site',
   'data-scroll-target="solar-production-detail"',
-  'data-scroll-target="solar-inverter-detail"',
   'data-scroll-target="solar-battery-detail"'
 ]) {
   assert.ok(story.includes(required), 'compact solar value flow missing: ' + required);
 }
 assert.ok(app.includes("solarHardwareSection('Solar production'"), 'solar production detail remains available');
-assert.ok(app.includes("solarHardwareSection(\n        'Inverter system'"), 'inverter detail remains available');
+assert.ok(app.includes("solarHardwareSection(\n        'Inverter system'"), 'inverter detail remains available outside the primary flow');
+assert.ok(!story.includes('data-scroll-target="solar-inverter-detail"'), 'inverter must not be a primary flow node');
+const solarAt = story.indexOf('<small>Solar</small>');
+const batteryAt = story.indexOf('<small>Battery</small>');
+const homeAt = story.indexOf('<small>Home</small>');
+const gridAt = story.indexOf('<small>Grid</small>');
+assert.ok(solarAt < batteryAt && batteryAt < homeAt && homeAt < gridAt, 'primary flow order must be Solar > Battery > Home <> Grid');
 assert.ok(app.includes("solarHardwareSection(\n        'Home Battery'"), 'battery detail remains available');
 assert.ok(app.includes('id="solar-production-detail"'), 'solar production has scroll target');
 assert.ok(app.includes('id="solar-inverter-detail"'), 'inverter system has scroll target');
