@@ -1,3 +1,12 @@
+## 4.2.5 — UX convergence and flexible flow
+
+- restores canonical flexible-device identity and charger/vehicle connection projection in Flow and Planning;
+- restores the Gas hero through the packaged SVG transport;
+- separates page context/navigation from executable commands while keeping one page-control surface;
+- keeps Hero, Status and shared action grammar Core-owned;
+- blocks hardcoded backend-release assumptions in runtime UX code;
+- ratchets historical Energy presentation debt so legacy styling can only decrease.
+
 ## 4.2.3 — information density and single action bar
 
 - fixes legacy Quick Actions injection and keeps one canonical action bar;
