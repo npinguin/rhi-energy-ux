@@ -33,6 +33,16 @@ compat["ux_core"] = {
     **dict(product.get("ux_core") or {}),
     "runtime_dependency": False,
 }
+compat["foundation"] = {
+    **dict(compat.get("foundation") or {}),
+    "minimum_release": product.get("minimum_foundation"),
+    "visual_registry_contract": "RHI_VISUAL_ASSET_REGISTRY_V1",
+    "minimum_contract_version": "1.1.0",
+}
+compat["mobility"] = {
+    **dict(compat.get("mobility") or {}),
+    "minimum_release_for_cross_domain_visuals": product.get("minimum_mobility_for_cross_domain_visuals"),
+}
 write("COMPATIBILITY.json", compat)
 
 manifest = read("RELEASE_MANIFEST.json")
@@ -54,6 +64,8 @@ manifest["ux_core"] = {
     **dict(product.get("ux_core") or {}),
     "runtime_dependency": False,
 }
+manifest["minimum_foundation"] = product.get("minimum_foundation")
+manifest["minimum_mobility_for_cross_domain_visuals"] = product.get("minimum_mobility_for_cross_domain_visuals")
 write("RELEASE_MANIFEST.json", manifest)
 
 status = read("release/RELEASE_STATUS.json")
@@ -68,6 +80,8 @@ status["ux_core"] = {
     **dict(product.get("ux_core") or {}),
     "runtime_dependency": False,
 }
+status["minimum_foundation"] = product.get("minimum_foundation")
+status["minimum_mobility_for_cross_domain_visuals"] = product.get("minimum_mobility_for_cross_domain_visuals")
 write("release/RELEASE_STATUS.json", status)
 
 qualification = read("release/QUALIFICATION.json")
