@@ -3357,7 +3357,16 @@
     solarHardwareExperience(rt) {
       const assets = rt.assets().map(asset=>this.energyAssetContext(rt,asset));
       const production = assets.filter(asset=>this.energyAssetType(asset)==='solar_production');
-      const arrays = assets.filter(asset=>['solar_array','solar_zone'].includes(this.energyAssetType(asset)));
+      const arrays = assets
+        .filter(asset=>['solar_array','solar_zone'].includes(this.energyAssetType(asset)))
+        .sort((left,right) => {
+          const leftId = String(firstDefined(left.asset_id,left.id,'') || '');
+          const rightId = String(firstDefined(right.asset_id,right.id,'') || '');
+          const leftName = String(firstDefined(left.display_name,left.name,rt.assetName(leftId),human(leftId),'') || '');
+          const rightName = String(firstDefined(right.display_name,right.name,rt.assetName(rightId),human(rightId),'') || '');
+          const byName = leftName.localeCompare(rightName, undefined, { sensitivity:'base', numeric:true });
+          return byName || leftId.localeCompare(rightId, undefined, { sensitivity:'base', numeric:true });
+        });
       const panels = assets.filter(asset=>this.energyAssetType(asset)==='solar_panel');
       const inverters = assets.filter(asset=>this.energyAssetType(asset)==='solar_inverter');
       const systems = assets.filter(asset=>['battery_system','home_battery_system'].includes(this.energyAssetType(asset)));
