@@ -6,6 +6,7 @@ normative = [
     "docs/ARCHITECTURE.md",
     "docs/BRANDING.md",
     "docs/ENGINEER_HANDOVER.md",
+    "docs/HACS_PLUGIN_STANDARD.md",
     "docs/RELEASE_GOVERNANCE.md",
     "docs/SOURCE_PACKAGE_GOVERNANCE.md",
     "docs/TEST_GOVERNANCE.md",
@@ -22,6 +23,7 @@ branding = (ROOT / "docs/BRANDING.md").read_text(encoding="utf-8")
 architecture = (ROOT / "docs/ARCHITECTURE.md").read_text(encoding="utf-8")
 handover = (ROOT / "docs/ENGINEER_HANDOVER.md").read_text(encoding="utf-8")
 source_gov = (ROOT / "docs/SOURCE_PACKAGE_GOVERNANCE.md").read_text(encoding="utf-8")
+hacs_standard = (ROOT / "docs/HACS_PLUGIN_STANDARD.md").read_text(encoding="utf-8")
 
 for rel, text in (("README.md", readme), ("docs/BRANDING.md", branding)):
     if "source/assets/" in text:
@@ -32,6 +34,13 @@ if "source/modules/" in architecture or "source/homebrain-energy-card.js" in arc
     failures.append("docs/ARCHITECTURE.md: obsolete source ownership path")
 if "source/homebrain-energy-card.js" in handover or "source/modules/" in handover:
     failures.append("docs/ENGINEER_HANDOVER.md: obsolete source ownership path")
+if (ROOT / "documentation").exists():
+    failures.append("legacy documentation/ root must not exist; use docs/")
+if "zero assets" not in hacs_standard or "content_in_root" not in hacs_standard:
+    failures.append("docs/HACS_PLUGIN_STANDARD.md: incomplete canonical HACS release rules")
+if "evidence assets only" in handover:
+    failures.append("docs/ENGINEER_HANDOVER.md: stale release-asset guidance")
+
 for token in ("app/", "runtime/", "domain/", "assets/", "dist/PACKAGE_MANIFEST.json", "Migration sequence"):
     if token not in source_gov:
         failures.append(f"SOURCE_PACKAGE_GOVERNANCE missing {token}")
