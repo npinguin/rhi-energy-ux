@@ -31,6 +31,8 @@ function readEnergyPublicV2(gateway) {
   const commands = array(attrs.commands);
   const activity = array(attrs.activity);
   const planning = object(attrs.planning);
+  const metering = object(attrs.metering);
+  const retrospective = object(attrs.retrospective);
   const intelligence = object(attrs.intelligence);
   const overview = object(attrs.overview);
   const configuration = object(attrs.configuration);
@@ -169,6 +171,8 @@ function readEnergyPublicV2(gateway) {
     relationships:Array.isArray(relationships),
     connections:Array.isArray(connections),
     planning:Object.keys(object(planning.horizons)).length > 0,
+    metering:Object.keys(object(metering.periods)).length > 0,
+    retrospective:Object.keys(retrospective).length > 0,
     pricing:Object.keys(pricing).length > 0,
     metering_configuration:Object.keys(metering).length > 0,
     strategy:Object.keys(strategy).length > 0,
@@ -198,6 +202,8 @@ function readEnergyPublicV2(gateway) {
     relationships,
     connections,
     planning,
+    metering,
+    retrospective,
     intelligence,
     overview,
     configuration,
