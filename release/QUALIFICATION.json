@@ -1,8 +1,8 @@
 {
-  "version": "4.3.9",
-  "candidate_tag": "v4.3.9",
+  "version": "4.3.10",
+  "candidate_tag": "v4.3.10",
   "candidate_sha": "pending",
-  "previous_release": "4.3.8",
+  "previous_release": "4.3.9",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -30,5 +30,8 @@
   "physical_consumer_target_identity": "NOT_EXECUTED",
   "mobility_registry_visuals": "NOT_EXECUTED",
   "charging_connection_deduplication": "NOT_EXECUTED",
-  "producer_visual_precedence": "NOT_EXECUTED"
+  "producer_visual_precedence": "NOT_EXECUTED",
+  "managed_consumer_semantics": "NOT_EXECUTED",
+  "infrastructure_exclusion_all_surfaces": "NOT_EXECUTED",
+  "vehicle_visual_identity_precedence": "NOT_EXECUTED"
 }
