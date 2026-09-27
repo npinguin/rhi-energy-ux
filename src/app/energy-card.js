@@ -4257,7 +4257,14 @@
         };
       });
       const canonicalIds = new Set(canonicalRows.map(row => String(row.asset_id||row.consumer_id||row.id||'')));
-      const rows = canonicalRows.concat(publishedRows.filter(row => !canonicalIds.has(String(row.asset_id||row.consumer_id||row.id||''))));
+      const rows = canonicalRows.concat(publishedRows.filter(row => {
+        const id = String(row.asset_id||row.consumer_id||row.id||'');
+        if (canonicalIds.has(id)) return false;
+        const vm = domain.byId(id);
+        if (vm) return !vm.isInfrastructure && !vm.isStorage;
+        const kind = String(firstDefined(row.source_asset_kind,row.asset_type,row.object_class,row.energy_asset_role,'') || '').toLowerCase();
+        return !/(^|_)(charger|connection|charging_point)(_|$)/.test(kind);
+      }));
       const visibleRows = this.filterAndSortConsumers(rows);
       const participating = visibleRows.filter(row => { const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return !vm || (vm.isParticipating && !vm.isDisabled); });
       const disabled = visibleRows.filter(row => domain.byId(row.asset_id||row.consumer_id||row.id)?.isDisabled);
@@ -4322,7 +4329,7 @@
         ${profilePicker || `<section class="panel"><h2>No strategy profiles published</h2><p>Waiting for canonical V2 strategy configuration.</p></section>`}
         <div class="profileEditorColumn">${selected ? this.strategyProfileCard(rt, selected) : ''}</div>
         <section class="panel effectivePolicyPreview"><h2>Current policy effect${selected ? ` · ${escapeHtml(this.profileUserLabel(selected))}` : ''}</h2><p>Configured, effective and influencing policy state.</p><div class="effectivePolicyList">${effectiveRows || `<div class="empty"><b>No effective strategy published</b><span>Waiting for canonical V2 effective strategy.</span></div>`}</div></section>
-        <section class="panel strategyParticipation"><h2>Participating assets</h2><p>The same central participation model used across Energy.</p><div class="effectivePolicyList">${this.flexibleAssetDomain(rt).all().filter(vm=>!vm.isStorage).map(vm=>`<div class="planningTransparencyRow"><div class="strategyAssetIdentity">${this.assetVisual(vm.raw,{size:'xs',fallbackIcon:this.flexibleAssetIcon(vm.raw)})}<div><b>${escapeHtml(rt.assetName(vm.id))}</b><span>${escapeHtml(vm.isDisabled?'Excluded from planning':'Included in flexible planning')}</span></div></div><strong>${escapeHtml(human(vm.participation))}</strong></div>`).join('') || `<div class="empty"><b>No flexible assets published</b></div>`}</div></section>
+        <section class="panel strategyParticipation"><h2>Participating assets</h2><p>The same central participation model used across Energy.</p><div class="effectivePolicyList">${this.flexibleAssetDomain(rt).consumerFacing().map(vm=>`<div class="planningTransparencyRow"><div class="strategyAssetIdentity">${this.assetVisual(vm.raw,{size:'xs',fallbackIcon:this.flexibleAssetIcon(vm.raw)})}<div><b>${escapeHtml(rt.assetName(vm.id))}</b><span>${escapeHtml(vm.isDisabled?'Excluded from planning':'Included in flexible planning')}</span></div></div><strong>${escapeHtml(human(vm.participation))}</strong></div>`).join('') || `<div class="empty"><b>No flexible assets published</b></div>`}</div></section>
       </div>`;
     }
 
