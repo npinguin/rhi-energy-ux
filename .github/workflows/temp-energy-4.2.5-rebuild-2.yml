@@ -1,0 +1,39 @@
+name: Temporary Energy 4.2.5 rebuild after invariant fix
+
+on:
+  push:
+    branches:
+      - cleanup/energy-ux-convergence-main
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: cleanup/energy-ux-convergence-main
+          fetch-depth: 0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run build
+      - name: Commit deterministic package
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "build: refresh Energy UX 4.2.5 after invariant fix"
+          git push origin HEAD:cleanup/energy-ux-convergence-main
