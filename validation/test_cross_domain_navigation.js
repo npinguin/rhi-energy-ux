@@ -16,7 +16,7 @@ const storage=(()=>{const data={};return {getItem:k=>data[k]??null,setItem:(k,v)
 const context={globalThis:{localStorage:storage},String,Object,Array,JSON,encodeURIComponent};
 vm.createContext(context);
 vm.runInContext(core,context);
-if(!context.rhiUxRegisterDomainNavigation({domain:'rhi_future_domain',assetDetailTemplate:'/future-root/asset?asset=__RHI_ASSET_ID__'},storage)) throw new Error('producer route registration failed');
+if(!context.rhiUxRegisterDomainNavigation({domain:'rhi_future_domain',assetDetailTemplate:'/future-root/asset?asset={asset_id}'},storage)) throw new Error('producer route registration failed');
 const route=context.rhiUxResolveDomainAssetNavigation('rhi_future_domain','asset 42',storage);
 if(route!=='/future-root/asset?asset=asset%2042') throw new Error('generic producer route resolution failed');
 if(context.rhiUxResolveDomainAssetNavigation('rhi_unknown','asset 42',storage)!=='') throw new Error('missing producer route must remain optional');
