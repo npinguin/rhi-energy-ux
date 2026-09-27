@@ -3366,9 +3366,10 @@
     energyAssetParentId(asset = {}) {
       return String(firstDefined(asset.parent_asset_id,asset.parent_id,asset.system_asset_id,asset.group_asset_id,asset.array_asset_id,asset.zone_asset_id,'') || '').trim();
     }
-    solarHardwareSection(title, description, body, meta = '') {
+    solarHardwareSection(title, description, body, meta = '', anchorId = '') {
       if (!body) return '';
-      return `<section class="panel solarHardwareSection"><div class="solarHardwareSectionHead"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${meta ? `<span>${escapeHtml(meta)}</span>` : ''}</div>${body}</section>`;
+      const anchor = anchorId ? ` id="${escapeHtml(anchorId)}"` : '';
+      return `<section class="panel solarHardwareSection"${anchor}><div class="solarHardwareSectionHead"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${meta ? `<span>${escapeHtml(meta)}</span>` : ''}</div>${body}</section>`;
     }
     solarModuleCard(rt, panel, optimizers = []) {
       const enriched = this.energyAssetContext(rt,panel);
@@ -3477,7 +3478,8 @@
         'Inverter system',
         'Physical inverters with their canonically linked strings.',
         `<div class="solarInverterGrid">${inverters.map(asset=>this.solarInverterCard(rt,asset,stringsForInverter(asset),panelsFor,optimizersFor)).join('')}</div>`,
-        `${inverters.length} inverter${inverters.length===1?'':'s'}`
+        `${inverters.length} inverter${inverters.length===1?'':'s'}`,
+        'solar-inverter-detail'
       );
     }
     solarBatterySystem(rt, systems = [], batteries = []) {
@@ -3487,7 +3489,13 @@
         ? this.energyDeviceStatusCard(rt,system,'Battery system')
         : `<div class="solarSystemSummary"><div><small>BATTERY SYSTEM</small><h3>Home Battery System</h3><p>No aggregate battery-system object is currently published.</p></div><div class="solarAggregateFacts"><span><small>Batteries</small><b>${batteries.length}</b></span></div></div>`;
       const children = batteries.length ? `<div class="solarChildGrid">${batteries.map(asset=>this.batteryChildCard(rt,String(firstDefined(asset.asset_id,asset.id,'') || ''))).join('')}</div>` : '';
-      return this.solarHardwareSection('Battery system','Storage connected to the solar/home energy system. Aggregate storage state with the physical batteries shown underneath.',head+children,`${batteries.length} batter${batteries.length===1?'y':'ies'}`);
+      return this.solarHardwareSection(
+        'Home Battery',
+        'Storage system with its physical batteries.',
+        head+children,
+        `${batteries.length} batter${batteries.length===1?'y':'ies'}`,
+        'solar-battery-detail'
+      );
     }
 
     solarHardwareExperience(rt) {
@@ -3544,7 +3552,8 @@
         'Solar production',
         'Aggregate production objects for the current solar system.',
         `<div class="energyDeviceGrid">${production.map(asset=>this.energyDeviceStatusCard(rt,asset,'Solar production')).join('')}</div>`,
-        `${production.length} system${production.length===1?'':'s'}`
+        `${production.length} system${production.length===1?'':'s'}`,
+        'solar-production-detail'
       ) : '';
       const inverterSection = this.solarInverterSystem(rt,inverters,stringsForInverter,panelsFor,optimizersFor);
       const batterySection = this.solarBatterySystem(rt,systems,batteries);
@@ -3562,46 +3571,44 @@
       const current = this.currentEnergyModel(rt);
       const solar = current.solar.powerKw;
       const site = current.consumption.siteConsumptionKw;
-      const home = current.consumption.homeConsumptionKw;
       const battery = current.battery;
       const gridImport = current.grid.importPowerKw;
       const gridExport = current.grid.exportPowerKw;
-      const solarText = solar === null ? 'Solar production is not currently measured.' : `Your solar system is producing ${fmtKw(solar)} now.`;
-      const homeText = site === null ? 'Current site consumption is not available.' : `The home bus is supplying ${fmtKw(site)} of site consumption${home === null ? '' : `, including ${fmtKw(home)} non-flexible home consumption`}.`;
-      const batteryText = battery.state === 'charging'
-        ? `The Home Battery is charging at ${fmtKw(battery.displayPowerKw,'—')}. Exact solar-versus-grid charge allocation is not separately published.`
-        : battery.state === 'discharging'
-          ? `The Home Battery is supplying ${fmtKw(battery.displayPowerKw,'—')} to the Home Bus.`
-          : battery.state === 'idle'
-            ? 'The Home Battery is idle.'
-            : 'Battery flow is currently unavailable.';
-      const gridText = current.grid.direction === 'exporting'
-        ? `The site is exporting ${fmtKw(gridExport,'—')} to the grid.`
-        : current.grid.direction === 'importing'
-          ? `The site is importing ${fmtKw(gridImport,'—')} from the grid.`
-          : 'Grid flow is balanced locally.';
-      const whereSolar = solar !== null && solar > 0.05
-        ? (current.grid.direction === 'exporting'
-          ? 'Solar feeds the Home Bus first; the measured site balance currently includes export to the grid.'
-          : battery.state === 'charging'
-            ? 'Solar feeds the Home Bus while the battery is charging. The backend does not publish a source split, so the UX does not invent how much charge came from solar versus grid.'
-            : 'Solar feeds the Home Bus, where it is consumed by the home and active loads before any measured grid exchange.')
-        : 'There is no meaningful solar production to route right now.';
-      return `<section class="panel solarEnergyStory"><div class="solarStoryHead"><div><small>From panel to home</small><h2>What is happening with my solar?</h2><p>Live measured facts are kept separate from inferred source allocation.</p></div><div class="solarStoryRoute"><span>Panel</span><i>→</i><span>Inverter</span><i>→</i><span>Home Bus</span><i>↔</i><span>Battery / Grid</span></div></div>
-        <div class="solarAnswerGrid">
-          <article><small>What are my panels doing?</small><b>${escapeHtml(solarText)}</b></article>
-          <article><small>What is my home using?</small><b>${escapeHtml(homeText)}</b></article>
-          <article><small>What is the battery doing?</small><b>${escapeHtml(batteryText)}</b></article>
-          <article><small>What is happening at the grid?</small><b>${escapeHtml(gridText)}</b></article>
+      const gridPower = current.grid.direction === 'exporting' ? gridExport : gridImport;
+      const inverterCount = rt.assets().filter(asset => this.energyAssetType(asset) === 'solar_inverter').length;
+      const batteryDirection = battery.state === 'charging' ? '←' : battery.state === 'discharging' ? '→' : '↔';
+      const gridDirection = current.grid.direction === 'exporting' ? '→' : current.grid.direction === 'importing' ? '←' : '↔';
+      const incomplete = [
+        solar === null ? 'solar' : '',
+        site === null ? 'home' : '',
+        battery.displayPowerKw === null ? 'battery' : '',
+        gridPower === null ? 'grid' : ''
+      ].filter(Boolean);
+      const status = incomplete.length
+        ? `<div class="solarFlowStatus">Live flow incomplete · ${escapeHtml(incomplete.join(', '))} unavailable</div>`
+        : '';
+      return `<section class="panel solarEnergyStory" aria-label="Live solar energy flow">
+        <div class="solarValueFlow">
+          <button type="button" data-scroll-target="solar-production-detail"><small>Solar</small><b>${fmtKw(solar)}</b><span>Production</span></button>
+          <i>→</i>
+          <button type="button" data-scroll-target="solar-inverter-detail"><small>Inverters</small><b>${inverterCount || '—'}</b><span>Devices</span></button>
+          <i>→</i>
+          <div class="solarFlowNode"><small>Home</small><b>${fmtKw(site)}</b><span>Consumption</span></div>
+          <i>${batteryDirection}</i>
+          <button type="button" data-scroll-target="solar-battery-detail"><small>Battery</small><b>${fmtKw(battery.displayPowerKw)}</b><span>${escapeHtml(battery.label || human(battery.state || ''))}</span></button>
+          <i>${gridDirection}</i>
+          <div class="solarFlowNode"><small>Grid</small><b>${fmtKw(gridPower)}</b><span>${escapeHtml(current.grid.label || human(current.grid.direction || ''))}</span></div>
         </div>
-        <div class="solarWhereAnswer"><span>Where is my solar going?</span><b>${escapeHtml(whereSolar)}</b></div>
+        ${status}
       </section>`;
     }
+
     energyHardwareStyles() {
       return `
         .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceCard{max-width:720px}.gasMeterPanel .energyDeviceGrid{grid-template-columns:minmax(0,720px)}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasContextGrid,.planningContextGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gasStatisticsHost{min-height:220px}}
 
-        .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead,.solarStoryHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
+        .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
+        .solarEnergyStory{padding:10px 12px}.solarValueFlow{display:grid;grid-template-columns:minmax(92px,1fr) auto minmax(82px,.8fr) auto minmax(92px,1fr) auto minmax(92px,1fr) auto minmax(92px,1fr);gap:7px;align-items:stretch}.solarValueFlow button,.solarFlowNode{border:0;background:#f8fafc;border-radius:10px;padding:8px 10px;text-align:left;min-width:0}.solarValueFlow button{cursor:pointer}.solarValueFlow button:hover{background:#eff6ff;box-shadow:inset 0 0 0 1px #bfdbfe}.solarValueFlow small,.solarValueFlow b,.solarValueFlow span{display:block}.solarValueFlow small{font-size:8px;color:#64748b;font-weight:700}.solarValueFlow b{font-size:14px;color:#0f172a;margin-top:2px;white-space:nowrap}.solarValueFlow span{font-size:8px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.solarValueFlow>i{font-style:normal;align-self:center;color:#64748b;font-size:14px}.solarFlowStatus{margin-top:7px;font-size:8.5px;color:#9a5b17;padding:0 2px}.solarHardwareSection{scroll-margin-top:12px}@media(max-width:720px){.solarValueFlow{grid-template-columns:1fr auto 1fr auto 1fr}.solarValueFlow>*:nth-child(6),.solarValueFlow>*:nth-child(7),.solarValueFlow>*:nth-child(8),.solarValueFlow>*:nth-child(9){margin-top:2px}.solarValueFlow>*:nth-child(6){grid-column:2}.solarValueFlow>*:nth-child(7){grid-column:3}.solarValueFlow>*:nth-child(8){grid-column:4}.solarValueFlow>*:nth-child(9){grid-column:5}}
         .solarInverterGrid{display:grid;gap:12px}.solarInverterCard{border:1px solid #e5ebf3;border-radius:15px;background:#fff;padding:10px}.solarInverterCard>.energyDeviceCard{border:0;padding:2px;min-height:150px}.solarInverterStrings{margin-top:8px;border-top:1px solid #edf1f6;padding-top:8px}.solarInverterStringsHead{display:flex;justify-content:space-between;align-items:center;padding:0 4px 6px}.solarInverterStringsHead small{font-size:8px;letter-spacing:.1em;color:#64748b;font-weight:800}.solarInverterStringsHead b{font-size:10px;color:#475569}.solarStringLink{border-top:1px solid #edf1f6}.solarStringLink>summary{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(90px,.7fr) minmax(70px,.5fr) auto;gap:10px;align-items:center;padding:10px 4px;cursor:pointer;list-style:none}.solarStringLink>summary::-webkit-details-marker{display:none}.solarStringLink>summary span small,.solarStringLink>summary span b{display:block}.solarStringLink>summary small{font-size:8px;color:#64748b}.solarStringLink>summary b{font-size:11px;color:#1e293b;margin-top:2px}.solarStringLink>summary i{font-style:normal;font-size:9px;color:#355D96;font-weight:700}.solarStringDetails{padding:0 4px 10px}.solarStringList{border:1px solid #e5ebf3;border-radius:12px;padding:0 8px;background:#fff}@media(max-width:720px){.solarStringLink>summary{grid-template-columns:minmax(0,1fr) auto}.solarStringLink>summary span:not(:first-child){display:none}}
                 .energyDeviceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.energyDeviceCard{display:grid;grid-template-columns:126px minmax(0,1fr);gap:12px;border:1px solid #e5ebf3;background:#fff;border-radius:14px;padding:12px;min-height:166px}.energyDeviceVisual{height:138px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fbfdff,#f6f8fb);border-radius:11px;overflow:hidden}.energyDeviceVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.energyDeviceVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:5px;box-sizing:border-box}.energyDeviceBody{min-width:0}.energyDeviceTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.energyDeviceTop small{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.energyDeviceTop h3{font-size:13px;line-height:1.25;margin:3px 0 8px}.energyDeviceArea{display:block;margin:-4px 0 7px;color:#64748b;font-size:9px}.batteryContributorArea{display:block;margin-top:3px;color:#64748b;font-size:9px}.energyDeviceState{font-size:9px;background:#eef7f1;color:#3f7f5a;border-radius:999px;padding:5px 7px;white-space:nowrap}.energyDeviceConfig{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.energyDeviceConfig span{font-size:9px;color:#64748b;background:#f8fafc;border-radius:7px;padding:5px 6px}.energyDeviceConfig b{color:#334155;margin-right:4px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyDeviceFacts span{background:#f8fafc;border-radius:7px;padding:6px;min-width:0}.energyDeviceRelation{grid-column:1/-1}.energyDeviceFacts small,.energyDeviceFacts b{display:block}.energyDeviceFacts small{font-size:8px;color:#64748b}.energyDeviceFacts b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.energyDeviceNoFacts{grid-column:1/-1}.energyAssetQuickActions{grid-column:1/-1;display:grid;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid #edf1f6}.energyAssetQuickActions>small{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700}.energyAssetQuickActions>div{display:flex;gap:6px;flex-wrap:wrap}.energyAssetQuickActions .hiAction{min-height:30px;padding:0 9px;font-size:9.5px}
         .energyAssetDetails{margin-top:8px;border-top:1px solid #edf1f6;padding-top:7px}.energyAssetDetails>summary{cursor:pointer;color:#355D96;font-size:9px;font-weight:650;list-style:none}.energyAssetDetails>summary::-webkit-details-marker{display:none}.energyAssetDetails>summary:after{content:" ▾";color:#94a3b8}.energyAssetDetails[open]>summary:after{content:" ▴"}.energyAssetDetailGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:7px}.energyAssetDetailGrid span{min-width:0;background:#f8fafc;border-radius:7px;padding:6px}.energyAssetDetailGrid span.wide{grid-column:1/-1}.energyAssetDetailGrid small,.energyAssetDetailGrid b{display:block}.energyAssetDetailGrid small{font-size:8px;color:#64748b}.energyAssetDetailGrid b{font-size:9.5px;line-height:1.3;overflow-wrap:anywhere}.energyAssetPropertyList{margin-top:8px;padding-top:8px;border-top:1px solid #edf1f6}.energyAssetPropertyTitle{display:block;margin-bottom:6px;font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700}.energyAssetPropertyGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyAssetPropertyGrid span{min-width:0;background:#f8fafc;border-radius:7px;padding:6px}.energyAssetPropertyGrid small,.energyAssetPropertyGrid b{display:block}.energyAssetPropertyGrid small{font-size:8px;color:#64748b}.energyAssetPropertyGrid b{font-size:9.5px;line-height:1.3;overflow-wrap:anywhere}
