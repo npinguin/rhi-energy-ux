@@ -3,7 +3,7 @@
   "package": "rhi-ux-core",
   "version": "1.5.1",
   "source_repository": "npinguin/rhi-ux-core",
-  "source_commit": "26629d0eb8b64c3928c9db7ee7c3c44e64de476f",
+  "source_commit": "bb275767d9e9672713c00b9e8bd9fde13b9b5962",
   "runtime_dependency": false,
   "branding_owner": "rhi-ux-core"
 }
