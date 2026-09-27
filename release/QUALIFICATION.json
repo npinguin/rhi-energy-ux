@@ -1,7 +1,7 @@
 {
   "version": "4.2.7",
   "candidate_tag": "v4.2.7",
-  "candidate_sha": "pending",
+  "candidate_sha": "4ccb1a2f3768b062fb3c3baeacef9cc7003f76cb",
   "previous_release": "4.2.6",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
