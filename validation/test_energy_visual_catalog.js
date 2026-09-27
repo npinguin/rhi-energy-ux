@@ -2,16 +2,11 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 
-const store = {};
 const context = {
   console,
   UX_VERSION:"test",
   HERO_IMAGE_BYD_LVS20:"data:image/webp;base64,test",
-  globalThis:null,
-  localStorage:{
-    getItem:key => store[key] || null,
-    setItem:(key,value) => { store[key]=value; }
-  }
+  globalThis:null
 };
 context.globalThis=context;
 vm.createContext(context);
@@ -29,29 +24,22 @@ assert.ok(batteryChoices.length >= 2);
 assert.ok(batteryChoices.every(row=>row.asset_type==="battery"));
 assert.ok(context.rhiEnergyVisualCatalogForType("solar_inverter").every(row=>row.asset_type==="solar_inverter"));
 
+assert.equal(context.rhiEnergyVisualRef(batteryChoices.find(row=>row.id==="battery.solaredge_home_48v_9_6")),"energy.battery.solaredge.48v");
+assert.equal(context.rhiEnergyVisualRef(batteryChoices.find(row=>row.id==="battery.home")),"energy.battery.generic");
+assert.equal(context.rhiEnergyVisualRef(context.rhiEnergyVisualCatalogForType("solar_inverter").find(row=>row.id==="solar_inverter.solaredge_rws_8k")),"energy.solar_inverter.solaredge.rws");
+
 const batteryDefault=context.rhiEnergyDefaultVisualEntry(battery);
 assert.equal(batteryDefault.asset_type,"battery");
-assert.match(context.rhiEnergyVisualRef(batteryDefault),/^energy\.logical\.battery\./);
 assert.equal(context.rhiEnergyDefaultVisualEntry(inverter).asset_type,"solar_inverter");
 assert.equal(context.rhiEnergyDefaultVisualEntry(grid).asset_type,"grid_connection");
 
-const wrong=context.rhiEnergyVisualRef(context.rhiEnergyVisualCatalogForType("solar_inverter")[0]);
-assert.equal(context.rhiEnergySetVisualPreference(battery,wrong),false);
-const genericBattery=context.rhiEnergyVisualRef(batteryChoices.find(row=>row.id==="battery.home"));
-assert.equal(context.rhiEnergySetVisualPreference(battery,genericBattery),true);
-assert.equal(context.rhiEnergySelectedVisualRef("battery_1"),genericBattery);
-
-const resolved=context.resolveEnergyAssetVisual(battery);
+const selected={...battery,visual_ref:"energy.battery.solaredge.48v"};
+const resolved=context.resolveEnergyAssetVisual(selected);
 assert.ok(resolved && resolved.url);
 assert.equal(resolved.asset_type,"battery");
-assert.equal(resolved.visual_ref,genericBattery);
+assert.equal(resolved.visual_ref,"energy.battery.solaredge.48v");
 
-context.rhiEnergyClearVisualPreference("battery_1");
-const defaultResolved=context.resolveEnergyAssetVisual(battery);
-assert.ok(defaultResolved && defaultResolved.url);
-assert.equal(defaultResolved.asset_type,"battery");
-
-// Producer-owned cross-domain visuals remain authoritative but resolve only through Foundation.
+// Producer-owned cross-domain visuals remain authoritative and can only resolve through Foundation.
 const producer={asset_id:"vehicle_1",asset_type:"flexible_load",visual_ref:"mobility.vehicle.generic.fallback"};
 assert.equal(context.resolveEnergyAssetVisual(producer),null,"producer ref without Foundation registry must fail closed");
 const producerRegistry={
@@ -69,9 +57,11 @@ assert.equal(producerResolved.kind,"vehicle");
 assert.equal(producerResolved.visual_ref,"mobility.vehicle.generic.fallback");
 assert.match(producerResolved.url,/^\/hacsfiles\/rhi-mobility-ux\/assets\/vehicles\/vehicle_fallback\.png\?r=2$/);
 
+const catalogSource=fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
+assert.doesNotMatch(catalogSource,/homebrain\.energy\.visual_preferences/);
+assert.doesNotMatch(catalogSource,/localStorage/);
 const picker=fs.readFileSync("src/ui/components/energy-visual-picker.js","utf8");
-assert.match(picker,/catalogFor\(asset/);
-assert.match(picker,/rhiEnergyVisualCatalogForType/);
+assert.match(picker,/rhiUxVisualPickerShell/);
 assert.match(picker,/data-energy-visual-select/);
 
-console.log("PASS Energy logical-device visual catalog and type-safe picker");
+console.log("PASS backend-canonical Energy visual catalog and producer-owned Mobility preservation");
