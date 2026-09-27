@@ -2192,29 +2192,36 @@
       const number = asNumber(value);
       return number === null ? fallback : `${number.toLocaleString(undefined,{maximumFractionDigits:3})} m³/h`;
     }
-    mountGasStatisticsGraph() {
+    async mountGasStatisticsGraph() {
       if (this.view !== 'gas') return;
       const host = this.shadowRoot?.querySelector('[data-gas-statistics-host]');
-      if (!host || host.firstElementChild) return;
+      if (!host || host.firstElementChild || host.dataset.loading === 'true') return;
       const entityId = String(host.dataset.entityId || this.gasTotalEntityId() || '');
       if (!entityId) return;
-      const card = document.createElement('hui-statistics-graph-card');
-      if (typeof card.setConfig !== 'function') {
-        host.innerHTML = '<div class="empty"><b>Home Assistant statistics graph unavailable</b><span>The gas meter remains available; history needs the native Statistics Graph element.</span></div>';
-        return;
+      host.dataset.loading = 'true';
+      try {
+        if (typeof window.loadCardHelpers !== 'function') throw new Error('Home Assistant card helpers unavailable');
+        const helpers = await window.loadCardHelpers();
+        if (this.view !== 'gas' || !host.isConnected) return;
+        const card = await helpers.createCardElement({
+          type:'statistics-graph',
+          title:'Gas consumption',
+          entities:[entityId],
+          stat_types:['change'],
+          period:'day',
+          days_to_show:30,
+          chart_type:'bar',
+          hide_legend:true
+        });
+        card.hass = this._hass;
+        host.replaceChildren(card);
+      } catch (error) {
+        if (host.isConnected) {
+          host.innerHTML = '<div class="empty"><b>Gas history temporarily unavailable</b><span>The meter is available, but Home Assistant could not load the Statistics Graph card.</span></div>';
+        }
+      } finally {
+        delete host.dataset.loading;
       }
-      card.setConfig({
-        type:'statistics-graph',
-        title:'Gas consumption',
-        entities:[entityId],
-        stat_types:['change'],
-        period:'day',
-        days_to_show:30,
-        chart_type:'bar',
-        hide_legend:true
-      });
-      card.hass = this._hass;
-      host.appendChild(card);
     }
 
     buildPageViewModel(rt, tab) {
@@ -2347,6 +2354,7 @@
         const target = String(command.target_asset_id || '');
         const asset = assets.get(target);
         const type = String(asset?.asset_type || asset?.object_class || '').toLowerCase();
+        if (tab === 'gas') return !!target && type === 'gas_meter';
         return !target || !type || allowed.has(type);
       });
       const seen = new Set();
