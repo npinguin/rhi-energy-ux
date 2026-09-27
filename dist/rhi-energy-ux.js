@@ -2672,11 +2672,11 @@ function rhiEnergyPageHeader({
   const commandGroup = commandActions
     ? `<div class="rhiEnergyControlGroup commands"><small>Quick actions</small><div class="rhiUxQuickActions">${commandActions}</div></div>`
     : "";
-  const controlsMarkup = (contextGroup || commandGroup)
+  const actionsMarkup = (contextGroup || commandGroup)
     ? `<section class="rhiEnergyPageControls rhiUxQuickActionBar" aria-label="Page controls">${contextGroup}${commandGroup}</section>`
     : "";
 
-  return `<section class="rhiEnergyPageHeader rhiUxPageStack ${rhiUxEscape(tone)}">${heroMarkup}${statusMarkup}${controlsMarkup}</section>`;
+  return `<section class="rhiEnergyPageHeader rhiUxPageStack ${rhiUxEscape(tone)}">${heroMarkup}${statusMarkup}${actionsMarkup}</section>`;
 }
 
 // ---- src/ui/components/energy-visual-picker.js ----
