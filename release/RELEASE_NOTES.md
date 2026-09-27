@@ -1,28 +1,20 @@
-# RHI Energy UX v4.3.5 — TEST CANDIDATE
+# RHI Energy UX v4.3.6 — TEST CANDIDATE
 
-## Cross-domain visual ownership closure
+## Runtime render closure
 
-- removes the Energy-owned Mobility visual manifest and all duplicated Mobility vehicle/charger artwork;
-- resolves producer-owned `visual_ref` exclusively through the Foundation `RHI_VISUAL_ASSET_REGISTRY_V1` presentation registry;
-- preserves canonical producer visual identity when Energy materializes Mobility flexible assets;
-- fails unknown/unregistered producer visuals closed to a neutral presentation fallback instead of showing the wrong Energy or real-product image;
-- adds anti-drift gates that reject producer model/image-key mappings in Energy source;
-- adds synthetic future-product coverage proving a new registered producer visual needs no Energy model-specific code.
+- fixes the central `assetVisual()` renderer so it acquires the current Energy runtime explicitly instead of referencing an undeclared free-scoped `rt`;
+- restores Solar, Home Battery, Consumers and Gas render paths that failed in v4.3.5 when they rendered asset visuals;
+- preserves the Foundation-registry-driven cross-domain visual architecture introduced in v4.3.5;
+- adds an active regression gate preventing free-scoped runtime access from returning;
+- preserves all existing Energy tabs, navigation, Details and Diagnostics depth.
 
 ## Required package set
 
-- RHI UX Core **1.5.1** vendored from exact source commit `bb275767d9e9672713c00b9e8bd9fde13b9b5962`;
-- Foundation **F1.8.25+** for registry presentation locators;
-- Energy backend **E0.15.71+**;
-- Mobility backend **M0.10.19+** when Mobility producer visuals are present.
+- RHI UX Core **1.5.1** at `bb275767d9e9672713c00b9e8bd9fde13b9b5962`;
+- Foundation **F1.8.25+**;
+- Energy backend **E0.15.71+**; tested with **E0.15.72**;
+- Mobility backend **M0.10.19+** for Mobility producer visuals.
 
-## UX scope
+Rollback: **v4.3.5**.
 
-- no tabs removed or renamed;
-- no Energy capability navigation reduction;
-- no change to Energy semantic authority;
-- existing Details/Diagnostics depth remains available.
-
-## Qualification
-
-This is an immutable TEST CANDIDATE only after repository validation passes. Target Home Assistant proof remains required for stable promotion, including real Mobility flexible-asset visuals, refresh/restart, arbitrary dashboard root, upgrade from v4.3.4 and rollback to v4.3.4.
+Target Home Assistant qualification remains mandatory. The exact runtime failure shown on Solar, Home Battery, Consumers and Gas in v4.3.5 is a mandatory 4.3.6 regression check.
