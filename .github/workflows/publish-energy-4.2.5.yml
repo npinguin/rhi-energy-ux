@@ -1,0 +1,53 @@
+name: Publish Energy UX 4.2.5 candidate
+
+on:
+  push:
+    branches:
+      - ops/publish-energy-4.2.5
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: dd5aeeedb0aa36f86626c26b4dac4b33ca66b0d1
+          fetch-depth: 0
+      - name: Verify immutable candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./package.json').version")" = "4.2.5"
+          test "$(python -c "import json; print(json.load(open('RELEASE_MANIFEST.json'))['stage'])")" = "test_candidate"
+          test "$(python -c "import json; print(json.load(open('release/QUALIFICATION.json'))['candidate_tag'])")" = "v4.2.5"
+          test "$(python -c "import json; print(json.load(open('release/QUALIFICATION.json'))['candidate_sha'])")" = "pending"
+          (cd dist && sha256sum -c rhi-energy-ux.js.sha256)
+      - name: Publish tag and GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: dd5aeeedb0aa36f86626c26b4dac4b33ca66b0d1
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v4.2.5 >/dev/null 2>&1; then
+            echo "v4.2.5 release already exists"
+            exit 1
+          fi
+          gh release create v4.2.5             --target "$CANDIDATE_SHA"             --title "RHI Energy UX v4.2.5"             --notes-file release/RELEASE_NOTES.md
+      - name: Verify published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: dd5aeeedb0aa36f86626c26b4dac4b33ca66b0d1
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/tags/v4.2.5 | cut -f1)" = "$CANDIDATE_SHA"
+          test "$(gh release view v4.2.5 --json targetCommitish --jq '.targetCommitish')" = "$CANDIDATE_SHA"
+          test "$(gh release view v4.2.5 --json isPrerelease --jq '.isPrerelease')" = "false"
+          test "$(gh release view v4.2.5 --json assets --jq '.assets | length')" = "0"
