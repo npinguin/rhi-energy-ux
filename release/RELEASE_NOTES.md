@@ -8,6 +8,9 @@ This release closes the cross-surface drift where Mobility charger infrastructur
 - treats Mobility charger/connection fallback rows as infrastructure, never as vehicle/managed-consumer identity;
 - preserves producer-owned Mobility `visual_ref` over Energy object enrichment;
 - Operational Planning now renders only real consumer/planning targets;
+- Metering exposes the canonical writable period selector with backend readback;
+- Automation mode is directly adjustable through the canonical strategy property;
+- selected policy profiles expose their writable policy controls directly with Save/Discard and authoritative readback;
 - Consumers excludes charger fallbacks, including rows arriving through Consumer Mix;
 - Strategy participation, Tactical Planning, Outlook, Intelligence and Value use the same central consumer/planning participant set;
 - Tactical Planning consumes the canonical D0/D1 buckets and planner-owned lane totals that E0.15.76 now preserves through Public V2;
