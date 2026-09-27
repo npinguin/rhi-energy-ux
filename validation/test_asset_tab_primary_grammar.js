@@ -12,7 +12,7 @@ const deviceStart = app.indexOf("\n    energyDeviceStatusCard(");
 const deviceEnd = app.indexOf("\n    energyAssetType(", deviceStart);
 const device = app.slice(deviceStart, deviceEnd);
 assert.match(device,/energyDeviceArea/);
-assert.match(device,/energyAssetFacts\(rt,enriched,4\)/);
+assert.match(device,/energyAssetFacts\(rt,enriched,5\)/);
 assert.doesNotMatch(device,/energyDeviceConfig/);
 assert.doesNotMatch(device,/>Config</);
 assert.doesNotMatch(device,/>Telemetry</);
