@@ -145,10 +145,10 @@ function readEnergyPublicV2(gateway) {
     }
   };
   const pricing = object(configuration.pricing);
-  const metering = object(configuration.metering);
+  const meteringConfiguration = object(configuration.metering);
   const strategy = object(configuration.strategy);
   addConfigurationRows('pricing', pricing.properties);
-  addConfigurationRows('metering', metering.properties);
+  addConfigurationRows('metering', meteringConfiguration.properties);
   addConfigurationRows('strategy', object(strategy.configured).properties || strategy.configured_properties);
 
   for (const asset of objects) {
@@ -174,7 +174,7 @@ function readEnergyPublicV2(gateway) {
     metering:Object.keys(object(metering.periods)).length > 0,
     retrospective:Object.keys(retrospective).length > 0,
     pricing:Object.keys(pricing).length > 0,
-    metering_configuration:Object.keys(metering).length > 0,
+    metering_configuration:Object.keys(meteringConfiguration).length > 0,
     strategy:Object.keys(strategy).length > 0,
     value_accounting:Object.keys(valueAccounting).length > 0,
     commands:Array.isArray(commands)
