@@ -1,4 +1,4 @@
-name: Materialize Gas hero v2
+name: Materialize Gas hero v2 exact
 
 on:
   push:
