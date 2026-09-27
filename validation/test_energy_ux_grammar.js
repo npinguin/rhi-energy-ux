@@ -42,14 +42,14 @@ assert.ok(!app.includes("data:image/webp;base64"), "binary presentation images m
 assert.match(app,/publishedById = new Map/);
 assert.match(app,/visual_ref:firstDefined\(raw\.visual_ref/);
 assert.match(app,/energyAssetDetailDisclosure/);
-assert.match(app,/\['Status', statusLabel\]/);
-assert.match(app,/\['Telemetry', telemetryLabel\]/);
+assert.match(app,/energyDeviceState/);
+assert.match(app,/\['Telemetry', telemetry\]/);
 assert.match(app,/assetQuickActions\(rt, assetId/);
 assert.match(app,/rt\.commandActionModelsForAsset\(id\)/);
 assert.match(app,/Telemetry limited/);
 assert.match(app,/per-battery power is not published/);
-assert.match(app,/Unassigned published panels/);
-assert.match(app,/Unassigned published optimizers/);
+assert.match(app,/Panels without zone relationship/);
+assert.match(app,/Optimizers without module relationship/);
 assert.match(app,/solarTopologyDetails/);
 assert.match(app,/No charging topology published/);
 

@@ -1,29 +1,28 @@
-# v4.3.0 — coherent asset experience and body-control convergence TEST CANDIDATE
+# v4.3.1 — compact asset truth and canonical Energy hierarchy TEST CANDIDATE
 
-Energy 4.3.0 consolidates the runtime issues found during the 4.2.8/4.2.9 target-HA review into one clean candidate.
+Energy 4.3.1 completes the asset-tab refinement on top of the 4.3.0 architecture without adding navigation or backend semantics.
 
 ## User-facing changes
 
-- preserves the approved photographic Gas hero and supported native Statistics Graph loading introduced in 4.2.9;
-- separates page-level **Quick Actions** from body-scoped **View** controls: View now appears only where the body has a real horizon, period, filter, sort or alternate representation;
-- moves Today/Tomorrow, period and list filters directly above the content they govern;
-- consumes canonical Mobility vehicle/charger visual identity through a generated producer-owned manifest instead of a copied identity table;
-- preserves producer `visual_ref` through Consumers materialization so Audi, VW, BMW, Wallbox, Peblar and other Mobility assets keep the correct identity;
-- gives managed assets a consistent minimum user view: status, current power, relationship, planning intent, valid actions and deeper details;
-- distinguishes battery health/availability from missing child telemetry; missing per-battery power no longer makes a healthy battery appear unavailable;
-- materializes Solar as published arrays/zones with panels and optimizers underneath, with progressive disclosure and explicit unassigned-device handling;
-- keeps connected/linked chargers and vehicles visible in Flow even at 0 kW, separating topology from active power flow;
-- surfaces vehicle↔charger context in Consumers when the canonical relationship is published;
-- reports incomplete/not-published planning data explicitly instead of presenting subsystem existence as a positive status.
+- keeps the existing Energy tabs and applies the shared depth model: **Tab → Primary card → Details → dedicated view where justified**;
+- makes primary asset cards concise: canonical visual, identity, published Home Assistant area/location, operational status and the most relevant live energy facts;
+- moves profile, publication/source and telemetry-completeness information into **Details** instead of showing technical configuration in the primary card;
+- adds Details to physical Home Battery contributors while retaining only backend-published per-battery Quick Actions;
+- orders Solar as production summary → inverters → Home Battery system → solar zones → explicitly unassigned/support hardware;
+- renders each published solar panel as one physical module card and attaches optimizer measurements/details only when the canonical optimizer→panel relationship is published;
+- keeps zone-level or unassigned optimizers explicit instead of guessing a panel relationship;
+- places the compact Gas meter card before the Home Assistant native statistics graph, with no invented controls;
+- gives Consumers a compact operational summary for current power, required energy, planned energy and still-to-plan energy when those planning totals are published;
+- keeps each managed Consumer card focused on current power, energy need/progress, canonical vehicle↔charger relationship, valid commands and progressive Details.
 
-## Engineering cleanup
+## Engineering / drift control
 
-- upgrades the bundled presentation baseline to **RHI UX Core 1.5.0**;
-- removes the mixed page-control bar and the obsolete Energy-owned shared-control styling;
-- removes embedded base64 battery artwork from `energy-card.js`; package assets are the only image transport;
-- adds regression coverage for cross-domain visuals, body-scoped controls, battery telemetry completeness, Solar topology and idle physical topology;
-- keeps Energy semantics, calculations, relationships and command authority backend-owned.
+- no new tabs, backend contracts or name-based relationship inference;
+- no second Mobility visual authority and no new shared presentation layer;
+- adds regression gates for compact primary cards, Gas meter-first ordering, Solar module/optimizer composition and the required Solar section order;
+- preserves RHI UX Core **1.5.0** and Mobility's generated cross-domain visual manifest;
+- deterministic committed `dist`, immutable-tag HACS delivery and no GitHub release assets remain mandatory.
 
-Rollback: **v4.2.9**.
+Rollback: **v4.3.0**.
 
-This is an installable HACS test candidate. Target Home Assistant desktop/iPad rendering, live contracts, write/readback, refresh, upgrade and rollback proof remain mandatory before stable promotion.
+This is an installable HACS test candidate. Target Home Assistant desktop/iPad runtime proof, live data verification, upgrade and rollback remain mandatory before qualification.

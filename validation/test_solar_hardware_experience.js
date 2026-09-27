@@ -11,15 +11,17 @@ assert.match(app,/Exact solar-versus-grid charge allocation is not separately pu
 assert.match(app,/the UX does not invent how much charge came from solar versus grid/);
 
 assert.match(app,/solarHardwareExperience\(rt\)/);
-assert.match(app,/Solar arrays/);
+assert.match(app,/Solar zones/);
 assert.match(app,/Inverter system/);
 assert.match(app,/Battery system/);
-assert.match(app,/Solar support devices/);
+assert.match(app,/Other published hardware/);
 assert.match(app,/solar_array/);
 assert.match(app,/optimizersFor/);
 assert.match(app,/solarTopologyDetails/);
-assert.match(app,/Unassigned published panels/);
-assert.match(app,/Unassigned published optimizers/);
+assert.match(app,/Panels without zone relationship/);
+assert.match(app,/Optimizers without module relationship/);
+assert.match(app,/solarModuleCard/);
+assert.match(app,/optimizerByPanel/);
 assert.doesNotMatch(app,/solarOperationalExecutionPanel\(rt/);
 assert.match(app,/energyDeviceStatusCard/);
 assert.match(app,/energyAssetFacts/);

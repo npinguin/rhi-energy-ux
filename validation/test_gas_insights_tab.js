@@ -20,9 +20,6 @@ assert.match(app,/period:'day'/);
 assert.match(app,/days_to_show:30/);
 assert.match(app,/Gas usage history/);
 assert.match(app,/Home Assistant long-term statistics/);
-assert.match(app,/Meter context/);
-assert.match(app,/gasContextGrid/);
-assert.match(app,/Total entity/);
 assert.match(app,/No measured gas history yet/);
 assert.match(app,/Connect your gas meter/);
 assert.match(app,/The UX never estimates missing consumption/);
@@ -30,6 +27,11 @@ assert.match(app,/The UX never estimates missing consumption/);
 assert.match(app,/energyDeviceStatusCard\(rt, gas\.asset, 'Gas meter'\)/);
 assert.match(app,/gas: \{ image:hbEnergyHeroAsset\('gas'\)/);
 assert.ok(catalog.includes('gas_meter.smart_meter') && catalog.includes('package_path:"heroes/gas-hero.webp"'),"Gas meter catalog fallback may retain the logical-device WebP visual");
+
+const gasStart = app.indexOf("\n    gas(rt)");
+const gasEnd = app.indexOf("\n    battery(rt)", gasStart);
+const gasMethod = app.slice(gasStart, gasEnd);
+assert.ok(gasMethod.indexOf('${setupOrMeter}') < gasMethod.indexOf('${graph}'), "Gas primary meter must render before history");
 
 console.log("PASS Gas is the final Energy tab with dedicated hero, canonical meter and HA-native statistics history");
 
