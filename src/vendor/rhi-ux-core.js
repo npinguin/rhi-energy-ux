@@ -94,7 +94,7 @@ function rhiUxRegisterDomainNavigation({ domain = "", assetDetailTemplate = "" }
   const key = String(domain || "").trim();
   const template = String(assetDetailTemplate || "").trim();
   if (!/^[a-z0-9][a-z0-9_-]*$/.test(key)) return false;
-  if (!template || !template.includes("__RHI_ASSET_ID__")) return false;
+  if (!template || !template.includes("{asset_id}")) return false;
   if (/^https?:\/\//i.test(template)) return false;
   try {
     const registry = rhiUxReadNavigationRegistry(storage);
@@ -112,6 +112,6 @@ function rhiUxResolveDomainAssetNavigation(domain = "", assetId = "", storage = 
   if (!key || !id) return "";
   const row = rhiUxReadNavigationRegistry(storage)[key];
   const template = String(row?.asset_detail_template || "");
-  if (!template.includes("__RHI_ASSET_ID__")) return "";
-  return template.replaceAll("__RHI_ASSET_ID__", encodeURIComponent(id));
+  if (!template.includes("{asset_id}")) return "";
+  return template.replaceAll("{asset_id}", encodeURIComponent(id));
 }
