@@ -25,6 +25,27 @@
     planningFor(assetId) {
       return this.runtime.planningOutcomeFor(assetId) || {};
     }
+    isConnectionInfrastructure(asset = {}) {
+      const sourceContext = asset.source_context && typeof asset.source_context === 'object'
+        ? asset.source_context
+        : {};
+      const mobilityContext = sourceContext.mobility && typeof sourceContext.mobility === 'object'
+        ? sourceContext.mobility
+        : {};
+      const values = [
+        asset.source_asset_kind,
+        asset.asset_type,
+        asset.object_class,
+        asset.energy_asset_role,
+        asset.connection_type,
+        asset.ux_asset_type
+      ].map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
+      return String(mobilityContext.consumer_fallback || '').trim().toLowerCase() === 'unassigned_charger'
+        || values.some(value => ['charger','connection','charging_point','charge_point'].includes(value));
+    }
+    isConsumerFacing(asset = {}) {
+      return !this.isStorage(asset) && !this.isConnectionInfrastructure(asset);
+    }
     participationState(asset = {}, planning = {}) {
       if (this.isStorage(asset)) return 'storage';
       const context = this.assetContext(asset);
@@ -76,12 +97,12 @@
       // No semantic inference or cross-domain lookup is performed here.
       const materialized = context.asset
         ? {
-            ...asset,
             ...context.asset,
-            // Energy flexible-load state may add planning/participation facts, but
-            // canonical producer identity must never be overwritten by that projection.
+            ...asset,
+            // Producer identity from core.flexible.assets remains authoritative for
+            // cross-domain assets. Energy object context may enrich, never overwrite it.
             asset_id:id,
-            visual_ref:String(firstDefined(context.asset.visual_ref, asset.visual_ref, '') || '')
+            visual_ref:String(firstDefined(asset.visual_ref, context.asset.visual_ref, '') || '')
           }
         : { ...asset, asset_id:id };
       const participation = this.participationState(materialized, planning);
@@ -102,6 +123,8 @@
         participation,
         operation: this.operationalState(materialized, planning),
         isStorage: participation === 'storage',
+        isConnectionInfrastructure: this.isConnectionInfrastructure(materialized),
+        isConsumerFacing: this.isConsumerFacing(materialized),
         isDisabled: participation === 'disabled',
         isParticipating: participation === 'participating' || participation === 'temporarily_unavailable',
         isTemporarilyUnavailable: participation === 'temporarily_unavailable'
@@ -115,8 +138,10 @@
       return this._all;
     }
     byId(assetId) { this.all(); return this._byId.get(String(assetId)) || null; }
-    participating() { return this.all().filter(vm => vm.isParticipating && !vm.isStorage); }
-    disabled() { return this.all().filter(vm => vm.isDisabled); }
+    consumerAssets() { return this.all().filter(vm => vm.isConsumerFacing); }
+    connectionInfrastructure() { return this.all().filter(vm => vm.isConnectionInfrastructure); }
+    participating() { return this.consumerAssets().filter(vm => vm.isParticipating); }
+    disabled() { return this.consumerAssets().filter(vm => vm.isDisabled); }
     storage() { return this.all().filter(vm => vm.isStorage); }
     planningRows() {
       const published = new Map(this.runtime.planningIndexRows().map(row => [String(row.asset_id || row.consumer_id || row.id || ''), row]));
