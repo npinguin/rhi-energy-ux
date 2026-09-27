@@ -4,15 +4,15 @@ Energy UX adopts the Mobility visual-library pattern per logical Energy device t
 
 ## Ownership
 
-The Energy backend owns semantic identity, `asset_type`, `profile_id`, runtime truth and property publication. Energy backend profiles remain non-visual.
+The Energy backend owns semantic identity, `asset_type`, `profile_id`, runtime truth and property publication. Energy backend profiles remain non-visual. Energy and every producer domain register their own visual catalog with the Foundation Visual Asset Registry at boot.
 
-Energy UX owns representative artwork, the image catalog, profile-to-representative-image defaults, explicit presentation preference, same-type fallbacks and picker rendering.
+Energy UX owns Energy-domain representative artwork, Energy-only presentation preferences, same-type Energy fallbacks and picker rendering. It does not own or copy another domain's product catalog or artwork.
 
 A visual never changes Energy semantics.
 
 ## Resolution order
 
-1. Producer-owned `visual_ref` for producer-domain assets such as Mobility consumers.
+1. Foundation-registered producer-owned `visual_ref` for producer-domain assets such as Mobility consumers. Resolution is generic through registry presentation metadata.
 2. User-selected Energy UX visual preference for the exact logical asset.
 3. Best matching representative visual from the Energy profile/integration context.
 4. Generic fallback from the same logical `asset_type`.
@@ -54,3 +54,23 @@ CI must prove:
 - unknown profiles fall back inside the logical type;
 - producer-domain `visual_ref` remains authoritative;
 - all screens use the common `resolveEnergyAssetVisual` path.
+
+
+## Cross-domain hard invariant
+
+For producer-domain flexible assets the only supported path is:
+
+```text
+producer semantic asset
+→ producer-owned visual_ref
+→ producer registers presentation at boot
+→ Foundation validates/publishes registry entry
+→ Energy preserves visual_ref losslessly
+→ Energy UX renders the registered presentation generically
+```
+
+Energy must not contain producer-specific brand/model switches, image-key aliases, copied producer artwork, asset-id/display-name inference or hand-maintained `visual_ref → file` maps.
+
+Adding a new producer vehicle/charger visual must require zero product-specific Energy source changes. Unknown or invalid registry entries render neutrally; they never resolve to another real product or the Energy flexible-load hero.
+
+This invariant is machine-enforced by `validation/test_visual_ref_contract.js` and `validation/validate_shared_visual_ownership.py`.
