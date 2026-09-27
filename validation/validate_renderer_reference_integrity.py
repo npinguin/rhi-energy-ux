@@ -1,6 +1,6 @@
 from pathlib import Path
 
-SOURCE = Path(__file__).resolve().parents[1] / "dist" / "rhi-energy-ux.js"
+ROOT = Path(__file__).resolve().parents[1]\nSOURCE = ROOT / "dist" / "rhi-energy-ux.js"
 text = SOURCE.read_text(encoding="utf-8")
 errors = []
 for symbol in ("holdLabel", "holdCommand", "noUsableSurplus"):
