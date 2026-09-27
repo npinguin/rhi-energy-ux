@@ -93,8 +93,8 @@
         profileId: String(materialized.profile_id || context.profile?.profile_id || ''),
         publication: context.publication,
         visualRef: String(firstDefined(materialized.visual_ref, '') || ''),
-        visual: typeof resolveEnergyVisualRef === 'function'
-          ? resolveEnergyVisualRef(firstDefined(materialized.visual_ref, ''))
+        visual: typeof this.runtime.resolveVisualRef === 'function'
+          ? this.runtime.resolveVisualRef(firstDefined(materialized.visual_ref, ''), 'card')
           : null,
         publicationGap: typeof energyAssetPublicationGap === 'function'
           ? energyAssetPublicationGap(this.runtime.contractGateway(), id)
