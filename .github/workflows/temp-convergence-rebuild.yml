@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - cleanup/energy-ux-convergence
+  pull_request:
+    branches:
+      - fix/energy-flexible-flow-gas-hero
 
 permissions:
   contents: write
