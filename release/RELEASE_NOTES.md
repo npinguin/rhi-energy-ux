@@ -1,14 +1,14 @@
-# RHI Energy UX 4.3.13 — SOLAR_HIERARCHY_VALUE_UX
+# RHI Energy UX 4.3.14 — RELEASE_CLOSURE
 
-- Nest Solar strings under their canonical inverter instead of presenting strings as peer hardware cards.
-- Keep optimizer and panel detail below the string and suppress empty “No panels linked” boxes.
-- Replace the verbose “From panel to home” story with one compact live value flow: **Solar → Battery → Home ↔ Grid**.
-- Keep inverter hardware as Solar detail rather than a primary energy-flow node.
-- Replace the image picker / wizard hybrid with one compact image editor: optional brand filter, draft selection, explicit Save, Cancel and profile-default reset.
-- Persist an image only on explicit Save; Cancel leaves the stored preference unchanged.
-- Keep hierarchy and live values contract-driven; the UX does not invent missing topology or energy allocation.
+- Persist Energy-owned appearance selection through Energy Public V2 instead of browser-local storage.
+- Use canonical backend `energy.*` visual refs and normal write/readback semantics.
+- Keep Mobility producer visuals authoritative and non-overridable from Energy.
+- Converge Energy appearance editing on the shared RHI UX Core 1.5.2 picker shell.
+- Make Solar cards compact and energy-first: primary operational facts stay visible; technical metadata stays under Details.
+- Preserve 4.3.13 Solar hierarchy, E0.15.77 automation authority and all Metering/Value/Retrospective closures.
 
-Minimum/tested backend: **E0.15.77**.
+Minimum/tested backend: **E0.15.78**.
+RHI UX Core: **1.5.2 @ 16a217a33f6a7cc90d42ad83492e90ba1d364eee**.
 Known accepted technical debt: **0**.
 Known accepted feature debt: **0**.
 
