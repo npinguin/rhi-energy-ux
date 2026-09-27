@@ -39,13 +39,23 @@ assert.match(solar,/solarEnergyStory/);
 assert.match(solar,/solarHardwareExperience/);
 assert.doesNotMatch(solar,/solarOperationalExecutionPanel/);
 
-for (const phrase of ["Solar arrays","Inverter system","Battery system","Solar support devices"]) {
+for (const phrase of ["Solar zones","Inverter system","Battery system","Other published hardware"]) {
   assert.ok(app.includes(phrase), "missing Solar hierarchy section "+phrase);
 }
 assert.match(app,/energyAssetParentId/);
 assert.match(app,/energyAssetDetailDisclosure/);
 assert.match(app,/Missing publication fields/);
 assert.match(app,/Aggregate storage state with the physical batteries shown underneath/);
+const hardwareStart = app.indexOf("\n    solarHardwareExperience(rt)");
+const hardwareEnd = app.indexOf("\n    solarEnergyStory(rt)", hardwareStart);
+const hardware = app.slice(hardwareStart, hardwareEnd);
+assert.ok(hardware.indexOf("solarInverterSystem") < hardware.indexOf("solarBatterySystem"), "inverters must precede battery system");
+assert.ok(hardware.indexOf("solarBatterySystem") < hardware.indexOf("'Solar zones'"), "battery system must precede solar zones");
+assert.match(app,/solarModuleCard/);
+assert.match(app,/optimizerByPanel/);
+assert.match(app,/Optimizers without panel relationship/);
+assert.doesNotMatch(app,/summary>Panels \\(/);
+assert.doesNotMatch(app,/summary>Optimizers \\(/);
 assert.match(catalog,/solar_production\.sunpower_x21_335_blk/);
 assert.match(catalog,/solar_production\.jinkosolar_jkm435n_54hl4r/);
 
