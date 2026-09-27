@@ -134,3 +134,22 @@ assert.equal(d0LaneTotals.flexibleLoadsKwh,3.2);
 assert.equal(d0LaneTotals.sourceTotalKwh,10.0);
 assert.equal(d0LaneTotals.useTotalKwh,10.0);
 assert.equal(d0Contract.buckets[0].advisory_consumer_lane[1].participant_id,'vehicle_id4');
+
+
+const card = fs.readFileSync('src/app/energy-card.js','utf8');
+for (const token of [
+  "automationExecutionPolicy(rt)",
+  "autonomous_execution_allowed",
+  "manual_plan_execution_allowed",
+  "Advice · plan waits for your approval",
+  "Disabled · planning is informational only",
+  "Apply current plan",
+  "rt.value('energy_intelligence.automation_mode','advice')"
+]) if (!card.includes(token)) throw new Error('missing automation authority UX invariant '+token);
+
+for (const forbidden of [
+  "rt.value('energy_intelligence.automation_mode','automatic')",
+  "automationModeValue(rt, fallback = 'Automatic')"
+]) if (card.includes(forbidden)) throw new Error('unsafe Automatic fallback remains '+forbidden);
+
+console.log('PASS Advice / Automatic / Disabled execution-authority UX contract');

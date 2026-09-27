@@ -606,7 +606,7 @@
         availability_reason: this.value(`${id}.availability_reason`, row.availability_reason || ''),
         operating_state: this.value(`${id}.operating_state`, row.operating_state || 'unknown'),
         energy_control_hold_state: this.value(`${id}.energy_control_hold_state`, row.energy_control_hold_state || 'none'),
-        energy_control_mode: this.value(`${id}.energy_control_mode`, row.energy_control_mode || row.current_mode || 'automatic'),
+        energy_control_mode: this.value(`${id}.energy_control_mode`, row.energy_control_mode || row.current_mode || 'advice'),
         can_execute_energy_action_now: asBool(this.value(`${id}.can_execute_energy_action_now`, row.can_execute_energy_action_now), false),
         energy_planning: this.planningOutcomeFor(id),
         // Canonical producer-owned charging relation aliases. These are
@@ -1816,7 +1816,7 @@
       const map = {
         available:'Ready', ready:'Ready', ok:'Ready', verified:'Verified', trusted:'Verified', complete:'Complete',
         unavailable:'Not available', not_available:'Not available', missing:'Not available', not_published:'Not available',
-        disabled:'Not managed', excluded:'Not managed', off:'Off', advice:'Recommend', recommend:'Recommend', recommendation:'Recommend', automatic:'Automatic', automation:'Automatic',
+        disabled:'Not managed', excluded:'Not managed', off:'Off', advice:'Advice', recommend:'Advice', recommendation:'Advice', automatic:'Automatic', automation:'Automatic',
         waiting:'Waiting', planned:'Scheduled', scheduled:'Scheduled', active:'Running', running:'Running', charging:'Charging', discharging:'Discharging', paused:'Paused', busy:'In progress',
         succeeded:'Completed', completed:'Completed', failed:'Could not complete', blocked:'Blocked', constrained:'Limited', overridden:'Overridden',
         baseline_required:'Needs one-time reset', baseline_untrusted:'Needs one-time reset', verification_required:'Verification required', reset_pending:'Reset in progress',
@@ -2338,10 +2338,10 @@
         battery: { image:hbEnergyHeroAsset('battery'), icon:'▣', eyebrow:'Home Battery', title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(this.batteryReservePct(rt)),'Protected minimum']] },
         consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',flexibleLoadBudget===null?'Not published':fmtKw(flexibleLoadBudget),flexibleLoadBudget===null?'Planning budget not published':'Current planning budget'],['◷','Planning',flexibleLoadBudget===null && flexNeed===null?'Incomplete':this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),flexibleLoadBudget===null?'Budget not published':'Planning data available']] },
         gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:'Gas', title:gas.asset ? 'Gas consumption' : 'Gas meter not connected', value:this.gasVolume(gas.totalM3), unit:'total meter reading', explanation:gas.asset ? 'Measured gas use, meter health and 30-day history.' : 'Connect one authoritative gas meter to start measured consumption history.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),gas.flowM3h===null?'Not measured':'Current measured flow'],['◫','Meter total',this.gasVolume(gas.totalM3),gas.totalM3===null?'Not measured':'Cumulative meter reading'],['↺','History',gas.totalEntityId?'30 days':'Not available',gas.totalEntityId?'Daily measured consumption':'Waiting for total meter'],['✓','Health',gas.asset?human(gas.health):'Not configured',gas.asset?'Gas meter health':'Authoritative source required']] },
-        strategies: { image:hbEnergyHeroAsset('strategies'), icon:'◎', eyebrow:'Strategies', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Configured intent and the strategy currently in effect', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
-        'operational-planning': { image:hbEnergyHeroAsset('operational-planning'), icon:'◷', eyebrow:'Operational Planning', title:this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'), value:fmtKw(flexPower), unit:'managed power now', explanation:'Current flexible-load execution and next actions', tone:'purple', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Managed power now'],['⌂','Energy need',fmtKwh(flexNeed),'Known remaining need'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Current operational state'],['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'),'Energy control mode']] },
+        strategies: { image:hbEnergyHeroAsset('strategies'), icon:'◎', eyebrow:'Strategies', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Configured intent and the strategy currently in effect', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
+        'operational-planning': { image:hbEnergyHeroAsset('operational-planning'), icon:'◷', eyebrow:'Operational Planning', title:this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'), value:fmtKw(flexPower), unit:'managed power now', explanation:'Current flexible-load execution and next actions', tone:'purple', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Managed power now'],['⌂','Energy need',fmtKwh(flexNeed),'Known remaining need'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Current operational state'],['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'),'Energy control mode']] },
         metering: { image:hbEnergyHeroAsset('metering'), icon:'▥', eyebrow:'Metering', title:meteringContext.label, value:meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar), unit:'Solar production', explanation:`Measured energy flows this ${meteringContext.label.toLowerCase()}`, tone:'blue', metrics:[['▥','Consumption',meteringContext.consumption === null ? 'Unavailable' : fmtKwh(meteringContext.consumption),meteringContext.label],['☀','Solar',meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar),meteringContext.label],['↓','Grid import',meteringContext.gridImport === null ? 'Unavailable' : fmtKwh(meteringContext.gridImport),meteringContext.label],['↑','Grid export',meteringContext.gridExport === null ? 'Unavailable' : fmtKwh(meteringContext.gridExport),meteringContext.label]] },
-        intelligence: { image:hbEnergyHeroAsset('intelligence'), icon:'✦', eyebrow:'Home Intelligence', title:status, value:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), unit:'automation mode', explanation:'Your home energy control center', tone:'orange', metrics:[['✓','Status',status,'Current intelligence state'],['✦','Confidence',this.productStateLabel(decision.confidence || rt.value('energy_intelligence.confidence','unknown'), 'Not available'),'Decision confidence'],['◎','Recommendation',recommendation,'What Home Intelligence advises'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
+        intelligence: { image:hbEnergyHeroAsset('intelligence'), icon:'✦', eyebrow:'Home Intelligence', title:status, value:this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'), unit:'automation mode', explanation:'Your home energy control center', tone:'orange', metrics:[['✓','Status',status,'Current intelligence state'],['✦','Confidence',this.productStateLabel(decision.confidence || rt.value('energy_intelligence.confidence','unknown'), 'Not available'),'Decision confidence'],['◎','Recommendation',recommendation,'What Home Intelligence advises'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
         retrospective: (() => { const review=this.retrospectiveModel(); return { image:hbEnergyHeroAsset('intelligence'), icon:'↺', eyebrow:'Energy retrospective', title:review.rating, value:review.scoreText, unit:'intelligence performance', explanation:review.explanation, tone:'purple', metrics:[['◎','Coverage',review.coverageText,'Measured evidence'],['✦','Confidence',review.confidence,'Assessment confidence'],['↗','Trend',review.trendText,'Compared with previous period'],['✓','Objectives',String(review.kpis.length),'Measured goals']] }; })(),
         value: { image:hbEnergyHeroAsset('value'), icon:'€', eyebrow:'Energy value', title:valueContext.label, value:this.valueMoney(valueContext.net,valueContext.currency,valueContext.state), unit:'net financial result', explanation:valueContext.attention, tone:'green', metrics:[['✓','Result',valueContext.resultCompletenessLabel,'Measured site accounting'],['↓','Import cost',this.valueMoney(valueContext.importCost,valueContext.currency,valueContext.state),valueContext.label],['↑','Export revenue',this.valueMoney(valueContext.exportRevenue,valueContext.currency,valueContext.state),valueContext.label],['€','Net energy cost',this.valueMoney(valueContext.netEnergyCost,valueContext.currency,valueContext.state),valueContext.label]] }
       };
@@ -2753,9 +2753,22 @@
         || allowed.find(value => wanted.includes(human(value,'').trim().toLowerCase()));
       return hit ?? normalized;
     }
-    automationModeValue(rt, fallback = 'Automatic') {
+    automationModeValue(rt, fallback = 'Advice') {
       const row = this.automationModeRow(rt);
       return row && !row.missing ? rowValue(row, fallback) : fallback;
+    }
+    automationExecutionPolicy(rt) {
+      const policy = objectFrom(rt.publicV2().planning?.execution_policy || {});
+      const configuredMode = String(firstDefined(policy.configured_mode, this.automationModeValue(rt, 'advice')) || 'advice').toLowerCase();
+      return {
+        configuredMode,
+        planningEnabled: policy.planning_enabled !== false,
+        autonomousExecutionAllowed: policy.autonomous_execution_allowed === true,
+        manualPlanExecutionAllowed: policy.manual_plan_execution_allowed === true,
+        directManualCommandsAllowed: policy.direct_manual_commands_allowed !== false,
+        allocationState: String(firstDefined(policy.allocation_state, configuredMode === 'automatic' ? 'scheduled' : configuredMode === 'advice' ? 'advisory' : 'informational')),
+        authority: String(firstDefined(policy.authority, configuredMode === 'automatic' ? 'home_intelligence' : configuredMode === 'advice' ? 'user_approval' : 'none'))
+      };
     }
     modeSelector(rt, activeMode) {
       const modeRow = this.automationModeRow(rt);
@@ -2764,7 +2777,7 @@
       const propertyKey = modeRow.key || modeRow.property_key || modeRow.property_id || 'energy_intelligence.automation_mode';
       const opts = [
         { value: 'disabled', label: 'Off' },
-        { value: 'advice', label: 'Recommend' },
+        { value: 'advice', label: 'Advice' },
         { value: 'automation', label: 'Automatic' }
       ].map(opt => ({
         ...opt,
@@ -2794,7 +2807,7 @@
       const propertyKey = modeRow.key || modeRow.property_key || modeRow.property_id || 'energy_intelligence.automation_mode';
       const opts = [
         { value: 'disabled', label: 'Off' },
-        { value: 'advice', label: 'Recommend' },
+        { value: 'advice', label: 'Advice' },
         { value: 'automation', label: 'Automatic' }
       ].map(opt => ({
         ...opt,
@@ -2809,8 +2822,8 @@
     }
     automationModeSummary(activeMode) {
       const normalized = this.normalizeEnergyModeValue(activeMode);
-      const labels = { disabled:'Off', advice:'Recommend', automation:'Automatic' };
-      const descriptions = { disabled:'Home Intelligence is observing only.', advice:'Home Intelligence will recommend actions.', automation:'Home Intelligence is managing participating assets automatically.' };
+      const labels = { disabled:'Off', advice:'Advice', automation:'Automatic' };
+      const descriptions = { disabled:'Home Intelligence is observing only.', advice:'Home Intelligence recommends actions and waits for your approval.', automation:'Home Intelligence is managing participating assets automatically.' };
       return `<div class="automationModeSummary"><span>Home Intelligence</span><b>${escapeHtml(labels[normalized] || human(activeMode))}</b><em>${escapeHtml(descriptions[normalized] || '')}</em></div>`;
     }
     flexibleAssetIcon(load) {
@@ -2873,7 +2886,7 @@
     automationDisplayFor(rt, load, id) {
       const allowed = load.automation?.allowed ?? load.automation_allowed ?? rt.value(`${id}.automation.allowed`, rt.value(`${id}.automation_allowed`, null));
       const blocked = load.automation?.blocked_reason || load.automation_blocked_reason || rt.value(`${id}.automation.blocked_reason`, rt.value(`${id}.automation_blocked_reason`, ''));
-      if (allowed === null || allowed === undefined) return { label: human(load.energy_control_mode || 'Automatic'), sub: human(blocked || 'Normal priority'), on: !/off|manual|disabled|not automatic/i.test(String(load.energy_control_mode || '')) };
+      if (allowed === null || allowed === undefined) return { label: human(load.energy_control_mode || 'Advice'), sub: human(blocked || 'Normal priority'), on: !/off|manual|disabled|not automatic/i.test(String(load.energy_control_mode || '')) };
       return { label: asBool(allowed, false) ? 'Automatic' : 'Not automatic', sub: asBool(allowed, false) ? human(load.priority_label || 'Normal priority') : human(blocked || 'Not automatic'), on: asBool(allowed, false) };
     }
     priorityControl(rt, load, id) {
@@ -3540,7 +3553,34 @@
         const p = load.energy_planning || rt.planningOutcomeFor(load.asset_id) || {};
         return /waiting|blocked|uncertain|not eligible/i.test(String(firstDefined(p.state,p.status,p.today_status,p.expected,'')));
       }).length;
-      return `${this.tabExperienceHeader(rt,'operational-planning',pageVm)}<div class="operationalPlanningPage">
+      const executionPolicy = this.automationExecutionPolicy(rt);
+      const executePlan = rt.commands().find(command => rt.commandRole(command) === 'execute_plan') || null;
+      const policyTitle = executionPolicy.configuredMode === 'automatic'
+        ? 'Automatic · Home Intelligence may execute the current plan'
+        : executionPolicy.configuredMode === 'advice'
+          ? 'Advice · plan waits for your approval'
+          : 'Disabled · planning is informational only';
+      const policyWhy = executionPolicy.configuredMode === 'automatic'
+        ? 'Only the current canonical D0 allocation may be dispatched, with producer readiness and authoritative readback still required.'
+        : executionPolicy.configuredMode === 'advice'
+          ? 'Home Intelligence calculates the same plan but cannot dispatch it autonomously.'
+          : 'Home Intelligence keeps calculating planning insight but managed plan execution is blocked.';
+      const executeAction = executePlan && rt.commandVisible(executePlan)
+        ? this.componentActionButton(executePlan, executePlan.label || (executionPolicy.configuredMode === 'advice' ? 'Apply current plan' : 'Run current plan now'), 'energy')
+        : '';
+      const authorityCard = this.productStoryCard({
+        eyebrow:'Automation authority',
+        title:policyTitle,
+        why:policyWhy,
+        recommendation:executionPolicy.configuredMode === 'advice'
+          ? 'Review the plan and apply it when you agree.'
+          : executionPolicy.configuredMode === 'automatic'
+            ? 'Home Intelligence manages the current plan within your configured strategies.'
+            : 'Change Automation mode to Advice or Automatic to allow managed plan execution.',
+        actions:executeAction,
+        tone:executionPolicy.configuredMode === 'automatic' ? 'green' : executionPolicy.configuredMode === 'advice' ? 'blue' : 'orange'
+      });
+      return `${this.tabExperienceHeader(rt,'operational-planning',pageVm)}<div class="operationalPlanningPage">${authorityCard}
         <section class="panel operationalPlanningLoads"><div class="energySectionHead"><div><h2>Flexible loads</h2><p>Current execution, next action, requested power and operational reason. Hardware configuration is not shown here.</p></div></div><div class="flexLoadList">${cards || '<div class="empty"><b>No participating flexible loads</b><span>No controllable load currently participates in operational planning.</span></div>'}</div></section>
         ${disabledCards ? `<details class="panel compactDisclosure"><summary>Other assets (${disabled.length})</summary><p>These assets are excluded from operational planning.</p><div class="disabledAssetList">${disabledCards}</div></details>` : ''}
       </div>`;
@@ -4195,13 +4235,22 @@
       const relation = chargerId ? `${rt.assetName(chargerId) || human(chargerId)} · ${human(firstDefined(asset.connection_state,'linked'))}` : '';
       const reason = humanReason(firstDefined(planning.user_reason_label, planning.waiting_reason, planning.waiting_reason_code, planning.reason, planning.reason_code, row.reason), state === 'Ready' ? 'Ready when you need it.' : 'Home Intelligence is monitoring this asset.');
       const paused = /paused|hold/.test(String(stateRaw || '').toLowerCase()) || rt.commandEnabled(resume);
+      const executionPolicy = this.automationExecutionPolicy(rt);
       let recommendation = 'Home Intelligence will keep monitoring this asset.';
-      if (/waiting/.test(String(stateRaw || '').toLowerCase())) recommendation = 'Home Intelligence will act automatically when the required energy conditions are available.';
-      if (/planned|scheduled/.test(String(stateRaw || '').toLowerCase())) recommendation = 'Home Intelligence has included this asset in the current plan.';
-      if (/active|charging|running/.test(String(stateRaw || '').toLowerCase())) recommendation = 'Let Home Intelligence continue unless you want to stop or pause control.';
-      if (paused) recommendation = 'Resume automatic control when you want Home Intelligence to manage this asset again.';
+      if (/waiting/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
+        ? 'Home Intelligence may act automatically when the planned conditions are available.'
+        : executionPolicy.configuredMode === 'advice'
+          ? 'Home Intelligence will keep the recommendation ready and wait for your approval.'
+          : 'Planning remains visible, but managed execution is disabled.';
+      if (/planned|scheduled/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
+        ? 'Home Intelligence has included this asset in the executable current plan.'
+        : 'Home Intelligence has included this asset in the advisory plan.';
+      if (/active|charging|running/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
+        ? 'Let Home Intelligence continue unless you want to stop or pause control.'
+        : 'Current physical execution is shown separately from advisory planning.';
+      if (paused) recommendation = 'Resume managed participation when you want Home Intelligence to include this asset again.';
       const actions = [
-        paused ? this.componentActionButton(resume, 'Resume automatic control', id) : this.componentActionButton(pause, 'Pause automatic control', id),
+        paused ? this.componentActionButton(resume, 'Resume managed control', id) : this.componentActionButton(pause, 'Pause managed control', id),
         /active|charging|running/.test(String(stateRaw || '').toLowerCase()) ? this.componentActionButton(stop, 'Stop now', id) : this.componentActionButton(startCommand, 'Start now', id)
       ].join('');
       const currentPower = asNumber(firstDefined(row.current_power_kw, row.actual_power_kw, row.power_kw, raw.current_power_kw, raw.actual_power_kw, raw.power_kw));
@@ -4223,7 +4272,7 @@
         stillToPlan !== null ? ['Still to plan', fmtKwh(stillToPlan)] : null,
         planningLabel ? ['Plan', human(planningLabel)] : null
       ].filter(Boolean).slice(0,5);
-      const details = `${this.kv('Availability', human(availability))}${this.kv('Health', health)}${this.kv('Current power', fmtKw(currentPower, '0.0 kW'))}${this.kv('Requested power', fmtKw(requestedPower, '—'))}${energyNeed !== null ? this.kv('Energy needed',fmtKwh(energyNeed)) : ''}${plannedToday !== null ? this.kv('Planned today',fmtKwh(plannedToday)) : ''}${plannedTomorrow !== null ? this.kv('Planned tomorrow',fmtKwh(plannedTomorrow)) : ''}${stillToPlan !== null ? this.kv('Still to plan',fmtKwh(stillToPlan)) : ''}${this.kv('Automation', human(firstDefined(row.automation_mode, raw.automation_mode, 'Automatic')))}${relation ? this.kv('Relationship', relation) : ''}${this.energyAssetDetailDisclosure(rt,asset)}`;
+      const details = `${this.kv('Availability', human(availability))}${this.kv('Health', health)}${this.kv('Current power', fmtKw(currentPower, '0.0 kW'))}${this.kv('Requested power', fmtKw(requestedPower, '—'))}${energyNeed !== null ? this.kv('Energy needed',fmtKwh(energyNeed)) : ''}${plannedToday !== null ? this.kv('Planned today',fmtKwh(plannedToday)) : ''}${plannedTomorrow !== null ? this.kv('Planned tomorrow',fmtKwh(plannedTomorrow)) : ''}${stillToPlan !== null ? this.kv('Still to plan',fmtKwh(stillToPlan)) : ''}${this.kv('Automation', human(firstDefined(row.automation_mode, raw.automation_mode, 'Advice')))}${relation ? this.kv('Relationship', relation) : ''}${this.energyAssetDetailDisclosure(rt,asset)}`;
       return `<article class="managedAssetCard"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${area ? `${escapeHtml(area)} · ` : ''}${escapeHtml(state)} · ${escapeHtml(health)}</span></div></div><b>${fmtKw(currentPower, '0.0 kW')}</b></div><div class="managedAssetFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>${relation ? `<div class="managedAssetRelationship"><small>Connected via</small><b>${escapeHtml(relation)}</b></div>` : ''}<div class="managedAssetStory"><p>${escapeHtml(reason)}</p><div><small>What Home Intelligence will do</small><b>${escapeHtml(recommendation)}</b></div></div>${actions ? `<div class="managedAssetActions">${actions}</div>` : ''}${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}</article>`;
     }
 
@@ -4344,7 +4393,7 @@
       const effectiveRows = (effectiveRowsForProfile.length ? effectiveRowsForProfile : effectiveStrategies).map(strategy => this.effectivePolicyPreviewCard(rt, strategy)).join('');
       const diagnostics = `${this.kv('Editable strategy source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy')}${this.kv('Effective context source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy.effective_properties')}${this.kv('Planning outcome source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning')}${this.kv('Explanation source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.intelligence')}${this.kv('Action source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.commands')}${this.kv('Selected profile', selectedId || 'None')}`;
       const automationRow = rt.editableProperty('energy.automation_mode') || rt.row('energy.automation_mode');
-      const automationMode = rowValue(automationRow, this.energyAutomationMode(rt,d) || 'automatic');
+      const automationMode = rowValue(automationRow, this.energyAutomationMode(rt,d) || 'advice');
       const automationOptions = allowedValuesForRow(automationRow).length
         ? allowedValuesForRow(automationRow).map(value => ({ value, label:this.productStateLabel(value,human(value)), attrs:{'data-mode-value':value,'data-property-key':'energy.automation_mode'} }))
         : ['automatic','advice','disabled'].map(value => ({ value, label:this.productStateLabel(value,human(value)), attrs:{'data-mode-value':value,'data-property-key':'energy.automation_mode'} }));
@@ -4704,7 +4753,7 @@
       const d = rt.decision();
       const planningRows = this.flexibleAssetDomain(rt).planningRows();
       const policies = rt.effectiveStrategyRows();
-      const mode = this.automationModeValue(rt, firstDefined(d.mode, d.automation_mode, 'Automatic'));
+      const mode = this.automationModeValue(rt, firstDefined(d.mode, d.automation_mode, 'Advice'));
       const state = this.userStateText(firstDefined(d.product_state,d.status,d.state,rt.value('energy_intelligence.system_state','Monitoring')),'Monitoring');
       const reasonObj = objectFrom(d.reason || {});
       const why = humanReason(firstDefined(reasonObj.message,d.user_reason_label,d.reason_label,reasonObj.code,rt.rawText('energy_intelligence.reason',null)),'Home Intelligence is monitoring current energy conditions.');
@@ -5144,7 +5193,7 @@
         title:'Strategic Planning',
         explanation:'Longer-term goals, constraints and optimisation policy.',
         metrics:[
-          ['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'),'Automatic'),'Current control mode'],
+          ['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'),'Automatic'),'Current control mode'],
           ['◇','Objectives',String(objectiveRows.length),'Published strategic goals and policies'],
           ['◫','Constraints',String(constraintRows.length),'Published limits and resilience constraints'],
           ['↗','Tactical horizon','D0 / D1','Scheduling remains owned by Tactical Planning']
