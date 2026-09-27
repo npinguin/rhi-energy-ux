@@ -16,7 +16,9 @@
     "asset_profile_contract": "validation/test_asset_profile_contract.js",
     "visual_catalog": "validation/test_energy_visual_catalog.js",
     "gas_experience": "validation/test_gas_insights_tab.js",
-    "ux_core_integration": "validation/validate_ux_core_integration.py"
+    "ux_core_integration": "validation/validate_ux_core_integration.py",
+    "cross_domain_visual_registry": "validation/test_visual_ref_contract.js",
+    "shared_visual_ownership": "validation/validate_shared_visual_ownership.py"
   },
   "policy": {
     "source_inspection": "negative_architecture_boundaries_only",
