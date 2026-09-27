@@ -30,7 +30,7 @@ for (const type of [
   "flexible_load","flexible_asset","consumer","vehicle","charger","charging_point",
   "site_consumption","home_consumption","backup_interface","energy_system","home_bus"
 ]) {
-  assert.ok(facts.includes(type+":["), "missing explicit primary fact contract for "+type);
+  assert.ok(app.includes(type+":["), "missing explicit primary fact contract for "+type);
 }
 for (const phrase of [
   "State of charge","Power now","Available energy","Capacity","Production now",
