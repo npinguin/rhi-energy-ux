@@ -3592,9 +3592,20 @@
       const operating = firstDefined(consumer.operating_state, consumer.state, rt.value(`${id}.operating_state`, null));
       const active = asBool(firstDefined(consumer.active, rt.value(`${id}.active`, false)));
       const charging = asBool(firstDefined(consumer.charging, rt.value(`${id}.charging`, false))) || /charging/i.test(String(operating || ''));
-      const connected = asBool(firstDefined(consumer.connected, consumer.connection_state === 'connected', rt.value(`${id}.connected`, false)));
+      const connectionState = String(firstDefined(consumer.connection_state, '') || '').trim().toLowerCase();
+      const connected = asBool(firstDefined(consumer.connected, rt.value(`${id}.connected`, false)))
+        || ['connected','asset_connected'].includes(connectionState);
       const available = !/unavailable|offline|disconnected/i.test(String(firstDefined(consumer.availability_state, '')));
-      const charger = firstDefined(consumer.effective_charger, consumer.charger_asset_id, consumer.connection_asset_id, consumer.execution_target_asset_id, '');
+      const charger = firstDefined(
+        consumer.effective_charger,
+        consumer.effective_connection_id,
+        consumer.assigned_connection_id,
+        consumer.physical_connection_id,
+        consumer.charger_asset_id,
+        consumer.connection_asset_id,
+        consumer.execution_target_asset_id,
+        ''
+      );
       const requested = asNumber(firstDefined(consumer.requested_power_kw_effective, consumer.requested_power_kw));
       const state = charging ? 'Charging' : active || (power !== null && power > 0.05) ? 'Active' : connected ? 'Connected' : available ? 'Available' : 'Unavailable';
       const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
