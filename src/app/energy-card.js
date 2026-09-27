@@ -171,8 +171,16 @@
       this._meteringHorizons = null;
       this._meteringPeriods = null;
       this._meteringRemediations = null;
+      this._visualRegistry = null;
     }
     rawState(entityId) { return this.hass?.states?.[entityId] || null; }
+    visualRegistry() {
+      if (!this._visualRegistry) this._visualRegistry = readFoundationVisualRegistry(this.hass);
+      return this._visualRegistry;
+    }
+    resolveVisualRef(visualRef, variant = 'card') {
+      return resolveEnergyVisualRef(visualRef, this.visualRegistry(), variant);
+    }
     releaseState() { return this.rawState(RELEASE_ENTITY); }
     releaseAttrs() { return this.releaseState()?.attributes || {}; }
     publicUxEntities() {
@@ -1121,7 +1129,10 @@
         retrospective:['retrospective']
       };
       const keys = ['release', ...(byView[this.view] || [])];
-      return [...new Set(keys.map(key => UX_INTERFACES[key]).filter(Boolean))];
+      const registryEntity = Object.entries(this._hass?.states || {}).find(([,state]) =>
+        String(state?.attributes?.contract_id || '') === 'RHI_VISUAL_ASSET_REGISTRY_V1'
+      )?.[0] || '';
+      return [...new Set([...keys.map(key => UX_INTERFACES[key]).filter(Boolean), registryEntity].filter(Boolean))];
     }
     runtimeSignature() {
       const states = this._hass?.states || {};
@@ -3510,7 +3521,7 @@
         consumerId ? (rt.assetName(consumerId) || human(consumerId)) : '',
         operatingState ? human(operatingState) : ''
       ].filter(Boolean).join(' · ');
-      const visual = typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(charger.visual_ref) : null;
+      const visual = rt.resolveVisualRef(charger.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
       return `<div class="flowConnectionCard">${art}<div><b>${escapeHtml(charger.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(context || 'Connection state unavailable')}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
@@ -3526,7 +3537,7 @@
       const charger = firstDefined(consumer.effective_charger, consumer.charger_asset_id, consumer.connection_asset_id, consumer.execution_target_asset_id, '');
       const requested = asNumber(firstDefined(consumer.requested_power_kw_effective, consumer.requested_power_kw));
       const state = charging ? 'Charging' : active || (power !== null && power > 0.05) ? 'Active' : connected ? 'Connected' : available ? 'Available' : 'Unavailable';
-      const visual = typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(consumer.visual_ref) : null;
+      const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
       return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(state)}${charger ? ` · ${escapeHtml(rt.assetName(charger) || human(charger))}` : ''}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
@@ -4676,8 +4687,8 @@
     assetVisual(asset = {}, { size = 'md', fallbackIcon = '◆', decorative = true } = {}) {
       const visualRef = String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
       const resolved = typeof resolveEnergyAssetVisual === 'function'
-        ? resolveEnergyAssetVisual(asset)
-        : (visualRef && typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(visualRef) : null);
+        ? resolveEnergyAssetVisual(asset, rt.visualRegistry(), size === 'lg' ? 'detail' : 'card')
+        : (visualRef ? rt.resolveVisualRef(visualRef, size === 'lg' ? 'detail' : 'card') : null);
       const label = this.planningAssetName(asset);
       const assetId = String(firstDefined(asset.asset_id, asset.id, '') || '').trim();
       const assetType = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
