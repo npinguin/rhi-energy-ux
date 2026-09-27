@@ -154,7 +154,7 @@
         const measured = asNumber(firstDefined(asset.current_power_kw, asset.actual_power_kw, asset.power_kw, this.runtime.number(`${vm.id}.current_power_kw`), this.runtime.number(`${vm.id}.power_kw`))) || 0;
         const connected = asBool(firstDefined(asset.connected, asset.connection_state === 'connected', this.runtime.value(`${vm.id}.connected`, false)), false);
         const charger = firstDefined(asset.effective_charger, asset.charger_asset_id, asset.connection_asset_id, asset.execution_target_asset_id, '');
-        return measured > 0.05 || connected || related.has(vm.id) || (charger && related.has(String(charger)));
+        return measured > 0.05 || connected || related.has(vm.id) || Boolean(charger) || (charger && related.has(String(charger)));
       });
     }
   }

@@ -92,16 +92,7 @@ function hbEnergyPresentationStyles() {
     .rhiEnergyNav-intelligence .rhiUxDomainShell{--rhi-nav-active-bg:#F1EDFF;--rhi-nav-active-border:#DFD5FB;--rhi-nav-active-text:#5A38B3}
     .rhiEnergyNav-insights .rhiUxDomainShell{--rhi-nav-active-bg:#E7F7F4;--rhi-nav-active-border:#CDEBE6;--rhi-nav-active-text:#176E67}
     .rhiEnergyPageHeader{display:block;margin:0 0 10px}
-    .rhiEnergyPageControls{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
-    .rhiEnergyControlGroup{display:flex;align-items:center;gap:8px;min-width:0}
-    .rhiEnergyControlGroup>small{font-size:var(--rhi-font-label);letter-spacing:.10em;text-transform:uppercase;color:#476487;font-weight:var(--rhi-weight-medium);white-space:nowrap}
-    .rhiEnergyControlGroup.commands{padding-left:14px;border-left:1px solid var(--rhi-color-line-soft)}
     @media(max-width:760px){
-      .rhiEnergyPageControls{display:grid;grid-template-columns:1fr;gap:8px}
-      .rhiEnergyControlGroup{overflow-x:auto;scrollbar-width:none}
-      .rhiEnergyControlGroup::-webkit-scrollbar{display:none}
-      .rhiEnergyControlGroup.commands{padding-left:0;border-left:0;border-top:1px solid var(--rhi-color-line-soft);padding-top:8px}
-      .rhiEnergyControlGroup .rhiUxQuickActions{flex-wrap:nowrap}
     }
     .rhi-context-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--rhi-space-2)}
     .rhi-context-card{min-width:0;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm);padding:14px 16px}

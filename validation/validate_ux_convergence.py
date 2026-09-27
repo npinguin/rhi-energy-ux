@@ -15,27 +15,40 @@ for token in ("rhiUxPageHero(", "rhiUxStatusGrid(", "rhiUxQuickActionBar", "rhiU
     if token not in HEADER:
         errors.append(f"page header lost Core primitive: {token}")
 
-# Context/navigation and executable commands must never be concatenated into an
-# undifferentiated Quick Actions row again.
+# Page-level controls are executable commands only. View/filter context is body-scoped.
 required = [
-    "contextControls = \"\"",
     "commandActions = \"\"",
-    'class="rhiEnergyPageControls rhiUxQuickActionBar"',
-    'class="rhiEnergyControlGroup context"',
-    'class="rhiEnergyControlGroup commands"',
-    "contextControls:this.pageContextControls(rt, tab)",
+    'class="rhiUxQuickActionBar"',
     "commandActions:this.pageQuickActions(rt, tab)",
+    "bodyContextBar(rt, tab",
+    'class="rhiUxContextBar"',
 ]
 for token in required:
     if token not in HEADER + APP:
-        errors.append(f"missing converged page-control contract: {token}")
+        errors.append(f"missing converged control contract: {token}")
 
 for forbidden in (
+    "contextControls:this.pageContextControls(rt, tab)",
+    'class="rhiEnergyControlGroup context"',
+    'class="rhiEnergyPageControls rhiUxQuickActionBar"',
     "quickActions:this.quickActionBar(rt, tab) + this.pageQuickActions(rt, tab)",
     "quickActionBar(rt, tab) {",
 ):
-    if forbidden in APP:
+    if forbidden in HEADER + APP:
         errors.append(f"legacy mixed page-control authority remains: {forbidden}")
+
+context_start = APP.find("pageContextControls(rt, tab)")
+context_end = APP.find("bodyContextBar(rt, tab")
+context_block = APP[context_start:context_end]
+for expected in ("outlook","consumers","metering","planning","value"):
+    if f"tab === '{expected}'" not in context_block:
+        errors.append(f"missing body-scoped context case: {expected}")
+for forbidden_view_nav in ("Energy flow","Tactical planning","Gas meter","Consumer list"):
+    if forbidden_view_nav in context_block:
+        errors.append(f"navigation shortcut leaked into body View controls: {forbidden_view_nav}")
+
+if "data:image/" in APP:
+    errors.append("embedded binary presentation asset remains in energy-card.js; use packaged assets")
 
 # Legacy presentation authority is closed. Neither rendering nor stylesheet debt may reappear.
 for legacy_class in ("hiTabHero", "hiTabStatusGrid", "hiQuickActionBar"):

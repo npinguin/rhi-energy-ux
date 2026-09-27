@@ -10,6 +10,7 @@
         "runtime/energy-v2-contract.js",
         "domain/selectors/energy-selectors.js",
         "app/energy-asset-catalog.js",
+        "runtime/mobility-visual-manifest.js",
         "runtime/visual-asset-resolver.js",
         "runtime/asset-profile-contract.js",
         "runtime/consumption-contract.js",
