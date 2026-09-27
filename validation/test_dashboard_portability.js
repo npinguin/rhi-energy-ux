@@ -10,7 +10,10 @@ const runtime = app + "\n" + presentation;
 // Energy capability navigation is internal card state. A Lovelace dashboard root
 // is deployment configuration and must never become frontend semantic state.
 assert.doesNotMatch(runtime, /\/mobility-supervisor|\/robotix-energy|\/energy\/overview|dashboard_path/);
-assert.doesNotMatch(runtime, /window\.location\.pathname|location\.pathname|history\.pushState/);
+assert.doesNotMatch(runtime, /window\.location\.pathname|location\.pathname|dashboard_path/);
+const pushStateUses = runtime.match(/history\.pushState/g) || [];
+assert.equal(pushStateUses.length, 1, "only the explicit cross-domain source-asset navigation may touch browser history");
+assert.match(app, /data-source-asset-nav[\s\S]*history\.pushState\(null, '', path\)[\s\S]*location-changed/);
 
 // HACS package resources are intentionally root-absolute, so changing the
 // Lovelace dashboard URL cannot turn assets into relative dashboard requests.
