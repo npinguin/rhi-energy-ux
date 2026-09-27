@@ -5119,7 +5119,8 @@
       const picker = new HomeBrainEnergyVisualPicker();
       return picker.render(asset, current, {
         draftRef: this.energyVisualPickerDraftRef || current,
-        brand: this.energyVisualPickerBrand || 'all'
+        brand: this.energyVisualPickerBrand || 'all',
+        feedback: this.energyVisualPickerFeedback || ''
       });
     }
     assetIdentityChip(asset = {}, meta = '') {
