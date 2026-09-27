@@ -1,5 +1,5 @@
-// Package-local resolver for Foundation/Mobility visual_ref identities.
-// The backend publishes only package-neutral keys. Energy UX owns these image files.
+// Visual resolver for Energy-owned presentation preferences and registered cross-domain refs.
+// Cross-domain visual identity is opaque and resolved only through Foundation registry metadata.
 function rhiEnergyVisualAssetUrl(relativePath = "") {
   const normalized = String(relativePath || "").replace(/^\/+/, "");
   return `/hacsfiles/rhi-energy-ux/assets/${normalized}?v=${encodeURIComponent(UX_VERSION)}`;
@@ -19,6 +19,7 @@ function resolveEnergyOwnedVisualRef(visualRef = "") {
   if (!url) return null;
   return Object.freeze({
     visual_ref: ref,
+    owner_domain: "rhi_energy_ux",
     kind: "energy_logical_device",
     asset_type: entry.asset_type,
     catalog_id: entry.id,
@@ -28,10 +29,35 @@ function resolveEnergyOwnedVisualRef(visualRef = "") {
   });
 }
 
-function resolveEnergyAssetVisual(asset = {}) {
+function resolveEnergyVisualRef(visualRef = "", registry = null, variant = "card") {
+  const ref = String(visualRef || "").trim();
+  if (!ref) return null;
+
+  // Backend/domain visual refs are registered producer identity. Never interpret
+  // their namespace, brand, model, image key or asset id in Energy.
+  const registered = typeof rhiRegisteredPresentationUrl === "function"
+    ? rhiRegisteredPresentationUrl(registry, ref, variant)
+    : null;
+  if (registered) return registered;
+
+  // UX-local Energy presentation preferences are not cross-domain semantic identity.
+  if (ref.startsWith("energy.logical.")) return resolveEnergyOwnedVisualRef(ref);
+
+  // Missing/unregistered producer identity fails closed. Callers render a neutral icon.
+  return null;
+}
+
+function resolveEnergyAssetVisual(asset = {}, registry = null, variant = "card") {
   const sourceRef = String(asset.visual_ref || asset.visualRef || asset.raw?.visual_ref || "").trim();
-  // Producer visual identity stays authoritative across the domain boundary.
-  if (sourceRef.startsWith("mobility.")) return resolveEnergyVisualRef(sourceRef);
+
+  // Any registered producer/domain visual is authoritative.
+  if (sourceRef) {
+    const registered = resolveEnergyVisualRef(sourceRef, registry, variant);
+    if (registered) return registered;
+
+    // An explicit non-UX-local ref must never be replaced by an Energy semantic image.
+    if (!sourceRef.startsWith("energy.logical.")) return null;
+  }
 
   const assetId = String(asset.asset_id || asset.id || "").trim();
   const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
@@ -56,32 +82,4 @@ function resolveEnergyAssetVisual(asset = {}) {
     ? rhiEnergyDefaultVisualEntry(asset)
     : null;
   return fallbackEntry ? resolveEnergyOwnedVisualRef(rhiEnergyVisualRef(fallbackEntry)) : null;
-}
-
-function resolveEnergyVisualRef(visualRef = "") {
-  const ref = String(visualRef || "").trim();
-  if (!ref) return null;
-  if (ref.startsWith("energy.logical.")) return resolveEnergyOwnedVisualRef(ref);
-  if (ref === "mobility.vehicle.generic.fallback") {
-    return Object.freeze({ visual_ref:ref, kind:"vehicle", url:rhiEnergyVisualAssetUrl("mobility/vehicle_fallback.png"), filter:"none" });
-  }
-  if (ref === "mobility.charger.generic.fallback") {
-    return Object.freeze({ visual_ref:ref, kind:"charger", url:rhiEnergyVisualAssetUrl("mobility/charger_fallback.png"), filter:"none" });
-  }
-  if (ref.startsWith("mobility.vehicle.") || ref.startsWith("mobility.charger.")) {
-    const entry = typeof rhiEnergyMobilityVisualEntry === "function" ? rhiEnergyMobilityVisualEntry(ref) : null;
-    if (entry) {
-      const file = RHI_ENERGY_MOBILITY_ASSET_TRANSPORT[entry.image_key] || "";
-      if (file) return Object.freeze({ visual_ref:ref, kind:entry.kind, url:rhiEnergyVisualAssetUrl(file), filter:entry.filter || "none", fallback:false });
-    }
-    const vehicle = ref.startsWith("mobility.vehicle.");
-    return Object.freeze({
-      visual_ref:ref,
-      kind:vehicle ? "vehicle" : "charger",
-      url:rhiEnergyVisualAssetUrl(vehicle ? "mobility/vehicle_fallback.png" : "mobility/charger_fallback.png"),
-      filter:"none",
-      fallback:true
-    });
-  }
-  return null;
 }

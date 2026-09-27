@@ -16,6 +16,8 @@ const context = {
 context.globalThis=context;
 vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/app/energy-asset-catalog.js","utf8"),context);
+context.parseMaybeJson=(value,fallback=null)=>{if(value===undefined||value===null||value==="")return fallback;if(typeof value!=="string")return value;try{return JSON.parse(value)}catch{return fallback}};
+vm.runInContext(fs.readFileSync("src/runtime/foundation-visual-registry.js","utf8"),context);
 vm.runInContext(fs.readFileSync("src/runtime/visual-asset-resolver.js","utf8"),context);
 
 const battery={asset_id:"battery_1",asset_type:"battery",profile_id:"energy.battery.solaredge_modbus_multi",integration_domain:"solaredge_modbus_multi"};
@@ -49,11 +51,23 @@ const defaultResolved=context.resolveEnergyAssetVisual(battery);
 assert.ok(defaultResolved && defaultResolved.url);
 assert.equal(defaultResolved.asset_type,"battery");
 
-// Producer-owned cross-domain visuals remain authoritative for flexible loads.
+// Producer-owned cross-domain visuals remain authoritative but resolve only through Foundation.
 const producer={asset_id:"vehicle_1",asset_type:"flexible_load",visual_ref:"mobility.vehicle.generic.fallback"};
-const producerResolved=context.resolveEnergyAssetVisual(producer);
+assert.equal(context.resolveEnergyAssetVisual(producer),null,"producer ref without Foundation registry must fail closed");
+const producerRegistry={
+  available:true,
+  entry:ref=>ref==="mobility.vehicle.generic.fallback" ? {
+    visual_ref:ref,
+    owner_domain:"rhi_mobility",
+    asset_type:"vehicle",
+    revision:2,
+    presentation:{package_id:"rhi-mobility-ux",variants:{card:"assets/vehicles/vehicle_fallback.png"}}
+  } : null
+};
+const producerResolved=context.resolveEnergyAssetVisual(producer,producerRegistry,"card");
 assert.equal(producerResolved.kind,"vehicle");
 assert.equal(producerResolved.visual_ref,"mobility.vehicle.generic.fallback");
+assert.match(producerResolved.url,/^\/hacsfiles\/rhi-mobility-ux\/assets\/vehicles\/vehicle_fallback\.png\?r=2$/);
 
 const picker=fs.readFileSync("src/ui/components/energy-visual-picker.js","utf8");
 assert.match(picker,/catalogFor\(asset/);

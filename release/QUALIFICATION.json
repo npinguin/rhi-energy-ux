@@ -1,8 +1,8 @@
 {
-  "version": "4.3.4",
-  "candidate_tag": "v4.3.4",
+  "version": "4.3.5",
+  "candidate_tag": "v4.3.5",
   "candidate_sha": "pending",
-  "previous_release": "4.3.3",
+  "previous_release": "4.3.4",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -21,5 +21,7 @@
   "rollback_to_previous": "NOT_EXECUTED",
   "runtime_proof": "PENDING",
   "rollback_proof": "PENDING",
-  "release_decision": "BLOCKED"
+  "release_decision": "BLOCKED",
+  "foundation_visual_registry": "NOT_EXECUTED",
+  "cross_domain_visuals": "NOT_EXECUTED"
 }
