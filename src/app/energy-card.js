@@ -3701,8 +3701,10 @@
       const materialize = (chargerId, consumerId = '', relationship = {}) => {
         const chargerKey = String(chargerId || '').trim();
         const consumerKey = String(consumerId || '').trim();
-        if (!chargerKey) return;
-        const charger = { ...objectFrom(relationship), ...objectFrom(rt.asset(chargerKey) || {}) };
+        if (!chargerKey || rows.has(chargerKey)) return;
+        // One physical charger is one connection row. The producer/public row is
+        // materialized first and remains authoritative over Energy-local fallbacks.
+        const charger = { ...objectFrom(rt.asset(chargerKey) || {}), ...objectFrom(relationship) };
         const consumer = consumerKey
           ? (rt.asset(consumerKey) || this.flexibleAssetDomain(rt).byId(consumerKey)?.raw || {})
           : {};
@@ -3735,10 +3737,12 @@
             ''
           ) || ''),
           physical_power_kw:power,
-          visual_ref:String(firstDefined(charger.visual_ref, '') || ''),
+          // Preserve producer-owned visual identity from the canonical connection
+          // row; Energy-local projections may only fill it when the producer omitted it.
+          visual_ref:String(firstDefined(relationship.visual_ref, charger.visual_ref, '') || ''),
           source_relationship_id:String(firstDefined(relationship.relationship_id, relationship.id, '') || '')
         };
-        rows.set(`${chargerKey}::${consumerKey}`, row);
+        rows.set(chargerKey, row);
       };
 
       // Prefer the exact producer-owned connection rows published by Energy V2.
@@ -3786,8 +3790,7 @@
       rt.assets().filter(isCharger).forEach(charger => {
         const id=String(charger.asset_id || '');
         if (!id) return;
-        const already=[...rows.values()].some(row => String(row.asset_id || '') === id);
-        if (!already) materialize(id, '', {});
+        if (!rows.has(id)) materialize(id, '', charger);
       });
 
       const projected = Object.freeze([...rows.values()].map(row => Object.freeze(row)));
