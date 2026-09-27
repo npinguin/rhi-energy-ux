@@ -75,7 +75,14 @@
       // carries richer producer identity such as visual_ref and charger linkage.
       // No semantic inference or cross-domain lookup is performed here.
       const materialized = context.asset
-        ? { ...context.asset, ...asset, asset_id:id }
+        ? {
+            ...asset,
+            ...context.asset,
+            // Energy flexible-load state may add planning/participation facts, but
+            // canonical producer identity must never be overwritten by that projection.
+            asset_id:id,
+            visual_ref:String(firstDefined(context.asset.visual_ref, asset.visual_ref, '') || '')
+          }
         : { ...asset, asset_id:id };
       const participation = this.participationState(materialized, planning);
       return {
