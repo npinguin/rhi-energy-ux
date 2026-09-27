@@ -57,3 +57,9 @@ assert.match(app,/object-fit:contain/);
 assert.match(app,/object-position:center/);
 
 console.log("PASS Solar hardware experience: compact flow + inverter/string hierarchy + measured facts");
+
+assert.match(app,/solar\.ac_energy_total_kwh/);
+assert.match(app,/solar\.status/);
+assert.match(app,/solarHardwareExperience \.energyDeviceCard\{grid-template-columns:88px/);
+assert.match(app,/solarHardwareExperience \.energyDeviceVisual\{height:84px/);
+assert.match(app,/solarHardwareExperience \.energyDeviceFacts\{grid-template-columns:repeat\(auto-fit/);
