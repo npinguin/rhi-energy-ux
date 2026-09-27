@@ -3,11 +3,11 @@ const fs = require("node:fs");
 
 const app = fs.readFileSync("src/app/energy-card.js","utf8");
 
-assert.match(app,/batteryContributorVisual \.assetVisual\{width:88px!important;height:108px!important/);
-assert.match(app,/batteryContributorVisual \.assetVisual img\{[^}]*object-fit:contain!important[^}]*object-position:center center!important/);
+assert.match(app,/batteryContributorVisual \.assetVisual\{width:88px;height:108px/);
+assert.match(app,/batteryContributorVisual \.assetVisual img\{[^}]*object-fit:contain[^}]*object-position:center center/);
 assert.match(app,/batteryContributorCard\{[^}]*min-height:148px/);
 assert.doesNotMatch(app,/batteryContributorCard\{[^}]*max-height:/);
-assert.match(app,/@media\(max-width:700px\)[\s\S]*batteryContributorVisual \.assetVisual\{width:68px!important;height:88px!important/);
+assert.match(app,/@media\(max-width:700px\)[\s\S]*batteryContributorVisual \.assetVisual\{width:68px;height:88px/);
 assert.match(app,/batteryContributorFacts\{display:grid/);
 assert.match(app,/energyAssetQuickActions/);
 
