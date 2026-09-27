@@ -14,3 +14,5 @@ Changes:
 Rollback: v4.2.7.
 
 Target Home Assistant desktop/iPad rendering, functional journeys, refresh/restart, upgrade and rollback proof remain separate runtime qualification gates.
+
+Validation: full source/package validation, deterministic rebuild proof and HACS repository validation are required before publication.
