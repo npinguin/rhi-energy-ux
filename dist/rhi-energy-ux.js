@@ -6896,6 +6896,54 @@ function rhiEnergyVisualPickerStyles() {
       <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>${vm.buckets.length} published bucket${vm.buckets.length===1?'':'s'} · backend timestamps preserved · no interpolation · zero values hidden · Grid out fixed at table end</p></div><span>All primary values are kWh per bucket</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>published by Planning</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Canonical Tactical plan projected without frontend recalculation.</p></div></div><div class="planningLoadList">${planningLoadRows||'<div class="empty"><b>No planned flexible loads</b></div>'}</div></section>`;
     }
 
+    strategicPlanning(rt) {
+      const base = this.buildPageViewModel(rt, 'strategies');
+      const profiles = asArray(rt.strategyProfileRows());
+      const effective = asArray(rt.effectiveStrategyRows());
+      const configured = profiles.flatMap(profile => {
+        const rows = asArray(firstDefined(profile.editable_field_rows, profile.properties, profile.fields, []));
+        return rows.map(row => ({ ...objectFrom(row), profile_id:firstDefined(row.profile_id, profile.profile_id, '') }));
+      });
+      const byKey = new Map();
+      [...configured, ...effective].forEach(row => {
+        const key = String(firstDefined(row.property_key,row.property_id,row.key,row.setting_id,row.id,'') || '');
+        if (!key) return;
+        byKey.set(key, { ...(byKey.get(key) || {}), ...objectFrom(row), property_key:key });
+      });
+      const rows = [...byKey.values()];
+      const objectiveRows = rows.filter(row => /objective|goal|mode|solar_policy|grid_policy|battery_policy/i.test(row.property_key));
+      const constraintRows = rows.filter(row => /reserve|minimum|maximum|limit|deadline|priority|resilience|threshold/i.test(row.property_key));
+      const optimisationRows = rows.filter(row => !objectiveRows.includes(row) && !constraintRows.includes(row));
+      const valueText = row => {
+        const value = firstDefined(row.effective_value,row.value,row.configured_value,row.selected_value,row.current_value,null);
+        if (value === null) return 'Not published';
+        return this.genericValueWithUnit(value, firstDefined(row.unit,row.native_unit,''));
+      };
+      const rowMarkup = row => `<div class="planningTransparencyRow"><div><b>${escapeHtml(human(row.label || row.name || row.property_key))}</b><span>${escapeHtml(row.profile_id ? human(row.profile_id) : 'Effective strategy')}</span></div><strong>${escapeHtml(valueText(row))}</strong></div>`;
+      const section = (title, description, items) => `<section class="panel"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p><div class="effectivePolicyList">${items.length ? items.map(rowMarkup).join('') : '<div class="empty"><b>No values published</b><span>The canonical strategy contract does not currently publish values for this section.</span></div>'}</div></section>`;
+      const model = {
+        ...base,
+        image:hbEnergyHeroAsset('strategic-planning'),
+        title:'Strategic Planning',
+        explanation:'Longer-term goals, constraints and optimisation policy.',
+        metrics:[
+          ['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'),'Automatic'),'Current control mode'],
+          ['◇','Objectives',String(objectiveRows.length),'Published strategic goals and policies'],
+          ['◫','Constraints',String(constraintRows.length),'Published limits and resilience constraints'],
+          ['↗','Tactical horizon','D0 / D1','Scheduling remains owned by Tactical Planning']
+        ]
+      };
+      return `${this.tabExperienceHeader(rt,'strategic-planning',model)}
+        <div class="strategicPlanningPage">
+          <section class="panel strategicPlanningIntro"><h2>Strategic posture</h2><p>Strategy configuration is the authority for longer-term intent. This view is read-only: edit intent on Strategy; Tactical Planning owns today/tomorrow scheduling and Operational Planning owns execution.</p></section>
+          <div class="strategyGrid">
+            ${section('Goals & policy','What Home Intelligence is trying to optimise over time.',objectiveRows)}
+            ${section('Constraints & resilience','Boundaries that planning must respect.',constraintRows)}
+          </div>
+          ${optimisationRows.length ? section('Other effective policy','Additional effective strategy values currently influencing planning.',optimisationRows) : ''}
+        </div>`;
+    }
+
     navigationPlaceholder(rt, view) {
       if (view === 'solar-generation') {
         const p = this.buildPageViewModel(rt, 'solar');
@@ -6971,7 +7019,7 @@ function rhiEnergyVisualPickerStyles() {
       return `<section class="panel"><h2>${escapeHtml(human(view))} unavailable</h2><p>The screen failed to render. This is a frontend defect guard; other Energy tabs remain available.</p><div class="softBox"><b>Error</b><span>${escapeHtml(message)}</span></div>${stack ? `<pre class="decisionDump">${escapeHtml(stack)}</pre>` : ''}</section>`;
     }
     viewContent(rt) {
-      const body = this.view === 'overview' ? this.overview(rt) : this.view === 'outlook' ? this.outlook(rt) : this.view === 'flow' ? this.flow(rt) : this.view === 'solar' ? this.solar(rt) : this.view === 'operational-planning' ? this.operationalPlanning(rt) : this.view === 'battery' ? this.battery(rt) : this.view === 'consumers' ? this.consumers(rt) : this.view === 'gas' ? this.gas(rt) : this.view === 'strategies' ? this.strategies(rt) : this.view === 'metering' ? this.metering(rt) : this.view === 'intelligence' ? this.intelligence(rt) : this.view === 'retrospective' ? this.retrospective(rt) : this.view === 'value' ? this.value(rt) : this.view === 'planning' ? this.planning(rt) : this.view === 'strategic-planning' ? this.navigationPlaceholder(rt, 'strategic-planning') : this.placeholder(rt);
+      const body = this.view === 'overview' ? this.overview(rt) : this.view === 'outlook' ? this.outlook(rt) : this.view === 'flow' ? this.flow(rt) : this.view === 'solar' ? this.solar(rt) : this.view === 'operational-planning' ? this.operationalPlanning(rt) : this.view === 'battery' ? this.battery(rt) : this.view === 'consumers' ? this.consumers(rt) : this.view === 'gas' ? this.gas(rt) : this.view === 'strategies' ? this.strategies(rt) : this.view === 'metering' ? this.metering(rt) : this.view === 'intelligence' ? this.intelligence(rt) : this.view === 'retrospective' ? this.retrospective(rt) : this.view === 'value' ? this.value(rt) : this.view === 'planning' ? this.planning(rt) : this.view === 'strategic-planning' ? this.strategicPlanning(rt) : this.placeholder(rt);
       const marker = '</section>';
       const headerEnd = body.indexOf(marker);
       if (headerEnd < 0) return body;
