@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.9';
+  const UX_VERSION = 'R4.3.10';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
@@ -787,11 +787,19 @@ function readLiveConsumptionContract(gateway) {
   const home = v2.field('home_consumption.power_kw');
   const flexible = v2.field('flexible_loads.power_kw');
   const attributed = v2.field('flexible_loads.attributed_power_kw');
-  const contributors = (v2.flexibleAssets || []).map(row => Object.freeze({
-    ...row,
-    asset_id:String(row.asset_id || ''),
-    power_kw:asNumber(firstDefined(row.power_kw,row.current_power_kw,row.actual_power_kw))
-  }));
+  const contributors = (v2.flexibleAssets || [])
+    .filter(row => {
+      const sourceContext = row?.source_context && typeof row.source_context === 'object' ? row.source_context : {};
+      const mobilityContext = sourceContext.mobility && typeof sourceContext.mobility === 'object' ? sourceContext.mobility : {};
+      const kind = String(firstDefined(row?.participation_state,row?.source_asset_kind,row?.asset_type,row?.object_class,mobilityContext.consumer_fallback,'') || '').toLowerCase();
+      return row?.infrastructure_only !== true
+        && !['infrastructure_only','charger','connection','unassigned_charger'].includes(kind);
+    })
+    .map(row => Object.freeze({
+      ...row,
+      asset_id:String(row.asset_id || ''),
+      power_kw:asNumber(firstDefined(row.power_kw,row.current_power_kw,row.actual_power_kw))
+    }));
   const statusFor = field => String(field.status || field.state || (field.resolved ? 'AVAILABLE' : 'UNAVAILABLE')).toUpperCase();
   return Object.freeze({
     envelope:v2.envelope,
@@ -2103,6 +2111,23 @@ class FlexibleAssetDomainModel {
       if (!id || typeof readEnergyAssetContext !== 'function') return { available:false, asset:null, profile:null, publication:null };
       return readEnergyAssetContext(this.runtime.contractGateway(), id);
     }
+    isInfrastructure(asset = {}) {
+      const sourceContext = asset.source_context && typeof asset.source_context === 'object' ? asset.source_context : {};
+      const mobilityContext = sourceContext.mobility && typeof sourceContext.mobility === 'object' ? sourceContext.mobility : {};
+      const values = [
+        asset.participation_state,
+        asset.source_asset_kind,
+        asset.asset_type,
+        asset.object_class,
+        asset.energy_asset_role,
+        mobilityContext.consumer_fallback
+      ].map(value => String(value || '').trim().toLowerCase());
+      return asset.infrastructure_only === true
+        || values.includes('infrastructure_only')
+        || values.includes('unassigned_charger')
+        || values.includes('charger')
+        || values.includes('connection');
+    }
     isStorage(asset = {}) {
       const context = this.assetContext(asset);
       const values = [
@@ -2121,6 +2146,7 @@ class FlexibleAssetDomainModel {
     }
     participationState(asset = {}, planning = {}) {
       if (this.isStorage(asset)) return 'storage';
+      if (this.isInfrastructure(asset)) return 'infrastructure_only';
       const context = this.assetContext(asset);
       const explicit = String(firstDefined(
         context.asset?.participation_state,
@@ -2170,12 +2196,12 @@ class FlexibleAssetDomainModel {
       // No semantic inference or cross-domain lookup is performed here.
       const materialized = context.asset
         ? {
-            ...asset,
+            // Energy object context enriches the producer-owned flexible row.
+            // Producer identity must win for visual_ref, asset kind and connection semantics.
             ...context.asset,
-            // Energy flexible-load state may add planning/participation facts, but
-            // canonical producer identity must never be overwritten by that projection.
+            ...asset,
             asset_id:id,
-            visual_ref:String(firstDefined(context.asset.visual_ref, asset.visual_ref, '') || '')
+            visual_ref:String(firstDefined(asset.visual_ref, context.asset.visual_ref, '') || '')
           }
         : { ...asset, asset_id:id };
       const participation = this.participationState(materialized, planning);
@@ -2196,6 +2222,7 @@ class FlexibleAssetDomainModel {
         participation,
         operation: this.operationalState(materialized, planning),
         isStorage: participation === 'storage',
+        isInfrastructure: participation === 'infrastructure_only',
         isDisabled: participation === 'disabled',
         isParticipating: participation === 'participating' || participation === 'temporarily_unavailable',
         isTemporarilyUnavailable: participation === 'temporarily_unavailable'
@@ -2209,12 +2236,15 @@ class FlexibleAssetDomainModel {
       return this._all;
     }
     byId(assetId) { this.all(); return this._byId.get(String(assetId)) || null; }
-    participating() { return this.all().filter(vm => vm.isParticipating && !vm.isStorage); }
-    disabled() { return this.all().filter(vm => vm.isDisabled); }
+    consumerFacing() { return this.all().filter(vm => !vm.isStorage && !vm.isInfrastructure); }
+    participating() { return this.consumerFacing().filter(vm => vm.isParticipating); }
+    planningParticipants() { return this.participating(); }
+    disabled() { return this.consumerFacing().filter(vm => vm.isDisabled); }
+    infrastructure() { return this.all().filter(vm => vm.isInfrastructure); }
     storage() { return this.all().filter(vm => vm.isStorage); }
     planningRows() {
       const published = new Map(this.runtime.planningIndexRows().map(row => [String(row.asset_id || row.consumer_id || row.id || ''), row]));
-      return this.participating().map(vm => {
+      return this.planningParticipants().map(vm => {
         const row = published.get(vm.id) || vm.planning || {};
         return {
           ...row,
@@ -2236,6 +2266,7 @@ class FlexibleAssetDomainModel {
         participating_count: rows.length,
         disabled_count: this.disabled().length,
         storage_count: this.storage().length,
+        infrastructure_count: this.infrastructure().length,
         waiting_count: rows.filter(row => row.operational_state === 'waiting').length,
         planned_count: rows.filter(row => row.operational_state === 'planned').length,
         active_count: rows.filter(row => row.operational_state === 'active').length,
