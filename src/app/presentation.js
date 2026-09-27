@@ -43,7 +43,7 @@ const HB_ENERGY_HERO_ASSETS = Object.freeze({
   "solar-generation": "heroes/solar-hero.webp",
   battery: "heroes/battery-hero.webp",
   consumers: "heroes/consumers-hero.webp",
-  gas: "heroes/gas-hero.webp",
+  gas: "heroes/gas-page-hero-v2.webp",
   strategy: "heroes/strategies-hero.webp",
   strategies: "heroes/strategies-hero.webp",
   intelligence: "heroes/intelligence-hero.webp",
