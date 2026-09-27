@@ -1,8 +1,8 @@
 {
-  "version": "4.3.6",
-  "candidate_tag": "v4.3.6",
+  "version": "4.3.7",
+  "candidate_tag": "v4.3.7",
   "candidate_sha": "pending",
-  "previous_release": "4.3.5",
+  "previous_release": "4.3.6",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -24,5 +24,7 @@
   "release_decision": "BLOCKED",
   "foundation_visual_registry": "NOT_EXECUTED",
   "cross_domain_visuals": "NOT_EXECUTED",
-  "asset_visual_runtime_scope": "NOT_EXECUTED"
+  "asset_visual_runtime_scope": "NOT_EXECUTED",
+  "charging_topology": "NOT_EXECUTED",
+  "idle_flexible_assets": "NOT_EXECUTED"
 }

@@ -24,6 +24,10 @@ function readEnergyPublicV2(gateway) {
     source_asset_id:String(row.source_asset_id || row.from_asset_id || ''),
     target_asset_id:String(row.target_asset_id || row.to_asset_id || '')
   }));
+  // Producer-owned physical charging topology is a first-class Energy V2
+  // surface. Keep it separate from Energy logical objects and do not infer it
+  // from Home Assistant names/devices in the frontend.
+  const connections = Object.freeze(array(attrs.connections).map(row => Object.freeze({...row})));
   const commands = array(attrs.commands);
   const activity = array(attrs.activity);
   const planning = object(attrs.planning);
@@ -161,6 +165,7 @@ function readEnergyPublicV2(gateway) {
     core:coreContractOk,
     assets:Array.isArray(objects),
     relationships:Array.isArray(relationships),
+    connections:Array.isArray(connections),
     planning:Object.keys(object(planning.horizons)).length > 0,
     pricing:Object.keys(pricing).length > 0,
     strategy:Object.keys(strategy).length > 0,
@@ -188,6 +193,7 @@ function readEnergyPublicV2(gateway) {
     objects,
     profiles,
     relationships,
+    connections,
     planning,
     intelligence,
     overview,

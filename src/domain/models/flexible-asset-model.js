@@ -159,8 +159,19 @@
       return this.participating().filter(vm => {
         const asset = vm.raw || {};
         const measured = asNumber(firstDefined(asset.current_power_kw, asset.actual_power_kw, asset.power_kw, this.runtime.number(`${vm.id}.current_power_kw`), this.runtime.number(`${vm.id}.power_kw`))) || 0;
-        const connected = asBool(firstDefined(asset.connected, asset.connection_state === 'connected', this.runtime.value(`${vm.id}.connected`, false)), false);
-        const charger = firstDefined(asset.effective_charger, asset.charger_asset_id, asset.connection_asset_id, asset.execution_target_asset_id, '');
+        const connectionState = String(firstDefined(asset.connection_state, '') || '').trim().toLowerCase();
+        const connected = asBool(firstDefined(asset.connected, this.runtime.value(`${vm.id}.connected`, false)), false)
+          || ['connected','asset_connected'].includes(connectionState);
+        const charger = firstDefined(
+          asset.effective_charger,
+          asset.effective_connection_id,
+          asset.assigned_connection_id,
+          asset.physical_connection_id,
+          asset.charger_asset_id,
+          asset.connection_asset_id,
+          asset.execution_target_asset_id,
+          ''
+        );
         return measured > 0.05 || connected || related.has(vm.id) || Boolean(charger) || (charger && related.has(String(charger)));
       });
     }

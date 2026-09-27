@@ -608,7 +608,26 @@
         energy_control_hold_state: this.value(`${id}.energy_control_hold_state`, row.energy_control_hold_state || 'none'),
         energy_control_mode: this.value(`${id}.energy_control_mode`, row.energy_control_mode || row.current_mode || 'automatic'),
         can_execute_energy_action_now: asBool(this.value(`${id}.can_execute_energy_action_now`, row.can_execute_energy_action_now), false),
-        energy_planning: this.planningOutcomeFor(id)
+        energy_planning: this.planningOutcomeFor(id),
+        // Canonical producer-owned charging relation aliases. These are
+        // presentation conveniences only; the values remain Mobility-owned.
+        effective_charger: firstDefined(
+          row.effective_charger,
+          row.effective_connection_id,
+          row.assigned_connection_id,
+          row.physical_connection_id,
+          row.charger_asset_id,
+          row.connection_asset_id,
+          ''
+        ),
+        charger_asset_id: firstDefined(
+          row.charger_asset_id,
+          row.effective_connection_id,
+          row.assigned_connection_id,
+          row.physical_connection_id,
+          row.connection_asset_id,
+          ''
+        )
       };
     }
     flexibleAssetIndexRows() {
@@ -3357,7 +3376,16 @@
     solarHardwareExperience(rt) {
       const assets = rt.assets().map(asset=>this.energyAssetContext(rt,asset));
       const production = assets.filter(asset=>this.energyAssetType(asset)==='solar_production');
-      const arrays = assets.filter(asset=>['solar_array','solar_zone'].includes(this.energyAssetType(asset)));
+      const arrays = assets
+        .filter(asset=>['solar_array','solar_zone'].includes(this.energyAssetType(asset)))
+        .sort((left,right) => {
+          const leftId = String(firstDefined(left.asset_id,left.id,'') || '');
+          const rightId = String(firstDefined(right.asset_id,right.id,'') || '');
+          const leftName = String(firstDefined(left.display_name,left.name,rt.assetName(leftId),human(leftId),'') || '');
+          const rightName = String(firstDefined(right.display_name,right.name,rt.assetName(rightId),human(rightId),'') || '');
+          const byName = leftName.localeCompare(rightName, undefined, { sensitivity:'base', numeric:true });
+          return byName || leftId.localeCompare(rightId, undefined, { sensitivity:'base', numeric:true });
+        });
       const panels = assets.filter(asset=>this.energyAssetType(asset)==='solar_panel');
       const inverters = assets.filter(asset=>this.energyAssetType(asset)==='solar_inverter');
       const systems = assets.filter(asset=>['battery_system','home_battery_system'].includes(this.energyAssetType(asset)));
@@ -3604,8 +3632,10 @@
         const chargerKey = String(chargerId || '').trim();
         const consumerKey = String(consumerId || '').trim();
         if (!chargerKey) return;
-        const charger = rt.asset(chargerKey) || {};
-        const consumer = consumerKey ? (rt.asset(consumerKey) || {}) : {};
+        const charger = { ...objectFrom(relationship), ...objectFrom(rt.asset(chargerKey) || {}) };
+        const consumer = consumerKey
+          ? (rt.asset(consumerKey) || this.flexibleAssetDomain(rt).byId(consumerKey)?.raw || {})
+          : {};
         const power = asNumber(firstDefined(
           charger.actual_power_kw,
           charger.current_power_kw,
@@ -3641,6 +3671,17 @@
         rows.set(`${chargerKey}::${consumerKey}`, row);
       };
 
+      // Prefer the exact producer-owned connection rows published by Energy V2.
+      // This is the canonical cross-domain topology boundary and remains visible
+      // even at 0 kW / idle.
+      asArray(rt.publicV2().connections).forEach(connection => {
+        materialize(
+          firstDefined(connection.asset_id, connection.connection_asset_id, ''),
+          firstDefined(connection.connected_asset_id, connection.connected_consumer_id, ''),
+          connection
+        );
+      });
+
       // Flexible assets may publish their exact execution/charger target directly.
       this.flexibleAssetDomain(rt).all()
         .filter(vm => !vm.isDisabled && !vm.isStorage)
@@ -3648,6 +3689,9 @@
           const asset = vm.raw || {};
           const chargerId = firstDefined(
             asset.effective_charger,
+            asset.effective_connection_id,
+            asset.assigned_connection_id,
+            asset.physical_connection_id,
             asset.charger_asset_id,
             asset.connection_asset_id,
             asset.execution_target_asset_id,
