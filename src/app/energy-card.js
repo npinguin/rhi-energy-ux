@@ -3200,10 +3200,6 @@
       if (!body) return '';
       return `<section class="panel solarHardwareSection"><div class="solarHardwareSectionHead"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${meta ? `<span>${escapeHtml(meta)}</span>` : ''}</div>${body}</section>`;
     }
-    solarHardwareSection(title, description, body, meta = '') {
-      if (!body) return '';
-      return `<section class="panel solarHardwareSection"><div class="solarHardwareSectionHead"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${meta ? `<span>${escapeHtml(meta)}</span>` : ''}</div>${body}</section>`;
-    }
 
     solarModuleCard(rt, panel = null, optimizer = null) {
       const panelAsset = panel ? this.energyAssetContext(rt,panel) : null;
