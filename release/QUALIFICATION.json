@@ -30,5 +30,6 @@
   "physical_consumer_target_identity": "NOT_EXECUTED",
   "mobility_registry_visuals": "NOT_EXECUTED",
   "charging_connection_deduplication": "NOT_EXECUTED",
-  "producer_visual_precedence": "NOT_EXECUTED"
+  "producer_visual_precedence": "NOT_EXECUTED",
+  "connection_deduplication": "NOT_EXECUTED"
 }
