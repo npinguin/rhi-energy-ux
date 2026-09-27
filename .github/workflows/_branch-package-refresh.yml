@@ -1,7 +1,7 @@
 name: Branch package refresh
 on:
   push:
-    branches: [feat/registry-driven-flexible-visuals]
+    branches: [release/4.3.5-registry-driven-visuals]
 permissions:
   contents: write
 jobs:
@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: feat/registry-driven-flexible-visuals
+          ref: release/4.3.5-registry-driven-visuals
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '24'
@@ -28,5 +28,5 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add package.json package-lock.json COMPATIBILITY.json RELEASE_MANIFEST.json release/RELEASE_STATUS.json release/QUALIFICATION.json dist
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "build: resync deterministic Energy UX 4.3.5 package"
-          git push origin HEAD:feat/registry-driven-flexible-visuals
+          git commit -m "build: refresh deterministic Energy UX 4.3.5 package"
+          git push origin HEAD:release/4.3.5-registry-driven-visuals
