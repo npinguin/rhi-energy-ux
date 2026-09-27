@@ -8,6 +8,13 @@ files = [p for p in SRC.rglob("*") if p.is_file() and p.suffix in {".js", ".css"
 texts = {p: p.read_text(encoding="utf-8") for p in files}
 
 errors = []
+
+# Cross-domain visual identity is Foundation-registry driven. Energy may not
+# recreate Mobility product knowledge or carry a second Mobility visual library.
+if (SRC / "runtime" / "mobility-visual-manifest.js").exists():
+    errors.append("copied Mobility visual manifest is forbidden; consume Foundation registry")
+if (SRC / "assets" / "mobility").exists():
+    errors.append("copied Mobility assets are forbidden; use producer-registered presentation locator")
 for path, text in texts.items():
     rel = path.relative_to(ROOT)
     if re.search(r"font-family\s*:", text, re.I):
@@ -17,6 +24,10 @@ for path, text in texts.items():
             errors.append(f"{rel}: shared selector {selector} may only be styled by UX Core")
     if re.search(r"--rhi-font-[\w-]+\s*:", text):
         errors.append(f"{rel}: --rhi-font-* tokens are UX Core-owned")
+    if "RHI_ENERGY_MOBILITY_ASSET_TRANSPORT" in text or "rhiEnergyMobilityVisualEntry" in text:
+        errors.append(f"{rel}: producer-specific Mobility visual mapping is forbidden")
+    if "/hacsfiles/rhi-mobility-ux/" in text or re.search(r"[\"']mobility/(?:vehicle|charger)", text):
+        errors.append(f"{rel}: hardcoded Mobility presentation path is forbidden")
 
 card = texts.get(SRC / "app" / "energy-card.js", "")
 for obsolete in ("planningKpiStrip", "gasKpiStrip", "solarProductionStrip", "solarCompactSummaryRow", "gasUseFacts", "summaryRow four", "outlookSummaryStrip", "operationalSummaryGrid"):
