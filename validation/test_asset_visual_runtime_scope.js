@@ -9,7 +9,10 @@ assert.ok(match, 'assetVisual method not found');
 const body = match[1];
 
 assert.match(body, /const rt = this\.runtime\(\);/, 'assetVisual must acquire runtime explicitly');
-assert.doesNotMatch(body, /(?<!this\.)\brt\b[\s\S]*?=/, 'assetVisual must not rely on an undeclared free-scoped rt');
+const declaration = body.indexOf('const rt = this.runtime();');
+const firstRuntimeUse = body.indexOf('rt.');
+assert.ok(declaration >= 0, 'assetVisual runtime declaration missing');
+assert.ok(firstRuntimeUse > declaration, 'assetVisual must declare rt before any runtime use');
 assert.match(body, /rt\.visualRegistry\(\)/);
 assert.match(body, /rt\.resolveVisualRef\(/);
 
