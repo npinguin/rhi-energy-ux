@@ -1,3 +1,9 @@
+## 4.2.7 — Gas hero binary integrity
+
+- fixes Gas hero rendering with a valid RIFF/WEBP asset;
+- adds WebP magic-byte validation to prevent extension-only false positives;
+- preserves 4.2.6 one-action-bar composition and detail-information closure.
+
 ## 4.2.6 — Gas hero and information-detail closure
 
 - uses the approved Gas WebP hero and rejects the obsolete SVG transport;
