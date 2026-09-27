@@ -2446,10 +2446,13 @@
     canonicalLiveEnergyBalance(rt) {
       const current = this.currentEnergyModel(rt);
       const consumption = current.consumption;
-      const contributors = consumption.flexibleLoadContributors.map(row => {
-        const id = String(firstDefined(row.asset_id,row.flexible_asset_id,row.consumer_asset_id,'') || '');
-        return Object.freeze({ id, name:firstDefined(row.display_name,rt.assetName(id),human(id)), powerKw:asNumber(firstDefined(row.power_kw,row.actual_power_kw,row.current_power_kw)), raw:row });
-      });
+      const domain = this.flexibleAssetDomain(rt);
+      const contributors = consumption.flexibleLoadContributors
+        .filter(row => !domain.isConnectionInfrastructure(row))
+        .map(row => {
+          const id = String(firstDefined(row.asset_id,row.flexible_asset_id,row.consumer_asset_id,'') || '');
+          return Object.freeze({ id, name:firstDefined(row.display_name,rt.assetName(id),human(id)), powerKw:asNumber(firstDefined(row.power_kw,row.actual_power_kw,row.current_power_kw)), raw:row });
+        });
       return Object.freeze({
         consumption,
         siteConsumptionKw:consumption.siteConsumptionKw,
@@ -4253,7 +4256,10 @@
         };
       });
       const canonicalIds = new Set(canonicalRows.map(row => String(row.asset_id||row.consumer_id||row.id||'')));
-      const rows = canonicalRows.concat(publishedRows.filter(row => !canonicalIds.has(String(row.asset_id||row.consumer_id||row.id||''))));
+      const rows = canonicalRows.concat(publishedRows.filter(row => {
+        const id = String(row.asset_id||row.consumer_id||row.id||'');
+        return !canonicalIds.has(id) && !domain.isConnectionInfrastructure(row);
+      }));
       const visibleRows = this.filterAndSortConsumers(rows);
       const participating = visibleRows.filter(row => { const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return !vm || (vm.isParticipating && !vm.isDisabled); });
       const disabled = visibleRows.filter(row => domain.byId(row.asset_id||row.consumer_id||row.id)?.isDisabled);
