@@ -2616,6 +2616,17 @@ function hbEnergyPresentationStyles() {
     .rhiEnergyNav-intelligence .rhiUxDomainShell{--rhi-nav-active-bg:#F1EDFF;--rhi-nav-active-border:#DFD5FB;--rhi-nav-active-text:#5A38B3}
     .rhiEnergyNav-insights .rhiUxDomainShell{--rhi-nav-active-bg:#E7F7F4;--rhi-nav-active-border:#CDEBE6;--rhi-nav-active-text:#176E67}
     .rhiEnergyPageHeader{display:block;margin:0 0 10px}
+    .rhiEnergyPageControls{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+    .rhiEnergyControlGroup{display:flex;align-items:center;gap:8px;min-width:0}
+    .rhiEnergyControlGroup>small{font-size:var(--rhi-font-label);letter-spacing:.10em;text-transform:uppercase;color:#476487;font-weight:var(--rhi-weight-medium);white-space:nowrap}
+    .rhiEnergyControlGroup.commands{padding-left:14px;border-left:1px solid var(--rhi-color-line-soft)}
+    @media(max-width:760px){
+      .rhiEnergyPageControls{display:grid;grid-template-columns:1fr;gap:8px}
+      .rhiEnergyControlGroup{overflow-x:auto;scrollbar-width:none}
+      .rhiEnergyControlGroup::-webkit-scrollbar{display:none}
+      .rhiEnergyControlGroup.commands{padding-left:0;border-left:0;border-top:1px solid var(--rhi-color-line-soft);padding-top:8px}
+      .rhiEnergyControlGroup .rhiUxQuickActions{flex-wrap:nowrap}
+    }
     .rhi-context-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--rhi-space-2)}
     .rhi-context-card{min-width:0;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm);padding:14px 16px}
     .rhi-data-list{display:grid;gap:6px}
@@ -2627,7 +2638,19 @@ function hbEnergyPresentationStyles() {
 // ---- src/ui/components/page-header.js ----
 // Energy domain adapter onto shared RHI UX Core presentation primitives.
 // Domain semantics arrive fully interpreted through pageViewModel.
-function rhiEnergyPageHeader({ sectionLabel = "Energy", itemLabel = "", title = "", description = "", hero = "", metrics = [], quickActions = "", tone = "" } = {}) {
+// Page-level controls are intentionally one surface: context/navigation is
+// separated from executable commands without creating duplicate action bars.
+function rhiEnergyPageHeader({
+  sectionLabel = "Energy",
+  itemLabel = "",
+  title = "",
+  description = "",
+  hero = "",
+  metrics = [],
+  contextControls = "",
+  commandActions = "",
+  tone = ""
+} = {}) {
   const eyebrow = [sectionLabel, itemLabel].filter(Boolean).join(" / ");
   const heroMarkup = rhiUxPageHero({
     eyebrow,
@@ -2642,8 +2665,18 @@ function rhiEnergyPageHeader({ sectionLabel = "Energy", itemLabel = "", title = 
     value:value ?? "—",
     detail:detail || ""
   })));
-  const actionsMarkup = quickActions ? `<section class="rhiUxQuickActionBar" aria-label="Quick actions"><small>Quick actions</small><div class="rhiUxQuickActions">${quickActions}</div></section>` : "";
-  return `<section class="rhiEnergyPageHeader rhiUxPageStack ${rhiUxEscape(tone)}">${heroMarkup}${statusMarkup}${actionsMarkup}</section>`;
+
+  const contextGroup = contextControls
+    ? `<div class="rhiEnergyControlGroup context"><small>View</small><div class="rhiUxQuickActions">${contextControls}</div></div>`
+    : "";
+  const commandGroup = commandActions
+    ? `<div class="rhiEnergyControlGroup commands"><small>Quick actions</small><div class="rhiUxQuickActions">${commandActions}</div></div>`
+    : "";
+  const controlsMarkup = (contextGroup || commandGroup)
+    ? `<section class="rhiEnergyPageControls rhiUxQuickActionBar" aria-label="Page controls">${contextGroup}${commandGroup}</section>`
+    : "";
+
+  return `<section class="rhiEnergyPageHeader rhiUxPageStack ${rhiUxEscape(tone)}">${heroMarkup}${statusMarkup}${controlsMarkup}</section>`;
 }
 
 // ---- src/ui/components/energy-visual-picker.js ----
@@ -3628,7 +3661,7 @@ function rhiEnergyVisualPickerStyles() {
     pilotReadinessPanel(rt) { return ''; }
 
 
-    quickActionBar(rt, tab) {
+    pageContextControls(rt, tab) {
       const button = (label, attrs) => `<button class="hiQuickAction" ${attrs}>${escapeHtml(label)}</button>`;
       const jump = (label, id) => button(label, `data-scroll-target="${escapeHtml(id)}"`);
       let controls = '';
@@ -4024,7 +4057,8 @@ function rhiEnergyVisualPickerStyles() {
         description:semanticDescription,
         hero:hbEnergyHeroAsset(heroKey),
         metrics:p.metrics,
-        quickActions:this.quickActionBar(rt, tab) + this.pageQuickActions(rt, tab),
+        contextControls:this.pageContextControls(rt, tab),
+        commandActions:this.pageQuickActions(rt, tab),
         tone:p.tone
       });
     }
