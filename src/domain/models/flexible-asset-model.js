@@ -74,9 +74,11 @@
       // core.flexible.assets owns participation/planning semantics, while objects[]
       // carries richer producer identity such as visual_ref and charger linkage.
       // No semantic inference or cross-domain lookup is performed here.
+      const producerVisualRef = String(firstDefined(context.asset?.visual_ref, asset.visual_ref, '') || '');
+      const producerSourceDomain = String(firstDefined(context.asset?.source_domain, asset.source_domain, '') || '');
       const materialized = context.asset
-        ? { ...context.asset, ...asset, asset_id:id }
-        : { ...asset, asset_id:id };
+        ? { ...context.asset, ...asset, asset_id:id, visual_ref:producerVisualRef, source_domain:producerSourceDomain }
+        : { ...asset, asset_id:id, visual_ref:producerVisualRef, source_domain:producerSourceDomain };
       const participation = this.participationState(materialized, planning);
       return {
         id,
@@ -87,7 +89,7 @@
         publication: context.publication,
         visualRef: String(firstDefined(materialized.visual_ref, '') || ''),
         visual: typeof resolveEnergyVisualRef === 'function'
-          ? resolveEnergyVisualRef(firstDefined(materialized.visual_ref, ''))
+          ? resolveEnergyVisualRef(firstDefined(materialized.visual_ref, ''), this.runtime.hass, 'card')
           : null,
         publicationGap: typeof energyAssetPublicationGap === 'function'
           ? energyAssetPublicationGap(this.runtime.contractGateway(), id)
