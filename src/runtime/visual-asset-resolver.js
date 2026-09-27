@@ -40,8 +40,9 @@ function resolveEnergyVisualRef(visualRef = "", registry = null, variant = "card
     : null;
   if (registered) return registered;
 
-  // UX-local Energy presentation preferences are not cross-domain semantic identity.
-  if (ref.startsWith("energy.logical.")) return resolveEnergyOwnedVisualRef(ref);
+  // Energy-owned canonical refs are package-neutral backend identity and may
+  // resolve locally even before Foundation registry hydration completes.
+  if (ref.startsWith("energy.")) return resolveEnergyOwnedVisualRef(ref);
 
   // Missing/unregistered producer identity fails closed. Callers render a neutral icon.
   return null;
@@ -59,18 +60,7 @@ function resolveEnergyAssetVisual(asset = {}, registry = null, variant = "card")
     if (!sourceRef.startsWith("energy.logical.")) return null;
   }
 
-  const assetId = String(asset.asset_id || asset.id || "").trim();
   const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
-  const selectedRef = typeof rhiEnergySelectedVisualRef === "function"
-    ? rhiEnergySelectedVisualRef(assetId)
-    : "";
-  const selectedEntry = typeof rhiEnergyVisualEntryFromRef === "function"
-    ? rhiEnergyVisualEntryFromRef(selectedRef)
-    : null;
-  if (selectedEntry && selectedEntry.asset_type === assetType) {
-    return resolveEnergyOwnedVisualRef(selectedRef);
-  }
-
   const sourceEntry = typeof rhiEnergyVisualEntryFromRef === "function"
     ? rhiEnergyVisualEntryFromRef(sourceRef)
     : null;
