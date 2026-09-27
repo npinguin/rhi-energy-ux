@@ -9,6 +9,23 @@
       if (!id || typeof readEnergyAssetContext !== 'function') return { available:false, asset:null, profile:null, publication:null };
       return readEnergyAssetContext(this.runtime.contractGateway(), id);
     }
+    isInfrastructure(asset = {}) {
+      const sourceContext = asset.source_context && typeof asset.source_context === 'object' ? asset.source_context : {};
+      const mobilityContext = sourceContext.mobility && typeof sourceContext.mobility === 'object' ? sourceContext.mobility : {};
+      const values = [
+        asset.participation_state,
+        asset.source_asset_kind,
+        asset.asset_type,
+        asset.object_class,
+        asset.energy_asset_role,
+        mobilityContext.consumer_fallback
+      ].map(value => String(value || '').trim().toLowerCase());
+      return asset.infrastructure_only === true
+        || values.includes('infrastructure_only')
+        || values.includes('unassigned_charger')
+        || values.includes('charger')
+        || values.includes('connection');
+    }
     isStorage(asset = {}) {
       const context = this.assetContext(asset);
       const values = [
@@ -27,6 +44,7 @@
     }
     participationState(asset = {}, planning = {}) {
       if (this.isStorage(asset)) return 'storage';
+      if (this.isInfrastructure(asset)) return 'infrastructure_only';
       const context = this.assetContext(asset);
       const explicit = String(firstDefined(
         context.asset?.participation_state,
@@ -76,12 +94,12 @@
       // No semantic inference or cross-domain lookup is performed here.
       const materialized = context.asset
         ? {
-            ...asset,
+            // Energy object context enriches the producer-owned flexible row.
+            // Producer identity must win for visual_ref, asset kind and connection semantics.
             ...context.asset,
-            // Energy flexible-load state may add planning/participation facts, but
-            // canonical producer identity must never be overwritten by that projection.
+            ...asset,
             asset_id:id,
-            visual_ref:String(firstDefined(context.asset.visual_ref, asset.visual_ref, '') || '')
+            visual_ref:String(firstDefined(asset.visual_ref, context.asset.visual_ref, '') || '')
           }
         : { ...asset, asset_id:id };
       const participation = this.participationState(materialized, planning);
@@ -102,6 +120,7 @@
         participation,
         operation: this.operationalState(materialized, planning),
         isStorage: participation === 'storage',
+        isInfrastructure: participation === 'infrastructure_only',
         isDisabled: participation === 'disabled',
         isParticipating: participation === 'participating' || participation === 'temporarily_unavailable',
         isTemporarilyUnavailable: participation === 'temporarily_unavailable'
@@ -115,12 +134,17 @@
       return this._all;
     }
     byId(assetId) { this.all(); return this._byId.get(String(assetId)) || null; }
-    participating() { return this.all().filter(vm => vm.isParticipating && !vm.isStorage); }
-    disabled() { return this.all().filter(vm => vm.isDisabled); }
+    consumerFacing() { return this.all().filter(vm => !vm.isStorage && !vm.isInfrastructure); }
+    participating() { return this.consumerFacing().filter(vm => vm.isParticipating); }
+    planningParticipants() {
+      return this.participating().filter(vm => vm.raw?.planning_input_ready !== false);
+    }
+    disabled() { return this.consumerFacing().filter(vm => vm.isDisabled); }
+    infrastructure() { return this.all().filter(vm => vm.isInfrastructure); }
     storage() { return this.all().filter(vm => vm.isStorage); }
     planningRows() {
       const published = new Map(this.runtime.planningIndexRows().map(row => [String(row.asset_id || row.consumer_id || row.id || ''), row]));
-      return this.participating().map(vm => {
+      return this.planningParticipants().map(vm => {
         const row = published.get(vm.id) || vm.planning || {};
         return {
           ...row,
@@ -142,6 +166,7 @@
         participating_count: rows.length,
         disabled_count: this.disabled().length,
         storage_count: this.storage().length,
+        infrastructure_count: this.infrastructure().length,
         waiting_count: rows.filter(row => row.operational_state === 'waiting').length,
         planned_count: rows.filter(row => row.operational_state === 'planned').length,
         active_count: rows.filter(row => row.operational_state === 'active').length,

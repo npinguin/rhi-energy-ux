@@ -32,7 +32,10 @@ function gatewayFor(state, signed) {
       solar:{status:'AVAILABLE',fields:{power_kw:sem(2.8,'kW')}},
       consumption:{status:'AVAILABLE',fields:{power_kw:sem(2.7,'kW')}},
       home:{status:'AVAILABLE',fields:{power_kw:sem(2.6,'kW')}},
-      flexible:{status:'AVAILABLE',producer_available:true,fields:{power_kw:sem(0.1,'kW'),attributed_power_kw:sem(0.1,'kW')},assets:[]}
+      flexible:{status:'AVAILABLE',producer_available:true,fields:{power_kw:sem(0.1,'kW'),attributed_power_kw:sem(0.1,'kW')},assets:[
+        {asset_id:'charger_1',asset_type:'charger',source_asset_kind:'charger',participation_state:'infrastructure_only',infrastructure_only:true,power_kw:0.0},
+        {asset_id:'vehicle_1',asset_type:'vehicle',source_asset_kind:'vehicle',participation_state:'participating',power_kw:0.1}
+      ]}
     },
     objects:[],profiles:[],relationships:[],planning:{horizons:{}},configuration:{},intelligence:{},summary:{}
   };
@@ -55,5 +58,6 @@ for(const [state,signed,display,signedFlow,label,direction] of cases){
     throw new Error(`${state} mismatch: ${JSON.stringify(got)}`);
   }
   if(model.consumption.siteConsumptionKw!==2.7 || model.consumption.homeConsumptionKw!==2.6) throw new Error('core consumption projection failed');
+  if(model.consumption.flexibleLoadContributors.length!==1 || model.consumption.flexibleLoadContributors[0].asset_id!=='vehicle_1') throw new Error('infrastructure leaked into managed contributor identities');
 }
 console.log('current-energy V2 core view-model matrix PASS');

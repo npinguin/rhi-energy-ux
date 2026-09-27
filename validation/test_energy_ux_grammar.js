@@ -75,5 +75,8 @@ assert.doesNotMatch(presentation,/\.rhiUxQuickActionBar\s*\{/);
 assert.match(app,/object-fit:contain/);
 assert.ok(app.includes('rhiUxDomainShell({'));
 assert.match(app,/domain:'ENERGIE'/);
+assert.ok(app.includes('strategicPlanning(rt)'), "Strategic Planning must be a real contract-backed surface");
+assert.ok(app.includes('Strategy configuration is the authority for longer-term intent'), "Strategic Planning must explain its contract authority");
+assert.ok(!app.includes('Strategic planning content follows in the next screen pass'), "Strategic Planning placeholder must not return");
 
 console.log("PASS Energy 4.3 canonical page/body controls, asset grammar, visuals and responsive ownership");

@@ -105,7 +105,9 @@ const planningGateway = {
         objects:[], profiles:[], relationships:[], commands:[], configuration:{}, intelligence:{}, overview:{}, activity:[], value_accounting:{}, layers:{planning_objects:[]},
         planning:{
           horizons:{
-            D0:{ horizon_id:'D0', required_kwh:12.4, planned_kwh:9.8, still_to_plan_kwh:2.6, flexible_required_kwh:5.8, flexible_planned_kwh:3.2, flexible_still_to_plan_kwh:2.6, status:'AVAILABLE', execution_status:'NOT_MEASURED' },
+            D0:{ horizon_id:'D0', required_kwh:12.4, planned_kwh:9.8, still_to_plan_kwh:2.6, flexible_required_kwh:5.8, flexible_planned_kwh:3.2, flexible_still_to_plan_kwh:2.6, status:'AVAILABLE', execution_status:'NOT_MEASURED',
+              summary:{lane_totals:{sources:{solar_kwh:7.0,battery_out_kwh:1.0,grid_in_kwh:2.0},consumers:{home_kwh:6.8,flexible_loads_kwh:3.2,flexible_assets:[{asset_id:'vehicle_id4',planned_energy_kwh:3.2}]},boundary:{grid_out_kwh:0.0},source_total_kwh:10.0,use_total_kwh:10.0,balance_delta_kwh:0}},
+              buckets:[{bucket_id:'D0-H20',start_time:'2026-09-27T20:00:00+02:00',duration_minutes:60,advisory_source_lane:[{participant_id:'grid',planned_supply_kwh:3.9}],advisory_consumer_lane:[{participant_id:'home',planned_demand_kwh:0},{participant_id:'vehicle_id4',planned_demand_kwh:3.9}],advisory_boundary_flows:{grid_export_kwh:0},advisory_lane_balance_delta_kwh:0}] },
             D1:{ horizon_id:'D1', required_kwh:14.1, planned_kwh:11.6, still_to_plan_kwh:2.5, flexible_required_kwh:7.2, flexible_planned_kwh:4.7, flexible_still_to_plan_kwh:2.5, status:'AVAILABLE' }
           }
         }
@@ -120,3 +122,15 @@ assert.deepEqual(Object.keys(d1Contract.planningCombinedTotals), []);
 assert.equal(normalizePlanningLaneTotals(d1Contract.laneTotals).flexibleLoadsKwh, 4.7);
 
 console.log('PASS canonical V2 planning horizons without frontend total derivation');
+
+assert.equal(d1Contract.planningTodayTotals.buckets.length,1);
+const d0Contract = readPlanningContract(planningGateway, 'D0');
+assert.equal(d0Contract.buckets.length,1,'Tactical buckets must survive Public V2');
+const d0LaneTotals = normalizePlanningLaneTotals(d0Contract.laneTotals);
+assert.equal(d0LaneTotals.solarKwh,7.0);
+assert.equal(d0LaneTotals.gridInKwh,2.0);
+assert.equal(d0LaneTotals.homeKwh,6.8);
+assert.equal(d0LaneTotals.flexibleLoadsKwh,3.2);
+assert.equal(d0LaneTotals.sourceTotalKwh,10.0);
+assert.equal(d0LaneTotals.useTotalKwh,10.0);
+assert.equal(d0Contract.buckets[0].advisory_consumer_lane[1].participant_id,'vehicle_id4');
