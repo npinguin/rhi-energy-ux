@@ -20,7 +20,7 @@
         "contract readers",
         "command contract boundary",
         "canonical Energy V2 asset profile and publication-context readers",
-        "Energy and producer visual_ref resolution"
+        "Foundation visual-registry consumption and Energy-owned visual_ref resolution"
       ]
     },
     "domain_models": {
@@ -43,7 +43,7 @@
     "assets": {
       "path": "src/assets",
       "owns": [
-        "canonical package artwork grouped by public asset category"
+        "Energy-owned canonical package artwork grouped by public asset category; cross-domain producer artwork is never copied here"
       ]
     },
     "package": {
