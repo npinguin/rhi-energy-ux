@@ -1,15 +1,16 @@
 {
   "schema_version": 1,
-  "ux_version": "4.3.4",
+  "ux_version": "4.3.5",
   "energy_contract": {
     "minimum": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-    "minimum_backend": "E0.15.52",
+    "minimum_backend": "E0.15.69",
     "tested_backend_releases": [
-      "E0.15.56"
+      "E0.15.69"
     ],
     "required_contracts": [
       "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-      "RHI_ENERGY_CORE_V1"
+      "RHI_ENERGY_CORE_V1",
+      "RHI_VISUAL_ASSET_REGISTRY_V1"
     ]
   },
   "deployment": {
@@ -23,5 +24,13 @@
     "source_commit": "667b6f4274ffd0855d51444cb2eb27891a5ab398",
     "runtime_dependency": false,
     "branding_owner": "rhi-ux-core"
+  },
+  "foundation": {
+    "minimum_release": "F1.8.23",
+    "visual_registry_contract": "RHI_VISUAL_ASSET_REGISTRY_V1",
+    "minimum_contract_version": "1.1.0"
+  },
+  "mobility": {
+    "minimum_release_for_cross_domain_visuals": "M0.10.19"
   }
 }
