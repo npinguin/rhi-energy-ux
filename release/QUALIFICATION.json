@@ -36,5 +36,8 @@
   "vehicle_visual_identity_precedence": "NOT_EXECUTED",
   "tactical_planning_buckets": "NOT_EXECUTED",
   "tactical_planning_lane_totals": "NOT_EXECUTED",
-  "strategic_planning_contract_surface": "NOT_EXECUTED"
+  "strategic_planning_contract_surface": "NOT_EXECUTED",
+  "metering_write_readback": "NOT_EXECUTED",
+  "automation_mode_write_readback": "NOT_EXECUTED",
+  "policy_settings_write_readback": "NOT_EXECUTED"
 }
