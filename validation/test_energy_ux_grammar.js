@@ -49,7 +49,9 @@ assert.match(app,/rt\.commandActionModelsForAsset\(id\)/);
 assert.match(app,/Telemetry limited/);
 assert.match(app,/per-battery power is not published/);
 assert.match(app,/Panels without zone relationship/);
-assert.match(app,/Optimizers without module relationship/);
+assert.match(app,/solarOptimizerPrimaryCard/);
+assert.match(app,/POWER OPTIMIZER/);
+assert.doesNotMatch(app,/No panels linked to this zone/);
 assert.match(app,/solarTopologyDetails/);
 assert.match(app,/No charging topology published/);
 
