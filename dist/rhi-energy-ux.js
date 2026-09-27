@@ -2219,7 +2219,7 @@ class FlexibleAssetDomainModel {
     }
   }
 
-// ---- src/domain/planning/contract-adapter.js ----
+  // ---- src/domain/planning/contract-adapter.js ----
 // Canonical support is capability-based. R1.79.3 compatibility is deliberately bounded to the
 // published bucket fields and must not become a second planning owner.
   function planningArray(value) {
@@ -6399,7 +6399,14 @@ function rhiEnergyVisualPickerStyles() {
       const registered = visualRef && typeof rhiVisualRegistryEntry === 'function'
         ? rhiVisualRegistryEntry(this._hass || {}, visualRef)
         : null;
-      return String(firstDefined(registered?.asset_type, asset.producer_asset_type, asset.object_class, asset.asset_type, asset.flexible_role, '') || '').trim().toLowerCase();
+      return String(firstDefined(
+        registered?.asset_type,
+        asset.producer_asset_type,
+        asset.object_class,
+        asset.asset_type,
+        asset.flexible_role,
+        ''
+      ) || '').trim().toLowerCase();
     }
     planningAssetIcon(asset = {}) {
       const kind = this.planningAssetKind(asset);
