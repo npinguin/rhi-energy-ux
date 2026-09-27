@@ -12,14 +12,19 @@ const context = {
   asBool: (value, fallback = false) => value === undefined || value === null ? fallback : Boolean(value),
   readEnergyAssetContext: (_gateway, assetId) => ({
     available:true,
-    asset:{
+    asset:assetId === 'vehicle_id4' ? {
       asset_id:assetId,
       asset_type:'flexible_load',
       display_name:'VW ID4',
-      visual_ref:'mobility.vehicle.volkswagen.id4.2024-2026.ev.costa-azul',
+      visual_ref:'energy.logical.flexible_load.generic',
       effective_connection_id:'charger_driveway',
       assigned_connection_id:'charger_driveway',
       connection_state:'asset_connected'
+    } : {
+      asset_id:assetId,
+      asset_type:'flexible_load',
+      display_name:'Garage charger projection',
+      visual_ref:'energy.logical.flexible_load.generic'
     },
     profile:{ profile_id:'vehicle.default', asset_type:'flexible_load' },
     publication:{ complete:true }
@@ -36,9 +41,24 @@ const runtime = {
   planningOutcomeFor: id => ({asset_id:id,status:'planned'}),
   primaryFlexibleAssets: () => [{
     asset_id:'vehicle_id4',
+    source_asset_kind:'vehicle',
+    asset_type:'vehicle',
     participation_state:'participating',
+    planning_input_ready:true,
     current_power_kw:0,
-    visual_ref:'energy.flexible_load.generic'
+    visual_ref:'mobility.vehicle.volkswagen.id4.2024-2026.ev.costa-azul',
+    effective_connection_id:'charger_driveway',
+    connection_state:'asset_connected'
+  },{
+    asset_id:'charger_driveway',
+    source_asset_kind:'charger',
+    asset_type:'charger',
+    participation_state:'infrastructure_only',
+    infrastructure_only:true,
+    planning_input_ready:false,
+    current_power_kw:0,
+    visual_ref:'mobility.charger.wallbox.commander2.white',
+    source_context:{mobility:{consumer_fallback:'unassigned_charger'}}
   }],
   planningIndexRows: () => [{asset_id:'vehicle_id4',planned_today_kwh:5.4}],
   connectedRelationships: () => [],
@@ -52,6 +72,11 @@ assert.equal(asset.raw.display_name,'VW ID4');
 assert.equal(asset.raw.effective_connection_id,'charger_driveway');
 assert.equal(asset.visualRef,'mobility.vehicle.volkswagen.id4.2024-2026.ev.costa-azul','canonical producer visual_ref must win over generic flexible projection');
 assert.equal(asset.raw.current_power_kw,0);
+assert.equal(domain.all().length,2);
+assert.equal(domain.consumerFacing().length,1,'charger infrastructure must not become a managed consumer');
+assert.equal(domain.infrastructure().length,1,'technical charger fallback remains represented as infrastructure');
+assert.equal(domain.infrastructure()[0].id,'charger_driveway');
+assert.equal(domain.planningParticipants().length,1,'only the vehicle is a planning participant');
 assert.equal(domain.planningRows()[0].asset_id,'vehicle_id4');
 assert.equal(domain.physicalFlowParticipants()[0].id,'vehicle_id4');
 assert.equal(domain.physicalFlowParticipants().length,1,'charger-linked idle vehicle must remain in physical topology');
@@ -99,3 +124,10 @@ assert.ok(card.includes('if (!chargerKey || rows.has(chargerKey)) return;'), 'du
 assert.ok(card.includes('relationship.visual_ref, charger.visual_ref'), 'producer visual_ref must outrank Energy-local visual');
 assert.ok(!card.includes('rows.set(`${chargerKey}::${consumerKey}`, row)'), 'consumer assignment must not create a second physical connection row');
 console.log('PASS one charger row per physical connection and producer visual ownership');
+
+
+assert.ok(card.includes('assetDomain.consumerFacing()'), 'Operational Planning must use consumer-facing assets');
+assert.ok(card.includes('domain.consumerFacing().map'), 'Consumers must use consumer-facing assets');
+assert.ok(card.includes('planningParticipants().map'), 'Planning projections must use planning participants');
+assert.ok(card.includes('vm?.isInfrastructure'), 'Value/consumer escape hatches must reject infrastructure');
+console.log('PASS infrastructure-only charger fallback cannot leak into managed consumer/planning surfaces');
