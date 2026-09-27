@@ -17,8 +17,9 @@ const context = {
       asset_type:'flexible_load',
       display_name:'VW ID4',
       visual_ref:'mobility.vehicle.volkswagen.id4.2024-2026.ev.costa-azul',
-      charger_asset_id:'charger_driveway',
-      connection_state:'connected'
+      effective_connection_id:'charger_driveway',
+      assigned_connection_id:'charger_driveway',
+      connection_state:'asset_connected'
     },
     profile:{ profile_id:'vehicle.default', asset_type:'flexible_load' },
     publication:{ complete:true }
@@ -48,7 +49,7 @@ const runtime = {
 const domain = new context.FlexibleAssetDomainModel(runtime);
 const asset = domain.all()[0];
 assert.equal(asset.raw.display_name,'VW ID4');
-assert.equal(asset.raw.charger_asset_id,'charger_driveway');
+assert.equal(asset.raw.effective_connection_id,'charger_driveway');
 assert.equal(asset.visualRef,'mobility.vehicle.volkswagen.id4.2024-2026.ev.costa-azul','canonical producer visual_ref must win over generic flexible projection');
 assert.equal(asset.raw.current_power_kw,0);
 assert.equal(domain.planningRows()[0].asset_id,'vehicle_id4');
@@ -57,8 +58,10 @@ assert.equal(domain.physicalFlowParticipants().length,1,'charger-linked idle veh
 
 const card = fs.readFileSync('src/app/energy-card.js','utf8');
 assert.ok(card.includes('canonicalConnectionSnapshot(rt)'));
+assert.ok(card.includes('rt.publicV2().connections'));
 assert.ok(card.includes('rt.connectedRelationships().forEach'));
-assert.ok(card.includes('asset.effective_charger'));
+assert.ok(card.includes('asset.effective_connection_id'));
+assert.ok(card.includes('asset.assigned_connection_id'));
 assert.ok(card.includes('rt.assets().filter(isCharger)'));
 assert.ok(card.includes('No charging topology published'));
 assert.ok(card.includes('visual_ref:firstDefined(raw.visual_ref'));
