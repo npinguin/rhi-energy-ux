@@ -3304,17 +3304,17 @@
     solarBatterySystem(rt, systems = [], batteries = []) {
       if (!systems.length && !batteries.length) return '';
       const system = systems[0] || null;
-      const systemSummary = system ? this.energyAssetContext(rt,system) : null;
-      const systemId = String(firstDefined(systemSummary?.asset_id,systemSummary?.id,'') || '');
-      const systemName = systemSummary ? firstDefined(systemSummary.display_name,systemSummary.name,rt.assetName(systemId),'Home Battery System') : 'Home Battery System';
-      const facts = systemSummary ? this.energyAssetFacts(rt,systemSummary,5) : [];
-      const head = `<div class="solarSystemSummary"><div><small>BATTERY SYSTEM</small><h3>${escapeHtml(systemName)}</h3><p>Aggregate storage state with the physical batteries shown underneath.</p></div><div class="solarAggregateFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span><small>Batteries</small><b>${batteries.length}</b></span>`}</div></div>`;
+      const head = system
+        ? this.energyDeviceStatusCard(rt,system,'Battery system')
+        : `<div class="solarSystemSummary"><div><small>BATTERY SYSTEM</small><h3>Home Battery System</h3><p>No aggregate battery-system object is currently published.</p></div><div class="solarAggregateFacts"><span><small>Batteries</small><b>${batteries.length}</b></span></div></div>`;
       const children = batteries.length ? `<div class="solarChildGrid">${batteries.map(asset=>this.batteryChildCard(rt,String(firstDefined(asset.asset_id,asset.id,'') || ''))).join('')}</div>` : '';
       return this.solarHardwareSection('Battery system','Storage connected to the solar/home energy system.',head+children,`${batteries.length} batter${batteries.length===1?'y':'ies'}`);
     }
+
     solarHardwareExperience(rt) {
       const assets = rt.assets().map(asset=>this.energyAssetContext(rt,asset));
-      const arrays = assets.filter(asset=>['solar_production','solar_array','solar_zone'].includes(this.energyAssetType(asset)));
+      const production = assets.filter(asset=>this.energyAssetType(asset)==='solar_production');
+      const arrays = assets.filter(asset=>['solar_array','solar_zone'].includes(this.energyAssetType(asset)));
       const panels = assets.filter(asset=>this.energyAssetType(asset)==='solar_panel');
       const inverters = assets.filter(asset=>this.energyAssetType(asset)==='solar_inverter');
       const systems = assets.filter(asset=>['battery_system','home_battery_system'].includes(this.energyAssetType(asset)));
@@ -3335,6 +3335,12 @@
       const assignedOptimizerIds = new Set(arrays.flatMap(array => optimizersFor(array,panelsFor(array)).map(item=>String(firstDefined(item.asset_id,item.id,'')||''))));
       const unassignedOptimizers = optimizers.filter(item => !assignedOptimizerIds.has(String(firstDefined(item.asset_id,item.id,'')||'')));
 
+      const productionSection = production.length ? this.solarHardwareSection(
+        'Solar production',
+        'Aggregate production objects for the current solar system.',
+        `<div class="energyDeviceGrid">${production.map(asset=>this.energyDeviceStatusCard(rt,asset,'Solar production')).join('')}</div>`,
+        `${production.length} system${production.length===1?'':'s'}`
+      ) : '';
       const inverterSection = this.solarInverterSystem(rt,inverters);
       const batterySection = this.solarBatterySystem(rt,systems,batteries);
       const zoneCards = arrays.map(array=>this.solarArrayCard(rt,array,panelsFor(array),optimizersFor(array,panelsFor(array)))).join('');
@@ -3350,7 +3356,7 @@
         backup.length ? `<div class="solarUnassignedPanels"><h3>Support devices</h3><div class="solarChildGrid">${backup.map(asset=>this.energyDeviceStatusCard(rt,asset,'Backup interface')).join('')}</div></div>` : ''
       ].join('');
       const unassignedSection = unassignedBody ? this.solarHardwareSection('Other published hardware','Hardware that cannot be placed deeper in the canonical hierarchy remains explicit.',unassignedBody) : '';
-      return `<div class="solarHardwareExperience">${inverterSection}${batterySection}${zonesSection}${unassignedSection}</div>`;
+      return `<div class="solarHardwareExperience">${productionSection}${inverterSection}${batterySection}${zonesSection}${unassignedSection}</div>`;
     }
 
     solarEnergyStory(rt) {
