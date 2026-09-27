@@ -5,6 +5,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import shutil
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -67,8 +68,12 @@ def main() -> None:
         raise SystemExit("Energy app template must contain exactly one UX version placeholder")
 
     bundle = inject_modules(template, manifest).replace("__RHI_UX_VERSION__", f"R{version}")
-    if "__RHI_" in bundle:
-        raise SystemExit("Unresolved build placeholder remains in Energy bundle")
+    unresolved = sorted(set(re.findall(r"__RHI_[A-Z0-9_]+__", bundle)))
+    if unresolved:
+        raise SystemExit(
+            "Unresolved build placeholder remains in Energy bundle: "
+            + ", ".join(unresolved)
+        )
     if "/local/homebrain/infrastructure/energy/" in bundle:
         raise SystemExit("Legacy /local Energy asset path remains in generated bundle")
 
