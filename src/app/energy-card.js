@@ -1087,6 +1087,7 @@
       this.energyVisualPickerAssetId = '';
       this.energyVisualPickerDraftRef = '';
       this.energyVisualPickerBrand = 'all';
+      this.energyVisualPickerFeedback = '';
     }
     restoreView() {
       try {
@@ -1302,11 +1303,13 @@
         return;
       }
       const visualReset = event.target.closest('[data-energy-visual-reset]');
-      if (visualReset) {
-        if (typeof rhiEnergyClearVisualPreference === 'function') rhiEnergyClearVisualPreference(visualReset.dataset.energyVisualReset || '');
-        closeVisualEditor();
-        this._forceRender = true;
-        this.render();
+      if (visualReset && !visualReset.disabled) {
+        const assetId = visualReset.dataset.energyVisualReset || this.energyVisualPickerAssetId || '';
+        this.persistEnergyVisualPreference(assetId, '').then(ok => {
+          if (ok) closeVisualEditor();
+          this._forceRender = true;
+          this.render();
+        });
         return;
       }
       const visualBrand = event.target.closest('[data-energy-visual-brand]');
@@ -1326,23 +1329,21 @@
       const visualSave = event.target.closest('[data-energy-visual-save]');
       if (visualSave && !visualSave.disabled) {
         const assetId = visualSave.dataset.energyVisualSave || this.energyVisualPickerAssetId || '';
-        const rt = this.runtime();
-        const asset = typeof rt.asset === 'function'
-          ? rt.asset(assetId)
-          : (typeof rt.assets === 'function' ? rt.assets().find(row => String(row?.asset_id || '') === String(assetId)) : null);
-        if (asset && this.energyVisualPickerDraftRef && typeof rhiEnergySetVisualPreference === 'function') {
-          rhiEnergySetVisualPreference(asset, this.energyVisualPickerDraftRef);
-        }
-        closeVisualEditor();
-        this._forceRender = true;
-        this.render();
+        const visualRef = String(this.energyVisualPickerDraftRef || '').trim();
+        this.persistEnergyVisualPreference(assetId, visualRef).then(ok => {
+          if (ok) closeVisualEditor();
+          this._forceRender = true;
+          this.render();
+        });
         return;
       }
       const visualOpen = event.target.closest('[data-energy-visual-open]');
       if (visualOpen) {
         const assetId = visualOpen.dataset.energyVisualOpen || '';
         this.energyVisualPickerAssetId = assetId;
-        this.energyVisualPickerDraftRef = typeof rhiEnergySelectedVisualRef === 'function' ? rhiEnergySelectedVisualRef(assetId) : '';
+        const asset = this.runtime().asset(assetId) || {};
+        this.energyVisualPickerDraftRef = String(firstDefined(asset.visual_ref,asset.visualRef,asset.raw?.visual_ref,'') || '');
+        this.energyVisualPickerFeedback = '';
         this.energyVisualPickerBrand = 'all';
         this._forceRender = true;
         this.render();
@@ -5058,6 +5059,50 @@
       }
       return `<span class="assetVisual assetVisual-${escapeHtml(size)} assetVisualFallback"${pickerAttrs} aria-hidden="${canPick ? 'false' : 'true'}">${escapeHtml(fallbackIcon)}</span>`;
     }
+    async persistEnergyVisualPreference(assetId = '', visualRef = '') {
+      const rt = this.runtime();
+      const id = String(assetId || '').trim();
+      const asset = rt.asset(id);
+      if (!id || !asset) {
+        this.energyVisualPickerFeedback = 'Energy asset is no longer available.';
+        return false;
+      }
+      const sourceRef = String(firstDefined(asset.visual_ref,asset.visualRef,asset.raw?.visual_ref,'') || '').trim();
+      const sourceOwner = sourceRef ? String(rt.visualRegistry()?.entry?.(sourceRef)?.owner_domain || '').trim() : '';
+      if (sourceOwner && !['rhi_energy','rhi_energy_ux'].includes(sourceOwner)) {
+        this.energyVisualPickerFeedback = 'This visual is owned by the producer domain.';
+        return false;
+      }
+      const row = rt.publicV2().property('asset.visual_ref', id);
+      if (!row || !this.hasPublicWriteRoute(row)) {
+        this.energyVisualPickerFeedback = 'Energy backend does not publish a writable image preference for this asset.';
+        return false;
+      }
+      const ref = String(visualRef || '').trim();
+      if (ref && (!ref.startsWith('energy.') || !rhiEnergyVisualEntryFromRef(ref))) {
+        this.energyVisualPickerFeedback = 'Selected image is not a registered Energy visual.';
+        return false;
+      }
+      const meta = this.writeMeta(row);
+      if (!this._hass?.callService || !meta.domain || !meta.action) {
+        this.energyVisualPickerFeedback = 'Public Energy property writer is unavailable.';
+        return false;
+      }
+      this.energyVisualPickerFeedback = 'Saving…';
+      try {
+        await this._hass.callService(meta.domain, meta.action, {
+          ...meta.data,
+          property_id:String(row.property_id || meta.propertyId),
+          [meta.valueParameter]:ref
+        });
+        this.energyVisualPickerFeedback = 'Saved';
+        return true;
+      } catch (error) {
+        this.energyVisualPickerFeedback = error?.message || String(error);
+        return false;
+      }
+    }
+
     energyVisualPickerOverlay(rt) {
       const assetId = String(this.energyVisualPickerAssetId || '').trim();
       if (!assetId) return '';
@@ -5068,7 +5113,7 @@
       const type = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
       const choices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(type) : [];
       if (!choices.length) return '';
-      const selected = typeof rhiEnergySelectedVisualRef === 'function' ? rhiEnergySelectedVisualRef(assetId) : '';
+      const selected = String(firstDefined(asset.visual_ref,asset.visualRef,asset.raw?.visual_ref,'') || '');
       const fallbackEntry = typeof rhiEnergyDefaultVisualEntry === 'function' ? rhiEnergyDefaultVisualEntry(asset) : null;
       const current = selected || (fallbackEntry && typeof rhiEnergyVisualRef === 'function' ? rhiEnergyVisualRef(fallbackEntry) : '');
       const picker = new HomeBrainEnergyVisualPicker();
