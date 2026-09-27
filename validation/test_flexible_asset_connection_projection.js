@@ -99,3 +99,70 @@ assert.ok(card.includes('if (!chargerKey || rows.has(chargerKey)) return;'), 'du
 assert.ok(card.includes('relationship.visual_ref, charger.visual_ref'), 'producer visual_ref must outrank Energy-local visual');
 assert.ok(!card.includes('rows.set(`${chargerKey}::${consumerKey}`, row)'), 'consumer assignment must not create a second physical connection row');
 console.log('PASS one charger row per physical connection and producer visual ownership');
+
+
+const consumerBoundaryContext = {
+  console,
+  Object, Array, Map, Set, String, Number, Boolean, JSON,
+  firstDefined: (...values) => values.find(value => value !== undefined && value !== null),
+  asNumber: value => value === undefined || value === null || value === '' || Number.isNaN(Number(value)) ? null : Number(value),
+  asBool: (value, fallback = false) => value === undefined || value === null ? fallback : Boolean(value),
+  readEnergyAssetContext: () => ({available:true,asset:null,profile:null,publication:null}),
+  energyAssetPublicationGap: () => ({status:'complete',missing:[]})
+};
+vm.createContext(consumerBoundaryContext);
+vm.runInContext(source + '\nthis.FlexibleAssetDomainModel=FlexibleAssetDomainModel;', consumerBoundaryContext);
+const boundaryRuntime = {
+  contractGateway: () => ({}),
+  planningOutcomeFor: id => ({asset_id:id,status:'planned'}),
+  primaryFlexibleAssets: () => [
+    {
+      asset_id:'vehicle_id4',
+      source_domain:'mobility',
+      source_asset_kind:'vehicle',
+      asset_type:'vehicle',
+      participation_state:'participating',
+      visual_ref:'mobility.vehicle.volkswagen.id4.2024-2026.ev.scale-silver',
+      power_kw:3.9,
+      effective_connection_id:'charger_black'
+    },
+    {
+      asset_id:'charger_white',
+      source_domain:'mobility',
+      source_asset_kind:'charger',
+      asset_type:'charger',
+      energy_asset_role:'flexible_load',
+      participation_state:'participating',
+      visual_ref:'mobility.charger.wallbox.commander2.white',
+      power_kw:0,
+      source_context:{mobility:{consumer_fallback:'unassigned_charger'}}
+    }
+  ],
+  planningIndexRows: () => [
+    {asset_id:'vehicle_id4',planned_today_kwh:5.4},
+    {asset_id:'charger_white',planned_today_kwh:0}
+  ],
+  connectedRelationships: () => [],
+  number: () => null,
+  value: (_key, fallback) => fallback
+};
+const boundaryDomain = new consumerBoundaryContext.FlexibleAssetDomainModel(boundaryRuntime);
+assert.equal(boundaryDomain.all().length,2,'technical flexible inventory remains lossless');
+assert.equal(boundaryDomain.connectionInfrastructure().length,1,'charger fallback remains available as technical infrastructure');
+assert.equal(boundaryDomain.consumerAssets().length,1,'consumer-facing inventory excludes charger fallback');
+assert.equal(boundaryDomain.consumerAssets()[0].id,'vehicle_id4');
+assert.equal(boundaryDomain.participating().length,1,'planning participation is consumer-side only');
+assert.equal(boundaryDomain.planningRows().length,1,'planning rows exclude charger fallback');
+assert.equal(boundaryDomain.summary().participating_count,1,'summary counts consumer-side assets only');
+
+for (const marker of [
+  'const loads = assetDomain.consumerAssets().map',
+  'flexibleAssetDomain(rt).consumerAssets().filter(vm => !vm.isDisabled)',
+  'const canonicalRows = domain.consumerAssets().map',
+  'flexibleAssetDomain(rt).consumerAssets().map(vm=>',
+  'const assets = domain.consumerAssets().filter(vm => !vm.isDisabled)',
+  '!domain.isConnectionInfrastructure(row)'
+]) {
+  assert.ok(card.includes(marker), 'missing broad consumer boundary marker: '+marker);
+}
+console.log('PASS charger fallback is retained technically but excluded from all consumer/planning UX surfaces');
