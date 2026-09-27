@@ -4,28 +4,37 @@ const fs = require("node:fs");
 const app = fs.readFileSync("src/app/energy-card.js","utf8");
 const catalog = fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
 
-assert.match(app,/solarEnergyStory\(rt\)/);
-assert.match(app,/What is happening with my solar\?/);
-assert.match(app,/Panel<\/span><i>→<\/i><span>Inverter<\/span><i>→<\/i><span>Home Bus/);
-assert.match(app,/Exact solar-versus-grid charge allocation is not separately published/);
-assert.match(app,/the UX does not invent how much charge came from solar versus grid/);
-
 assert.match(app,/solarHardwareExperience\(rt\)/);
-assert.match(app,/Solar arrays/);
 assert.match(app,/Inverter system/);
 assert.match(app,/Battery system/);
-assert.match(app,/Solar support devices/);
-assert.match(app,/solar_array/);
-assert.match(app,/optimizersFor/);
-assert.match(app,/solarTopologyDetails/);
-assert.match(app,/Unassigned published panels/);
-assert.match(app,/Unassigned published optimizers/);
-assert.doesNotMatch(app,/solarOperationalExecutionPanel\(rt/);
+assert.match(app,/Solar zones/);
+assert.match(app,/solar_zone/);
+assert.match(app,/solarZoneCard\(rt/);
+assert.match(app,/solarModuleCard\(rt/);
+assert.match(app,/PANEL \+ OPTIMIZER/);
+assert.match(app,/optimizer telemetry is the technical interface/i);
+assert.match(app,/Unassigned published hardware/);
+assert.match(app,/Primary storage truth and hierarchy only/);
+assert.match(app,/Policies and controls remain in Home Battery/);
+
+const hardwareStart = app.indexOf('solarHardwareExperience(rt)');
+const hardwareEnd = app.indexOf('\n    solarEnergyStory(rt)', hardwareStart);
+const hardware = app.slice(hardwareStart, hardwareEnd);
+assert.ok(hardware.indexOf('inverterSection') < hardware.indexOf('batterySection'));
+assert.ok(hardware.indexOf('batterySection') < hardware.indexOf('zonesSection'));
+assert.match(hardware,/return `<div class="solarHardwareExperience">\$\{inverterSection\}\$\{batterySection\}\$\{zonesSection\}/);
+
+const solarStart = app.indexOf('\n    solar(rt) {');
+const solarEnd = app.indexOf('\n    operationalPlanning(rt)', solarStart);
+const solar = app.slice(solarStart, solarEnd);
+assert.match(solar,/solarHardwareExperience\(rt\)/);
+assert.doesNotMatch(solar,/solarEnergyStory\(rt\)/);
+assert.doesNotMatch(solar,/Solar energy facts/);
+
 assert.match(app,/energyDeviceStatusCard/);
 assert.match(app,/energyAssetFacts/);
-assert.match(app,/this\.assetVisual\(enriched/);
-assert.match(app,/this\.assetVisual\(enriched,\{size:'lg',fallbackIcon:this\.planningAssetIcon\(enriched\),decorative:false\}/);
-assert.match(app,/this\.assetVisual\(enriched,\{size:'lg',fallbackIcon:'☀',decorative:false\}/);
+assert.match(app,/this\.assetVisual\(visualAsset,\{size:'lg',fallbackIcon:'☀',decorative:false\}/);
+assert.match(app,/this\.energyAssetDetailDisclosure\(rt,optimizerAsset\)/);
 
 for (const id of [
   "battery.byd_lvs_20",
@@ -42,4 +51,4 @@ for (const id of [
 assert.match(app,/object-fit:contain/);
 assert.match(app,/object-position:center/);
 
-console.log("PASS Solar hardware experience: facts + visuals + measured-flow Q&A");
+console.log("PASS Solar hierarchy: inverter -> battery -> zones with panel+optimizer module cards");
