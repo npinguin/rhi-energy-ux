@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.5';
+  const UX_VERSION = 'R4.3.6';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
@@ -6490,6 +6490,9 @@ function rhiEnergyVisualPickerStyles() {
       return firstDefined(asset.display_name, asset.name, asset.friendly_name, asset.label, asset.asset_id, 'Flexible asset');
     }
     assetVisual(asset = {}, { size = 'md', fallbackIcon = '◆', decorative = true } = {}) {
+      // assetVisual is called from many page/card helpers that receive rt themselves.
+      // Never depend on a free-scoped `rt`; resolve the current HA runtime explicitly.
+      const rt = this.runtime();
       const visualRef = String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
       const resolved = typeof resolveEnergyAssetVisual === 'function'
         ? resolveEnergyAssetVisual(asset, rt.visualRegistry(), size === 'lg' ? 'detail' : 'card')
