@@ -1,17 +1,16 @@
 {
   "schema_version": 1,
   "product": "rhi-energy-ux",
-  "version": "4.3.4",
+  "version": "4.3.5",
   "source_manifest_schema": 1,
   "hacs_package_root": "dist",
   "hacs_filename": "rhi-energy-ux.js",
   "assets_root": "assets",
   "asset_categories": [
     "energy",
-    "heroes",
-    "mobility"
+    "heroes"
   ],
-  "runtime_sha256": "996d8439326be944c68165bdb939fdb7cf8d82b4708a5609282d879967274189",
+  "runtime_sha256": "70ee0eef80d8ace499461e5ec23f032f5ee1eee174288849bca1bd5295f9a7ad",
   "files": [
     {
       "path": "assets/energy/byd_lvs_20.webp",
@@ -114,52 +113,8 @@
       "bytes": 21792
     },
     {
-      "path": "assets/mobility/charger_fallback.png",
-      "bytes": 132329
-    },
-    {
-      "path": "assets/mobility/charger_peblar.svg",
-      "bytes": 2252
-    },
-    {
-      "path": "assets/mobility/charger_utility_plug.svg",
-      "bytes": 2210
-    },
-    {
-      "path": "assets/mobility/charger_wallbox_black.svg",
-      "bytes": 2453
-    },
-    {
-      "path": "assets/mobility/charger_wallbox_white.svg",
-      "bytes": 2453
-    },
-    {
-      "path": "assets/mobility/vehicle_audi_q8.png",
-      "bytes": 261604
-    },
-    {
-      "path": "assets/mobility/vehicle_bmw_x1_phev.png",
-      "bytes": 267503
-    },
-    {
-      "path": "assets/mobility/vehicle_fallback.png",
-      "bytes": 113622
-    },
-    {
-      "path": "assets/mobility/vehicle_mercedes_gla.png",
-      "bytes": 238575
-    },
-    {
-      "path": "assets/mobility/vehicle_renault_scenic_techno_ev.webp",
-      "bytes": 9128
-    },
-    {
-      "path": "assets/mobility/vehicle_vw_id4.webp",
-      "bytes": 9580
-    },
-    {
       "path": "rhi-energy-ux.js",
-      "bytes": 747300
+      "bytes": 738220
     },
     {
       "path": "rhi-energy-ux.js.sha256",

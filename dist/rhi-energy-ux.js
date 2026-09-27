@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.4';
+  const UX_VERSION = 'R4.3.5';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
@@ -590,385 +590,68 @@ function rhiEnergyClearVisualPreference(assetId = "") {
   }
 }
 
-// ---- src/runtime/mobility-visual-manifest.js ----
-// GENERATED from npinguin/rhi-mobility-ux canonical visual catalog.
-// Presentation identity only; no Mobility runtime semantics are copied here.
-// Source candidate: v1.0.0-rc.67 (Mobility #100).
-const RHI_ENERGY_MOBILITY_VISUAL_MANIFEST = Object.freeze([
-  {
-    "visual_ref": "mobility.charger.fibaro.wall-plug-2.zwave-plus.be-fr.white",
-    "kind": "charger",
-    "image_key": "charger_utility_plug",
-    "filter": "none",
-    "brand": "Fibaro",
-    "model": "Wall Plug 2",
-    "appearance": "white"
-  },
-  {
-    "visual_ref": "mobility.charger.peblar.business.socket.factory",
-    "kind": "charger",
-    "image_key": "charger_peblar",
-    "filter": "none",
-    "brand": "Peblar",
-    "model": "Business",
-    "appearance": "factory"
-  },
-  {
-    "visual_ref": "mobility.charger.wallbox.commander2.black",
-    "kind": "charger",
-    "image_key": "charger_wallbox_black",
-    "filter": "none",
-    "brand": "Wallbox",
-    "model": "Commander 2",
-    "appearance": "black"
-  },
-  {
-    "visual_ref": "mobility.charger.wallbox.commander2.white",
-    "kind": "charger",
-    "image_key": "charger_wallbox_white",
-    "filter": "none",
-    "brand": "Wallbox",
-    "model": "Commander 2",
-    "appearance": "white"
-  },
-  {
-    "visual_ref": "mobility.vehicle.audi.q8.4m.2024-2026.tfsi-e.daytona-grey",
-    "kind": "vehicle",
-    "image_key": "vehicle_audi_q8",
-    "filter": "none",
-    "brand": "Audi",
-    "model": "Q8",
-    "appearance": "daytona-grey"
-  },
-  {
-    "visual_ref": "mobility.vehicle.audi.q8.4m.2024-2026.tfsi-e.glacier-white",
-    "kind": "vehicle",
-    "image_key": "vehicle_audi_q8",
-    "filter": "brightness(1.35) saturate(.45) contrast(.88)",
-    "brand": "Audi",
-    "model": "Q8",
-    "appearance": "glacier-white"
-  },
-  {
-    "visual_ref": "mobility.vehicle.audi.q8.4m.2024-2026.tfsi-e.mythos-black",
-    "kind": "vehicle",
-    "image_key": "vehicle_audi_q8",
-    "filter": "brightness(.42) contrast(1.14) saturate(.7)",
-    "brand": "Audi",
-    "model": "Q8",
-    "appearance": "mythos-black"
-  },
-  {
-    "visual_ref": "mobility.vehicle.audi.q8.4m.2024-2026.tfsi-e.navarra-blue",
-    "kind": "vehicle",
-    "image_key": "vehicle_audi_q8",
-    "filter": "sepia(.32) saturate(2.4) hue-rotate(170deg) brightness(.78)",
-    "brand": "Audi",
-    "model": "Q8",
-    "appearance": "navarra-blue"
-  },
-  {
-    "visual_ref": "mobility.vehicle.audi.q8.4m.2024-2026.tfsi-e.tango-red",
-    "kind": "vehicle",
-    "image_key": "vehicle_audi_q8",
-    "filter": "sepia(.45) saturate(3.2) hue-rotate(305deg) brightness(.82)",
-    "brand": "Audi",
-    "model": "Q8",
-    "appearance": "tango-red"
-  },
-  {
-    "visual_ref": "mobility.vehicle.bmw.x1.u11.2025-2026.phev.black-sapphire",
-    "kind": "vehicle",
-    "image_key": "vehicle_bmw_x1_phev",
-    "filter": "brightness(.40) contrast(1.18) saturate(.7)",
-    "brand": "BMW",
-    "model": "X1",
-    "appearance": "black-sapphire"
-  },
-  {
-    "visual_ref": "mobility.vehicle.bmw.x1.u11.2025-2026.phev.fire-red",
-    "kind": "vehicle",
-    "image_key": "vehicle_bmw_x1_phev",
-    "filter": "sepia(.45) saturate(3.1) hue-rotate(305deg) brightness(.85)",
-    "brand": "BMW",
-    "model": "X1",
-    "appearance": "fire-red"
-  },
-  {
-    "visual_ref": "mobility.vehicle.bmw.x1.u11.2025-2026.phev.mineral-white",
-    "kind": "vehicle",
-    "image_key": "vehicle_bmw_x1_phev",
-    "filter": "none",
-    "brand": "BMW",
-    "model": "X1",
-    "appearance": "mineral-white"
-  },
-  {
-    "visual_ref": "mobility.vehicle.bmw.x1.u11.2025-2026.phev.phytonic-blue",
-    "kind": "vehicle",
-    "image_key": "vehicle_bmw_x1_phev",
-    "filter": "sepia(.28) saturate(2.5) hue-rotate(170deg) brightness(.82)",
-    "brand": "BMW",
-    "model": "X1",
-    "appearance": "phytonic-blue"
-  },
-  {
-    "visual_ref": "mobility.vehicle.bmw.x1.u11.2025-2026.phev.skyscraper-grey",
-    "kind": "vehicle",
-    "image_key": "vehicle_bmw_x1_phev",
-    "filter": "grayscale(.55) brightness(.86)",
-    "brand": "BMW",
-    "model": "X1",
-    "appearance": "skyscraper-grey"
-  },
-  {
-    "visual_ref": "mobility.vehicle.generic.guest.current.ev-3phase.carbon-black",
-    "kind": "vehicle",
-    "image_key": "vehicle_guest",
-    "filter": "brightness(.42) contrast(1.16)",
-    "brand": "Generic",
-    "model": "Guest EV",
-    "appearance": "carbon-black"
-  },
-  {
-    "visual_ref": "mobility.vehicle.generic.guest.current.ev-3phase.deep-blue",
-    "kind": "vehicle",
-    "image_key": "vehicle_guest",
-    "filter": "sepia(.3) saturate(2.4) hue-rotate(170deg) brightness(.76)",
-    "brand": "Generic",
-    "model": "Guest EV",
-    "appearance": "deep-blue"
-  },
-  {
-    "visual_ref": "mobility.vehicle.generic.guest.current.ev-3phase.pearl-white",
-    "kind": "vehicle",
-    "image_key": "vehicle_guest",
-    "filter": "brightness(1.32) saturate(.40)",
-    "brand": "Generic",
-    "model": "Guest EV",
-    "appearance": "pearl-white"
-  },
-  {
-    "visual_ref": "mobility.vehicle.generic.guest.current.ev-3phase.slate-grey",
-    "kind": "vehicle",
-    "image_key": "vehicle_guest",
-    "filter": "none",
-    "brand": "Generic",
-    "model": "Guest EV",
-    "appearance": "slate-grey"
-  },
-  {
-    "visual_ref": "mobility.vehicle.generic.guest.current.ev-3phase.urban-green",
-    "kind": "vehicle",
-    "image_key": "vehicle_guest",
-    "filter": "sepia(.4) saturate(1.9) hue-rotate(70deg) brightness(.72)",
-    "brand": "Generic",
-    "model": "Guest EV",
-    "appearance": "urban-green"
-  },
-  {
-    "visual_ref": "mobility.vehicle.generic.guest.current.phev-1phase.carbon-black",
-    "kind": "vehicle",
-    "image_key": "vehicle_guest",
-    "filter": "brightness(.42) contrast(1.16)",
-    "brand": "Generic",
-    "model": "Guest PHEV",
-    "appearance": "carbon-black"
-  },
-  {
-    "visual_ref": "mobility.vehicle.generic.guest.current.phev-1phase.deep-blue",
-    "kind": "vehicle",
-    "image_key": "vehicle_guest",
-    "filter": "sepia(.3) saturate(2.4) hue-rotate(170deg) brightness(.76)",
-    "brand": "Generic",
-    "model": "Guest PHEV",
-    "appearance": "deep-blue"
-  },
-  {
-    "visual_ref": "mobility.vehicle.generic.guest.current.phev-1phase.pearl-white",
-    "kind": "vehicle",
-    "image_key": "vehicle_guest",
-    "filter": "brightness(1.32) saturate(.40)",
-    "brand": "Generic",
-    "model": "Guest PHEV",
-    "appearance": "pearl-white"
-  },
-  {
-    "visual_ref": "mobility.vehicle.generic.guest.current.phev-1phase.slate-grey",
-    "kind": "vehicle",
-    "image_key": "vehicle_guest",
-    "filter": "none",
-    "brand": "Generic",
-    "model": "Guest PHEV",
-    "appearance": "slate-grey"
-  },
-  {
-    "visual_ref": "mobility.vehicle.generic.guest.current.phev-1phase.urban-green",
-    "kind": "vehicle",
-    "image_key": "vehicle_guest",
-    "filter": "sepia(.4) saturate(1.9) hue-rotate(70deg) brightness(.72)",
-    "brand": "Generic",
-    "model": "Guest PHEV",
-    "appearance": "urban-green"
-  },
-  {
-    "visual_ref": "mobility.vehicle.mercedes.gla.h247.2023-2026.phev.mountain-grey",
-    "kind": "vehicle",
-    "image_key": "vehicle_mercedes_gla",
-    "filter": "none",
-    "brand": "Mercedes-Benz",
-    "model": "GLA",
-    "appearance": "mountain-grey"
-  },
-  {
-    "visual_ref": "mobility.vehicle.mercedes.gla.h247.2023-2026.phev.night-black",
-    "kind": "vehicle",
-    "image_key": "vehicle_mercedes_gla",
-    "filter": "brightness(.42) contrast(1.15) saturate(.7)",
-    "brand": "Mercedes-Benz",
-    "model": "GLA",
-    "appearance": "night-black"
-  },
-  {
-    "visual_ref": "mobility.vehicle.mercedes.gla.h247.2023-2026.phev.patagonia-red",
-    "kind": "vehicle",
-    "image_key": "vehicle_mercedes_gla",
-    "filter": "sepia(.45) saturate(3.1) hue-rotate(305deg) brightness(.82)",
-    "brand": "Mercedes-Benz",
-    "model": "GLA",
-    "appearance": "patagonia-red"
-  },
-  {
-    "visual_ref": "mobility.vehicle.mercedes.gla.h247.2023-2026.phev.polar-white",
-    "kind": "vehicle",
-    "image_key": "vehicle_mercedes_gla",
-    "filter": "brightness(1.35) saturate(.45) contrast(.88)",
-    "brand": "Mercedes-Benz",
-    "model": "GLA",
-    "appearance": "polar-white"
-  },
-  {
-    "visual_ref": "mobility.vehicle.mercedes.gla.h247.2023-2026.phev.spectral-blue",
-    "kind": "vehicle",
-    "image_key": "vehicle_mercedes_gla",
-    "filter": "sepia(.30) saturate(2.5) hue-rotate(170deg) brightness(.80)",
-    "brand": "Mercedes-Benz",
-    "model": "GLA",
-    "appearance": "spectral-blue"
-  },
-  {
-    "visual_ref": "mobility.vehicle.renault.scenic.e-tech.2024-2026.techno.flame-red",
-    "kind": "vehicle",
-    "image_key": "vehicle_renault_scenic_techno_ev",
-    "filter": "sepia(.45) saturate(3.0) hue-rotate(305deg) brightness(.84)",
-    "brand": "Renault",
-    "model": "Scenic",
-    "appearance": "flame-red"
-  },
-  {
-    "visual_ref": "mobility.vehicle.renault.scenic.e-tech.2024-2026.techno.midnight-blue",
-    "kind": "vehicle",
-    "image_key": "vehicle_renault_scenic_techno_ev",
-    "filter": "sepia(.28) saturate(2.2) hue-rotate(170deg) brightness(.72)",
-    "brand": "Renault",
-    "model": "Scenic",
-    "appearance": "midnight-blue"
-  },
-  {
-    "visual_ref": "mobility.vehicle.renault.scenic.e-tech.2024-2026.techno.pearl-white",
-    "kind": "vehicle",
-    "image_key": "vehicle_renault_scenic_techno_ev",
-    "filter": "none",
-    "brand": "Renault",
-    "model": "Scenic",
-    "appearance": "pearl-white"
-  },
-  {
-    "visual_ref": "mobility.vehicle.renault.scenic.e-tech.2024-2026.techno.schiste-grey",
-    "kind": "vehicle",
-    "image_key": "vehicle_renault_scenic_techno_ev",
-    "filter": "grayscale(.55) brightness(.82)",
-    "brand": "Renault",
-    "model": "Scenic",
-    "appearance": "schiste-grey"
-  },
-  {
-    "visual_ref": "mobility.vehicle.renault.scenic.e-tech.2024-2026.techno.starry-black",
-    "kind": "vehicle",
-    "image_key": "vehicle_renault_scenic_techno_ev",
-    "filter": "brightness(.42) contrast(1.16) saturate(.65)",
-    "brand": "Renault",
-    "model": "Scenic",
-    "appearance": "starry-black"
-  },
-  {
-    "visual_ref": "mobility.vehicle.volkswagen.id4.2024-2026.ev.costa-azul",
-    "kind": "vehicle",
-    "image_key": "vehicle_vw_id4",
-    "filter": "none",
-    "brand": "Volkswagen",
-    "model": "ID.4",
-    "appearance": "costa-azul"
-  },
-  {
-    "visual_ref": "mobility.vehicle.volkswagen.id4.2024-2026.ev.glacier-white",
-    "kind": "vehicle",
-    "image_key": "vehicle_vw_id4",
-    "filter": "brightness(1.35) saturate(.42) contrast(.88)",
-    "brand": "Volkswagen",
-    "model": "ID.4",
-    "appearance": "glacier-white"
-  },
-  {
-    "visual_ref": "mobility.vehicle.volkswagen.id4.2024-2026.ev.moonstone-grey",
-    "kind": "vehicle",
-    "image_key": "vehicle_vw_id4",
-    "filter": "grayscale(.65) brightness(.78)",
-    "brand": "Volkswagen",
-    "model": "ID.4",
-    "appearance": "moonstone-grey"
-  },
-  {
-    "visual_ref": "mobility.vehicle.volkswagen.id4.2024-2026.ev.mythos-black",
-    "kind": "vehicle",
-    "image_key": "vehicle_vw_id4",
-    "filter": "brightness(.40) contrast(1.18) saturate(.65)",
-    "brand": "Volkswagen",
-    "model": "ID.4",
-    "appearance": "mythos-black"
-  },
-  {
-    "visual_ref": "mobility.vehicle.volkswagen.id4.2024-2026.ev.scale-silver",
-    "kind": "vehicle",
-    "image_key": "vehicle_vw_id4",
-    "filter": "grayscale(.85) brightness(1.05)",
-    "brand": "Volkswagen",
-    "model": "ID.4",
-    "appearance": "scale-silver"
-  }
-]);
-const RHI_ENERGY_MOBILITY_ASSET_TRANSPORT = Object.freeze({
-  vehicle_audi_q8:"mobility/vehicle_audi_q8.png",
-  vehicle_bmw_x1_phev:"mobility/vehicle_bmw_x1_phev.png",
-  vehicle_mercedes_gla:"mobility/vehicle_mercedes_gla.png",
-  vehicle_vw_id4:"mobility/vehicle_vw_id4.webp",
-  vehicle_renault_scenic_techno_ev:"mobility/vehicle_renault_scenic_techno_ev.webp",
-  vehicle_guest:"mobility/vehicle_fallback.png",
-  vehicle_fallback:"mobility/vehicle_fallback.png",
-  charger_wallbox:"mobility/charger_wallbox_white.svg",
-  charger_wallbox_white:"mobility/charger_wallbox_white.svg",
-  charger_wallbox_black:"mobility/charger_wallbox_black.svg",
-  charger_peblar:"mobility/charger_peblar.svg",
-  charger_utility_plug:"mobility/charger_utility_plug.svg",
-  charger_fallback:"mobility/charger_fallback.png"
-});
-function rhiEnergyMobilityVisualEntry(visualRef=""){
-  return RHI_ENERGY_MOBILITY_VISUAL_MANIFEST.find(row=>row.visual_ref===String(visualRef||"").trim())||null;
+// ---- src/runtime/foundation-visual-registry.js ----
+// Generic cross-domain visual presentation resolver.
+// Producer domains register visual identity + presentation with Foundation.
+// Energy must never carry producer model/brand/image-key mappings.
+const RHI_FOUNDATION_VISUAL_REGISTRY_CONTRACT = "RHI_VISUAL_ASSET_REGISTRY_V1";
+
+function readFoundationVisualRegistry(hass = {}) {
+  const states = Object.values(hass?.states || {});
+  const state = states.find(candidate =>
+    String(candidate?.attributes?.contract_id || "") === RHI_FOUNDATION_VISUAL_REGISTRY_CONTRACT
+  ) || null;
+  const attributes = state?.attributes || {};
+  const rawEntries = parseMaybeJson(attributes.entries, attributes.entries);
+  const entries = Array.isArray(rawEntries)
+    ? rawEntries.filter(row => row && typeof row === "object")
+    : [];
+  const byRef = new Map(entries.map(row => [String(row.visual_ref || ""), Object.freeze({...row})]).filter(([ref]) => ref));
+  return Object.freeze({
+    available: !!state,
+    contractId: String(attributes.contract_id || ""),
+    contractVersion: String(attributes.contract_version || ""),
+    status: String(attributes.status || state?.state || "UNAVAILABLE"),
+    entries: Object.freeze(entries),
+    entry(visualRef = "") { return byRef.get(String(visualRef || "").trim()) || null; }
+  });
+}
+
+function rhiRegisteredPresentationUrl(registry, visualRef = "", variant = "card") {
+  const ref = String(visualRef || "").trim();
+  if (!ref || !registry?.available) return null;
+  const entry = registry.entry(ref);
+  if (!entry) return null;
+  const presentation = entry.presentation && typeof entry.presentation === "object" ? entry.presentation : null;
+  const packageId = String(presentation?.package_id || "").trim();
+  const variants = presentation?.variants && typeof presentation.variants === "object" ? presentation.variants : {};
+  const wanted = String(variant || "card");
+  const packagePath = String(
+    variants[wanted]
+    || variants.card
+    || variants.detail
+    || variants.thumbnail
+    || variants.hero
+    || ""
+  ).trim();
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(packageId)) return null;
+  if (!packagePath || packagePath.startsWith("/") || packagePath.includes("..") || packagePath.includes("://")) return null;
+  if (!String(entry.owner_domain || "").trim()) return null;
+  return Object.freeze({
+    visual_ref: ref,
+    owner_domain: String(entry.owner_domain || ""),
+    asset_type: String(entry.asset_type || ""),
+    kind: String(entry.asset_type || ""),
+    url: `/hacsfiles/${packageId}/${packagePath}?r=${encodeURIComponent(String(entry.revision || 1))}`,
+    filter: "none",
+    fallback: false,
+    registry_contract: RHI_FOUNDATION_VISUAL_REGISTRY_CONTRACT
+  });
 }
 
 // ---- src/runtime/visual-asset-resolver.js ----
-// Package-local resolver for Foundation/Mobility visual_ref identities.
-// The backend publishes only package-neutral keys. Energy UX owns these image files.
+// Visual resolver for Energy-owned presentation preferences and registered cross-domain refs.
+// Cross-domain visual identity is opaque and resolved only through Foundation registry metadata.
 function rhiEnergyVisualAssetUrl(relativePath = "") {
   const normalized = String(relativePath || "").replace(/^\/+/, "");
   return `/hacsfiles/rhi-energy-ux/assets/${normalized}?v=${encodeURIComponent(UX_VERSION)}`;
@@ -988,6 +671,7 @@ function resolveEnergyOwnedVisualRef(visualRef = "") {
   if (!url) return null;
   return Object.freeze({
     visual_ref: ref,
+    owner_domain: "rhi_energy_ux",
     kind: "energy_logical_device",
     asset_type: entry.asset_type,
     catalog_id: entry.id,
@@ -997,10 +681,35 @@ function resolveEnergyOwnedVisualRef(visualRef = "") {
   });
 }
 
-function resolveEnergyAssetVisual(asset = {}) {
+function resolveEnergyVisualRef(visualRef = "", registry = null, variant = "card") {
+  const ref = String(visualRef || "").trim();
+  if (!ref) return null;
+
+  // Backend/domain visual refs are registered producer identity. Never interpret
+  // their namespace, brand, model, image key or asset id in Energy.
+  const registered = typeof rhiRegisteredPresentationUrl === "function"
+    ? rhiRegisteredPresentationUrl(registry, ref, variant)
+    : null;
+  if (registered) return registered;
+
+  // UX-local Energy presentation preferences are not cross-domain semantic identity.
+  if (ref.startsWith("energy.logical.")) return resolveEnergyOwnedVisualRef(ref);
+
+  // Missing/unregistered producer identity fails closed. Callers render a neutral icon.
+  return null;
+}
+
+function resolveEnergyAssetVisual(asset = {}, registry = null, variant = "card") {
   const sourceRef = String(asset.visual_ref || asset.visualRef || asset.raw?.visual_ref || "").trim();
-  // Producer visual identity stays authoritative across the domain boundary.
-  if (sourceRef.startsWith("mobility.")) return resolveEnergyVisualRef(sourceRef);
+
+  // Any registered producer/domain visual is authoritative.
+  if (sourceRef) {
+    const registered = resolveEnergyVisualRef(sourceRef, registry, variant);
+    if (registered) return registered;
+
+    // An explicit non-UX-local ref must never be replaced by an Energy semantic image.
+    if (!sourceRef.startsWith("energy.logical.")) return null;
+  }
 
   const assetId = String(asset.asset_id || asset.id || "").trim();
   const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
@@ -1025,34 +734,6 @@ function resolveEnergyAssetVisual(asset = {}) {
     ? rhiEnergyDefaultVisualEntry(asset)
     : null;
   return fallbackEntry ? resolveEnergyOwnedVisualRef(rhiEnergyVisualRef(fallbackEntry)) : null;
-}
-
-function resolveEnergyVisualRef(visualRef = "") {
-  const ref = String(visualRef || "").trim();
-  if (!ref) return null;
-  if (ref.startsWith("energy.logical.")) return resolveEnergyOwnedVisualRef(ref);
-  if (ref === "mobility.vehicle.generic.fallback") {
-    return Object.freeze({ visual_ref:ref, kind:"vehicle", url:rhiEnergyVisualAssetUrl("mobility/vehicle_fallback.png"), filter:"none" });
-  }
-  if (ref === "mobility.charger.generic.fallback") {
-    return Object.freeze({ visual_ref:ref, kind:"charger", url:rhiEnergyVisualAssetUrl("mobility/charger_fallback.png"), filter:"none" });
-  }
-  if (ref.startsWith("mobility.vehicle.") || ref.startsWith("mobility.charger.")) {
-    const entry = typeof rhiEnergyMobilityVisualEntry === "function" ? rhiEnergyMobilityVisualEntry(ref) : null;
-    if (entry) {
-      const file = RHI_ENERGY_MOBILITY_ASSET_TRANSPORT[entry.image_key] || "";
-      if (file) return Object.freeze({ visual_ref:ref, kind:entry.kind, url:rhiEnergyVisualAssetUrl(file), filter:entry.filter || "none", fallback:false });
-    }
-    const vehicle = ref.startsWith("mobility.vehicle.");
-    return Object.freeze({
-      visual_ref:ref,
-      kind:vehicle ? "vehicle" : "charger",
-      url:rhiEnergyVisualAssetUrl(vehicle ? "mobility/vehicle_fallback.png" : "mobility/charger_fallback.png"),
-      filter:"none",
-      fallback:true
-    });
-  }
-  return null;
 }
 
 // ---- src/runtime/asset-profile-contract.js ----
@@ -1541,8 +1222,16 @@ function readEnergyCommandContract(gateway) {
       this._meteringHorizons = null;
       this._meteringPeriods = null;
       this._meteringRemediations = null;
+      this._visualRegistry = null;
     }
     rawState(entityId) { return this.hass?.states?.[entityId] || null; }
+    visualRegistry() {
+      if (!this._visualRegistry) this._visualRegistry = readFoundationVisualRegistry(this.hass);
+      return this._visualRegistry;
+    }
+    resolveVisualRef(visualRef, variant = 'card') {
+      return resolveEnergyVisualRef(visualRef, this.visualRegistry(), variant);
+    }
     releaseState() { return this.rawState(RELEASE_ENTITY); }
     releaseAttrs() { return this.releaseState()?.attributes || {}; }
     publicUxEntities() {
@@ -2440,7 +2129,14 @@ class FlexibleAssetDomainModel {
       // carries richer producer identity such as visual_ref and charger linkage.
       // No semantic inference or cross-domain lookup is performed here.
       const materialized = context.asset
-        ? { ...context.asset, ...asset, asset_id:id }
+        ? {
+            ...asset,
+            ...context.asset,
+            // Energy flexible-load state may add planning/participation facts, but
+            // canonical producer identity must never be overwritten by that projection.
+            asset_id:id,
+            visual_ref:String(firstDefined(context.asset.visual_ref, asset.visual_ref, '') || '')
+          }
         : { ...asset, asset_id:id };
       const participation = this.participationState(materialized, planning);
       return {
@@ -3166,7 +2862,10 @@ function rhiEnergyVisualPickerStyles() {
         retrospective:['retrospective']
       };
       const keys = ['release', ...(byView[this.view] || [])];
-      return [...new Set(keys.map(key => UX_INTERFACES[key]).filter(Boolean))];
+      const registryEntity = Object.entries(this._hass?.states || {}).find(([,state]) =>
+        String(state?.attributes?.contract_id || '') === 'RHI_VISUAL_ASSET_REGISTRY_V1'
+      )?.[0] || '';
+      return [...new Set([...keys.map(key => UX_INTERFACES[key]).filter(Boolean), registryEntity].filter(Boolean))];
     }
     runtimeSignature() {
       const states = this._hass?.states || {};
@@ -5555,7 +5254,7 @@ function rhiEnergyVisualPickerStyles() {
         consumerId ? (rt.assetName(consumerId) || human(consumerId)) : '',
         operatingState ? human(operatingState) : ''
       ].filter(Boolean).join(' · ');
-      const visual = typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(charger.visual_ref) : null;
+      const visual = rt.resolveVisualRef(charger.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
       return `<div class="flowConnectionCard">${art}<div><b>${escapeHtml(charger.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(context || 'Connection state unavailable')}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
@@ -5571,7 +5270,7 @@ function rhiEnergyVisualPickerStyles() {
       const charger = firstDefined(consumer.effective_charger, consumer.charger_asset_id, consumer.connection_asset_id, consumer.execution_target_asset_id, '');
       const requested = asNumber(firstDefined(consumer.requested_power_kw_effective, consumer.requested_power_kw));
       const state = charging ? 'Charging' : active || (power !== null && power > 0.05) ? 'Active' : connected ? 'Connected' : available ? 'Available' : 'Unavailable';
-      const visual = typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(consumer.visual_ref) : null;
+      const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
       return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(state)}${charger ? ` · ${escapeHtml(rt.assetName(charger) || human(charger))}` : ''}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
@@ -6721,8 +6420,8 @@ function rhiEnergyVisualPickerStyles() {
     assetVisual(asset = {}, { size = 'md', fallbackIcon = '◆', decorative = true } = {}) {
       const visualRef = String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
       const resolved = typeof resolveEnergyAssetVisual === 'function'
-        ? resolveEnergyAssetVisual(asset)
-        : (visualRef && typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(visualRef) : null);
+        ? resolveEnergyAssetVisual(asset, rt.visualRegistry(), size === 'lg' ? 'detail' : 'card')
+        : (visualRef ? rt.resolveVisualRef(visualRef, size === 'lg' ? 'detail' : 'card') : null);
       const label = this.planningAssetName(asset);
       const assetId = String(firstDefined(asset.asset_id, asset.id, '') || '').trim();
       const assetType = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
