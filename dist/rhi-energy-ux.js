@@ -2238,7 +2238,9 @@ class FlexibleAssetDomainModel {
     byId(assetId) { this.all(); return this._byId.get(String(assetId)) || null; }
     consumerFacing() { return this.all().filter(vm => !vm.isStorage && !vm.isInfrastructure); }
     participating() { return this.consumerFacing().filter(vm => vm.isParticipating); }
-    planningParticipants() { return this.participating(); }
+    planningParticipants() {
+      return this.participating().filter(vm => vm.raw?.planning_input_ready !== false);
+    }
     disabled() { return this.consumerFacing().filter(vm => vm.isDisabled); }
     infrastructure() { return this.all().filter(vm => vm.isInfrastructure); }
     storage() { return this.all().filter(vm => vm.isStorage); }
