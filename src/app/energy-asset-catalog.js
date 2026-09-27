@@ -1,7 +1,6 @@
 // Energy logical-device visual catalog.
 // Backend profiles remain semantic and non-visual. This UX module owns representative
-// artwork, same-type defaults, picker options and local presentation preference.
-const RHI_ENERGY_VISUAL_PREFERENCE_KEY = "homebrain.energy.visual_preferences.v1";
+// artwork, same-type defaults and picker options. Persisted presentation choice is backend-owned.
 
 const RHI_ENERGY_LOGICAL_VISUALS = Object.freeze([
   { id:"battery_system.home", asset_type:"battery_system", label:"Home battery system", brand:"Generic", model:"Home battery system", variant:"System", profile_patterns:["energy.battery_system."], package_path:"heroes/battery-hero.webp", quality:"representative", selectable:true },
@@ -60,16 +59,37 @@ function rhiEnergyVisualBrandsForType(assetType = "") {
     .sort((a, b) => a.localeCompare(b));
 }
 
+const RHI_ENERGY_CANONICAL_VISUAL_REFS = Object.freeze({
+  "battery.byd_lvs_20":"energy.battery.byd.lvs",
+  "battery.solaredge_home_48v_9_6":"energy.battery.solaredge.48v",
+  "grid_connection.homewizard_p1":"energy.grid_connection.homewizard.p1",
+  "solar_production.sunpower_x21_335_blk":"energy.solar_production.sunpower.x21_335_blk",
+  "solar_production.jinkosolar_jkm435n_54hl4r":"energy.solar_production.jinkosolar.jkm435n_54hl4r",
+  "solar_panel.sunpower_x21_335_blk":"energy.solar_panel.sunpower.x21_335_blk",
+  "solar_panel.jinkosolar_jkm435n_54hl4r":"energy.solar_panel.jinkosolar.jkm435n_54hl4r",
+  "solar_inverter.solaredge_rwb_10k":"energy.solar_inverter.solaredge.rwb",
+  "solar_inverter.solaredge_rws_8k":"energy.solar_inverter.solaredge.rws",
+  "solar_inverter.solaredge":"energy.solar_inverter.generic",
+  "solar_optimizer.solaredge_s500b":"energy.solar_optimizer.solaredge",
+  "solar_optimizer.solaredge":"energy.solar_optimizer.solaredge",
+  "backup_interface.solaredge_3phase":"energy.backup_interface.solaredge.3phase"
+});
+
 function rhiEnergyVisualRef(entryOrId = "") {
-  const id = typeof entryOrId === "object" ? String(entryOrId?.id || "") : String(entryOrId || "");
-  return id ? `energy.logical.${id}` : "";
+  const entry = typeof entryOrId === "object"
+    ? entryOrId
+    : RHI_ENERGY_LOGICAL_VISUALS.find(row => row.id === String(entryOrId || ""));
+  if (!entry) return "";
+  const explicit = RHI_ENERGY_CANONICAL_VISUAL_REFS[entry.id];
+  if (explicit) return explicit;
+  const type = String(entry.asset_type || "").trim().toLowerCase();
+  return type ? `energy.${type}.generic` : "";
 }
 
 function rhiEnergyVisualEntryFromRef(visualRef = "") {
   const ref = String(visualRef || "").trim();
-  if (!ref.startsWith("energy.logical.")) return null;
-  const id = ref.slice("energy.logical.".length);
-  return RHI_ENERGY_LOGICAL_VISUALS.find(row => row.id === id) || null;
+  if (!ref) return null;
+  return RHI_ENERGY_LOGICAL_VISUALS.find(row => rhiEnergyVisualRef(row) === ref) || null;
 }
 
 function rhiEnergyVisualEntryMatchesAsset(entry = {}, asset = {}) {
@@ -92,48 +112,7 @@ function rhiEnergyDefaultVisualEntry(asset = {}) {
     || null;
 }
 
-function rhiEnergyReadVisualPreferences() {
-  try {
-    const raw = globalThis?.localStorage?.getItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch (_) {
-    return {};
-  }
+function rhiEnergySelectedVisualRef(asset = {}) {
+  return String(asset?.visual_ref || asset?.visualRef || asset?.raw?.visual_ref || "").trim();
 }
 
-function rhiEnergySelectedVisualRef(assetId = "") {
-  const id = String(assetId || "").trim();
-  if (!id) return "";
-  return String(rhiEnergyReadVisualPreferences()[id] || "").trim();
-}
-
-function rhiEnergySetVisualPreference(asset = {}, visualRef = "") {
-  const assetId = String(asset.asset_id || asset.id || "").trim();
-  const ref = String(visualRef || "").trim();
-  if (!assetId || !ref) return false;
-  const entry = rhiEnergyVisualEntryFromRef(ref);
-  const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
-  if (!entry || entry.asset_type !== assetType) return false;
-  try {
-    const preferences = rhiEnergyReadVisualPreferences();
-    preferences[assetId] = ref;
-    globalThis?.localStorage?.setItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY, JSON.stringify(preferences));
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-function rhiEnergyClearVisualPreference(assetId = "") {
-  const id = String(assetId || "").trim();
-  if (!id) return false;
-  try {
-    const preferences = rhiEnergyReadVisualPreferences();
-    delete preferences[id];
-    globalThis?.localStorage?.setItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY, JSON.stringify(preferences));
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
