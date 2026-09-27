@@ -57,8 +57,11 @@ for (const token of ["flexible_asset.generic","consumer.generic","solar_array.ge
   assert.ok(catalog.includes(token), "missing representative visual fallback "+token);
 }
 
-assert.match(core,/RHI UX Core 1\.5\.0/);
+assert.match(core,/RHI UX Core 1\.5\.1/);
 assert.match(core,/function rhiUxContextBar/);
+assert.match(core,/function rhiUxResolveDomainAssetNavigation/);
+assert.ok(core.includes("{asset_id}"), "runtime-safe Core navigation token missing");
+assert.ok(!core.includes("__RHI_ASSET_ID__"), "stale build-placeholder-style Core navigation token returned");
 assert.match(core,/\.rhiUxPageHeroArt\{position:absolute/);
 assert.match(core,/\.rhiUxStatusGrid\{/);
 assert.match(core,/\.rhiUxQuickActionBar/);
