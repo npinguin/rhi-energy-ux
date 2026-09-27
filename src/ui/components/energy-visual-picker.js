@@ -8,7 +8,7 @@ class HomeBrainEnergyVisualPicker {
     return typeof rhiEnergyVisualCatalogForType === "function" ? rhiEnergyVisualCatalogForType(type) : [];
   }
 
-  render(asset = {}, selectedRef = "", { draftRef = "", brand = "all" } = {}) {
+  render(asset = {}, selectedRef = "", { draftRef = "", brand = "all", feedback = "" } = {}) {
     const assetId = String(asset.asset_id || asset.id || "").trim();
     const type = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
     const choices = this.catalogFor(asset);
@@ -32,25 +32,33 @@ class HomeBrainEnergyVisualPicker {
       const ref = rhiEnergyVisualRef(entry);
       const visual = typeof resolveEnergyVisualRef === "function" ? resolveEnergyVisualRef(ref) : null;
       const selected = ref === current;
-      return `<button class="energyVisualChoice ${selected ? "selected" : ""}" type="button" data-energy-visual-select="${escapeHtml(ref)}" data-energy-visual-asset="${escapeHtml(assetId)}" aria-pressed="${selected ? "true" : "false"}">
-        <span class="energyVisualChoiceImage">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="">` : ""}</span>
-        <span class="energyVisualChoiceCopy"><small>${escapeHtml(entry.brand || "Representative")}</small><b>${escapeHtml(entry.model || entry.label)}</b><em>${escapeHtml(entry.variant || human(type))}</em></span>
+      return `<button class="rhiUxVisualChoice energyVisualChoice ${selected ? "selected" : ""}" type="button" data-energy-visual-select="${escapeHtml(ref)}" data-energy-visual-asset="${escapeHtml(assetId)}" aria-pressed="${selected ? "true" : "false"}">
+        <span class="rhiUxVisualChoiceImage energyVisualChoiceImage">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="">` : ""}</span>
+        <span class="rhiUxVisualChoiceCopy energyVisualChoiceCopy"><small>${escapeHtml(entry.brand || "Representative")}</small><b>${escapeHtml(entry.model || entry.label)}</b><em>${escapeHtml(entry.variant || human(type))}</em></span>
       </button>`;
     }).join("");
 
-    return `<div class="energyVisualPickerBackdrop" data-energy-visual-backdrop="1">
-      <section class="energyVisualPickerPanel" role="dialog" aria-modal="true" aria-label="Choose image" data-energy-visual-panel="1">
-        <header><div><small>APPEARANCE · ${escapeHtml(human(type))}</small><h2>Choose image</h2></div><button type="button" class="energyVisualClose" data-energy-visual-cancel="1" aria-label="Cancel">×</button></header>
-        ${filters}
-        <div class="energyVisualChoices">${cards}</div>
-        <footer>
-          <button type="button" class="energyVisualReset" data-energy-visual-reset="${escapeHtml(assetId)}">Use profile default</button>
-          <span class="energyVisualFooterSpacer"></span>
-          <button type="button" class="energyVisualCancel" data-energy-visual-cancel="1">Cancel</button>
-          <button type="button" class="energyVisualSave" data-energy-visual-save="${escapeHtml(assetId)}" ${current ? "" : "disabled"}>Save image</button>
-        </footer>
-      </section>
-    </div>`;
+    const closeHtml = `<button type="button" class="energyVisualClose" data-energy-visual-cancel="1" aria-label="Cancel">×</button>`;
+    const resetHtml = `<button type="button" data-energy-visual-reset="${escapeHtml(assetId)}">Use profile default</button>`;
+    const cancelHtml = `<button type="button" data-energy-visual-cancel="1">Cancel</button>`;
+    const saveHtml = `<button type="button" class="primary" data-energy-visual-save="${escapeHtml(assetId)}" ${current ? "" : "disabled"}>Save appearance</button>`;
+    const filterHtml = brands.length > 1
+      ? `<button type="button" class="${activeBrand === "all" ? "selected" : ""}" data-energy-visual-brand="all">All</button>${brands.map(item => `<button type="button" class="${activeBrand === item ? "selected" : ""}" data-energy-visual-brand="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join("")}`
+      : "";
+    const selectedHtml = feedback ? `<small class="energyVisualFeedback">${escapeHtml(feedback)}</small>` : "";
+    return rhiUxVisualPickerShell({
+      eyebrow:`Appearance · ${human(type)}`,
+      title:"Choose appearance",
+      description:"Select the representative product image. The choice is stored in the Energy backend and survives reloads.",
+      filtersHtml:filterHtml,
+      choicesHtml:cards,
+      selectedHtml,
+      resetHtml,
+      cancelHtml,
+      saveHtml,
+      modal:true,
+      closeHtml
+    });
   }
 }
 
@@ -58,26 +66,7 @@ function rhiEnergyVisualPickerStyles() {
   return `
     .assetVisual[data-energy-visual-open]{cursor:pointer;outline:0}
     .assetVisual[data-energy-visual-open]:hover{box-shadow:0 0 0 2px rgba(37,99,235,.16)}
-    .energyVisualPickerBackdrop{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.44);display:grid;place-items:center;padding:20px}
-    .energyVisualPickerPanel{width:min(720px,94vw);max-height:86vh;overflow:auto;background:#fff;border-radius:20px;border:1px solid #e2e8f0;box-shadow:0 30px 80px rgba(15,23,42,.28);padding:18px}
-    .energyVisualPickerPanel header{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
-    .energyVisualPickerPanel header small{font-size:10px;font-weight:800;letter-spacing:.12em;color:#64748b}
-    .energyVisualPickerPanel header h2{margin:4px 0 0;font-size:21px}
     .energyVisualClose{border:0;background:#f1f5f9;border-radius:10px;width:36px;height:36px;font-size:22px;cursor:pointer}
-    .energyVisualBrandFilter{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
-    .energyVisualBrandFilter button{border:1px solid #dbe3ee;background:#fff;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer}
-    .energyVisualBrandFilter button.selected{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}
-    .energyVisualChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
-    .energyVisualChoice{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;align-items:center;text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:14px;padding:10px;cursor:pointer}
-    .energyVisualChoice:hover{border-color:#93c5fd;background:#f8fbff}.energyVisualChoice.selected{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12);background:#f8fbff}
-    .energyVisualChoiceImage{width:104px;height:72px;border-radius:10px;background:#f8fafc;display:grid;place-items:center;overflow:hidden}
-    .energyVisualChoiceImage img{max-width:100%;max-height:100%;object-fit:contain}
-    .energyVisualChoiceCopy{min-width:0}.energyVisualChoiceCopy small,.energyVisualChoiceCopy b,.energyVisualChoiceCopy em{display:block}
-    .energyVisualChoiceCopy small{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.08em}.energyVisualChoiceCopy b{font-size:13px;margin-top:3px}.energyVisualChoiceCopy em{font-size:10px;color:#64748b;font-style:normal;margin-top:3px}
-    .energyVisualPickerPanel footer{display:flex;align-items:center;gap:8px;margin-top:14px;border-top:1px solid #eef2f7;padding-top:14px}
-    .energyVisualFooterSpacer{flex:1}
-    .energyVisualReset,.energyVisualCancel,.energyVisualSave{border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer}
-    .energyVisualReset,.energyVisualCancel{border:1px solid #dbe3ee;background:#fff}.energyVisualSave{border:1px solid #2563eb;background:#2563eb;color:#fff}.energyVisualSave:disabled{opacity:.45;cursor:default}
-    @media(max-width:700px){.energyVisualChoices{grid-template-columns:1fr}.energyVisualPickerPanel{padding:14px}.energyVisualChoice{grid-template-columns:88px minmax(0,1fr)}.energyVisualChoiceImage{width:88px;height:66px}.energyVisualPickerPanel footer{flex-wrap:wrap}.energyVisualFooterSpacer{display:none}.energyVisualSave{margin-left:auto}}
+    .energyVisualFeedback{color:#526178;font-size:9.5px;max-width:220px}
   `;
 }
