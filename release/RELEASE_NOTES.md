@@ -1,17 +1,17 @@
-# v4.2.3 — Information density and single-action-bar correction TEST CANDIDATE
+# v4.2.5 — UX convergence and flexible-flow correction TEST CANDIDATE
 
-This release corrects the remaining Energy UX regression visible in 4.2.1/4.2.2.
+This release completes the current Energy UX correction and starts the structural convergence cleanup.
 
-- removes the legacy render-time Quick Actions injection that was inserted after the first closing section and therefore appeared between Hero and Status;
-- merges contextual navigation controls and executable commands into one canonical Core-owned Quick Actions bar;
-- preserves Hero → Status → Quick Actions → Body as the only page-header composition;
-- restores Consumers from the full canonical flexible-asset domain, not only consumer-mix rows;
-- restores compact asset provenance/details for Solar and other hardware cards;
-- restores Gas meter/source/entity context without duplicating the status summary;
-- adds Tactical Planning context (horizon, state, bucket count, participating loads, confidence and reason) while keeping missing hourly allocations fail-closed;
-- adds release-blocking tests so a second page-level Quick Actions bar cannot return.
+- fixes flexible-device identity materialization so vehicle/charger context survives consistently into Flow and Planning;
+- removes the stale frontend assumption that charging-connection telemetry is unavailable;
+- restores the Gas hero through the packaged SVG transport;
+- keeps backend-owned Energy aggregate truth authoritative instead of reconstructing totals in the frontend;
+- keeps one canonical page-control surface after Hero and Status;
+- separates navigation/context controls from executable runtime commands;
+- keeps shared Hero, Status and Quick Actions primitives owned by RHI UX Core;
+- adds a convergence gate against legacy structural markup and hardcoded backend-release assumptions;
+- adds a ratchet for historical Energy presentation debt so legacy CSS/release-evolution layers can only decrease.
 
-Rollback: v4.2.2.
+Rollback: v4.2.4.
 
-Target Home Assistant render, functional journey, refresh/restart, upgrade and rollback proof remain separate runtime qualification gates.
-
+Target Home Assistant render, desktop/iPad proof, functional journey, refresh/restart, upgrade and rollback proof remain separate runtime qualification gates.
