@@ -1,0 +1,67 @@
+name: Materialize Gas hero
+
+on:
+  push:
+    branches:
+      - fix/gas-runtime-4.2.9
+    paths:
+      - 'tools/tmp/gas-hero.part*.b64'
+      - '.github/workflows/materialize-gas-hero.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/gas-runtime-4.2.9
+          fetch-depth: 0
+
+      - name: Materialize approved photographic Gas hero
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, hashlib
+          parts = sorted(Path("tools/tmp").glob("gas-hero.part*.b64"))
+          if len(parts) != 6:
+              raise SystemExit(f"expected 6 Gas hero parts, found {len(parts)}")
+          encoded = "".join(p.read_text(encoding="utf-8").strip() for p in parts)
+          data = base64.b64decode(encoded, validate=True)
+          expected_sha = "9ef1b601f9d28a9fa8e6d1bb601dedd01d54522c9d0c04d70eaa8ea883e0f7d6"
+          actual = hashlib.sha256(data).hexdigest()
+          if actual != expected_sha:
+              raise SystemExit(f"Gas hero SHA mismatch: {actual} != {expected_sha}")
+          if len(data) != 21958:
+              raise SystemExit(f"Gas hero byte-size mismatch: {len(data)}")
+          if data[:4] != b"RIFF" or data[8:12] != b"WEBP":
+              raise SystemExit("Gas hero is not a valid RIFF/WEBP file")
+          target = Path("src/assets/heroes/gas-page-hero-v3.webp")
+          target.write_bytes(data)
+          print(f"materialized {target}: {len(data)} bytes sha256={actual}")
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Commit exact source and HACS dist
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/assets/heroes/gas-page-hero-v3.webp dist
+          if git diff --cached --quiet; then
+            echo "Gas hero and dist already exact"
+            exit 0
+          fi
+          git commit -m "Materialize approved Gas hero binary and exact 4.2.9 dist"
+          git push origin HEAD:fix/gas-runtime-4.2.9
