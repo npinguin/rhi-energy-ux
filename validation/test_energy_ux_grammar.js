@@ -73,4 +73,4 @@ assert.match(app,/object-fit:contain/);
 assert.ok(app.includes('rhiUxDomainShell({'));
 assert.match(app,/domain:'ENERGIE'/);
 
-console.log("PASS Energy 4.3 canonical page/body controls, asset grammar, visuals and responsive ownership");
+assert.match(app,/energyAssetLocation\\(asset = \\{\\}\\)/);\nassert.match(app,/energyAssetDetailSection/);\nconsole.log("PASS Energy 4.3.1 canonical page/body controls, compact asset grammar, visuals and responsive ownership");
