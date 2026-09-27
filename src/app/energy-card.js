@@ -1923,7 +1923,7 @@
     pilotReadinessPanel(rt) { return ''; }
 
 
-    quickActionBar(rt, tab) {
+    pageContextControls(rt, tab) {
       const button = (label, attrs) => `<button class="hiQuickAction" ${attrs}>${escapeHtml(label)}</button>`;
       const jump = (label, id) => button(label, `data-scroll-target="${escapeHtml(id)}"`);
       let controls = '';
@@ -2319,7 +2319,8 @@
         description:semanticDescription,
         hero:hbEnergyHeroAsset(heroKey),
         metrics:p.metrics,
-        quickActions:this.quickActionBar(rt, tab) + this.pageQuickActions(rt, tab),
+        contextControls:this.pageContextControls(rt, tab),
+        commandActions:this.pageQuickActions(rt, tab),
         tone:p.tone
       });
     }
