@@ -36,7 +36,7 @@ for (const phrase of [
   "State of charge","Power now","Available energy","Capacity","Production now",
   "Produced today","Installed capacity","Efficiency","Energy needed","Meter total",
   "Charging power","Requested power","Grid power","Grid state"
-]) assert.ok(facts.includes(phrase), "missing primary fact "+phrase);
+]) assert.ok(app.includes(phrase), "missing primary fact "+phrase);
 
 assert.match(facts,/valueAtPath\(asset, path\)/, "primary facts must consume explicit published asset values when the indexed field is not materialized");
 assert.doesNotMatch(facts,/display_name|friendly_name|asset_id.*match|includes\(name/i, "primary fact resolution must not infer semantics from names");
