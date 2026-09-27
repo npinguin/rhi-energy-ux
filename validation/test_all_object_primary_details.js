@@ -23,7 +23,7 @@ const method = name => {
   throw new Error("unterminated "+name);
 };
 
-const facts = method("energyAssetFacts");
+const factsStart = app.indexOf("\n    energyAssetFacts(");\nassert.ok(factsStart >= 0, "missing energyAssetFacts");\nconst factsEnd = app.indexOf("\n    energyAssetAreaLabel(", factsStart);\nassert.ok(factsEnd > factsStart, "missing energyAssetFacts boundary");\nconst facts = app.slice(factsStart, factsEnd);
 for (const type of [
   "battery","battery_system","home_battery_system","solar_production","solar_array",
   "solar_panel","solar_optimizer","solar_inverter","grid_connection","gas_meter",
