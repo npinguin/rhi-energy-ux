@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - ops/publish-energy-4.2.5
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
