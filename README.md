@@ -120,7 +120,7 @@ npm run validate
 
 A candidate is valid only when the PR validation is green, the deterministic second build matches the first, committed `dist/` matches that build, and HACS validation passes. Publication then tags those exact committed package bytes without rebuilding.
 
-See `BUILDING.md`, `docs/CONTRACT.md`, `docs/BRANDING.md`, `docs/TEST_GOVERNANCE.md`, `validation/OWNERSHIP.json`, `docs/UX_RELEASE_STANDARD.md`, `docs/UX_FOOTER_STANDARD.md` and `docs/RELEASE_GOVERNANCE.md`.
+See `BUILDING.md`, `docs/CONTRACT.md`, `docs/BRANDING.md`, `docs/HACS_PLUGIN_STANDARD.md`, `docs/TEST_GOVERNANCE.md`, `validation/OWNERSHIP.json`, `docs/UX_RELEASE_STANDARD.md`, `docs/UX_FOOTER_STANDARD.md` and `docs/RELEASE_GOVERNANCE.md`.
 
 ## Source and package structure
 
