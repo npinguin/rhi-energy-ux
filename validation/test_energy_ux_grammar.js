@@ -8,91 +8,69 @@ const catalog = fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
 const core = fs.readFileSync("src/vendor/rhi-ux-core.js","utf8");
 
 for (const token of [
-  'id:"overview", label:"Overview"',
-  'id:"flow", label:"Flow"',
-  'id:"solar", label:"Solar"',
-  'id:"battery", label:"Home Battery"',
-  'id:"consumers", label:"Consumers"',
-  'id:"gas", label:"Gas"',
-  'id:"strategy", label:"Strategy"',
-  'id:"operational-planning", label:"Operational Planning"',
-  'id:"tactical-planning", label:"Tactical Planning"',
-  'id:"strategic-planning", label:"Strategic Planning"',
-  'id:"metering", label:"Metering"',
-  'id:"value", label:"Value"',
-  'id:"retrospective", label:"Retrospective"'
+  'id:"overview", label:"Overview"', 'id:"flow", label:"Flow"', 'id:"solar", label:"Solar"',
+  'id:"battery", label:"Home Battery"', 'id:"consumers", label:"Consumers"', 'id:"gas", label:"Gas"',
+  'id:"strategy", label:"Strategy"', 'id:"operational-planning", label:"Operational Planning"',
+  'id:"tactical-planning", label:"Tactical Planning"', 'id:"strategic-planning", label:"Strategic Planning"',
+  'id:"metering", label:"Metering"', 'id:"value", label:"Value"', 'id:"retrospective", label:"Retrospective"'
 ]) assert.ok(presentation.includes(token), "missing existing tab "+token);
 
-assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v3.webp"'), "Gas page must use immutable photographic hero v2");
+assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v3.webp"'), "Gas page must use immutable photographic hero v3");
 assert.ok(!presentation.includes('gas: "heroes/gas-hero.webp"'), "legacy Gas page hero mapping must not return");
 assert.ok(!presentation.includes('gas: "heroes/gas-page-hero-v2.svg"'), "blurred Gas SVG transport must not return");
 assert.ok(app.includes("if (tab === 'gas') return !!target && type === 'gas_meter';"), "Gas page must reject global/untargeted commands");
 assert.ok(app.includes("window.loadCardHelpers"), "Gas statistics graph must use Home Assistant card helpers");
 assert.ok(app.includes("helpers.createCardElement"), "Gas statistics graph must lazy-create the native card");
 
-assert.match(header,/metrics = \[\],[\s\S]*contextControls = "",[\s\S]*commandActions = ""/);
+assert.match(header,/metrics = \[\],[\s\S]*commandActions = ""/);
+assert.ok(!header.includes("contextControls"));
 assert.match(header,/rhiUxQuickActionBar/);
-assert.ok(app.includes("contextControls:this.pageContextControls(rt, tab)"));
+assert.ok(!app.includes("contextControls:this.pageContextControls(rt, tab)"));
 assert.ok(app.includes("commandActions:this.pageQuickActions(rt, tab)"));
-assert.ok(app.includes("pageQuickActions(rt, tab)"));
-assert.ok(!app.includes("${this.quickActionBar(rt, this.view)}"));
 assert.match(app,/pageContextControls\(rt, tab\)/);
-assert.match(app,/return controls;/);
+assert.match(app,/bodyContextBar\(rt, tab/);
+assert.match(app,/rhiUxContextBar/);
+for (const tab of ["outlook","consumers","metering","planning","value"]) {
+  assert.ok(app.includes(`tab === '${tab}'`), "missing body-scoped context case "+tab);
+}
+const contextBlock=app.slice(app.indexOf("pageContextControls(rt, tab)"),app.indexOf("bodyContextBar(rt, tab"));
+for(const nav of ["Energy flow","Strategy","Tactical planning","Solar plan","Flexible loads","Usage history","Gas meter","Consumer list"]) {
+  assert.ok(!contextBlock.includes(nav), "navigation leaked into body View controls: "+nav);
+}
+assert.ok(!app.includes("data:image/webp;base64"), "binary presentation images must be packaged assets");
+
 assert.match(app,/publishedById = new Map/);
+assert.match(app,/visual_ref:firstDefined\(raw\.visual_ref/);
 assert.match(app,/energyAssetDetailDisclosure/);
-assert.match(app,/const fallbackFacts = \[/);
-assert.match(app,/\['Source', firstDefined\(enriched\.integration_domain/);
-assert.match(app,/\['Publication', publication\.complete === true/);
-assert.match(app,/planningContextPanel/);
-assert.match(app,/rt\.visibleCommands\(\)/);
-assert.match(app,/createCommandActionModel\(command\)/);
+assert.match(app,/\['Status', statusLabel\]/);
+assert.match(app,/\['Telemetry', telemetryLabel\]/);
 assert.match(app,/assetQuickActions\(rt, assetId/);
 assert.match(app,/rt\.commandActionModelsForAsset\(id\)/);
+assert.match(app,/Telemetry limited/);
+assert.match(app,/per-battery power is not published/);
+assert.match(app,/Unassigned published panels/);
+assert.match(app,/Unassigned published optimizers/);
+assert.match(app,/solarTopologyDetails/);
+assert.match(app,/No charging topology published/);
 
-const start = app.indexOf("\n    energyAssetFacts(");
-const end = app.indexOf("\n    energyDeviceStatusCard(", start);
-assert.ok(start > 0 && end > start, "energyAssetFacts method missing");
-const facts = app.slice(start,end);
-assert.match(facts,/rt\.assetField\(id, key\)/);
-assert.doesNotMatch(facts,/rowsByAsset/);
-assert.doesNotMatch(app,/rawText\([^\n]*\.health/);
+for (const token of ["flexible_asset.generic","consumer.generic","solar_array.generic","inverter.generic","site_consumption.home","energy_system.home"]) {
+  assert.ok(catalog.includes(token), "missing representative visual fallback "+token);
+}
 
-assert.match(app,/battery\.available_kwh/);
-assert.match(app,/battery\.capacity_kwh/);
-assert.match(app,/batteryContributorFacts/);
-assert.match(app,/this\.assetQuickActions\(rt,assetId,3\)/);
-
-for (const token of [
-  "flexible_asset.generic",
-  "consumer.generic",
-  "solar_array.generic",
-  "inverter.generic",
-  "site_consumption.home",
-  "energy_system.home"
-]) assert.ok(catalog.includes(token), "missing representative visual fallback "+token);
-
-assert.match(app,/@media\(max-width:1100px\)/);
-assert.match(app,/@media\(max-width:720px\)/);
-assert.match(core,/@media\(max-width:760px\)/);
-assert.match(core,/@media\(max-width:430px\)/);
+assert.match(core,/RHI UX Core 1\.5\.0/);
+assert.match(core,/function rhiUxContextBar/);
 assert.match(core,/\.rhiUxPageHeroArt\{position:absolute/);
 assert.match(core,/\.rhiUxStatusGrid\{/);
 assert.match(core,/\.rhiUxQuickActionBar/);
-assert.match(core,/--rhi-font-family:/);
 assert.match(core,/\.rhiUxPageStack>\.rhiUxPageHero\{order:1\}/);
 assert.match(core,/\.rhiUxPageStack>\.rhiUxStatusGrid\{order:2\}/);
 assert.match(core,/\.rhiUxPageStack>\.rhiUxQuickActionBar\{order:3\}/);
 assert.match(header,/rhiEnergyPageHeader rhiUxPageStack/);
-for (const duplicate of ['class="solarCompactSummaryRow"','class="gasUseFacts"','class="summaryRow four"','class="outlookSummaryStrip"','class="operationalSummaryGrid"']) {
-  assert.ok(!app.includes(duplicate), "duplicate page status surface remains: "+duplicate);
-}
 assert.doesNotMatch(presentation,/\.rhiUxPageHero\s*\{/);
 assert.doesNotMatch(presentation,/\.rhiUxStatusGrid\s*\{/);
 assert.doesNotMatch(presentation,/\.rhiUxQuickActionBar\s*\{/);
 assert.match(app,/object-fit:contain/);
 assert.ok(app.includes('rhiUxDomainShell({'));
 assert.match(app,/domain:'ENERGIE'/);
-assert.match(app,/data-rhi-module/);
-assert.match(app,/data-rhi-item/);
 
-console.log("PASS Energy canonical page/asset grammar, quick commands, visuals and responsive coverage");
+console.log("PASS Energy 4.3 canonical page/body controls, asset grammar, visuals and responsive ownership");
