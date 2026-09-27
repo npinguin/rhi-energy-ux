@@ -84,6 +84,8 @@ const states = {
       ],
       planning:{horizons:{D0:{required_kwh:19.2,planned_kwh:19.2,executed_kwh:null,still_to_plan_kwh:0,status:'AVAILABLE',execution_status:'NOT_MEASURED'},D1:{required_kwh:11,planned_kwh:4,still_to_plan_kwh:7,status:'AVAILABLE'}}},
       configuration:{strategy:{configured:{status:'AVAILABLE',properties:[]},effective:{status:'AVAILABLE',properties:[],runtime_overrides:[]}}},
+      metering:{selected_period_id:'today',periods:{today:{period_id:'today',availability:'AVAILABLE',measurement_state:'AVAILABLE',quality:'OK',baseline_reset_required:false,user_action_required:false,summary:{measured:{solar_production_kwh:4.2,site_consumption_kwh:3.1,grid_import_kwh:0.4,grid_export_kwh:0.2,battery_charge_kwh:0.5,battery_discharge_kwh:1.0,flexible_loads_energy_in_kwh:0.0},quality:{period:'OK',health:'OK',measurement_state:'AVAILABLE',user_action_required:false}}}}},
+      retrospective:{contract_id:'RHI_ENERGY_RETROSPECTIVE_V1',status:'COLLECTING_EVIDENCE',reason:'retrospective_prerequisites_incomplete',prerequisites:[{prerequisite_id:'planning_outcome',state:'READY'},{prerequisite_id:'execution_evidence',state:'PENDING'},{prerequisite_id:'completed_metering',state:'READY'}],evidence_coverage_pct:66.7,score:null},
       value_accounting:{selected_period_id:'today',net_financial_result:{value:1.23,unit:'EUR',status:'AVAILABLE'},periods:{today:{net_financial_result_eur:1.23}}},
       commands:[]
     }
@@ -108,4 +110,7 @@ if(v2.field('battery.soc_pct','battery_b').value!==43) throw new Error('battery 
 if(v2.field('battery.power_kw','battery_a').value!==-1.1 || v2.field('battery.power_kw','battery_b').value!==0.7) throw new Error('battery asset-scoped power collision');
 const batteryChildren=v2.relationships.filter(row => row.relationship_type==='contains' && row.source_asset_id==='battery_system').map(row => row.target_asset_id).sort();
 if(JSON.stringify(batteryChildren)!==JSON.stringify(['battery_a','battery_b'])) throw new Error('canonical battery_system child reachability lost');
-console.log('PASS canonical Energy V2 core + multi-object asset projection reader');
+if(v2.metering.periods.today.summary.measured.solar_production_kwh!==4.2) throw new Error('canonical Metering period evidence lost');
+if(v2.metering.periods.today.user_action_required!==false) throw new Error('reset requirement drifted from backend evidence');
+if(v2.retrospective.prerequisites[1].state!=='PENDING' || v2.retrospective.score!==null) throw new Error('Retrospective must preserve backend evidence readiness without inventing a score');
+console.log('PASS canonical Energy V2 core + multi-object asset + Metering/Retrospective projection reader');
