@@ -72,3 +72,23 @@ assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v3.webp"'));
 assert.ok(!presentation.includes('gas: "heroes/gas-hero.svg"'));
 
 console.log('PASS flexible asset identity, charger connection projection and Gas hero transport');
+
+
+const chainMarkers = [
+  'flowConsumers(rt, connectionSnapshot',
+  'const chargerIds = new Set(',
+  'const connectedConsumerIds = new Set(',
+  'if (!id || isChargerRow({...row,asset_id:id})) return;',
+  'connection.connected_consumer_id',
+  'connection.connected_asset_id',
+  'visual_ref:firstDefined(asset.visual_ref, connection.connected_consumer_visual_ref',
+  'A charger can never become the Physical consumers row'
+];
+for (const marker of chainMarkers) {
+  assert.ok(card.includes(marker), 'missing physical consumer chain invariant: '+marker);
+}
+assert.ok(card.includes("['connected','asset_connected'].includes(connectionState)"), 'asset_connected must be treated as connected');
+assert.ok(card.includes('consumer.effective_connection_id'));
+assert.ok(card.includes('consumer.assigned_connection_id'));
+assert.ok(card.includes('consumer.physical_connection_id'));
+console.log('PASS physical consumer rows are connection targets, never charger infrastructure');

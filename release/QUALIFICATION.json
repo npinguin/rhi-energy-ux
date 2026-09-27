@@ -1,8 +1,8 @@
 {
-  "version": "4.3.7",
-  "candidate_tag": "v4.3.7",
+  "version": "4.3.8",
+  "candidate_tag": "v4.3.8",
   "candidate_sha": "pending",
-  "previous_release": "4.3.6",
+  "previous_release": "4.3.7",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -26,5 +26,7 @@
   "cross_domain_visuals": "NOT_EXECUTED",
   "asset_visual_runtime_scope": "NOT_EXECUTED",
   "charging_topology": "NOT_EXECUTED",
-  "idle_flexible_assets": "NOT_EXECUTED"
+  "idle_flexible_assets": "NOT_EXECUTED",
+  "physical_consumer_target_identity": "NOT_EXECUTED",
+  "mobility_registry_visuals": "NOT_EXECUTED"
 }

@@ -3592,33 +3592,103 @@
       const operating = firstDefined(consumer.operating_state, consumer.state, rt.value(`${id}.operating_state`, null));
       const active = asBool(firstDefined(consumer.active, rt.value(`${id}.active`, false)));
       const charging = asBool(firstDefined(consumer.charging, rt.value(`${id}.charging`, false))) || /charging/i.test(String(operating || ''));
-      const connected = asBool(firstDefined(consumer.connected, consumer.connection_state === 'connected', rt.value(`${id}.connected`, false)));
+      const connectionState = String(firstDefined(consumer.connection_state, '') || '').trim().toLowerCase();
+      const connected = asBool(firstDefined(consumer.connected, rt.value(`${id}.connected`, false)))
+        || ['connected','asset_connected'].includes(connectionState);
       const available = !/unavailable|offline|disconnected/i.test(String(firstDefined(consumer.availability_state, '')));
-      const charger = firstDefined(consumer.effective_charger, consumer.charger_asset_id, consumer.connection_asset_id, consumer.execution_target_asset_id, '');
+      const charger = firstDefined(
+        consumer.effective_charger,
+        consumer.effective_connection_id,
+        consumer.assigned_connection_id,
+        consumer.physical_connection_id,
+        consumer.charger_asset_id,
+        consumer.connection_asset_id,
+        consumer.execution_target_asset_id,
+        ''
+      );
       const requested = asNumber(firstDefined(consumer.requested_power_kw_effective, consumer.requested_power_kw));
       const state = charging ? 'Charging' : active || (power !== null && power > 0.05) ? 'Active' : connected ? 'Connected' : available ? 'Available' : 'Unavailable';
       const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
       return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(state)}${charger ? ` · ${escapeHtml(rt.assetName(charger) || human(charger))}` : ''}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
-    flowConsumers(rt) {
+    flowConsumers(rt, connectionSnapshot = { rows:[] }) {
       const domain = this.flexibleAssetDomain(rt);
-      const physical = domain.physicalFlowParticipants().map(vm => vm.raw);
-      const explicit = rt.assets().filter(a => {
-        const id = String(a.asset_id || '');
-        if (!id) return false;
-        const vm = domain.byId(id);
-        if (vm?.isDisabled || vm?.isStorage) return false;
-        return String(a.asset_type || '').toLowerCase() === 'consumer' && String(a.parent_asset_id || '').toLowerCase() === 'consumer';
-      });
+      const snapshotRows = asArray(connectionSnapshot?.rows);
+      const chargerIds = new Set(
+        snapshotRows
+          .map(row => String(firstDefined(row.connection_asset_id, row.asset_id, row.charger_id, '') || '').trim())
+          .filter(Boolean)
+      );
+      const connectedConsumerIds = new Set(
+        snapshotRows
+          .map(row => String(firstDefined(row.connected_consumer_id, row.connected_asset_id, row.target_asset_id, '') || '').trim())
+          .filter(Boolean)
+      );
+      const isChargerRow = row => {
+        const id = String(firstDefined(row?.asset_id, row?.connection_asset_id, '') || '').trim();
+        const type = String(firstDefined(row?.asset_type, row?.object_class, row?.source_asset_kind, '') || '').trim().toLowerCase();
+        return chargerIds.has(id) || /(^|_)(charger|charging_point|charge_point)(_|$)/.test(type);
+      };
       const byId = new Map();
-      [...explicit, ...physical].forEach(row => {
-        const id = row.asset_id || row.flexible_asset_id || row.target_asset_id;
-        if (!id) return;
+
+      const addConsumer = row => {
+        if (!row || typeof row !== 'object') return;
+        const id = String(firstDefined(row.asset_id, row.flexible_asset_id, row.target_asset_id, '') || '').trim();
+        if (!id || isChargerRow({...row,asset_id:id})) return;
         const vm = domain.byId(id);
         if (vm?.isDisabled || vm?.isStorage) return;
-        byId.set(String(id), { ...(byId.get(String(id)) || {}), ...row, asset_id:id });
+        const materialized = vm?.raw ? { ...row, ...vm.raw, asset_id:id } : { ...row, asset_id:id };
+        byId.set(id, { ...(byId.get(id) || {}), ...materialized });
+      };
+
+      // The physical charging chain is directional:
+      // connection.asset_id (charger infrastructure) -> connected_consumer_id (vehicle/load).
+      // A charger can never become the Physical consumers row when a target exists.
+      for (const connection of snapshotRows) {
+        const consumerId = String(firstDefined(
+          connection.connected_consumer_id,
+          connection.connected_asset_id,
+          connection.target_asset_id,
+          ''
+        ) || '').trim();
+        if (!consumerId) continue;
+        const vm = domain.byId(consumerId);
+        const asset = vm?.raw || rt.asset(consumerId) || {};
+        addConsumer({
+          ...asset,
+          asset_id:consumerId,
+          connection_state:firstDefined(asset.connection_state, connection.connection_state, ''),
+          effective_connection_id:firstDefined(asset.effective_connection_id, connection.connection_asset_id, connection.asset_id, ''),
+          physical_connection_id:firstDefined(asset.physical_connection_id, connection.connection_asset_id, connection.asset_id, ''),
+          visual_ref:firstDefined(asset.visual_ref, connection.connected_consumer_visual_ref, ''),
+          physical_power_kw:firstDefined(asset.physical_power_kw, asset.current_power_kw, asset.actual_power_kw, connection.physical_power_kw, connection.power_kw)
+        });
+      }
+
+      // Preserve other genuine non-charger flexible loads (pool, thermal loads, etc.)
+      // while excluding Mobility's unassigned-charger fallback from this UX section.
+      domain.physicalFlowParticipants().forEach(vm => addConsumer(vm.raw));
+
+      const explicit = rt.assets().filter(a => {
+        const id = String(a.asset_id || '');
+        if (!id || isChargerRow(a)) return false;
+        const vm = domain.byId(id);
+        if (vm?.isDisabled || vm?.isStorage) return false;
+        return String(a.asset_type || '').toLowerCase() === 'consumer'
+          && String(a.parent_asset_id || '').toLowerCase() === 'consumer';
       });
+      explicit.forEach(addConsumer);
+
+      // When an explicit charger->consumer target exists it is the physical chain
+      // authority. This also ensures assigned vehicles remain visible while idle.
+      connectedConsumerIds.forEach(id => {
+        if (byId.has(id)) return;
+        const vm = domain.byId(id);
+        const asset = vm?.raw || rt.asset(id) || {};
+        addConsumer({ ...asset, asset_id:id });
+      });
+
       return [...byId.values()];
     }
     canonicalConnectionSnapshot(rt) {
@@ -3739,8 +3809,8 @@
       const gridImport = current.grid.importPowerKw;
       const gridExport = current.grid.exportPowerKw;
       const battery = current.battery;
-      const rawConsumers = this.flowConsumers(rt);
       const connectionSnapshot = this.canonicalConnectionSnapshot(rt);
+      const rawConsumers = this.flowConsumers(rt, connectionSnapshot);
       const rawChargers = connectionSnapshot.rows;
       const physicalFlow = buildPhysicalFlowViewModel(rt, rt.contractGateway(), rawConsumers, rawChargers, connectionSnapshot);
       const siteConsumption = physicalFlow.siteConsumptionKw;
