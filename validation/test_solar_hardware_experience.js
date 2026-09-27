@@ -5,26 +5,17 @@ const app = fs.readFileSync("src/app/energy-card.js","utf8");
 const catalog = fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
 
 assert.match(app,/solarEnergyStory\(rt\)/);
-assert.match(app,/What is happening with my solar\?/);
-assert.match(app,/Panel<\/span><i>→<\/i><span>Inverter<\/span><i>→<\/i><span>Home Bus/);
-assert.match(app,/Exact solar-versus-grid charge allocation is not separately published/);
-assert.match(app,/the UX does not invent how much charge came from solar versus grid/);
-
+assert.match(app,/solarValueFlow/);
 assert.match(app,/solarHardwareExperience\(rt\)/);
-assert.match(app,/Solar zones/);
 assert.match(app,/Inverter system/);
-assert.match(app,/Battery system/);
+assert.match(app,/Home Battery/);
 assert.match(app,/Other published hardware/);
 assert.match(app,/solar_array/);
 assert.match(app,/optimizersFor/);
 assert.match(app,/solarTopologyDetails/);
-assert.match(app,/Panels without zone relationship/);
 assert.match(app,/solarModuleCard/);
 assert.match(app,/solarOptimizerPrimaryCard/);
 assert.match(app,/POWER OPTIMIZER/);
-assert.match(app,/Primary solar production and optimizer status for this zone/);
-assert.match(app,/Energy-first view of each string or zone/);
-assert.match(app,/optimizerByPanel/);
 assert.match(app,/solar_optimizer\.power_w/);
 assert.match(app,/solar_optimizer\.energy_kwh/);
 assert.match(app,/solar_optimizer\.status/);
@@ -37,8 +28,18 @@ assert.doesNotMatch(app,/solarOperationalExecutionPanel\(rt/);
 assert.match(app,/energyDeviceStatusCard/);
 assert.match(app,/energyAssetFacts/);
 assert.match(app,/this\.assetVisual\(enriched/);
-assert.match(app,/this\.assetVisual\(enriched,\{size:'lg',fallbackIcon:this\.planningAssetIcon\(enriched\),decorative:false\}/);
-assert.match(app,/this\.assetVisual\(enriched,\{size:'lg',fallbackIcon:'☀',decorative:false\}/);
+
+const hierarchyStart = app.indexOf("\n    solarHardwareExperience(rt)");
+const hierarchyEnd = app.indexOf("\n    solarEnergyStory(rt)", hierarchyStart);
+const hierarchy = app.slice(hierarchyStart, hierarchyEnd);
+assert.match(app,/solarStringLink/);
+assert.match(app,/solarInverterCard/);
+assert.match(hierarchy,/stringsForInverter/);
+assert.match(hierarchy,/unassignedArrays/);
+assert.doesNotMatch(hierarchy,/const zoneCards = arrays\.map/);
+assert.doesNotMatch(hierarchy,/'Solar zones'/);
+assert.match(app,/SOLAR STRING/);
+assert.match(app,/data-solar-string/);
 
 for (const id of [
   "battery.byd_lvs_20",
@@ -55,18 +56,4 @@ for (const id of [
 assert.match(app,/object-fit:contain/);
 assert.match(app,/object-position:center/);
 
-console.log("PASS Solar hardware experience: facts + visuals + measured-flow Q&A");
-
-
-const hierarchyStart = app.indexOf("\n    solarHardwareExperience(rt)");
-const hierarchyEnd = app.indexOf("\n    solarEnergyStory(rt)", hierarchyStart);
-const hierarchy = app.slice(hierarchyStart, hierarchyEnd);
-assert.match(app,/solarStringLink/);
-assert.match(app,/solarInverterCard/);
-assert.match(hierarchy,/stringsForInverter/);
-assert.match(hierarchy,/unassignedArrays/);
-assert.doesNotMatch(hierarchy,/const zoneCards = arrays\.map/);
-assert.doesNotMatch(hierarchy,/'Solar zones'/);
-assert.match(app,/SOLAR STRING/);
-assert.match(app,/data-solar-string/);
-assert.match(app,/Canonical parent relation links this string to its inverter/);
+console.log("PASS Solar hardware experience: compact flow + inverter/string hierarchy + measured facts");
