@@ -3464,6 +3464,15 @@
         else if (isCharger(to)) materialize(toId, fromId, relationship);
       });
 
+      // Topology is not the same as active power flow: keep published chargers
+      // visible when idle or currently unassigned.
+      rt.assets().filter(isCharger).forEach(charger => {
+        const id=String(charger.asset_id || '');
+        if (!id) return;
+        const already=[...rows.values()].some(row => String(row.asset_id || '') === id);
+        if (!already) materialize(id, '', {});
+      });
+
       const projected = Object.freeze([...rows.values()].map(row => Object.freeze(row)));
       const observedAt = projected.map(row => String(firstDefined(row.observed_at, row.updated_at, '') || '')).filter(Boolean).sort().pop() || '';
       return Object.freeze({
@@ -3525,8 +3534,8 @@
           </div>
         </section>
         <div class="flowDetailsGrid flowDetailsGridTwoUp">
-          <section class="panel"><h2>Charging connections</h2><p>Chargers and vehicle assignments currently visible to Energy.</p>${chargers.map(charger => this.connectorCard(rt, charger)).join('') || `<div class="empty"><b>${connectionSnapshot.available ? 'No active charging connections' : 'Connection data unavailable'}</b><span>${connectionSnapshot.available ? 'No charger assignment is currently active.' : 'The canonical connection snapshot is not available.'}</span></div>`}</section>
-          <section class="panel"><h2>Active physical consumers</h2><p>Participating loads with a live physical relationship to the energy system.</p>${consumers.map(consumer => this.consumerCard(rt, consumer)).join('') || `<div class="empty"><b>No flexible consumers available</b><span>No controllable loads are currently available.</span></div>`}</section>
+          <section class="panel"><h2>Charging connections</h2><p>Chargers and vehicle assignments currently visible to Energy.</p>${chargers.map(charger => this.connectorCard(rt, charger)).join('') || `<div class="empty"><b>${connectionSnapshot.available ? 'No charging topology published' : 'Connection data unavailable'}</b><span>${connectionSnapshot.available ? 'No charger or charger assignment is currently published.' : 'The canonical connection snapshot is not available.'}</span></div>`}</section>
+          <section class="panel"><h2>Physical consumers</h2><p>Participating loads with a published physical relationship; idle assets remain visible.</p>${consumers.map(consumer => this.consumerCard(rt, consumer)).join('') || `<div class="empty"><b>No flexible consumers available</b><span>No controllable loads are currently available.</span></div>`}</section>
         </div>
       </div>`;
     }
@@ -3825,13 +3834,21 @@
       const vm = this.flexibleAssetDomain(rt).byId(id);
       if (vm?.isDisabled) return this.disabledFlexibleAssetCard(rt, vm.raw || row, vm.planning || {});
       const planning = vm?.planning || rt.planningOutcomeFor(id) || {};
+      const raw = vm?.raw || row;
+      const asset = this.energyAssetContext(rt, { ...raw, ...row, visual_ref:firstDefined(raw.visual_ref,row.visual_ref,'') });
+      const status = this.canonicalOperationalStatus(rt, asset, planning);
       const commands = rt.commandsForAsset(id);
-      const start = commands.find(c => rt.commandRole(c) === 'start');
+      const startCommand = commands.find(c => rt.commandRole(c) === 'start');
       const stop = commands.find(c => rt.commandRole(c) === 'stop');
       const pause = commands.find(c => rt.commandRole(c) === 'pause');
       const resume = commands.find(c => rt.commandRole(c) === 'resume');
-      const stateRaw = firstDefined(planning.product_state, planning.status, planning.state, row.status, planning.active ? 'active' : planning.waiting ? 'waiting' : planning.planned ? 'planned' : 'available');
+      const stateRaw = firstDefined(planning.product_state, planning.status, planning.state, row.status, planning.active ? 'active' : planning.waiting ? 'waiting' : planning.planned ? 'planned' : asset.operating_state, 'available');
       const state = this.userStateText(stateRaw);
+      const availability = String(firstDefined(asset.availability_state, status.unavailable ? 'unavailable' : 'available') || '').toLowerCase();
+      const healthRaw = firstDefined(asset.health, asset.lifecycle_state, asset.status, '');
+      const health = status.unavailable ? 'Unavailable' : healthRaw ? human(healthRaw) : 'Available';
+      const chargerId = String(firstDefined(asset.effective_charger, asset.charger_asset_id, asset.connection_asset_id, asset.execution_target_asset_id, '') || '');
+      const relation = chargerId ? `${rt.assetName(chargerId) || human(chargerId)} · ${human(firstDefined(asset.connection_state,'linked'))}` : '';
       const reason = humanReason(firstDefined(planning.user_reason_label, planning.waiting_reason, planning.waiting_reason_code, planning.reason, planning.reason_code, row.reason), state === 'Ready' ? 'Ready when you need it.' : 'Home Intelligence is monitoring this asset.');
       const paused = /paused|hold/.test(String(stateRaw || '').toLowerCase()) || rt.commandEnabled(resume);
       let recommendation = 'Home Intelligence will keep monitoring this asset.';
@@ -3841,13 +3858,21 @@
       if (paused) recommendation = 'Resume automatic control when you want Home Intelligence to manage this asset again.';
       const actions = [
         paused ? this.componentActionButton(resume, 'Resume automatic control', id) : this.componentActionButton(pause, 'Pause automatic control', id),
-        /active|charging|running/.test(String(stateRaw || '').toLowerCase()) ? this.componentActionButton(stop, 'Stop now', id) : this.componentActionButton(start, 'Start now', id)
+        /active|charging|running/.test(String(stateRaw || '').toLowerCase()) ? this.componentActionButton(stop, 'Stop now', id) : this.componentActionButton(startCommand, 'Start now', id)
       ].join('');
-      const currentPower = asNumber(firstDefined(row.current_power_kw, row.actual_power_kw, row.power_kw, vm?.raw?.power_kw));
-      const details = `${this.kv('Current power', fmtKw(currentPower, '0.0 kW'))}${this.kv('Requested power', fmtKw(firstDefined(row.requested_power_kw, vm?.raw?.requested_power_kw), '—'))}${this.kv('Automation', human(firstDefined(row.automation_mode, vm?.raw?.automation_mode, 'Automatic')))}`;
-      const asset = this.energyAssetContext(rt, vm?.raw || row);
-      return `<article class="managedAssetCard"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${escapeHtml(state)}</span></div></div><b>${fmtKw(currentPower, '0.0 kW')}</b></div><div class="managedAssetStory"><p>${escapeHtml(reason)}</p><div><small>What Home Intelligence will do</small><b>${escapeHtml(recommendation)}</b></div></div><div class="managedAssetActions">${actions}</div>${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}</article>`;
+      const currentPower = asNumber(firstDefined(row.current_power_kw, row.actual_power_kw, row.power_kw, raw.power_kw));
+      const requestedPower = asNumber(firstDefined(row.requested_power_kw, raw.requested_power_kw));
+      const planningLabel = firstDefined(planning.user_state_label, planning.product_state, planning.status, planning.state, '');
+      const facts = [
+        ['Status', health],
+        ['Power now', fmtKw(currentPower,'0.0 kW')],
+        relation ? ['Connected via', relation] : null,
+        planningLabel ? ['Plan', human(planningLabel)] : null
+      ].filter(Boolean);
+      const details = `${this.kv('Availability', human(availability))}${this.kv('Current power', fmtKw(currentPower, '0.0 kW'))}${this.kv('Requested power', fmtKw(requestedPower, '—'))}${this.kv('Automation', human(firstDefined(row.automation_mode, raw.automation_mode, 'Automatic')))}${relation ? this.kv('Relationship', relation) : ''}`;
+      return `<article class="managedAssetCard"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${escapeHtml(state)} · ${escapeHtml(health)}</span></div></div><b>${fmtKw(currentPower, '0.0 kW')}</b></div><div class="managedAssetFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div><div class="managedAssetStory"><p>${escapeHtml(reason)}</p><div><small>What Home Intelligence will do</small><b>${escapeHtml(recommendation)}</b></div></div>${actions ? `<div class="managedAssetActions">${actions}</div>` : ''}${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}</article>`;
     }
+
     filterAndSortConsumers(rows = []) {
       const filter = this.consumerFilter || 'all';
       let filtered = rows.filter(row => {
@@ -3881,13 +3906,20 @@
       const summary = rt.consumerMixSummary();
       const domain = this.flexibleAssetDomain(rt);
       const publishedById = new Map(publishedRows.map(row => [String(row.asset_id||row.consumer_id||row.id||''), row]));
-      const canonicalRows = domain.all().filter(vm => !vm.isStorage).map(vm => ({
-        ...(vm.raw || {}),
-        ...(publishedById.get(vm.id) || {}),
-        asset_id:vm.id,
-        participation_state:vm.participation,
-        operational_state:vm.operation
-      }));
+      const canonicalRows = domain.all().filter(vm => !vm.isStorage).map(vm => {
+        const raw = vm.raw || {};
+        const published = publishedById.get(vm.id) || {};
+        return {
+          ...raw,
+          ...published,
+          asset_id:vm.id,
+          visual_ref:firstDefined(raw.visual_ref, published.visual_ref, ''),
+          charger_asset_id:firstDefined(raw.charger_asset_id, raw.effective_charger, raw.connection_asset_id, published.charger_asset_id, published.effective_charger, published.connection_asset_id, ''),
+          connection_state:firstDefined(raw.connection_state, published.connection_state, ''),
+          participation_state:vm.participation,
+          operational_state:vm.operation
+        };
+      });
       const canonicalIds = new Set(canonicalRows.map(row => String(row.asset_id||row.consumer_id||row.id||'')));
       const rows = canonicalRows.concat(publishedRows.filter(row => !canonicalIds.has(String(row.asset_id||row.consumer_id||row.id||''))));
       const visibleRows = this.filterAndSortConsumers(rows);
