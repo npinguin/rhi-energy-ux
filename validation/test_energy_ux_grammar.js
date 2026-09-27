@@ -23,8 +23,12 @@ for (const token of [
   'id:"retrospective", label:"Retrospective"'
 ]) assert.ok(presentation.includes(token), "missing existing tab "+token);
 
-assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v2.svg"'), "Gas page must use immutable photographic hero v2");
+assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v3.webp"'), "Gas page must use immutable photographic hero v2");
 assert.ok(!presentation.includes('gas: "heroes/gas-hero.webp"'), "legacy Gas page hero mapping must not return");
+assert.ok(!presentation.includes('gas: "heroes/gas-page-hero-v2.svg"'), "blurred Gas SVG transport must not return");
+assert.ok(app.includes("if (tab === 'gas') return !!target && type === 'gas_meter';"), "Gas page must reject global/untargeted commands");
+assert.ok(app.includes("window.loadCardHelpers"), "Gas statistics graph must use Home Assistant card helpers");
+assert.ok(app.includes("helpers.createCardElement"), "Gas statistics graph must lazy-create the native card");
 
 assert.match(header,/metrics = \[\],[\s\S]*contextControls = "",[\s\S]*commandActions = ""/);
 assert.match(header,/rhiUxQuickActionBar/);
