@@ -1,28 +1,28 @@
-# v4.3.4 — portable dashboard mounting and install UX TEST CANDIDATE
+# v4.3.5 — registry-driven cross-domain visuals TEST CANDIDATE
 
-Energy 4.3.4 keeps the primary-object truth restored in 4.3.3 and makes dashboard portability an explicit, regression-tested deployment contract.
+Energy 4.3.5 removes consumer-owned Mobility visual mappings and makes flexible-asset presentation resolve through the Foundation Visual Asset Registry.
 
 ## User-facing changes
 
-- the Energy dashboard may use any Home Assistant dashboard URL, including a custom root such as `robotix-energy`;
-- the Energy card does not depend on a fixed Lovelace root or view path and works on generated view paths such as `/robotix-energy/0`;
-- Energy capability navigation stays inside the card instead of rewriting the dashboard URL;
-- HACS resources and package artwork remain root-absolute under `/hacsfiles/rhi-energy-ux/...`, so dashboard renaming cannot redirect asset requests;
-- installation instructions now make the dashboard URL/view-path distinction explicit and provide one minimal copy/paste configuration;
-- runtime verification explicitly includes custom-root refresh and navigation checks.
-
-## Preserved 4.3.3 UX contract
-
-- published primary object truth remains visible on inverter, battery, Solar, consumption, managed consumer and other object cards;
-- technical identity, source, profile, lifecycle and publication diagnostics stay under **Details**;
-- missing telemetry remains distinct from device unavailability;
-- Solar hierarchy, Mobility visual ownership, Core 1.5.0 View/Context semantics and deterministic HACS packaging remain unchanged.
+- Mobility-owned flexible assets use the producer visual registered through Foundation instead of Energy-owned copies or model mappings;
+- a new producer visual can appear in Energy without product-specific Energy code;
+- missing/unregistered producer visuals fail to a neutral visual state instead of showing a wrong real product or Energy consumer hero;
+- producer visual identity survives Energy flexible-load materialization unchanged.
 
 ## Engineering
 
-- adds a regression gate that rejects fixed Lovelace dashboard roots and browser-path-driven Energy capability routing;
-- deliberately does **not** introduce a second router or `dashboard_path` abstraction because Energy navigation is already card-local.
+- consumes `RHI_VISUAL_ASSET_REGISTRY_V1` contract 1.1.0 presentation locators;
+- removes the copied Mobility visual manifest and copied Mobility assets from Energy;
+- removes `RHI_ENERGY_MOBILITY_ASSET_TRANSPORT`;
+- blocks producer-specific Mobility presentation paths/mappings from returning through CI;
+- adds a synthetic future-product regression (Volvo EX30) proving zero Energy product mapping is required;
+- keeps all existing Energy capability tabs and routes unchanged.
 
-Rollback: **v4.3.3**.
+Target stack for qualification:
+- Foundation F1.8.23 or newer compatible registry contract;
+- Mobility M0.10.19 or newer compatible producer registration;
+- Energy E0.15.69 tested backend.
 
-This is an installable HACS test candidate. Target Home Assistant proof under a custom dashboard URL, desktop/iPad rendering, refresh, upgrade and rollback remains required before stable promotion.
+Rollback: **v4.3.4**.
+
+This remains a TEST CANDIDATE until target Home Assistant install, visual registry, flexible-asset rendering, refresh, upgrade and rollback are evidence-backed.
