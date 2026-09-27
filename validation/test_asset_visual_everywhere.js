@@ -16,3 +16,14 @@ if (card.includes("exceptions.map(x=>escapeHtml(x.name))")) {
   throw new Error('exception summary regressed to text-only asset names');
 }
 console.log('PASS canonical asset identity drives pictures across Energy Value and consumer allocation');
+
+
+const resolver=fs.readFileSync('src/runtime/visual-asset-resolver.js','utf8');
+const flexibleModel=fs.readFileSync('src/domain/models/flexible-asset-model.js','utf8');
+for (const token of [
+  "if (sourceDomain === \"mobility\" || [\"vehicle\",\"charger\"].includes(sourceKind)) return null;",
+  "const producerVisualRef = candidateVisualRefs.find(ref => !ref.startsWith('energy.logical.'))"
+]) {
+  if(!(resolver.includes(token)||flexibleModel.includes(token))) throw new Error('missing cross-domain visual ownership guard: '+token);
+}
+console.log('PASS Mobility visuals cannot fall back to Energy-owned device artwork');
