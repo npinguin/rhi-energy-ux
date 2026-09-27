@@ -3064,6 +3064,20 @@
       return facts;
     }
 
+    energyAssetAreaLabel(asset = {}) {
+      const raw = firstDefined(
+        asset.ha_area_name,
+        asset.area_name,
+        asset.area_label,
+        asset.location_name,
+        asset.location,
+        ''
+      );
+      if (typeof raw === 'string') return raw.trim();
+      if (raw && typeof raw === 'object') return String(firstDefined(raw.name, raw.label, '') || '').trim();
+      return '';
+    }
+
     energyAssetDetailDisclosure(rt, asset = {}) {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
@@ -3073,14 +3087,19 @@
       const projection = rt.assetProjection(id) || {};
       const lifecycle = objectFrom(projection.lifecycle || {});
       const parentId = this.energyAssetParentId(enriched);
+      const area = this.energyAssetAreaLabel(enriched);
+      const telemetry = publication.resolution_complete === false ? 'Incomplete'
+        : publication.complete === false ? 'Partial'
+        : publication.complete === true ? 'Complete' : 'Unknown';
       const rows = [
-        ['Asset id', id],
+        ['Area', area || '—'],
         ['Type', human(firstDefined(enriched.asset_type,enriched.object_class,'device'))],
         ['Parent', parentId || '—'],
         ['Profile', firstDefined(profile.display_name,profile.label,profile.name,enriched.profile_id,'—')],
         ['Lifecycle', firstDefined(lifecycle.state,enriched.health,enriched.status,'—')],
-        ['Publication', publication.complete === true ? 'Complete' : publication.complete === false ? 'Incomplete' : 'Unknown'],
-        ['Source', firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'—')]
+        ['Telemetry', telemetry],
+        ['Source', firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'—')],
+        ['Asset id', id]
       ];
       const missing = Array.isArray(publication.missing) ? publication.missing : Array.isArray(publication.missing_fields) ? publication.missing_fields : [];
       return `<details class="energyAssetDetails"><summary>Details</summary><div class="energyAssetDetailGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value ?? '—'))}</b></span>`).join('')}${missing.length ? `<span class="wide"><small>Missing publication fields</small><b>${escapeHtml(missing.join(' · '))}</b></span>` : ''}</div></details>`;
@@ -3090,34 +3109,21 @@
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
       const type = String(firstDefined(enriched.asset_type,enriched.object_class,'device') || 'device');
-      const profile = objectFrom(enriched.profile || {});
-      const profileLabel = firstDefined(profile.display_name,profile.label,profile.name,enriched.profile_id,'');
-      const facts = this.energyAssetFacts(rt,enriched,5);
+      const facts = this.energyAssetFacts(rt,enriched,4);
       const projection = id ? rt.assetProjection(id) : null;
       const lifecycle = String(firstDefined(projection?.lifecycle?.state, enriched.health, enriched.status, '') || '');
       const availability = String(firstDefined(enriched.availability_state,enriched.connection_state,'') || '');
-      const publication = objectFrom(enriched.publication || {});
-      const configState = publication.complete === true ? 'Configured' : profileLabel ? 'Profiled' : 'Detected';
       const unavailable = /unavailable|offline|disconnected|failed/i.test(`${availability} ${lifecycle}`);
       const degraded = /degraded|warning|attention|incomplete/i.test(lifecycle);
       const statusLabel = unavailable ? 'Unavailable' : degraded ? 'Needs attention' : lifecycle && !/unknown/i.test(lifecycle) ? human(lifecycle) : 'Available';
-      const telemetryLabel = publication.resolution_complete === false ? 'Telemetry incomplete'
-        : publication.complete === false ? 'Publication incomplete'
-        : publication.complete === true ? 'Telemetry OK' : 'Telemetry unknown';
+      const area = this.energyAssetAreaLabel(enriched);
       const actions = this.assetQuickActions(rt,id,3);
-      const fallbackFacts = [
-        ['Status', statusLabel],
-        ['Telemetry', telemetryLabel],
-        ['Source', firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'—')],
-        ['Parent', this.energyAssetParentId(enriched) || '—']
-      ];
       const details = facts.length
         ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
-        : fallbackFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value ?? '—'))}</b></span>`).join('');
+        : `<span><small>Status</small><b>${escapeHtml(statusLabel)}</b></span>`;
       return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
         <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
-        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3></div><span class="energyDeviceState">${escapeHtml(statusLabel)}</span></div>
-        <div class="energyDeviceConfig">${profileLabel ? `<span><b>Profile</b>${escapeHtml(human(profileLabel))}</span>` : ''}<span><b>Config</b>${escapeHtml(configState)}</span><span><b>Telemetry</b>${escapeHtml(telemetryLabel)}</span></div>
+        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div><span class="energyDeviceState">${escapeHtml(statusLabel)}</span></div>
         <div class="energyDeviceFacts">${details}</div>${actions}${this.energyAssetDetailDisclosure(rt,enriched)}</div>
       </article>`;
     }
@@ -3132,22 +3138,54 @@
       if (!body) return '';
       return `<section class="panel solarHardwareSection"><div class="solarHardwareSectionHead"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${meta ? `<span>${escapeHtml(meta)}</span>` : ''}</div>${body}</section>`;
     }
+    solarModuleCard(rt, panel, optimizers = []) {
+      const enriched = this.energyAssetContext(rt,panel);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id),'Solar module');
+      const area = this.energyAssetAreaLabel(enriched);
+      const panelFacts = this.energyAssetFacts(rt,enriched,3);
+      const optimizerFacts = optimizers.flatMap(optimizer => this.energyAssetFacts(rt,this.energyAssetContext(rt,optimizer),2).map(f=>({
+        label:`Optimizer · ${f.label}`, value:f.value
+      }))).slice(0,3);
+      const optimizerDetails = optimizers.map(optimizer=>this.energyAssetDetailDisclosure(rt,optimizer)).join('');
+      return `<article class="solarModuleCard">
+        <div class="solarModuleVisual">${this.assetVisual(enriched,{size:'md',fallbackIcon:'☀',decorative:false})}</div>
+        <div class="solarModuleBody"><div class="solarModuleHead"><div><small>SOLAR MODULE</small><h4>${escapeHtml(name)}</h4>${area ? `<span>${escapeHtml(area)}</span>` : ''}</div><b>${optimizers.length ? `${optimizers.length} optimizer${optimizers.length===1?'':'s'}` : 'Optimizer not linked'}</b></div>
+        <div class="solarModuleFacts">${[...panelFacts,...optimizerFacts].map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') || '<span><small>Status</small><b>Published module</b></span>'}</div>
+        ${this.energyAssetDetailDisclosure(rt,enriched)}
+        ${optimizerDetails ? `<details class="solarTopologyDetails"><summary>Optimizer details</summary>${optimizerDetails}</details>` : ''}
+        </div>
+      </article>`;
+    }
+
     solarArrayCard(rt, asset, childPanels = [], childOptimizers = []) {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id),'Solar array');
-      const facts = this.energyAssetFacts(rt,enriched,5);
-      const panelTypes = childPanels.map(panel => firstDefined(panel.model,panel.display_name,panel.name,rt.assetName(panel.asset_id),'')).filter(Boolean);
+      const facts = this.energyAssetFacts(rt,enriched,4);
+      const optimizerByPanel = new Map();
+      const zoneLevelOptimizers = [];
+      for (const optimizer of childOptimizers) {
+        const parentId = this.energyAssetParentId(optimizer);
+        const panel = childPanels.find(item => String(firstDefined(item.asset_id,item.id,'') || '') === parentId);
+        if (!panel) { zoneLevelOptimizers.push(optimizer); continue; }
+        const panelId = String(firstDefined(panel.asset_id,panel.id,'') || '');
+        optimizerByPanel.set(panelId,[...(optimizerByPanel.get(panelId)||[]),optimizer]);
+      }
+      const modules = childPanels.map(panel => {
+        const panelId = String(firstDefined(panel.asset_id,panel.id,'') || '');
+        return this.solarModuleCard(rt,panel,optimizerByPanel.get(panelId)||[]);
+      }).join('');
       return `<article class="solarAggregateCard solarArrayCard">
         <div class="solarAggregateHead">
           <div class="solarAggregateVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:'☀',decorative:false})}</div>
-          <div class="solarAggregateCopy"><small>SOLAR ARRAY / ZONE</small><h3>${escapeHtml(name)}</h3><p>${panelTypes.length ? escapeHtml(panelTypes.join(' · ')) : 'Choose the representative panel type for this array.'}</p></div>
-          <span class="solarAggregateCount">${childPanels.length ? `${childPanels.length} panel${childPanels.length===1?'':'s'} · ${childOptimizers.length} optimizer${childOptimizers.length===1?'':'s'}` : `${childOptimizers.length} optimizer${childOptimizers.length===1?'':'s'}`}</span>
+          <div class="solarAggregateCopy"><small>SOLAR ZONE</small><h3>${escapeHtml(name)}</h3><p>Published zone with its physical modules and canonical optimizer relationships.</p></div>
+          <span class="solarAggregateCount">${childPanels.length ? `${childPanels.length} module${childPanels.length===1?'':'s'}` : 'No modules linked'}</span>
         </div>
-        <div class="solarAggregateFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span><small>Status</small><b>Published array · no additional live facts</b></span>`}</div>
+        <div class="solarAggregateFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span><small>Status</small><b>Published zone</b></span>`}</div>
         ${this.energyAssetDetailDisclosure(rt,enriched)}
-        ${childPanels.length ? `<details class="solarTopologyDetails"><summary>Panels (${childPanels.length})</summary><div class="solarChildGrid">${childPanels.map(panel=>this.energyDeviceStatusCard(rt,panel,'Solar panel')).join('')}</div></details>` : ''}
-        ${childOptimizers.length ? `<details class="solarTopologyDetails"><summary>Optimizers (${childOptimizers.length})</summary><div class="solarChildGrid">${childOptimizers.map(item=>this.energyDeviceStatusCard(rt,item,'Power optimizer')).join('')}</div></details>` : ''}
+        ${modules ? `<div class="solarModuleGrid">${modules}</div>` : '<div class="empty"><b>No panels linked to this zone</b><span>Panel relationships are not currently published for this zone.</span></div>'}
+        ${zoneLevelOptimizers.length ? `<details class="solarTopologyDetails"><summary>Optimizers without panel relationship (${zoneLevelOptimizers.length})</summary><p>These optimizers are related to the zone, but no panel parent is published. Home Intelligence does not guess the module relationship.</p><div class="solarChildGrid">${zoneLevelOptimizers.map(item=>this.energyDeviceStatusCard(rt,item,'Power optimizer')).join('')}</div></details>` : ''}
       </article>`;
     }
     solarInverterSystem(rt, inverters = []) {
@@ -3175,7 +3213,7 @@
       const arrays = assets.filter(asset=>['solar_production','solar_array'].includes(this.energyAssetType(asset)));
       const panels = assets.filter(asset=>this.energyAssetType(asset)==='solar_panel');
       const inverters = assets.filter(asset=>this.energyAssetType(asset)==='solar_inverter');
-      const systems = assets.filter(asset=>this.energyAssetType(asset)==='battery_system');
+      const systems = assets.filter(asset=>['battery_system','home_battery_system'].includes(this.energyAssetType(asset)));
       const batteries = assets.filter(asset=>this.energyAssetType(asset)==='battery');
       const optimizers = assets.filter(asset=>this.energyAssetType(asset)==='solar_optimizer');
       const backup = assets.filter(asset=>this.energyAssetType(asset)==='backup_interface');
@@ -3193,25 +3231,22 @@
       const assignedOptimizerIds = new Set(arrays.flatMap(array => optimizersFor(array,panelsFor(array)).map(item=>String(firstDefined(item.asset_id,item.id,'')||''))));
       const unassignedOptimizers = optimizers.filter(item => !assignedOptimizerIds.has(String(firstDefined(item.asset_id,item.id,'')||'')));
 
-      const arrayCards = arrays.map(array=>this.solarArrayCard(rt,array,panelsFor(array),optimizersFor(array,panelsFor(array)))).join('')
-        + (unassignedPanels.length ? `<div class="solarUnassignedPanels"><h3>Unassigned published panels</h3><p>These panels are published but no zone/array relationship is available.</p><div class="solarChildGrid">${unassignedPanels.map(panel=>this.energyDeviceStatusCard(rt,panel,'Solar panel')).join('')}</div></div>` : '')
-        + (unassignedOptimizers.length ? `<div class="solarUnassignedPanels"><h3>Unassigned published optimizers</h3><p>These optimizers are published but no panel/array relationship is available.</p><div class="solarChildGrid">${unassignedOptimizers.map(item=>this.energyDeviceStatusCard(rt,item,'Power optimizer')).join('')}</div></div>` : '');
-      const arraysSection = this.solarHardwareSection(
-        'Solar arrays',
-        'Each solar zone keeps its own facts and representative panel type. Use the image picker on the array to choose SunPower or Jinko where appropriate.',
-        arrayCards || (panels.length ? `<div class="solarChildGrid">${panels.map(panel=>this.energyDeviceStatusCard(rt,panel,'Solar panel')).join('')}</div>` : ''),
-        arrays.length ? `${arrays.length} zone${arrays.length===1?'':'s'}` : ''
-      );
       const inverterSection = this.solarInverterSystem(rt,inverters);
       const batterySection = this.solarBatterySystem(rt,systems,batteries);
-      const supportAssets = [...backup];
-      const supportSection = supportAssets.length ? this.solarHardwareSection(
-        'Solar support devices',
-        'Optimizers and backup interfaces that support the physical solar installation.',
-        `<div class="solarChildGrid">${supportAssets.map(asset=>this.energyDeviceStatusCard(rt,asset,this.energyAssetType(asset)==='solar_optimizer'?'Power optimizer':'Backup interface')).join('')}</div>`,
-        `${supportAssets.length} device${supportAssets.length===1?'':'s'}`
-      ) : '';
-      return `<div class="solarHardwareExperience">${arraysSection}${inverterSection}${batterySection}${supportSection}</div>`;
+      const zoneCards = arrays.map(array=>this.solarArrayCard(rt,array,panelsFor(array),optimizersFor(array,panelsFor(array)))).join('');
+      const zonesSection = this.solarHardwareSection(
+        'Solar zones',
+        'Published zones with one physical module card per panel. Optimizer measurements stay attached to their canonical panel relationship.',
+        zoneCards,
+        arrays.length ? `${arrays.length} zone${arrays.length===1?'':'s'}` : ''
+      );
+      const unassignedBody = [
+        unassignedPanels.length ? `<div class="solarUnassignedPanels"><h3>Panels without zone relationship</h3><p>Published panels remain visible when no zone parent is available.</p><div class="solarChildGrid">${unassignedPanels.map(panel=>this.energyDeviceStatusCard(rt,panel,'Solar panel')).join('')}</div></div>` : '',
+        unassignedOptimizers.length ? `<div class="solarUnassignedPanels"><h3>Optimizers without module relationship</h3><p>Published optimizers remain visible; Home Intelligence does not infer a panel association.</p><div class="solarChildGrid">${unassignedOptimizers.map(item=>this.energyDeviceStatusCard(rt,item,'Power optimizer')).join('')}</div></div>` : '',
+        backup.length ? `<div class="solarUnassignedPanels"><h3>Support devices</h3><div class="solarChildGrid">${backup.map(asset=>this.energyDeviceStatusCard(rt,asset,'Backup interface')).join('')}</div></div>` : ''
+      ].join('');
+      const unassignedSection = unassignedBody ? this.solarHardwareSection('Other published hardware','Hardware that cannot be placed deeper in the canonical hierarchy remains explicit.',unassignedBody) : '';
+      return `<div class="solarHardwareExperience">${inverterSection}${batterySection}${zonesSection}${unassignedSection}</div>`;
     }
 
     solarEnergyStory(rt) {
@@ -3258,13 +3293,13 @@
         .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceCard{max-width:720px}.gasMeterPanel .energyDeviceGrid{grid-template-columns:minmax(0,720px)}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasContextGrid,.planningContextGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gasStatisticsHost{min-height:220px}}
 
         .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead,.solarStoryHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
-        .energyDeviceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.energyDeviceCard{display:grid;grid-template-columns:126px minmax(0,1fr);gap:12px;border:1px solid #e5ebf3;background:#fff;border-radius:14px;padding:12px;min-height:166px}.energyDeviceVisual{height:138px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fbfdff,#f6f8fb);border-radius:11px;overflow:hidden}.energyDeviceVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.energyDeviceVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:5px;box-sizing:border-box}.energyDeviceBody{min-width:0}.energyDeviceTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.energyDeviceTop small{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.energyDeviceTop h3{font-size:13px;line-height:1.25;margin:3px 0 8px}.energyDeviceState{font-size:9px;background:#eef7f1;color:#3f7f5a;border-radius:999px;padding:5px 7px;white-space:nowrap}.energyDeviceConfig{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.energyDeviceConfig span{font-size:9px;color:#64748b;background:#f8fafc;border-radius:7px;padding:5px 6px}.energyDeviceConfig b{color:#334155;margin-right:4px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyDeviceFacts span{background:#f8fafc;border-radius:7px;padding:6px;min-width:0}.energyDeviceFacts small,.energyDeviceFacts b{display:block}.energyDeviceFacts small{font-size:8px;color:#64748b}.energyDeviceFacts b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.energyDeviceNoFacts{grid-column:1/-1}.energyAssetQuickActions{grid-column:1/-1;display:grid;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid #edf1f6}.energyAssetQuickActions>small{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700}.energyAssetQuickActions>div{display:flex;gap:6px;flex-wrap:wrap}.energyAssetQuickActions .hiAction{min-height:30px;padding:0 9px;font-size:9.5px}
+        .energyDeviceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.energyDeviceCard{display:grid;grid-template-columns:126px minmax(0,1fr);gap:12px;border:1px solid #e5ebf3;background:#fff;border-radius:14px;padding:12px;min-height:166px}.energyDeviceVisual{height:138px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fbfdff,#f6f8fb);border-radius:11px;overflow:hidden}.energyDeviceVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.energyDeviceVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:5px;box-sizing:border-box}.energyDeviceBody{min-width:0}.energyDeviceTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.energyDeviceTop small{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.energyDeviceTop h3{font-size:13px;line-height:1.25;margin:3px 0 8px}.energyDeviceArea{display:block;margin:-4px 0 7px;color:#64748b;font-size:9px}.batteryContributorArea{display:block;margin-top:3px;color:#64748b;font-size:9px}.energyDeviceState{font-size:9px;background:#eef7f1;color:#3f7f5a;border-radius:999px;padding:5px 7px;white-space:nowrap}.energyDeviceConfig{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.energyDeviceConfig span{font-size:9px;color:#64748b;background:#f8fafc;border-radius:7px;padding:5px 6px}.energyDeviceConfig b{color:#334155;margin-right:4px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyDeviceFacts span{background:#f8fafc;border-radius:7px;padding:6px;min-width:0}.energyDeviceFacts small,.energyDeviceFacts b{display:block}.energyDeviceFacts small{font-size:8px;color:#64748b}.energyDeviceFacts b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.energyDeviceNoFacts{grid-column:1/-1}.energyAssetQuickActions{grid-column:1/-1;display:grid;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid #edf1f6}.energyAssetQuickActions>small{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700}.energyAssetQuickActions>div{display:flex;gap:6px;flex-wrap:wrap}.energyAssetQuickActions .hiAction{min-height:30px;padding:0 9px;font-size:9.5px}
         .energyAssetDetails{margin-top:8px;border-top:1px solid #edf1f6;padding-top:7px}.energyAssetDetails>summary{cursor:pointer;color:#355D96;font-size:9px;font-weight:650;list-style:none}.energyAssetDetails>summary::-webkit-details-marker{display:none}.energyAssetDetails>summary:after{content:" ▾";color:#94a3b8}.energyAssetDetails[open]>summary:after{content:" ▴"}.energyAssetDetailGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:7px}.energyAssetDetailGrid span{min-width:0;background:#f8fafc;border-radius:7px;padding:6px}.energyAssetDetailGrid span.wide{grid-column:1/-1}.energyAssetDetailGrid small,.energyAssetDetailGrid b{display:block}.energyAssetDetailGrid small{font-size:8px;color:#64748b}.energyAssetDetailGrid b{font-size:9.5px;line-height:1.3;overflow-wrap:anywhere}
         .gasContextGrid,.planningContextGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:10px}.gasContextGrid span,.planningContextGrid span{min-width:0;border:1px solid #e5ebf3;border-radius:10px;background:#f8fafc;padding:9px 10px}.gasContextGrid small,.planningContextGrid small,.gasContextGrid b,.planningContextGrid b{display:block}.gasContextGrid small,.planningContextGrid small{font-size:8.5px;color:#64748b}.gasContextGrid b,.planningContextGrid b{font-size:10.5px;line-height:1.3;margin-top:3px;overflow-wrap:anywhere}.planningContextPanel>p{margin:9px 0 0;color:#64748b;font-size:10.5px;line-height:1.4}.planningContextPanel>.empty{margin-top:9px}
-        .solarProductionStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 12px}.solarProductionStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:10px 12px}.solarProductionStrip small,.solarProductionStrip b{display:block}.solarProductionStrip small{font-size:9px;color:#64748b}.solarProductionStrip b{font-size:15px;margin-top:3px}.managedAssetIdentity,.strategyAssetIdentity,.meteringAssetIdentity,.effectivePolicyIdentity{display:flex;align-items:center;gap:8px;min-width:0}.managedAssetIdentity>div,.strategyAssetIdentity>div,.meteringAssetIdentity>span{min-width:0}.meteringAssetIdentity b,.meteringAssetIdentity small{display:block}.effectivePolicyIdentity b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.solarHardwareExperience{display:grid;gap:12px;margin:12px 0}.solarHardwareSection{margin:0}.solarHardwareSectionHead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}.solarHardwareSectionHead h2{margin:0 0 4px}.solarHardwareSectionHead p{margin:0;color:#64748b;font-size:11px}.solarHardwareSectionHead>span,.solarAggregateCount{font-size:10px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}.solarAggregateCard{border:1px solid #e5ebf3;border-radius:14px;padding:12px;background:#fff}.solarAggregateCard+.solarAggregateCard{margin-top:10px}.solarAggregateHead{display:grid;grid-template-columns:116px minmax(0,1fr) auto;gap:12px;align-items:center}.solarAggregateVisual{height:104px;display:flex;align-items:center;justify-content:center;background:#f8fafc;border-radius:11px;overflow:hidden}.solarAggregateVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.solarAggregateVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:6px;box-sizing:border-box}.solarAggregateCopy small,.solarSystemSummary small{font-size:9px;font-weight:750;color:#64748b;letter-spacing:.08em}.solarAggregateCopy h3,.solarSystemSummary h3{margin:3px 0 5px;font-size:15px}.solarAggregateCopy p,.solarSystemSummary p{margin:0;color:#64748b;font-size:10.5px;line-height:1.4}.solarAggregateFacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.solarAggregateFacts span{min-width:96px;background:#f8fafc;border-radius:8px;padding:7px 8px}.solarAggregateFacts small,.solarAggregateFacts b{display:block}.solarAggregateFacts small{font-size:8px;color:#64748b}.solarAggregateFacts b{font-size:10px;margin-top:2px}.solarChildGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}.solarSystemSummary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start}.solarUnassignedPanels{margin-top:12px}.solarUnassignedPanels h3{font-size:12px;margin:0 0 6px}.solarUnassignedPanels p{font-size:10px;color:#64748b;margin:0 0 7px}.solarTopologyDetails{margin-top:9px;border-top:1px solid #edf1f6;padding-top:7px}.solarTopologyDetails>summary{cursor:pointer;color:#355D96;font-size:10px;font-weight:650}
+        .solarProductionStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 12px}.solarProductionStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:10px 12px}.solarProductionStrip small,.solarProductionStrip b{display:block}.solarProductionStrip small{font-size:9px;color:#64748b}.solarProductionStrip b{font-size:15px;margin-top:3px}.managedAssetIdentity,.strategyAssetIdentity,.meteringAssetIdentity,.effectivePolicyIdentity{display:flex;align-items:center;gap:8px;min-width:0}.managedAssetIdentity>div,.strategyAssetIdentity>div,.meteringAssetIdentity>span{min-width:0}.meteringAssetIdentity b,.meteringAssetIdentity small{display:block}.effectivePolicyIdentity b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.solarHardwareExperience{display:grid;gap:12px;margin:12px 0}.solarHardwareSection{margin:0}.solarHardwareSectionHead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}.solarHardwareSectionHead h2{margin:0 0 4px}.solarHardwareSectionHead p{margin:0;color:#64748b;font-size:11px}.solarHardwareSectionHead>span,.solarAggregateCount{font-size:10px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}.solarAggregateCard{border:1px solid #e5ebf3;border-radius:14px;padding:12px;background:#fff}.solarAggregateCard+.solarAggregateCard{margin-top:10px}.solarAggregateHead{display:grid;grid-template-columns:116px minmax(0,1fr) auto;gap:12px;align-items:center}.solarAggregateVisual{height:104px;display:flex;align-items:center;justify-content:center;background:#f8fafc;border-radius:11px;overflow:hidden}.solarAggregateVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.solarAggregateVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:6px;box-sizing:border-box}.solarAggregateCopy small,.solarSystemSummary small{font-size:9px;font-weight:750;color:#64748b;letter-spacing:.08em}.solarAggregateCopy h3,.solarSystemSummary h3{margin:3px 0 5px;font-size:15px}.solarAggregateCopy p,.solarSystemSummary p{margin:0;color:#64748b;font-size:10.5px;line-height:1.4}.solarAggregateFacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.solarAggregateFacts span{min-width:96px;background:#f8fafc;border-radius:8px;padding:7px 8px}.solarAggregateFacts small,.solarAggregateFacts b{display:block}.solarAggregateFacts small{font-size:8px;color:#64748b}.solarAggregateFacts b{font-size:10px;margin-top:2px}.solarChildGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}.solarModuleGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.solarModuleCard{display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;border:1px solid #e5ebf3;border-radius:12px;padding:10px;background:#fbfdff}.solarModuleVisual{height:96px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:9px;overflow:hidden}.solarModuleVisual .assetVisual,.solarModuleVisual img{width:100%;height:100%;object-fit:contain}.solarModuleHead{display:flex;justify-content:space-between;gap:8px}.solarModuleHead small,.solarModuleHead span{display:block;font-size:8px;color:#64748b}.solarModuleHead h4{margin:2px 0;font-size:11px}.solarModuleHead>b{font-size:8.5px;color:#476487;white-space:nowrap}.solarModuleFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:7px}.solarModuleFacts span{padding:5px 6px;border-radius:7px;background:#fff}.solarModuleFacts small,.solarModuleFacts b{display:block}.solarModuleFacts small{font-size:7.5px;color:#64748b}.solarModuleFacts b{font-size:9px}.consumerPrimarySummary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.consumerPrimarySummary>span{padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#fff}.consumerPrimarySummary small,.consumerPrimarySummary b{display:block}.consumerPrimarySummary small{font-size:8.5px;color:var(--muted)}.consumerPrimarySummary b{margin-top:3px;font-size:13px}.managedAssetRelationship{margin-top:7px;padding:7px 8px;border-radius:8px;background:#f8fafc}.managedAssetRelationship small,.managedAssetRelationship b{display:block}.managedAssetRelationship small{font-size:8px;color:#64748b}.managedAssetRelationship b{font-size:9.5px;margin-top:2px}.solarSystemSummary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start}.solarUnassignedPanels{margin-top:12px}.solarUnassignedPanels h3{font-size:12px;margin:0 0 6px}.solarUnassignedPanels p{font-size:10px;color:#64748b;margin:0 0 7px}.solarTopologyDetails{margin-top:9px;border-top:1px solid #edf1f6;padding-top:7px}.solarTopologyDetails>summary{cursor:pointer;color:#355D96;font-size:10px;font-weight:650}
                 .solarStoryHead{align-items:center}.solarStoryHead small{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#d97706;font-weight:750}.solarStoryHead h2{margin:3px 0}.solarStoryRoute{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}.solarStoryRoute span{font-size:10px;font-weight:700;padding:6px 9px;border-radius:999px;background:#fff7ed;border:1px solid #fed7aa}.solarStoryRoute i{font-style:normal;color:#94a3b8}.solarAnswerGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.solarAnswerGrid article{background:#f8fafc;border:1px solid #edf1f6;border-radius:10px;padding:10px}.solarAnswerGrid small{display:block;color:#64748b;font-size:9px;margin-bottom:4px}.solarAnswerGrid b{font-size:11px;line-height:1.4;font-weight:650}.solarWhereAnswer{margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:11px 12px}.solarWhereAnswer span{display:block;color:#9a5b17;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}.solarWhereAnswer b{display:block;margin-top:3px;font-size:11.5px;line-height:1.4}
         @media(max-width:1100px){.energyDeviceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.energyDeviceCard{grid-template-columns:112px minmax(0,1fr)}.energyDeviceVisual{height:128px}.solarAnswerGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.solarChildGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.energyDeviceGrid{grid-template-columns:1fr}.energyDeviceCard{grid-template-columns:96px minmax(0,1fr);gap:10px;padding:10px;min-height:142px}.energyDeviceVisual{height:112px}.energyDeviceFacts{grid-template-columns:repeat(2,minmax(0,1fr))}.energyAssetQuickActions>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.energyAssetQuickActions .hiAction{width:100%;min-width:0}.solarStoryHead{display:block}.solarStoryRoute{justify-content:flex-start;margin-top:10px}.solarAnswerGrid{grid-template-columns:1fr}.solarChildGrid{grid-template-columns:1fr}.solarAggregateHead{grid-template-columns:92px minmax(0,1fr)}.solarAggregateCount{grid-column:2}.solarAggregateVisual{height:88px}.solarSystemSummary{grid-template-columns:1fr}}
-        @media(max-width:720px){.solarProductionStrip{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media(max-width:720px){.solarProductionStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.solarModuleGrid,.consumerPrimarySummary{grid-template-columns:1fr}.solarModuleCard{grid-template-columns:76px minmax(0,1fr)}.solarModuleVisual{height:78px}}
       `;
     }
 
@@ -3758,6 +3793,7 @@
       const projection = rt.assetProjection(assetId);
       const health = firstDefined(projection?.lifecycle?.state, published.health, published.status, 'UNKNOWN');
       const asset = this.energyAssetContext(rt, published.asset_id ? published : { asset_id:assetId, display_name:name, asset_type:'battery' });
+      const area = this.energyAssetAreaLabel(asset);
       const explicitlyUnavailable = /unavailable|offline|disconnected|failed/i.test(String(firstDefined(published.availability_state,published.connection_state,health,'')));
       const stateLabel = explicitlyUnavailable ? 'Unavailable'
         : state === 'charging' ? 'Charging'
@@ -3777,7 +3813,7 @@
         ['Capacity',capacity === null ? '' : fmtKwh(capacity)]
       ].filter(([,value])=>value);
       const actions = this.assetQuickActions(rt,assetId,3);
-      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b><span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorFacts">${quickFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div>${actions}</div></article>`;
+      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b>${area ? `<small class="batteryContributorArea">${escapeHtml(area)}</small>` : ''}<span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorFacts">${quickFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div>${actions}${this.energyAssetDetailDisclosure(rt,asset)}</div></article>`;
     }
     gas(rt) {
       const pageVm = this.buildPageViewModel(rt, 'gas');
@@ -3789,12 +3825,11 @@
         ? `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily measured gas use from Home Assistant long-term statistics on the canonical total-increasing meter.</p></div><span>Last 30 days</span></div><div class="gasStatisticsHost" data-gas-statistics-host data-entity-id="${escapeHtml(gas.totalEntityId)}"></div></section>`
         : `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily gas consumption will appear here when a canonical total-increasing gas meter is available.</p></div></div><div class="empty"><b>No measured gas history yet</b><span>Connect the authoritative gas meter to enable Home Assistant long-term statistics. The UX never estimates missing consumption.</span></div></section>`;
       const setupOrMeter = hasMeter
-        ? `<section class="panel gasMeterPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Gas meter</h2><p>Physical meter identity, source and canonical measurement health.</p></div></div>${meter}</section>`
+        ? `<section class="panel gasMeterPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Gas meter</h2><p>Current meter state and measured values.</p></div></div>${meter}</section>`
         : `<section class="panel gasSetupPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Connect your gas meter</h2><p>RHI Energy needs one authoritative gas source before it can show consumption history.</p></div></div><div class="gasSetupFacts"><div><small>Required</small><b>Total gas meter</b><span>A cumulative total-increasing reading in m³.</span></div><div><small>Optional</small><b>Live gas flow</b><span>An instantaneous m³/h reading when the source publishes it.</span></div><div><small>History</small><b>Home Assistant statistics</b><span>Daily changes are shown without frontend estimation.</span></div></div></section>`;
       return `${this.tabExperienceHeader(rt,'gas',pageVm)}<div class="gasPage">
-        <section class="panel gasUseInfoPanel"><div class="rhiUxSectionHead"><div><h2>Meter context</h2><p>The status row summarizes usage; this section identifies the authoritative source and measurement path behind it.</p></div></div><div class="gasContextGrid"><span><small>Source</small><b>${escapeHtml(gas.source || '—')}</b></span><span><small>Meter asset</small><b>${escapeHtml(String(firstDefined(gas.asset?.display_name,gas.asset?.name,gas.asset?.asset_id,'—')))}</b></span><span><small>Total entity</small><b>${escapeHtml(gas.totalEntityId || 'Not published')}</b></span><span><small>Health</small><b>${escapeHtml(human(gas.health || 'Unknown'))}</b></span></div></section>
-        ${graph}
         ${setupOrMeter}
+        ${graph}
       </div>`;
     }
 
@@ -3861,30 +3896,27 @@
       const availability = String(firstDefined(asset.availability_state, status.unavailable ? 'unavailable' : 'available') || '').toLowerCase();
       const healthRaw = firstDefined(asset.health, asset.lifecycle_state, asset.status, '');
       const health = status.unavailable ? 'Unavailable' : healthRaw ? human(healthRaw) : 'Available';
+      const area = this.energyAssetAreaLabel(asset);
       const chargerId = String(firstDefined(asset.effective_charger, asset.charger_asset_id, asset.connection_asset_id, asset.execution_target_asset_id, '') || '');
       const relation = chargerId ? `${rt.assetName(chargerId) || human(chargerId)} · ${human(firstDefined(asset.connection_state,'linked'))}` : '';
-      const reason = humanReason(firstDefined(planning.user_reason_label, planning.waiting_reason, planning.waiting_reason_code, planning.reason, planning.reason_code, row.reason), state === 'Ready' ? 'Ready when you need it.' : 'Home Intelligence is monitoring this asset.');
       const paused = /paused|hold/.test(String(stateRaw || '').toLowerCase()) || rt.commandEnabled(resume);
-      let recommendation = 'Home Intelligence will keep monitoring this asset.';
-      if (/waiting/.test(String(stateRaw || '').toLowerCase())) recommendation = 'Home Intelligence will act automatically when the required energy conditions are available.';
-      if (/planned|scheduled/.test(String(stateRaw || '').toLowerCase())) recommendation = 'Home Intelligence has included this asset in the current plan.';
-      if (/active|charging|running/.test(String(stateRaw || '').toLowerCase())) recommendation = 'Let Home Intelligence continue unless you want to stop or pause control.';
-      if (paused) recommendation = 'Resume automatic control when you want Home Intelligence to manage this asset again.';
       const actions = [
         paused ? this.componentActionButton(resume, 'Resume automatic control', id) : this.componentActionButton(pause, 'Pause automatic control', id),
         /active|charging|running/.test(String(stateRaw || '').toLowerCase()) ? this.componentActionButton(stop, 'Stop now', id) : this.componentActionButton(startCommand, 'Start now', id)
       ].join('');
-      const currentPower = asNumber(firstDefined(row.current_power_kw, row.actual_power_kw, row.power_kw, raw.power_kw));
+      const currentPower = asNumber(firstDefined(row.current_power_kw, row.actual_power_kw, row.power_kw, raw.current_power_kw, raw.power_kw));
       const requestedPower = asNumber(firstDefined(row.requested_power_kw, raw.requested_power_kw));
-      const planningLabel = firstDefined(planning.user_state_label, planning.product_state, planning.status, planning.state, '');
+      const need = asNumber(firstDefined(planning.energy_to_target_kwh,planning.energy_needed_kwh,planning.known_need_kwh,row.expected_energy_kwh,row.energy_need_kwh,raw.energy_to_target_kwh,raw.required_energy_kwh));
+      const planned = asNumber(firstDefined(planning.planned_today_kwh,planning.scheduled_kwh,row.planned_today_kwh,row.planned_energy_kwh));
+      const remaining = asNumber(firstDefined(planning.still_unresolved_kwh,planning.unresolved_horizon_kwh,planning.remaining_need_kwh,row.remaining_need_kwh,raw.remaining_need_kwh));
       const facts = [
-        ['Status', health],
         ['Power now', fmtKw(currentPower,'0.0 kW')],
-        relation ? ['Connected via', relation] : null,
-        planningLabel ? ['Plan', human(planningLabel)] : null
+        need !== null ? ['Required', fmtKwh(need)] : null,
+        planned !== null ? ['Planned today', fmtKwh(planned)] : null,
+        remaining !== null ? ['Still to plan', fmtKwh(remaining)] : null
       ].filter(Boolean);
-      const details = `${this.kv('Availability', human(availability))}${this.kv('Current power', fmtKw(currentPower, '0.0 kW'))}${this.kv('Requested power', fmtKw(requestedPower, '—'))}${this.kv('Automation', human(firstDefined(row.automation_mode, raw.automation_mode, 'Automatic')))}${relation ? this.kv('Relationship', relation) : ''}`;
-      return `<article class="managedAssetCard"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${escapeHtml(state)} · ${escapeHtml(health)}</span></div></div><b>${fmtKw(currentPower, '0.0 kW')}</b></div><div class="managedAssetFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div><div class="managedAssetStory"><p>${escapeHtml(reason)}</p><div><small>What Home Intelligence will do</small><b>${escapeHtml(recommendation)}</b></div></div>${actions ? `<div class="managedAssetActions">${actions}</div>` : ''}${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}</article>`;
+      const details = `${this.kv('Status', health)}${area ? this.kv('Area', area) : ''}${this.kv('Availability', human(availability))}${this.kv('Requested power', fmtKw(requestedPower, '—'))}${relation ? this.kv('Relationship', relation) : ''}${this.kv('Automation', human(firstDefined(row.automation_mode, raw.automation_mode, 'Automatic')))}`;
+      return `<article class="managedAssetCard"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${escapeHtml(state)} · ${escapeHtml(health)}${area ? ` · ${escapeHtml(area)}` : ''}</span></div></div><b>${fmtKw(currentPower, '0.0 kW')}</b></div><div class="managedAssetFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>${relation ? `<div class="managedAssetRelationship"><small>Connected via</small><b>${escapeHtml(relation)}</b></div>` : ''}${actions ? `<div class="managedAssetActions">${actions}</div>` : ''}${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}${this.energyAssetDetailDisclosure(rt,asset)}</article>`;
     }
 
     filterAndSortConsumers(rows = []) {
@@ -3946,6 +3978,17 @@
       const activeCount = statuses.filter(state => state.isCharging).length;
       const unavailableCount = statuses.filter(state => state.unavailable).length;
       const totalPower = asNumber(summary.current_power_kw);
+      const planningVm = this.buildPlanningViewModel(rt);
+      const todayTotals = objectFrom(planningVm.todayTotals || {});
+      const totalNeed = asNumber(firstDefined(todayTotals.flexible_total_need_kwh,summary.flexible_total_need_kwh,summary.required_energy_kwh));
+      const totalPlanned = asNumber(firstDefined(todayTotals.planned_flexible_energy_kwh,todayTotals.planned_today_kwh,summary.planned_today_kwh));
+      const stillToPlan = asNumber(firstDefined(todayTotals.still_unresolved_kwh,todayTotals.unresolved_horizon_kwh,summary.still_to_plan_kwh));
+      const summaryFacts = [
+        ['Power now',totalPower === null ? '—' : fmtKw(totalPower)],
+        ['Required today',totalNeed === null ? '—' : fmtKwh(totalNeed)],
+        ['Planned today',totalPlanned === null ? '—' : fmtKwh(totalPlanned)],
+        ['Still to plan',stillToPlan === null ? '—' : fmtKwh(stillToPlan)]
+      ];
       const story = activeCount
         ? `${activeCount} managed asset${activeCount===1?' is':'s are'} using measured power now.`
         : participating.length ? `Home Intelligence is managing ${participating.length} asset${participating.length===1?'':'s'}; none has measured active power now.` : 'No assets are currently managed by Home Intelligence.';
@@ -3953,8 +3996,9 @@
       const cards = participating.map(row=>this.consumerExplorerCard(rt,row)).join('');
       const disabledRows = disabled.map(row=>{ const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return this.disabledFlexibleAssetCard(rt,vm?.raw||row,vm?.planning||{}); }).join('');
       return `${this.tabExperienceHeader(rt,'consumers',pageVm)}${this.bodyContextBar(rt,'consumers','consumer-list')}<div class="consumersPage productPortalPage">
+        <section class="consumerPrimarySummary" aria-label="Managed energy summary">${summaryFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</section>
         ${this.productStoryCard({ eyebrow:'Managed energy', title:story, why, recommendation:unavailableCount?'Review unavailable assets and published reasons.':'No manual action is required unless a published command is offered.', tone:'blue' })}
-        <section class="panel consumerExplorer" id="consumer-list"><div class="consumerExplorerHeader"><div><h2>Managed assets</h2><p>Live power, execution state and planning remain separate.</p></div><strong>${fmtKw(totalPower,'—')}</strong></div><div class="consumerExplorerList">${cards || `<div class="empty"><b>No managed assets</b><span>Enable participation for an asset to let Home Intelligence manage it.</span></div>`}</div></section>
+        <section class="panel consumerExplorer" id="consumer-list"><div class="consumerExplorerHeader"><div><h2>Managed assets</h2><p>Primary cards show current power and published energy need. Details hold the deeper technical context.</p></div><strong>${fmtKw(totalPower,'—')}</strong></div><div class="consumerExplorerList">${cards || `<div class="empty"><b>No managed assets</b><span>Enable participation for an asset to let Home Intelligence manage it.</span></div>`}</div></section>
         ${disabledRows ? `<details class="panel compactDisclosure"><summary>Other assets (${disabled.length})</summary><p>These assets are not managed by Home Intelligence.</p><div class="disabledAssetList">${disabledRows}</div></details>` : ''}
       </div>`;
     }
