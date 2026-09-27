@@ -6,7 +6,9 @@ const app = fs.readFileSync("src/app/energy-card.js","utf8");
 const method = name => {
   const start = app.indexOf("\n    "+name+"(");
   assert.ok(start >= 0, "missing "+name);
-  const open = app.indexOf("{", start);
+  const signatureEnd = app.indexOf(") {", start);
+  assert.ok(signatureEnd >= 0, "missing method body "+name);
+  const open = signatureEnd + 2;
   let depth = 0, quote = null, escaped = false;
   for (let i = open; i < app.length; i += 1) {
     const ch = app[i];
