@@ -1,3 +1,11 @@
+## 4.2.6 — Gas hero and information-detail closure
+
+- uses the approved Gas WebP hero and rejects the obsolete SVG transport;
+- preserves the canonical Hero → Status → one Page Controls → Body hierarchy;
+- keeps Source, Profile, Parent and Publication context visible on hardware cards when live facts are unavailable;
+- retains expandable asset provenance/details without duplicating headline status;
+- keeps missing runtime telemetry fail-closed.
+
 ## 4.2.5 — UX convergence and flexible flow
 
 - restores canonical flexible-device identity and charger/vehicle connection projection in Flow and Planning;

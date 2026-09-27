@@ -3100,9 +3100,15 @@
       const publication = objectFrom(enriched.publication || {});
       const configState = publication.complete === true ? 'Configured' : profileLabel ? 'Profiled' : 'Detected';
       const actions = this.assetQuickActions(rt,id,3);
+      const fallbackFacts = [
+        ['Source', firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'—')],
+        ['Profile', profileLabel || firstDefined(enriched.profile_id,'—')],
+        ['Parent', this.energyAssetParentId(enriched) || '—'],
+        ['Publication', publication.complete === true ? 'Complete' : publication.complete === false ? 'Incomplete' : 'Unknown']
+      ];
       const details = facts.length
         ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
-        : `<span class="energyDeviceNoFacts"><small>Status</small><b>Canonical live facts are not published for this device.</b></span>`;
+        : fallbackFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value ?? '—'))}</b></span>`).join('');
       return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
         <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
         <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3></div><span class="energyDeviceState">${escapeHtml(health ? human(health) : configState)}</span></div>

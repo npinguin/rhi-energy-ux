@@ -6,8 +6,8 @@ const presentation = fs.readFileSync("src/app/presentation.js","utf8");
 const catalog = fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
 
 assert.match(presentation,/id:"consumers", label:"Consumers"[\s\S]*id:"gas", label:"Gas", view:"gas"/);
-assert.ok(presentation.includes('gas: "heroes/gas-hero.svg"'),"Gas hero mapping must use packaged SVG");
-assert.ok(fs.existsSync("src/assets/heroes/gas-hero.svg"),"missing Gas hero SVG artwork");
+assert.ok(presentation.includes('gas: "heroes/gas-hero.webp"'),"Gas hero mapping must use approved WebP");
+assert.ok(fs.existsSync("src/assets/heroes/gas-hero.webp"),"missing Gas hero WebP artwork");
 
 assert.match(app,/gas:\['consumer'\]/);
 assert.match(app,/gas:\['energy','gas'\]/);
