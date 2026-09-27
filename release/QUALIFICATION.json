@@ -1,8 +1,8 @@
 {
-  "version": "4.3.10",
-  "candidate_tag": "v4.3.10",
+  "version": "4.3.11",
+  "candidate_tag": "v4.3.11",
   "candidate_sha": "pending",
-  "previous_release": "4.3.9",
+  "previous_release": "4.3.10",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -39,5 +39,11 @@
   "strategic_planning_contract_surface": "NOT_EXECUTED",
   "metering_write_readback": "NOT_EXECUTED",
   "automation_mode_write_readback": "NOT_EXECUTED",
-  "policy_settings_write_readback": "NOT_EXECUTED"
+  "policy_settings_write_readback": "NOT_EXECUTED",
+  "automation_authority_policy": "NOT_EXECUTED",
+  "advice_no_autonomous_execution": "NOT_EXECUTED",
+  "advice_manual_plan_apply": "NOT_EXECUTED",
+  "automatic_execution_authority": "NOT_EXECUTED",
+  "disabled_plan_execution_blocked": "NOT_EXECUTED",
+  "execution_policy_projection": "NOT_EXECUTED"
 }
