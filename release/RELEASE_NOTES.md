@@ -1,15 +1,29 @@
-# v4.2.9 — Gas runtime correction TEST CANDIDATE
+# v4.3.0 — coherent asset experience and body-control convergence TEST CANDIDATE
 
-This candidate corrects the Gas-tab regressions proven on target Home Assistant after 4.2.8.
+Energy 4.3.0 consolidates the runtime issues found during the 4.2.8/4.2.9 target-HA review into one clean candidate.
 
-Changes:
-- replaces the blurred SVG-derived Gas hero with the approved photographic Gas hero supplied by the product owner, packaged as immutable `gas-page-hero-v3.webp`;
-- removes the obsolete `gas-page-hero-v2.svg` transport from source and HACS dist so it cannot be selected or cached again;
-- scopes Gas page commands strictly to commands targeted at the canonical `gas_meter` asset, preventing unrelated global Energy/Planning commands such as Reset Baseline and Execute Plan from leaking into Gas;
-- loads the Home Assistant Statistics Graph through `window.loadCardHelpers()` and `createCardElement()`, so the lazy-loaded native card is available before configuration;
-- keeps the canonical total-increasing gas meter and Home Assistant long-term statistics authoritative; no gas history is estimated in the frontend;
-- preserves RHI UX Core 1.4.1 ownership of Hero → Status → Page Controls → Body.
+## User-facing changes
 
-Rollback: v4.2.8.
+- preserves the approved photographic Gas hero and supported native Statistics Graph loading introduced in 4.2.9;
+- separates page-level **Quick Actions** from body-scoped **View** controls: View now appears only where the body has a real horizon, period, filter, sort or alternate representation;
+- moves Today/Tomorrow, period and list filters directly above the content they govern;
+- consumes canonical Mobility vehicle/charger visual identity through a generated producer-owned manifest instead of a copied identity table;
+- preserves producer `visual_ref` through Consumers materialization so Audi, VW, BMW, Wallbox, Peblar and other Mobility assets keep the correct identity;
+- gives managed assets a consistent minimum user view: status, current power, relationship, planning intent, valid actions and deeper details;
+- distinguishes battery health/availability from missing child telemetry; missing per-battery power no longer makes a healthy battery appear unavailable;
+- materializes Solar as published arrays/zones with panels and optimizers underneath, with progressive disclosure and explicit unassigned-device handling;
+- keeps connected/linked chargers and vehicles visible in Flow even at 0 kW, separating topology from active power flow;
+- surfaces vehicle↔charger context in Consumers when the canonical relationship is published;
+- reports incomplete/not-published planning data explicitly instead of presenting subsystem existence as a positive status.
 
-Target Home Assistant HACS install, desktop/iPad render, Gas history rendering, refresh/restart, upgrade and rollback remain runtime qualification gates before stable promotion.
+## Engineering cleanup
+
+- upgrades the bundled presentation baseline to **RHI UX Core 1.5.0**;
+- removes the mixed page-control bar and the obsolete Energy-owned shared-control styling;
+- removes embedded base64 battery artwork from `energy-card.js`; package assets are the only image transport;
+- adds regression coverage for cross-domain visuals, body-scoped controls, battery telemetry completeness, Solar topology and idle physical topology;
+- keeps Energy semantics, calculations, relationships and command authority backend-owned.
+
+Rollback: **v4.2.9**.
+
+This is an installable HACS test candidate. Target Home Assistant desktop/iPad rendering, live contracts, write/readback, refresh, upgrade and rollback proof remain mandatory before stable promotion.
