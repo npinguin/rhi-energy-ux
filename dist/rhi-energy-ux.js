@@ -4937,10 +4937,13 @@ function rhiEnergyVisualPickerStyles() {
           fact('solar.state','State',['solar.state','operating_state','state'],'state')
         ],
         solar_zone:[
-          fact(['solar_zone.power_w','solar.power_kw'],'Production now',['solar_zone.power_w','power_w','solar.power_kw','power_kw'],'w'),
-          fact(['solar_zone.energy_today_kwh','solar.energy_today_kwh'],'Produced today',['solar_zone.energy_today_kwh','solar.energy_today_kwh','energy_today_kwh'],'kwh'),
-          fact(['solar_zone.child_count','child_count'],'Modules',['solar_zone.child_count','child_count'],'count'),
-          fact(['solar_zone.state','solar.state'],'State',['solar_zone.state','solar.state','operating_state','state'],'state')
+          fact('solar_zone.power_w','Power now',['solar_zone.power_w','power_w'],'w'),
+          fact('solar_zone.energy_kwh','Lifetime energy',['solar_zone.energy_kwh','energy_kwh'],'kwh'),
+          fact('solar_zone.status','Status',['solar_zone.status','status','operating_state','state'],'state'),
+          fact('solar_zone.child_count','Optimizers',['solar_zone.child_count','child_count'],'count'),
+          fact('solar_zone.last_measurement','Last measurement',['solar_zone.last_measurement','last_measurement'],'state'),
+          fact('solar_zone.voltage_average_v','Average voltage',['solar_zone.voltage_average_v','voltage_average_v'],'v'),
+          fact('solar_zone.current_average_a','Average current',['solar_zone.current_average_a','current_average_a'],'a')
         ],
         solar_panel:[
           fact('solar.power_kw','Production now',['solar.power_kw','power_kw','current_power_kw'],'kw'),
@@ -4948,12 +4951,15 @@ function rhiEnergyVisualPickerStyles() {
           fact('solar.state','State',['solar.state','operating_state','state'],'state')
         ],
         solar_optimizer:[
-          fact('optimizer.power_kw','Power now',['optimizer.power_kw','power_kw','current_power_kw'],'kw'),
-          fact('optimizer.power_w','Power now',['optimizer.power_w','power_w','current_power_w'],'w'),
-          fact('optimizer.energy_today_kwh','Energy today',['optimizer.energy_today_kwh','energy_today_kwh'],'kwh'),
-          fact('optimizer.voltage_v','Voltage',['optimizer.voltage_v','voltage_v'],'v'),
-          fact('optimizer.current_a','Current',['optimizer.current_a','current_a'],'a'),
-          fact('optimizer.state','State',['optimizer.state','operating_state','state'],'state')
+          fact('solar_optimizer.power_w','Power now',['solar_optimizer.power_w','optimizer.power_w','power_w','current_power_w'],'w'),
+          fact('solar_optimizer.energy_kwh','Lifetime energy',['solar_optimizer.energy_kwh','optimizer.energy_kwh','energy_kwh'],'kwh'),
+          fact('solar_optimizer.status','Status',['solar_optimizer.status','optimizer.status','status','operating_state','state'],'state'),
+          fact('solar_optimizer.last_measurement','Last measurement',['solar_optimizer.last_measurement','optimizer.last_measurement','last_measurement'],'state'),
+          fact('solar_optimizer.optimizer_voltage_v','Optimizer voltage',['solar_optimizer.optimizer_voltage_v','optimizer_voltage_v'],'v'),
+          fact('solar_optimizer.panel_voltage_v','Panel voltage',['solar_optimizer.panel_voltage_v','panel_voltage_v'],'v'),
+          fact('solar_optimizer.current_a','Current',['solar_optimizer.current_a','optimizer.current_a','current_a'],'a'),
+          fact('solar_optimizer.temperature_c','Temperature',['solar_optimizer.temperature_c','temperature_c'],'c'),
+          fact('solar_optimizer.panel_identity','Panel',['solar_optimizer.panel_identity','panel_identity'],'state')
         ],
         solar_inverter:[
           fact(['solar.power_kw','inverter.power_kw'],'Power now',['solar.power_kw','inverter.power_kw','power_kw','current_power_kw','actual_power_kw'],'kw'),
@@ -5195,7 +5201,7 @@ function rhiEnergyVisualPickerStyles() {
       const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id),'Power optimizer');
       const area = this.energyAssetAreaLabel(enriched);
       const allFacts = this.energyAssetFacts(rt,enriched,12);
-      const preferred = ['Power now','Energy today','State'];
+      const preferred = ['Power now','Lifetime energy','Status'];
       const seen = new Set();
       const primaryFacts = allFacts.filter(fact => {
         if (!preferred.includes(fact.label) || seen.has(fact.label)) return false;
