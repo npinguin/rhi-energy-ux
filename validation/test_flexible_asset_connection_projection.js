@@ -60,7 +60,7 @@ assert.ok(card.includes('asset.effective_charger'));
 assert.ok(!card.includes('Canonical physical connection telemetry is not published by E0.15.48.'));
 
 const presentation = fs.readFileSync('src/app/presentation.js','utf8');
-assert.ok(presentation.includes('gas: "heroes/gas-hero.svg"'));
+assert.ok(presentation.includes('gas: "heroes/gas-hero.webp"'));
 assert.ok(!presentation.includes('gas: "heroes/gas-hero.webp"'));
 
 console.log('PASS flexible asset identity, charger connection projection and Gas hero transport');
