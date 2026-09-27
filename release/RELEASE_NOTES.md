@@ -1,26 +1,28 @@
-# v4.3.3 — restore published primary object truth TEST CANDIDATE
+# v4.3.4 — portable dashboard mounting and install UX TEST CANDIDATE
 
-Energy 4.3.3 fixes the structural contract-adapter defect proven by the target Home Assistant review of 4.3.2: valid object properties could be published with `status=NORMALIZED`, `availability=AVAILABLE` and a resolved authoritative value, while the UX incorrectly treated the normalization status as availability and therefore hid the value from primary cards.
+Energy 4.3.4 keeps the primary-object truth restored in 4.3.3 and makes dashboard portability an explicit, regression-tested deployment contract.
 
 ## User-facing changes
 
-- restores published live facts on object primary cards instead of collapsing to only “Status OK”;
-- Solar inverter cards consume published `solar.power_kw` / inverter power and other relevant facts when available;
-- physical battery cards consume published SoC, power, available energy and capacity while keeping source/profile/asset identity in **Details**;
-- Home Battery and Solar reuse the same physical-battery presentation, avoiding two truths for one battery;
-- Solar distinguishes aggregate production from actual zones and consumes explicit `solar_zone` facts without name inference;
-- Home Consumption and other current backend object classes consume their canonical property keys;
-- full resolved secondary object properties are available progressively under **Details**;
-- unavailable telemetry stays unavailable and is never promoted to a fabricated operational value.
+- the Energy dashboard may use any Home Assistant dashboard URL, including a custom root such as `robotix-energy`;
+- the Energy card does not depend on a fixed Lovelace root or view path and works on generated view paths such as `/robotix-energy/0`;
+- Energy capability navigation stays inside the card instead of rewriting the dashboard URL;
+- HACS resources and package artwork remain root-absolute under `/hacsfiles/rhi-energy-ux/...`, so dashboard renaming cannot redirect asset requests;
+- installation instructions now make the dashboard URL/view-path distinction explicit and provide one minimal copy/paste configuration;
+- runtime verification explicitly includes custom-root refresh and navigation checks.
 
-## Structural correction
+## Preserved 4.3.3 UX contract
 
-- separates property normalization status, availability, resolution status and quality in the Public V2 adapter;
-- `NORMALIZED + AVAILABLE + RESOLVED` now correctly yields a resolved frontend field;
-- explicit property-key aliases are governed by object type; names are never used to infer semantics;
-- regression coverage reproduces the exact backend property shape that caused the 4.3.2 runtime defect;
-- preserves Core 1.5.0, Mobility-owned visual identity, body-scoped View controls and the existing tab model.
+- published primary object truth remains visible on inverter, battery, Solar, consumption, managed consumer and other object cards;
+- technical identity, source, profile, lifecycle and publication diagnostics stay under **Details**;
+- missing telemetry remains distinct from device unavailability;
+- Solar hierarchy, Mobility visual ownership, Core 1.5.0 View/Context semantics and deterministic HACS packaging remain unchanged.
 
-Rollback: **v4.3.2**.
+## Engineering
 
-This is an installable HACS test candidate. Target Home Assistant desktop/iPad verification remains mandatory before qualification or stable promotion.
+- adds a regression gate that rejects fixed Lovelace dashboard roots and browser-path-driven Energy capability routing;
+- deliberately does **not** introduce a second router or `dashboard_path` abstraction because Energy navigation is already card-local.
+
+Rollback: **v4.3.3**.
+
+This is an installable HACS test candidate. Target Home Assistant proof under a custom dashboard URL, desktop/iPad rendering, refresh, upgrade and rollback remains required before stable promotion.
