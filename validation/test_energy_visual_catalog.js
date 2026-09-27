@@ -11,11 +11,13 @@ const context = {
   localStorage:{
     getItem:key => store[key] || null,
     setItem:(key,value) => { store[key]=value; }
-  }
+  },
+  asArray:value => Array.isArray(value) ? value : (value && typeof value === "object" ? Object.values(value) : [])
 };
 context.globalThis=context;
 vm.createContext(context);
 vm.runInContext(fs.readFileSync("src/app/energy-asset-catalog.js","utf8"),context);
+vm.runInContext(fs.readFileSync("src/runtime/visual-registry.js","utf8"),context);
 vm.runInContext(fs.readFileSync("src/runtime/visual-asset-resolver.js","utf8"),context);
 
 const battery={asset_id:"battery_1",asset_type:"battery",profile_id:"energy.battery.solaredge_modbus_multi",integration_domain:"solaredge_modbus_multi"};
@@ -50,10 +52,30 @@ assert.ok(defaultResolved && defaultResolved.url);
 assert.equal(defaultResolved.asset_type,"battery");
 
 // Producer-owned cross-domain visuals remain authoritative for flexible loads.
-const producer={asset_id:"vehicle_1",asset_type:"flexible_load",visual_ref:"mobility.vehicle.generic.fallback"};
-const producerResolved=context.resolveEnergyAssetVisual(producer);
+const producerRef="mobility.vehicle.generic.fallback";
+const hass={states:{
+  "sensor.rhi_foundation_visual_asset_registry":{
+    state:"1",
+    attributes:{
+      contract_id:"RHI_VISUAL_ASSET_REGISTRY_V1",
+      contract_version:"1.1.0",
+      status:"valid",
+      entries:[{
+        visual_ref:producerRef,
+        asset_type:"vehicle",
+        owner_domain:"rhi_mobility",
+        revision:2,
+        variant_keys:["card"],
+        presentation:{package_id:"rhi-mobility-ux",variants:{card:"assets/vehicles/vehicle_fallback.png"}}
+      }]
+    }
+  }
+}};
+const producer={asset_id:"vehicle_1",asset_type:"flexible_load",source_domain:"rhi_mobility",visual_ref:producerRef};
+const producerResolved=context.resolveEnergyAssetVisual(producer,hass,"card");
 assert.equal(producerResolved.kind,"vehicle");
-assert.equal(producerResolved.visual_ref,"mobility.vehicle.generic.fallback");
+assert.equal(producerResolved.visual_ref,producerRef);
+assert.equal(producerResolved.owner_domain,"rhi_mobility");
 
 const picker=fs.readFileSync("src/ui/components/energy-visual-picker.js","utf8");
 assert.match(picker,/catalogFor\(asset/);
