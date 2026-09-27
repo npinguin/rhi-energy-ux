@@ -3553,7 +3553,34 @@
         const p = load.energy_planning || rt.planningOutcomeFor(load.asset_id) || {};
         return /waiting|blocked|uncertain|not eligible/i.test(String(firstDefined(p.state,p.status,p.today_status,p.expected,'')));
       }).length;
-      return `${this.tabExperienceHeader(rt,'operational-planning',pageVm)}<div class="operationalPlanningPage">
+      const executionPolicy = this.automationExecutionPolicy(rt);
+      const executePlan = rt.commands().find(command => rt.commandRole(command) === 'execute_plan') || null;
+      const policyTitle = executionPolicy.configuredMode === 'automatic'
+        ? 'Automatic · Home Intelligence may execute the current plan'
+        : executionPolicy.configuredMode === 'advice'
+          ? 'Advice · plan waits for your approval'
+          : 'Disabled · planning is informational only';
+      const policyWhy = executionPolicy.configuredMode === 'automatic'
+        ? 'Only the current canonical D0 allocation may be dispatched, with producer readiness and authoritative readback still required.'
+        : executionPolicy.configuredMode === 'advice'
+          ? 'Home Intelligence calculates the same plan but cannot dispatch it autonomously.'
+          : 'Home Intelligence keeps calculating planning insight but managed plan execution is blocked.';
+      const executeAction = executePlan && rt.commandVisible(executePlan)
+        ? this.componentActionButton(executePlan, executePlan.label || (executionPolicy.configuredMode === 'advice' ? 'Apply current plan' : 'Run current plan now'), 'energy')
+        : '';
+      const authorityCard = this.productStoryCard({
+        eyebrow:'Automation authority',
+        title:policyTitle,
+        why:policyWhy,
+        recommendation:executionPolicy.configuredMode === 'advice'
+          ? 'Review the plan and apply it when you agree.'
+          : executionPolicy.configuredMode === 'automatic'
+            ? 'Home Intelligence manages the current plan within your configured strategies.'
+            : 'Change Automation mode to Advice or Automatic to allow managed plan execution.',
+        actions:executeAction,
+        tone:executionPolicy.configuredMode === 'automatic' ? 'green' : executionPolicy.configuredMode === 'advice' ? 'blue' : 'orange'
+      });
+      return `${this.tabExperienceHeader(rt,'operational-planning',pageVm)}<div class="operationalPlanningPage">${authorityCard}
         <section class="panel operationalPlanningLoads"><div class="energySectionHead"><div><h2>Flexible loads</h2><p>Current execution, next action, requested power and operational reason. Hardware configuration is not shown here.</p></div></div><div class="flexLoadList">${cards || '<div class="empty"><b>No participating flexible loads</b><span>No controllable load currently participates in operational planning.</span></div>'}</div></section>
         ${disabledCards ? `<details class="panel compactDisclosure"><summary>Other assets (${disabled.length})</summary><p>These assets are excluded from operational planning.</p><div class="disabledAssetList">${disabledCards}</div></details>` : ''}
       </div>`;
