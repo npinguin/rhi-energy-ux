@@ -3308,7 +3308,7 @@
         ? this.energyDeviceStatusCard(rt,system,'Battery system')
         : `<div class="solarSystemSummary"><div><small>BATTERY SYSTEM</small><h3>Home Battery System</h3><p>No aggregate battery-system object is currently published.</p></div><div class="solarAggregateFacts"><span><small>Batteries</small><b>${batteries.length}</b></span></div></div>`;
       const children = batteries.length ? `<div class="solarChildGrid">${batteries.map(asset=>this.batteryChildCard(rt,String(firstDefined(asset.asset_id,asset.id,'') || ''))).join('')}</div>` : '';
-      return this.solarHardwareSection('Battery system','Storage connected to the solar/home energy system.',head+children,`${batteries.length} batter${batteries.length===1?'y':'ies'}`);
+      return this.solarHardwareSection('Battery system','Storage connected to the solar/home energy system. Aggregate storage state with the physical batteries shown underneath.',head+children,`${batteries.length} batter${batteries.length===1?'y':'ies'}`);
     }
 
     solarHardwareExperience(rt) {
