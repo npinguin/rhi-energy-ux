@@ -10,24 +10,31 @@ for (const required of [
   'data-energy-visual-select',
   'data-energy-visual-save',
   'data-energy-visual-cancel',
-  'Save image',
-  'Use profile default'
+  'Save appearance',
+  'Use profile default',
+  'rhiUxVisualPickerShell'
 ]) {
   if (!pickerSource.includes(required) && !cardSource.includes(required)) {
-    throw new Error('missing coherent image editor control: ' + required);
+    throw new Error('missing coherent appearance editor control: ' + required);
   }
 }
 
-if (cardSource.includes("rhiEnergySetVisualPreference(asset, visualRef);\n        this.energyVisualPickerAssetId = '';")) {
-  throw new Error('image choice still auto-saves and closes instead of using explicit Save');
+for (const forbidden of [
+  'homebrain.energy.visual_preferences.v1',
+  'rhiEnergySetVisualPreference',
+  'rhiEnergyClearVisualPreference'
+]) {
+  if (catalogSource.includes(forbidden) || cardSource.includes(forbidden)) {
+    throw new Error('browser-local visual preference authority remains: ' + forbidden);
+  }
 }
-if (!cardSource.includes('energyVisualPickerDraftRef')) throw new Error('image editor requires a draft visual selection');
-if (!cardSource.includes('energyVisualPickerBrand')) throw new Error('image editor requires a local brand filter');
-if (!cardSource.includes("rhiEnergySetVisualPreference(asset, this.energyVisualPickerDraftRef)")) {
-  throw new Error('Save image must persist the draft selection');
-}
+if (!cardSource.includes('persistEnergyVisualPreference(assetId, visualRef)')) throw new Error('Save must use canonical backend persistence');
+if (!cardSource.includes("rt.publicV2().property('asset.visual_ref', id)")) throw new Error('picker must use per-asset Public V2 visual property');
+if (!cardSource.includes("this._hass.callService(meta.domain, meta.action")) throw new Error('picker must use published Energy writer');
+if (!cardSource.includes("sourceOwner && !['rhi_energy','rhi_energy_ux'].includes(sourceOwner)")) throw new Error('producer-owned visuals must be non-overridable');
+if (!cardSource.includes('energyVisualPickerDraftRef')) throw new Error('appearance editor requires local draft selection');
 
-const context = { console, globalThis:{localStorage:null}, Object, Array, String, JSON };
+const context = { console, globalThis:{}, Object, Array, String, JSON };
 vm.createContext(context);
 vm.runInContext(catalogSource + '\n'
   + 'globalThis.rhiEnergyVisualCatalogForType=rhiEnergyVisualCatalogForType;'
@@ -37,4 +44,4 @@ if (brands.join('|') !== 'Generic|SolarEdge') {
   throw new Error('brand filter must be derived, unique and sorted for the current asset type: ' + brands.join('|'));
 }
 
-console.log('PASS coherent Energy image editor with draft, brand filter and explicit Save');
+console.log('PASS shared Energy appearance picker with backend persistence and producer ownership');
