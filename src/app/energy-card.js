@@ -2757,6 +2757,19 @@
       const row = this.automationModeRow(rt);
       return row && !row.missing ? rowValue(row, fallback) : fallback;
     }
+    automationExecutionPolicy(rt) {
+      const policy = objectFrom(rt.publicV2().planning?.execution_policy || {});
+      const configuredMode = String(firstDefined(policy.configured_mode, this.automationModeValue(rt, 'advice')) || 'advice').toLowerCase();
+      return {
+        configuredMode,
+        planningEnabled: policy.planning_enabled !== false,
+        autonomousExecutionAllowed: policy.autonomous_execution_allowed === true,
+        manualPlanExecutionAllowed: policy.manual_plan_execution_allowed === true,
+        directManualCommandsAllowed: policy.direct_manual_commands_allowed !== false,
+        allocationState: String(firstDefined(policy.allocation_state, configuredMode === 'automatic' ? 'scheduled' : configuredMode === 'advice' ? 'advisory' : 'informational')),
+        authority: String(firstDefined(policy.authority, configuredMode === 'automatic' ? 'home_intelligence' : configuredMode === 'advice' ? 'user_approval' : 'none'))
+      };
+    }
     modeSelector(rt, activeMode) {
       const modeRow = this.automationModeRow(rt);
       const writable = this.isWritableRow(modeRow);
