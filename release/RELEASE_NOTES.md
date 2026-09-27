@@ -11,8 +11,9 @@
 
 ## Required package set
 
-- Foundation **F1.8.23+** for registry presentation locators;
-- Energy backend **E0.15.69+**;
+- RHI UX Core **1.5.1** vendored from exact source commit `bb275767d9e9672713c00b9e8bd9fde13b9b5962`;
+- Foundation **F1.8.25+** for registry presentation locators;
+- Energy backend **E0.15.71+**;
 - Mobility backend **M0.10.19+** when Mobility producer visuals are present.
 
 ## UX scope
