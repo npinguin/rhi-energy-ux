@@ -4693,7 +4693,9 @@
       const assetId = String(firstDefined(asset.asset_id, asset.id, '') || '').trim();
       const assetType = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
       const pickerChoices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(assetType) : [];
-      const canPick = !!assetId && !visualRef.startsWith('mobility.') && pickerChoices.length > 0;
+      const registeredOwner = visualRef ? String(rt.visualRegistry()?.entry?.(visualRef)?.owner_domain || '').trim() : '';
+      const externallyOwned = !!registeredOwner && !['rhi_energy','rhi_energy_ux'].includes(registeredOwner);
+      const canPick = !!assetId && !externallyOwned && pickerChoices.length > 0;
       const pickerAttrs = canPick
         ? ` data-energy-visual-open="${escapeHtml(assetId)}" role="button" tabindex="0" title="Choose representative image"`
         : '';
