@@ -82,7 +82,7 @@ for (const duplicate of ['class="solarCompactSummaryRow"','class="gasUseFacts"',
 assert.doesNotMatch(presentation,/\.rhiUxPageHero\s*\{/);
 assert.doesNotMatch(presentation,/\.rhiUxStatusGrid\s*\{/);
 assert.doesNotMatch(presentation,/\.rhiUxQuickActionBar\s*\{/);
-assert.match(app,/object-fit:contain/);
+assert.match(presentation,/gas:\s*"heroes\\/gas-page-hero-v2\\.webp"/);\nassert.ok(!presentation.includes('gas: "heroes/gas-hero.webp"'), "legacy Gas page hero mapping remains");\nassert.match(app,/object-fit:contain/);
 assert.ok(app.includes('rhiUxDomainShell({'));
 assert.match(app,/domain:'ENERGIE'/);
 assert.match(app,/data-rhi-module/);
