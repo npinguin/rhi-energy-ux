@@ -33,5 +33,8 @@
   "producer_visual_precedence": "NOT_EXECUTED",
   "managed_consumer_semantics": "NOT_EXECUTED",
   "infrastructure_exclusion_all_surfaces": "NOT_EXECUTED",
-  "vehicle_visual_identity_precedence": "NOT_EXECUTED"
+  "vehicle_visual_identity_precedence": "NOT_EXECUTED",
+  "tactical_planning_buckets": "NOT_EXECUTED",
+  "tactical_planning_lane_totals": "NOT_EXECUTED",
+  "strategic_planning_contract_surface": "NOT_EXECUTED"
 }
