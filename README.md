@@ -44,23 +44,29 @@ Keep the old files on disk until the HACS runtime has been verified on the targe
 
 ## Copy-paste dashboard YAML
 
+The Home Assistant **dashboard URL is your deployment choice**. The Energy UX does not depend on a fixed dashboard root. You can use `robotix-energy`, `energy`, or another URL.
+
 For a dedicated Energy dashboard, **Edit dashboard → Raw configuration editor** must contain a top-level `views:` array:
 
 ```yaml
 views:
   - title: Energy
-    path: energy
+    path: overview
     icon: mdi:flash
     type: panel
     cards:
       - type: custom:homebrain-energy-card
 ```
 
-If your existing dashboard already has its own view/layout, keep that YAML and use only this card declaration where the Energy card belongs:
+The example view path `overview` is not a runtime dependency. If Home Assistant uses a generated view path such as `0`, the card must work there as well. Energy capability navigation stays inside the card and never assumes or rewrites the Lovelace dashboard root.
+
+If your existing dashboard already has its own view/layout or URL, keep it and use only this card declaration where the Energy card belongs:
 
 ```yaml
 type: custom:homebrain-energy-card
 ```
+
+No `dashboard_path` setting is required for the normal Energy installation. HACS resources and package artwork remain under the absolute `/hacsfiles/rhi-energy-ux/...` path independently of the dashboard URL.
 
 ### Important: do not paste resource YAML into the dashboard editor
 
@@ -82,14 +88,16 @@ If Home Assistant reports **"views -- Expected an array"**, you pasted resource 
 After install or update:
 
 1. Hard-refresh the Home Assistant frontend.
-2. Open Energy and verify the card renders.
-3. Verify desktop and iPad.
-4. Confirm only the HACS Energy UX resource is active.
-5. Check the footer:
+2. Open Energy under the dashboard URL you chose (for example `/robotix-energy/0`) and verify the card renders.
+3. Verify Overview → Flow → Solar → Home Battery → Consumers → Gas and the Intelligence/Insights tabs without leaving that dashboard root.
+4. Refresh the browser on that custom dashboard URL and verify the card still renders.
+5. Verify desktop and iPad.
+6. Confirm only the HACS Energy UX resource is active.
+7. Check the footer:
    - healthy: quiet gray `RHI Energy UX <version> · Backend <version>`;
    - problem: the short issue summary becomes amber/red;
    - click `issues · details` to expand the concrete runtime/backend conditions and verification guidance.
-6. Only after this proof, remove obsolete files under `/config/www/homebrain/...`.
+8. Only after this proof, remove obsolete files under `/config/www/homebrain/...`.
 
 The backend version comes only from `sensor.energy_release_contract.backend_release`. If that value is wrong, fix the backend release contract; the UX must not map or guess it.
 
