@@ -4235,11 +4235,20 @@
       const relation = chargerId ? `${rt.assetName(chargerId) || human(chargerId)} · ${human(firstDefined(asset.connection_state,'linked'))}` : '';
       const reason = humanReason(firstDefined(planning.user_reason_label, planning.waiting_reason, planning.waiting_reason_code, planning.reason, planning.reason_code, row.reason), state === 'Ready' ? 'Ready when you need it.' : 'Home Intelligence is monitoring this asset.');
       const paused = /paused|hold/.test(String(stateRaw || '').toLowerCase()) || rt.commandEnabled(resume);
+      const executionPolicy = this.automationExecutionPolicy(rt);
       let recommendation = 'Home Intelligence will keep monitoring this asset.';
-      if (/waiting/.test(String(stateRaw || '').toLowerCase())) recommendation = 'Home Intelligence will act automatically when the required energy conditions are available.';
-      if (/planned|scheduled/.test(String(stateRaw || '').toLowerCase())) recommendation = 'Home Intelligence has included this asset in the current plan.';
-      if (/active|charging|running/.test(String(stateRaw || '').toLowerCase())) recommendation = 'Let Home Intelligence continue unless you want to stop or pause control.';
-      if (paused) recommendation = 'Resume automatic control when you want Home Intelligence to manage this asset again.';
+      if (/waiting/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
+        ? 'Home Intelligence may act automatically when the planned conditions are available.'
+        : executionPolicy.configuredMode === 'advice'
+          ? 'Home Intelligence will keep the recommendation ready and wait for your approval.'
+          : 'Planning remains visible, but managed execution is disabled.';
+      if (/planned|scheduled/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
+        ? 'Home Intelligence has included this asset in the executable current plan.'
+        : 'Home Intelligence has included this asset in the advisory plan.';
+      if (/active|charging|running/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
+        ? 'Let Home Intelligence continue unless you want to stop or pause control.'
+        : 'Current physical execution is shown separately from advisory planning.';
+      if (paused) recommendation = 'Resume managed participation when you want Home Intelligence to include this asset again.';
       const actions = [
         paused ? this.componentActionButton(resume, 'Resume managed control', id) : this.componentActionButton(pause, 'Pause managed control', id),
         /active|charging|running/.test(String(stateRaw || '').toLowerCase()) ? this.componentActionButton(stop, 'Stop now', id) : this.componentActionButton(startCommand, 'Start now', id)
