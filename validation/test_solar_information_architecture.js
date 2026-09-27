@@ -54,8 +54,8 @@ assert.ok(hardware.indexOf("solarBatterySystem") < hardware.indexOf("'Solar zone
 assert.match(app,/solarModuleCard/);
 assert.match(app,/optimizerByPanel/);
 assert.match(app,/Optimizers without panel relationship/);
-assert.doesNotMatch(app,/summary>Panels \\(/);
-assert.doesNotMatch(app,/summary>Optimizers \\(/);
+assert.doesNotMatch(app,/summary>Panels \(/);
+assert.doesNotMatch(app,/summary>Optimizers \(/);
 assert.match(catalog,/solar_production\.sunpower_x21_335_blk/);
 assert.match(catalog,/solar_production\.jinkosolar_jkm435n_54hl4r/);
 
