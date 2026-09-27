@@ -39,10 +39,13 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view v4.2.5 >/dev/null 2>&1; then
-            echo "v4.2.5 release already exists"
-            exit 1
+            echo "v4.2.5 release already exists; verifying exact candidate"
+          else
+            gh release create v4.2.5 \
+              --target "$CANDIDATE_SHA" \
+              --title "RHI Energy UX v4.2.5" \
+              --notes-file release/RELEASE_NOTES.md
           fi
-          gh release create v4.2.5             --target "$CANDIDATE_SHA"             --title "RHI Energy UX v4.2.5"             --notes-file release/RELEASE_NOTES.md
       - name: Verify published release
         env:
           GH_TOKEN: ${{ github.token }}
