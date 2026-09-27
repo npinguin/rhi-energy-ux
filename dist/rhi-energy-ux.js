@@ -3758,12 +3758,16 @@ function rhiEnergyVisualPickerStyles() {
       return asNumber(firstDefined(effective.available_above_reserve_kwh, effective.usable_above_reserve_kwh));
     }
     flexibleNeedKwh(rt) {
-      const values = this.flexibleAssetDomain(rt).participating().map(vm => asNumber(firstDefined(vm.raw.energy_to_target_kwh, vm.raw.energy_needed_kwh, vm.raw.remaining_energy_kwh))).filter(value => value !== null);
+      const values = this.flexibleAssetDomain(rt).planningParticipants().map(vm => asNumber(firstDefined(vm.raw.energy_to_target_kwh, vm.raw.energy_needed_kwh, vm.raw.remaining_energy_kwh))).filter(value => value !== null);
       if (!values.length) return null;
       return values.reduce((sum, value) => sum + Math.max(0, value), 0);
     }
     flexiblePowerNowKw(rt) {
-      const values = this.flexibleAssetDomain(rt).participating().map(vm => asNumber(firstDefined(vm.raw.power_kw, vm.raw.current_power_kw, vm.raw.actual_power_kw))).filter(value => value !== null);
+      // Live Flexible Loads power is physical connection truth owned by Energy core.
+      // Do not re-sum planning participants: infrastructure may consume power without being a planning target.
+      const physical = rt.number('flexible_loads.power_kw');
+      if (physical !== null) return Math.abs(physical);
+      const values = this.flexibleAssetDomain(rt).planningParticipants().map(vm => asNumber(firstDefined(vm.raw.power_kw, vm.raw.current_power_kw, vm.raw.actual_power_kw))).filter(value => value !== null);
       if (!values.length) return null;
       return values.reduce((sum, value) => sum + Math.abs(value), 0);
     }
@@ -5325,7 +5329,7 @@ function rhiEnergyVisualPickerStyles() {
       const recommendation = firstDefined(d.recommendation, d.advice, rt.rawText('energy_intelligence.recommendation', null), 'Observe');
       const targetId = firstDefined(d.recommended_target_asset_id, rt.value('energy_intelligence.recommended_target_asset_id', null), '');
       const assetDomain = this.flexibleAssetDomain(rt);
-      const loads = assetDomain.all().filter(vm => !vm.isStorage).map(vm => vm.raw);
+      const loads = assetDomain.consumerFacing().map(vm => vm.raw);
       const participating = loads.filter(load => !assetDomain.byId(load.asset_id)?.isDisabled);
       const disabled = loads.filter(load => assetDomain.byId(load.asset_id)?.isDisabled);
       const cards = participating.map(load => this.operationalLoadCard(rt, load, recommendation, targetId)).join('');
@@ -5371,7 +5375,7 @@ function rhiEnergyVisualPickerStyles() {
       const gridBalance = gridImport !== null && gridExport !== null ? gridImport-gridExport : null;
       const confidence = human(firstDefined(quality.confidence,horizon.confidence,'Not available'));
       const basis = human(firstDefined(supply.solar_basis,supply.forecast_basis,isTomorrow?'Full day forecast':'Remaining forecast'));
-      const planningRows = this.flexibleAssetDomain(rt).all().filter(vm => !vm.isDisabled && !vm.isStorage).map(vm => {
+      const planningRows = this.flexibleAssetDomain(rt).planningParticipants().map(vm => {
         const load=vm.raw||{}; const id=load.asset_id||load.flexible_asset_id||''; const planning=load.energy_planning||rt.planningOutcomeFor(id)||{};
         const amount=asNumber(firstDefined(planning.planned_today_kwh,planning.scheduled_kwh,planning.known_need_kwh,planning.energy_to_target_kwh,load.energy_to_target_kwh,load.required_energy_kwh));
         return amount===null?null:`<div class="outlookChildRow">${this.assetVisual(load,{size:'xs',fallbackIcon:this.flexibleAssetIcon(load)})}<b>${escapeHtml(load.display_name||rt.assetName(id)||human(id))}</b><strong>${escapeHtml(fmtKwh(amount))}</strong></div>`;
@@ -6059,7 +6063,7 @@ function rhiEnergyVisualPickerStyles() {
       const summary = rt.consumerMixSummary();
       const domain = this.flexibleAssetDomain(rt);
       const publishedById = new Map(publishedRows.map(row => [String(row.asset_id||row.consumer_id||row.id||''), row]));
-      const canonicalRows = domain.all().filter(vm => !vm.isStorage).map(vm => {
+      const canonicalRows = domain.consumerFacing().map(vm => {
         const raw = vm.raw || {};
         const published = publishedById.get(vm.id) || {};
         return {
@@ -6074,7 +6078,14 @@ function rhiEnergyVisualPickerStyles() {
         };
       });
       const canonicalIds = new Set(canonicalRows.map(row => String(row.asset_id||row.consumer_id||row.id||'')));
-      const rows = canonicalRows.concat(publishedRows.filter(row => !canonicalIds.has(String(row.asset_id||row.consumer_id||row.id||''))));
+      const rows = canonicalRows.concat(publishedRows.filter(row => {
+        const id = String(row.asset_id||row.consumer_id||row.id||'');
+        if (canonicalIds.has(id)) return false;
+        const vm = domain.byId(id);
+        if (vm) return !vm.isInfrastructure && !vm.isStorage;
+        const kind = String(firstDefined(row.source_asset_kind,row.asset_type,row.object_class,row.energy_asset_role,'') || '').toLowerCase();
+        return !/(^|_)(charger|connection|charging_point)(_|$)/.test(kind);
+      }));
       const visibleRows = this.filterAndSortConsumers(rows);
       const participating = visibleRows.filter(row => { const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return !vm || (vm.isParticipating && !vm.isDisabled); });
       const disabled = visibleRows.filter(row => domain.byId(row.asset_id||row.consumer_id||row.id)?.isDisabled);
@@ -6139,7 +6150,7 @@ function rhiEnergyVisualPickerStyles() {
         ${profilePicker || `<section class="panel"><h2>No strategy profiles published</h2><p>Waiting for canonical V2 strategy configuration.</p></section>`}
         <div class="profileEditorColumn">${selected ? this.strategyProfileCard(rt, selected) : ''}</div>
         <section class="panel effectivePolicyPreview"><h2>Current policy effect${selected ? ` · ${escapeHtml(this.profileUserLabel(selected))}` : ''}</h2><p>Configured, effective and influencing policy state.</p><div class="effectivePolicyList">${effectiveRows || `<div class="empty"><b>No effective strategy published</b><span>Waiting for canonical V2 effective strategy.</span></div>`}</div></section>
-        <section class="panel strategyParticipation"><h2>Participating assets</h2><p>The same central participation model used across Energy.</p><div class="effectivePolicyList">${this.flexibleAssetDomain(rt).all().filter(vm=>!vm.isStorage).map(vm=>`<div class="planningTransparencyRow"><div class="strategyAssetIdentity">${this.assetVisual(vm.raw,{size:'xs',fallbackIcon:this.flexibleAssetIcon(vm.raw)})}<div><b>${escapeHtml(rt.assetName(vm.id))}</b><span>${escapeHtml(vm.isDisabled?'Excluded from planning':'Included in flexible planning')}</span></div></div><strong>${escapeHtml(human(vm.participation))}</strong></div>`).join('') || `<div class="empty"><b>No flexible assets published</b></div>`}</div></section>
+        <section class="panel strategyParticipation"><h2>Participating assets</h2><p>The same central participation model used across Energy.</p><div class="effectivePolicyList">${this.flexibleAssetDomain(rt).consumerFacing().map(vm=>`<div class="planningTransparencyRow"><div class="strategyAssetIdentity">${this.assetVisual(vm.raw,{size:'xs',fallbackIcon:this.flexibleAssetIcon(vm.raw)})}<div><b>${escapeHtml(rt.assetName(vm.id))}</b><span>${escapeHtml(vm.isDisabled?'Excluded from planning':'Included in flexible planning')}</span></div></div><strong>${escapeHtml(human(vm.participation))}</strong></div>`).join('') || `<div class="empty"><b>No flexible assets published</b></div>`}</div></section>
       </div>`;
     }
 
@@ -6496,7 +6507,7 @@ function rhiEnergyVisualPickerStyles() {
         row.asset_id, row.consumer_id, row.consumer, row.source_asset_id,
         row.producer_asset_id, row.flexible_asset_id, row.target_asset_id
       ].map(v=>String(v||'').trim()).filter(Boolean);
-      const flexible = this.flexibleAssetDomain(rt).all().map(vm=>vm.raw || {});
+      const flexible = this.flexibleAssetDomain(rt).consumerFacing().map(vm=>vm.raw || {});
       const mix = rt.consumerMixRows?.() || [];
       const aliases = (asset)=>[
         asset.asset_id, asset.consumer_id, asset.consumer, asset.source_asset_id,
@@ -6534,9 +6545,12 @@ function rhiEnergyVisualPickerStyles() {
       const consumers = v.consumers.map(row => {
         const item=objectFrom(row);
         const identity=this.valueAssetIdentity(rt,item);
+        const vm=identity.id ? this.flexibleAssetDomain(rt).byId(identity.id) : null;
+        const kind=String(firstDefined(item.source_asset_kind,item.asset_type,item.object_class,item.energy_asset_role,'') || '').toLowerCase();
+        if (vm?.isInfrastructure || /(^|_)(charger|connection|charging_point)(_|$)/.test(kind)) return '';
         const meta=`${human(firstDefined(item.attribution_quality,'Not available'))} · ${fmtKwh(firstDefined(item.attributed_kwh,item.energy_kwh), 'Unavailable')}`;
         return `<div class="propertyRow valueConsumerRow"><div class="valueAssetIdentity">${this.assetVisual(identity.asset,{size:'sm',fallbackIcon:'🚗'})}<span><b>${escapeHtml(identity.name)}</b><small>${escapeHtml(meta)}</small></span></div><strong>${escapeHtml(money(firstDefined(item.attributed_value,item.attributed_eur)))}</strong></div>`;
-      }).join('');
+      }).filter(Boolean).join('');
       const optional = [['Savings',v.savings],['Avoided grid cost',v.avoided],['Self-consumption value',v.selfConsumption]].filter(([,value])=>asNumber(value)!==null).map(([label,value])=>this.kv(label,money(value))).join('');
       const financialBody = configurationBlocked ? `<section class="panel wide valueConfigurationState"><h2>Financial result</h2><div class="valueStateHeadline"><b>${escapeHtml(v.stateLabel)}</b><span>${escapeHtml(v.attention)}</span></div><p>Complete the missing Pricing inputs to calculate financial values for ${escapeHtml(v.label.toLowerCase())}.</p><div class="valueConfigurationChecklist">${(v.tariffs || []).filter(item=>item.required).map(item=>`<div><span>${item.configured?'✓':'□'}</span><b>${escapeHtml(item.label)}</b><em>${escapeHtml(item.configured?'Configured':'Configuration required')}</em></div>`).join('')}</div></section>` : `<section class="panel wide"><h2>${escapeHtml(v.label)} financial result</h2><p>Accumulated measured value for the Metering-selected period. No future value is predicted.</p><div class="r3280Balance"><span>Net financial result</span><b>${escapeHtml(money(v.net))}</b><p>${escapeHtml(v.interpretation)}</p></div><div class="goalGrid"><div class="goalRow"><span>Import cost</span><b>${escapeHtml(money(v.importCost))}</b></div><div class="goalRow"><span>Export revenue</span><b>${escapeHtml(money(v.exportRevenue))}</b></div><div class="goalRow"><span>Net energy cost</span><b>${escapeHtml(money(v.netEnergyCost))}</b></div><div class="goalRow"><span>Result completeness</span><b>${escapeHtml(v.resultCompletenessLabel)}</b><small>${escapeHtml(v.resultScopeLabel)}</small></div></div>${optional ? `<div class="softBox">${optional}</div>` : ''}</section>`;
       const allocationById = new Map(v.consumers.map(row => { const item=objectFrom(row); return [String(firstDefined(item.consumer_id,item.asset_id,item.consumer,'')), item]; }));
@@ -6720,7 +6734,7 @@ function rhiEnergyVisualPickerStyles() {
     buildPlanningViewModel(rt) {
       const horizonId = this.selectedPlanningHorizonId || 'D0';
       const domainAssets = this.flexibleAssetDomain(rt).all();
-      const assets = domainAssets.filter(vm => !vm.isDisabled && !vm.isStorage).map(vm => vm.raw);
+      const assets = this.flexibleAssetDomain(rt).planningParticipants().map(vm => vm.raw);
       const storage = domainAssets.find(vm => vm.isStorage && !vm.isDisabled)?.raw || null;
       return createPlanningViewModel({ gateway: rt.contractGateway(), horizonId, flexibleAssets: assets, storage });
     }
@@ -6767,10 +6781,9 @@ function rhiEnergyVisualPickerStyles() {
         const value = this.planningParticipant(row,'consumers',assetId)?.energyKwh;
         return sum + (value === null || value === undefined ? 0 : Math.max(0,Number(value) || 0));
       }, 0);
-      const assetTotals = allAssetTotals.filter(item => {
-        const values = [item.need,item.plannedEnergy,item.remainingNeed,hourlyAssetEnergy(assetKey(item.asset))];
-        return values.some(value => value !== null && value > 0.001);
-      });
+      // Tactical Planning shows every real planning participant. Zero/no-plan is
+      // a valid state and must not make a vehicle disappear from the horizon.
+      const assetTotals = allAssetTotals;
 
       const solarTotal = totals.solarKwh;
       const batteryOutTotal = totals.homeBatteryOutKwh;
@@ -6875,7 +6888,7 @@ function rhiEnergyVisualPickerStyles() {
         return `<article class="planningLoadRow"><div class="planningLoadIdentity">${this.assetVisual(item.asset,{size:'sm',fallbackIcon:this.planningAssetIcon(item.asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(item.asset))}</b><span class="priorityBadge">${escapeHtml(priority)}</span></div><small><i class="dot ${/connected/i.test(String(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'')))?'green':'gray'}"></i>${escapeHtml(human(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'Connection unavailable')))}</small></div></div><div><small>Next action</small><b class="nextActionBadge">${escapeHtml(next)}</b></div><div><small>Requested power</small><b>${fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')}</b></div><div><small>Planned today</small><b>${fmtKwh(item.plannedEnergy,'—')}</b></div><div><small>Why / reason</small><b>${escapeHtml(why)}</b></div><div><small>Plan status</small><b class="planStatusBadge ${/at.?risk|blocked|failed/i.test(String(firstDefined(canonical.exception_state,canonical.risk_state,canonical.today_status,'')))?'exception':'unknown'}">${escapeHtml(firstDefined(canonical.plan_conformance_label,canonical.exception_label,canonical.risk_label,'Status unavailable'))}</b></div></article>`;
       }).join('');
       const planningReason = human(firstDefined(vm.summary.reason, vm.horizon.reason, vm.currentActionIntent.reason, vm.quality.reason, vm.complete ? 'Planning data is available.' : 'No complete hourly allocation is currently published.'));
-      const planningContext = `<section class="panel planningContextPanel"><div class="planningContextGrid"><span><small>Horizon</small><b>${escapeHtml(horizonLabel)}</b></span><span><small>Plan state</small><b>${escapeHtml(statusLabel)}</b></span><span><small>Hourly buckets</small><b>${vm.rows.length}</b></span><span><small>Participating loads</small><b>${allAssetTotals.length}</b></span><span><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></span><span><small>Planning source</small><b>Energy public planning contract</b></span></div><p>${escapeHtml(planningReason)}</p>${vm.rows.length ? '' : '<div class="empty"><b>No hourly allocation published for this horizon</b><span>The UX keeps unavailable hours empty and does not estimate a schedule.</span></div>'}</section>`;
+      const planningContext = `<section class="panel planningContextPanel"><div class="planningContextGrid"><span><small>Horizon</small><b>${escapeHtml(horizonLabel)}</b></span><span><small>Plan state</small><b>${escapeHtml(statusLabel)}</b></span><span><small>Hourly buckets</small><b>${vm.rows.length}</b></span><span><small>Participating loads</small><b>${assetTotals.length}</b></span><span><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></span><span><small>Planning source</small><b>Energy public planning contract</b></span></div><p>${escapeHtml(planningReason)}</p>${vm.rows.length ? '' : '<div class="empty"><b>No hourly allocation published for this horizon</b><span>The UX keeps unavailable hours empty and does not estimate a schedule.</span></div>'}</section>`;
       return `${this.tabExperienceHeader(rt,'planning',planningHeader)}
       ${planningContext}
       <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>${vm.buckets.length} published bucket${vm.buckets.length===1?'':'s'} · backend timestamps preserved · no interpolation · zero values hidden · Grid out fixed at table end</p></div><span>All primary values are kWh per bucket</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>published by Planning</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Canonical Tactical plan projected without frontend recalculation.</p></div></div><div class="planningLoadList">${planningLoadRows||'<div class="empty"><b>No planned flexible loads</b></div>'}</div></section>`;
