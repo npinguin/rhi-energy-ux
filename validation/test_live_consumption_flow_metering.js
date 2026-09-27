@@ -28,7 +28,7 @@ console.log('PASS V2-only consumption and physical Flow contracts');
 
 
 for (const token of [
-  "addConfigurationRows('metering', metering.properties)",
+  "addConfigurationRows('metering', meteringConfiguration.properties)",
   "metering.selected_period",
   "meteringPeriodControl",
   "componentPeriodSelector(vm.periods, vm.periodId, 'metering-period')",
