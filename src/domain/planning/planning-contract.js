@@ -26,7 +26,9 @@
     const horizonsById = planningById(planning.horizons);
     const horizon = planningObject(horizonsById[normalized] || horizonsById[normalized.toLowerCase()]);
     const summary = horizon;
+    const canonicalLaneTotals = planningObject(planningObject(horizon.summary).lane_totals || horizon.lane_totals);
     const laneTotals = planningObject({
+      ...canonicalLaneTotals,
       required_kwh:horizon.required_kwh,
       planned_kwh:horizon.planned_kwh,
       executed_kwh:horizon.executed_kwh,
