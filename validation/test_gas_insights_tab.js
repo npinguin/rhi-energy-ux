@@ -6,8 +6,8 @@ const presentation = fs.readFileSync("src/app/presentation.js","utf8");
 const catalog = fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
 
 assert.match(presentation,/id:"consumers", label:"Consumers"[\s\S]*id:"gas", label:"Gas", view:"gas"/);
-assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v2.svg"'),"Gas page hero mapping must use immutable photographic v2 asset");
-assert.ok(fs.existsSync("src/assets/heroes/gas-page-hero-v2.svg"),"missing immutable Gas page hero v2 artwork");
+assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v3.webp"'),"Gas page hero mapping must use approved photographic v3 asset");
+assert.ok(fs.existsSync("src/assets/heroes/gas-page-hero-v3.webp"),"missing approved Gas page hero v3 artwork");
 
 assert.match(app,/gas:\['consumer'\]/);
 assert.match(app,/gas:\['energy','gas'\]/);
@@ -32,3 +32,8 @@ assert.match(app,/gas: \{ image:hbEnergyHeroAsset\('gas'\)/);
 assert.ok(catalog.includes('gas_meter.smart_meter') && catalog.includes('package_path:"heroes/gas-hero.webp"'),"Gas meter catalog fallback may retain the logical-device WebP visual");
 
 console.log("PASS Gas is the final Energy tab with dedicated hero, canonical meter and HA-native statistics history");
+
+assert.match(app,/async mountGasStatisticsGraph\(\)/);
+assert.match(app,/window\.loadCardHelpers/);
+assert.match(app,/helpers\.createCardElement/);
+assert.match(app,/tab === 'gas'\) return !!target && type === 'gas_meter'/);
