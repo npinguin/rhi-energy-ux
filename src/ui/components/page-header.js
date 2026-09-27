@@ -1,6 +1,18 @@
 // Energy domain adapter onto shared RHI UX Core presentation primitives.
 // Domain semantics arrive fully interpreted through pageViewModel.
-function rhiEnergyPageHeader({ sectionLabel = "Energy", itemLabel = "", title = "", description = "", hero = "", metrics = [], quickActions = "", tone = "" } = {}) {
+// Page-level controls are intentionally one surface: context/navigation is
+// separated from executable commands without creating duplicate action bars.
+function rhiEnergyPageHeader({
+  sectionLabel = "Energy",
+  itemLabel = "",
+  title = "",
+  description = "",
+  hero = "",
+  metrics = [],
+  contextControls = "",
+  commandActions = "",
+  tone = ""
+} = {}) {
   const eyebrow = [sectionLabel, itemLabel].filter(Boolean).join(" / ");
   const heroMarkup = rhiUxPageHero({
     eyebrow,
@@ -15,6 +27,16 @@ function rhiEnergyPageHeader({ sectionLabel = "Energy", itemLabel = "", title = 
     value:value ?? "—",
     detail:detail || ""
   })));
-  const actionsMarkup = quickActions ? `<section class="rhiUxQuickActionBar" aria-label="Quick actions"><small>Quick actions</small><div class="rhiUxQuickActions">${quickActions}</div></section>` : "";
-  return `<section class="rhiEnergyPageHeader rhiUxPageStack ${rhiUxEscape(tone)}">${heroMarkup}${statusMarkup}${actionsMarkup}</section>`;
+
+  const contextGroup = contextControls
+    ? `<div class="rhiEnergyControlGroup context"><small>View</small><div class="rhiUxQuickActions">${contextControls}</div></div>`
+    : "";
+  const commandGroup = commandActions
+    ? `<div class="rhiEnergyControlGroup commands"><small>Quick actions</small><div class="rhiUxQuickActions">${commandActions}</div></div>`
+    : "";
+  const controlsMarkup = (contextGroup || commandGroup)
+    ? `<section class="rhiEnergyPageControls rhiUxQuickActionBar" aria-label="Page controls">${contextGroup}${commandGroup}</section>`
+    : "";
+
+  return `<section class="rhiEnergyPageHeader rhiUxPageStack ${rhiUxEscape(tone)}">${heroMarkup}${statusMarkup}${controlsMarkup}</section>`;
 }
