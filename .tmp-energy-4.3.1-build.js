@@ -1,0 +1,6700 @@
+(() => {
+  const UX_VERSION = '__RHI_UX_VERSION__';
+  const RELEASE_ENTITY = 'sensor.rhi_energy_release';
+  // ---- src/runtime/public-interface-registry.js ----
+// Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
+// product-state entry point. Release/engineering entities are diagnostics only.
+const UX_INTERFACES = Object.freeze({
+  publicV2: 'sensor.rhi_energy_public_contract_v2'
+});
+
+// ---- src/runtime/energy-contract-gateway.js ----
+// Single backend-access owner for Energy UX public product contracts.
+  function createEnergyContractGateway(host) {
+    const cache = new Map();
+    const entityId = contractKey => {
+      const key = String(contractKey || '');
+      const configured = UX_INTERFACES[key];
+      if (!configured) throw new Error(`unknown_energy_contract:${key}`);
+      return configured;
+    };
+    const state = contractKey => {
+      const id = entityId(contractKey);
+      if (!cache.has(id)) cache.set(id, host.state(id) || null);
+      return cache.get(id);
+    };
+    const attrs = contractKey => state(contractKey)?.attributes || {};
+    const contract = contractKey => {
+      const id = entityId(contractKey);
+      const current = state(contractKey);
+      const attributes = current?.attributes || {};
+      return {
+        contractKey,
+        entityId: id,
+        state: current?.state ?? null,
+        attributes,
+        contractVersion: String(firstDefined(attributes.contract_version, attributes.release, '')),
+        available: !!current
+      };
+    };
+    return Object.freeze({ entityId, state, attrs, contract });
+  }
+
+// ---- src/runtime/energy-v2-contract.js ----
+// Canonical Energy V2 reader. This is the only UX adapter allowed to interpret
+// sensor.rhi_energy_public_contract_v2. Screens consume projections derived here.
+function readEnergyPublicV2(gateway) {
+  const envelope = gateway.contract('publicV2');
+  const attrs = envelope.attributes || {};
+  const array = value => {
+    const parsed = parseMaybeJson(value, value);
+    if (Array.isArray(parsed)) return parsed.filter(row => row && typeof row === 'object');
+    if (parsed && typeof parsed === 'object') return Object.values(parsed).filter(row => row && typeof row === 'object');
+    return [];
+  };
+  const object = value => {
+    const parsed = parseMaybeJson(value, value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  };
+
+  const core = object(attrs.core);
+  const objects = array(attrs.objects);
+  const profiles = array(attrs.profiles);
+  const relationships = array(attrs.relationships).map(row => Object.freeze({
+    ...row,
+    from_asset_id:String(row.from_asset_id || row.source_asset_id || ''),
+    to_asset_id:String(row.to_asset_id || row.target_asset_id || ''),
+    source_asset_id:String(row.source_asset_id || row.from_asset_id || ''),
+    target_asset_id:String(row.target_asset_id || row.to_asset_id || '')
+  }));
+  const commands = array(attrs.commands);
+  const activity = array(attrs.activity);
+  const planning = object(attrs.planning);
+  const intelligence = object(attrs.intelligence);
+  const overview = object(attrs.overview);
+  const configuration = object(attrs.configuration);
+  const valueAccounting = object(attrs.value_accounting);
+  const layers = object(attrs.layers);
+  const summary = object(attrs.summary);
+
+  const semantic = raw => {
+    const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {value:raw};
+    const resolution = source.resolution && typeof source.resolution === 'object' ? source.resolution : {};
+    const value = source.value !== undefined ? source.value : null;
+    const status = String(source.status || source.availability || resolution.status || (value !== null ? 'AVAILABLE' : 'UNAVAILABLE')).toUpperCase();
+    const quality = String(source.quality || (status === 'AVAILABLE' ? 'CANONICAL' : 'UNKNOWN')).toUpperCase();
+    const resolved = status === 'AVAILABLE' && value !== null && !['INVALID','STALE'].includes(quality);
+    return Object.freeze({
+      resolved,
+      value,
+      display:String(source.display ?? source.display_value ?? (value ?? '—')),
+      unit:String(source.unit || ''),
+      state:status.toLowerCase(),
+      status,
+      quality,
+      reason:String(source.reason || resolution.reason_code || source.reason_code || source.reason_text || ''),
+      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+      editable:source.write_supported === true || source.editable === true,
+      editor:source.editor || null,
+      constraints:source.constraints && typeof source.constraints === 'object' ? source.constraints : {},
+      write:source.write && typeof source.write === 'object' ? source.write : null,
+      operation:source.operation && typeof source.operation === 'object' ? source.operation : null,
+      raw:source
+    });
+  };
+
+  const coreField = (sectionName, fieldName) => {
+    const section = object(core[sectionName]);
+    const fields = object(section.fields);
+    if (fields[fieldName] !== undefined) return semantic(fields[fieldName]);
+    if (section[fieldName] && typeof section[fieldName] === 'object' && Object.prototype.hasOwnProperty.call(section[fieldName],'value')) {
+      return semantic(section[fieldName]);
+    }
+    if (Object.prototype.hasOwnProperty.call(section, fieldName)) {
+      const value = section[fieldName];
+      return semantic({
+        value,
+        unit:({power_kw:'kW',net_power_kw:'kW',import_power_kw:'kW',export_power_kw:'kW',attributed_power_kw:'kW',soc_pct:'%',reserve_target_pct:'%',capacity_kwh:'kWh',available_kwh:'kWh'})[fieldName] || null,
+        status:value === null || value === undefined ? 'UNAVAILABLE' : 'AVAILABLE',
+        quality:value === null || value === undefined ? 'UNKNOWN' : 'CANONICAL',
+        reason:value === null || value === undefined ? String(section.reason || '') : null
+      });
+    }
+    return semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:String(section.reason || 'canonical_field_not_published')});
+  };
+
+  const coreByKey = new Map([
+    ['battery.power_kw', coreField('battery','power_kw')],
+    ['battery.soc_pct', coreField('battery','soc_pct')],
+    ['battery.capacity_kwh', coreField('battery','capacity_kwh')],
+    ['battery.available_kwh', coreField('battery','available_kwh')],
+    ['battery.state', coreField('battery','state')],
+    ['battery.reserve_target_pct', coreField('battery','reserve_target_pct')],
+    ['solar.power_kw', coreField('solar','power_kw')],
+    ['grid.net_power_kw', coreField('grid','net_power_kw')],
+    ['grid_import.power_kw', coreField('grid','import_power_kw')],
+    ['grid_export.power_kw', coreField('grid','export_power_kw')],
+    ['grid.flow_direction', coreField('grid','flow_direction')],
+    ['site_consumption.power_kw', coreField('consumption','power_kw')],
+    ['home_consumption.power_kw', coreField('home','power_kw')],
+    ['flexible_loads.power_kw', coreField('flexible','power_kw')],
+    ['flexible_loads.attributed_power_kw', coreField('flexible','attributed_power_kw')]
+  ]);
+
+  const coreFlexible = object(core.flexible);
+  const flexibleAssets = Object.freeze(
+    (array(coreFlexible.assets).length ? array(coreFlexible.assets) : objects.filter(row => {
+      const type=String(row.asset_type || row.object_class || '').toLowerCase();
+      return type === 'flexible_load' || type === 'flexible_asset';
+    })).map(row => Object.freeze({ ...row }))
+  );
+  const planningObjects = Object.freeze(array(layers.planning_objects));
+  const objectById = new Map(objects.map(row => [String(row.asset_id || ''), row]).filter(([id]) => id));
+  const profileById = new Map(profiles.map(row => [String(row.profile_id || ''), row]).filter(([id]) => id));
+
+  const propertyRows = [];
+  const propertyByKey = new Map();
+  const propertyByAssetAndKey = new Map();
+  const configurationRows = [];
+  const addConfigurationRows = (configurationKind, rows) => {
+    for (const raw of array(rows)) {
+      const key = String(raw.property_key || raw.property_id || raw.key || '');
+      if (!key) continue;
+      const row = Object.freeze({
+        asset_id:String(raw.asset_id || configurationKind),
+        configuration_kind:configurationKind,
+        ...raw,
+        property_id:String(raw.property_id || key),
+        property_key:key,
+        key
+      });
+      configurationRows.push(row);
+      if (!propertyByKey.has(key)) propertyByKey.set(key,row);
+    }
+  };
+  const pricing = object(configuration.pricing);
+  const strategy = object(configuration.strategy);
+  addConfigurationRows('pricing', pricing.properties);
+  addConfigurationRows('strategy', object(strategy.configured).properties || strategy.configured_properties);
+
+  for (const asset of objects) {
+    const assetId = String(asset.asset_id || '');
+    for (const raw of array(asset.properties)) {
+      const key = String(raw.property_key || raw.property_id || raw.key || '');
+      if (!key) continue;
+      const row = Object.freeze({ asset_id:assetId, ...raw, property_key:key, key });
+      propertyRows.push(row);
+      if (!propertyByKey.has(key)) propertyByKey.set(key, row);
+      if (assetId) propertyByAssetAndKey.set(`${assetId}::${key}`, row);
+    }
+  }
+
+  const publicContractOk = envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2';
+  const coreContractOk = String(core.contract_id || '') === 'RHI_ENERGY_CORE_V1';
+  const capabilities = Object.freeze({
+    core:coreContractOk,
+    assets:Array.isArray(objects),
+    relationships:Array.isArray(relationships),
+    planning:Object.keys(object(planning.horizons)).length > 0,
+    pricing:Object.keys(pricing).length > 0,
+    strategy:Object.keys(strategy).length > 0,
+    value_accounting:Object.keys(valueAccounting).length > 0,
+    commands:Array.isArray(commands)
+  });
+  const compatibilityReason = !publicContractOk
+    ? 'public_v2_contract_unavailable'
+    : !coreContractOk
+      ? 'required_core_contract_missing'
+      : '';
+
+  return Object.freeze({
+    envelope,
+    available:publicContractOk && coreContractOk,
+    publicContractOk,
+    coreContractOk,
+    capabilities,
+    compatibilityReason,
+    contractVersion:String(attrs.contract_version || envelope.contractVersion || ''),
+    release:String(attrs.release || ''),
+    health:object(attrs.health).status || String(attrs.health || envelope.state || 'UNKNOWN'),
+    core,
+    summary,
+    objects,
+    profiles,
+    relationships,
+    planning,
+    intelligence,
+    overview,
+    configuration,
+    valueAccounting,
+    activity,
+    layers,
+    flexibleAssets,
+    planningObjects,
+    commands,
+    objectById,
+    profileById,
+    propertyRows:Object.freeze(propertyRows),
+    configurationRows:Object.freeze(configurationRows),
+    allPropertyRows:Object.freeze([...propertyRows, ...configurationRows]),
+    propertyByKey,
+    propertyByAssetAndKey,
+    coreByKey,
+    object(assetId) { return objectById.get(String(assetId || '')) || null; },
+    profile(profileId) { return profileById.get(String(profileId || '')) || null; },
+    property(key, assetId = '') {
+      const id = String(assetId || '');
+      return id ? (propertyByAssetAndKey.get(`${id}::${String(key || '')}`) || null) : (propertyByKey.get(String(key || '')) || null);
+    },
+    field(key, assetId = '') {
+      if (!assetId && coreByKey.has(String(key || ''))) return coreByKey.get(String(key || ''));
+      return semantic(this.property(key, assetId));
+    }
+  });
+}
+
+function createEnergyAssetProjection(v2, assetId) {
+  const asset = v2?.object?.(assetId) || null;
+  if (!asset) return null;
+  const profile = v2.profile(asset.profile_id) || null;
+  const relationships = (v2.relationships || []).filter(row =>
+    String(row.source_asset_id || '') === String(assetId)
+    || String(row.target_asset_id || '') === String(assetId)
+  );
+  const properties = (asset.properties || []).map(row => ({
+    ...row,
+    projection:v2.field(row.property_key || row.property_id || row.key, assetId)
+  }));
+  const controls = Array.isArray(asset.controls) ? asset.controls : [];
+  return Object.freeze({
+    identity:Object.freeze({
+      asset_id:String(asset.asset_id || ''),
+      display_name:String(asset.display_name || asset.name || asset.asset_id || ''),
+      asset_type:String(asset.asset_type || asset.object_class || ''),
+      object_class:String(asset.object_class || ''),
+      profile_id:String(asset.profile_id || ''),
+      visual_ref:String(asset.visual_ref || ''),
+      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+    }),
+    lifecycle:Object.freeze({
+      state:String(asset.health || asset.status || 'UNKNOWN'),
+      publication:asset.property_publication || {},
+      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+    }),
+    properties:Object.freeze(properties),
+    property(key) { return v2.field(key, assetId); },
+    relationships:Object.freeze(relationships),
+    controls:Object.freeze(controls),
+    profile,
+    raw:asset
+  });
+}
+
+// ---- src/domain/selectors/energy-selectors.js ----
+// Pure Energy product selectors. These functions know the normalized Energy V2
+// shape; screens must not know Home Assistant entity ids or raw contract paths.
+function selectEnergyAsset(store, assetId) {
+  return createEnergyAssetProjection(store, assetId);
+}
+
+function selectEnergyOverview(store) {
+  const row=store?.overview && typeof store.overview === 'object' ? store.overview : {};
+  return Object.freeze({
+    available:store?.available === true,
+    status:String(row.status || row.product_status || row.state || store?.health || 'UNKNOWN'),
+    primary:row.primary || row.primary_metric || null,
+    summary:row.summary || {},
+    flow:row.flow || {},
+    conclusions:Array.isArray(row.conclusions) ? row.conclusions : [],
+    reason:String(row.reason || row.product_reason || ''),
+    raw:row,
+    core:store?.core || {},
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.core'
+  });
+}
+
+function selectEnergyPlanning(store, horizon='D0') {
+  const id=String(horizon || 'D0').toUpperCase();
+  const planning=store?.planning && typeof store.planning === 'object' ? store.planning : {};
+  const horizons=planning.horizons && typeof planning.horizons === 'object' ? planning.horizons : {};
+  const row=horizons[id] && typeof horizons[id] === 'object' ? horizons[id] : {};
+  return Object.freeze({
+    available:store?.available === true && Object.keys(row).length > 0,
+    horizon_id:id,
+    horizon:row,
+    summary:row,
+    lane_totals:Object.freeze({
+      required_kwh:row.required_kwh ?? null,
+      planned_kwh:row.planned_kwh ?? null,
+      executed_kwh:row.executed_kwh ?? null,
+      still_to_plan_kwh:row.still_to_plan_kwh ?? null,
+      flexible_required_kwh:row.flexible_required_kwh ?? null,
+      flexible_planned_kwh:row.flexible_planned_kwh ?? null,
+      flexible_executed_kwh:row.flexible_executed_kwh ?? null,
+      flexible_still_to_plan_kwh:row.flexible_still_to_plan_kwh ?? null
+    }),
+    buckets:Array.isArray(row.buckets) ? row.buckets : [],
+    flexible_plan:{},
+    planning_objects:Array.isArray(store?.planningObjects) ? store.planningObjects : [],
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons'
+  });
+}
+
+function selectEnergyConfigurationProperties(store, scope) {
+  const kind=String(scope || '').toLowerCase();
+  const configuration=store?.configuration && typeof store.configuration === 'object' ? store.configuration : {};
+  const section=configuration[kind] && typeof configuration[kind] === 'object' ? configuration[kind] : {};
+  if (kind === 'strategy') {
+    const configured=section.configured && typeof section.configured === 'object' ? section.configured : {};
+    const effective=section.effective && typeof section.effective === 'object' ? section.effective : {};
+    const rows=Array.isArray(configured.properties) ? configured.properties : [];
+    const effectiveRows=Array.isArray(effective.properties) ? effective.properties : [];
+    return Object.freeze({
+      available:store?.available === true && configured.status !== 'UNAVAILABLE',
+      scope:kind,
+      properties:Object.freeze(rows.map(row=>Object.freeze({...row}))),
+      effective_properties:Object.freeze(effectiveRows.map(row=>Object.freeze({...row}))),
+      effective_state:String(effective.status || 'UNAVAILABLE'),
+      effective_reason:String(effective.reason || ''),
+      runtime_overrides:Object.freeze((Array.isArray(effective.runtime_overrides) ? effective.runtime_overrides : []).map(row=>Object.freeze({...row}))),
+      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy'
+    });
+  }
+  const rows=Array.isArray(section.properties) ? section.properties : [];
+  return Object.freeze({
+    available:store?.available === true && Array.isArray(rows),
+    scope:kind,
+    properties:Object.freeze(rows.map(row=>Object.freeze({...row}))),
+    effective_properties:Object.freeze([]),
+    effective_state:String(section.availability || section.status || 'UNAVAILABLE'),
+    effective_reason:String(section.reason || ''),
+    source:`RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.${kind}`
+  });
+}
+
+function selectEnergyStrategies(store) { return selectEnergyConfigurationProperties(store,'strategy'); }
+function selectEnergyPricing(store) { return selectEnergyConfigurationProperties(store,'pricing'); }
+
+function selectEnergyValue(store, period='today') {
+  const accounting=store?.valueAccounting && typeof store.valueAccounting === 'object' ? store.valueAccounting : {};
+  const id=String(period || accounting.selected_period_id || 'today').toLowerCase();
+  const periods=accounting.periods && typeof accounting.periods === 'object' ? accounting.periods : {};
+  const row=periods[id] && typeof periods[id] === 'object' ? periods[id] : {};
+  const selectedId=String(accounting.selected_period_id || '').toLowerCase();
+  const netOutcome=accounting.net_financial_result && typeof accounting.net_financial_result === 'object' ? accounting.net_financial_result : {};
+  return Object.freeze({
+    available:store?.available === true && Object.keys(row).length > 0,
+    period_id:id,
+    value:row,
+    net_financial_result_eur:row.net_financial_result_eur ?? (id === selectedId ? netOutcome.value ?? accounting.net_financial_result_eur ?? null : null),
+    net_financial_result:id === selectedId ? netOutcome : {},
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.value_accounting'
+  });
+}
+
+function selectEnergyMetering(store, period='today') {
+  const id=String(period || 'today').toLowerCase();
+  return Object.freeze({
+    available:false,
+    partial:false,
+    period_id:id,
+    metrics:Object.freeze({}),
+    reason:'canonical_period_energy_not_published',
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+  });
+}
+
+function selectEnergyActivity(store) {
+  return Object.freeze({
+    available:store?.available === true,
+    rows:Object.freeze((Array.isArray(store?.activity) ? store.activity : []).map(row=>Object.freeze({...row}))),
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.activity'
+  });
+}
+
+function selectEnergyCommands(store, assetId='') {
+  const wanted=String(assetId || '');
+  const rows=(Array.isArray(store?.commands) ? store.commands : [])
+    .filter(row=>!wanted || String(row.target_asset_id || '') === wanted)
+    .map(row=>Object.freeze({...row}));
+  return Object.freeze({
+    available:store?.available === true,
+    rows:Object.freeze(rows),
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.commands'
+  });
+}
+
+function selectEnergyCoverage(store) {
+  const present=value => {
+    if(Array.isArray(value)) return value.length > 0;
+    return !!value && typeof value === 'object' && Object.keys(value).length > 0;
+  };
+  const capabilities=Object.freeze({
+    core:present(store?.core) ? 'SUPPORTED' : 'UNAVAILABLE',
+    assets:present(store?.objects) ? 'SUPPORTED' : 'UNAVAILABLE',
+    relationships:Array.isArray(store?.relationships) ? 'SUPPORTED' : 'UNAVAILABLE',
+    planning:present(store?.planning?.horizons) ? 'SUPPORTED' : 'UNAVAILABLE',
+    pricing:present(store?.configuration?.pricing) ? 'SUPPORTED' : 'UNAVAILABLE',
+    strategies:present(store?.configuration?.strategy) ? 'SUPPORTED' : 'UNAVAILABLE',
+    commands:Array.isArray(store?.commands) ? 'SUPPORTED' : 'UNAVAILABLE',
+    value_accounting:present(store?.valueAccounting) ? 'SUPPORTED' : 'UNAVAILABLE'
+  });
+  return Object.freeze({
+    complete:Object.values(capabilities).every(value=>value === 'SUPPORTED'),
+    capabilities,
+    unsupported:Object.freeze(Object.entries(capabilities).filter(([,v])=>v!=='SUPPORTED').map(([k])=>k)),
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.coverage'
+  });
+}
+
+// ---- src/app/energy-asset-catalog.js ----
+// Energy logical-device visual catalog.
+// Backend profiles remain semantic and non-visual. This UX module owns representative
+// artwork, same-type defaults, picker options and local presentation preference.
+const RHI_ENERGY_VISUAL_PREFERENCE_KEY = "homebrain.energy.visual_preferences.v1";
+
+const RHI_ENERGY_LOGICAL_VISUALS = Object.freeze([
+  { id:"battery_system.home", asset_type:"battery_system", label:"Home battery system", brand:"Generic", model:"Home battery system", variant:"System", profile_patterns:["energy.battery_system."], package_path:"heroes/battery-hero.webp", quality:"representative", selectable:true },
+  { id:"battery.byd_lvs_20", asset_type:"battery", label:"BYD Battery-Box Premium LVS 20.0", brand:"BYD", model:"Battery-Box Premium LVS 20.0", variant:"20.0 kWh · 5 × LVS 4.0", profile_patterns:[], package_path:"energy/byd_lvs_20.webp", quality:"verified_model_choice", selectable:true },
+  { id:"battery.solaredge_home_48v_9_6", asset_type:"battery", label:"SolarEdge Home Battery 48V 9.6 kWh", brand:"SolarEdge", model:"Home Battery 48V", variant:"9.6 kWh", profile_patterns:[], package_path:"energy/solaredge_home_battery_48v_9_6.webp", quality:"verified_model_choice", selectable:true },
+  { id:"battery.home", asset_type:"battery", label:"Home battery", brand:"Generic", model:"Home battery", variant:"Battery module", profile_patterns:["energy.battery."], package_path:"heroes/battery-hero.webp", quality:"representative", selectable:true },
+
+  { id:"grid_connection.homewizard_p1", asset_type:"grid_connection", label:"HomeWizard P1 Meter", brand:"HomeWizard", model:"P1 Meter", variant:"HWE-P1 / HWE-P1-AU", profile_patterns:[], package_path:"energy/homewizard_p1.webp", quality:"verified_model_choice", selectable:true },
+  { id:"grid_connection.smart_meter", asset_type:"grid_connection", label:"Smart meter / grid connection", brand:"Generic", model:"Smart meter", variant:"Grid connection", profile_patterns:["energy.grid_connection."], package_path:"heroes/metering-hero.webp", quality:"representative", selectable:true },
+  { id:"grid_phase.generic", asset_type:"grid_phase", label:"Grid phase", brand:"Generic", model:"Grid phase", variant:"Phase", profile_patterns:["energy.grid_phase."], package_path:"heroes/flow-hero.webp", quality:"representative", selectable:true },
+
+  { id:"solar_production.array", asset_type:"solar_production", label:"Solar production", brand:"Generic", model:"PV array", variant:"System", profile_patterns:["energy.solar_production."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
+  { id:"solar_production.sunpower_x21_335_blk", asset_type:"solar_production", label:"SunPower SPR-X21-335-BLK array", brand:"SunPower", model:"SPR-X21-335-BLK", variant:"X21 Black · 335 W", profile_patterns:[], package_path:"energy/sunpower_spr_x21_335_blk.webp", quality:"verified_model_choice", selectable:true },
+  { id:"solar_production.jinkosolar_jkm435n_54hl4r", asset_type:"solar_production", label:"JinkoSolar JKM435N-54HL4R array", brand:"JinkoSolar", model:"JKM435N-54HL4R", variant:"Tiger Neo N-Type · 435 W", profile_patterns:[], package_path:"energy/jinkosolar_jkm435n_54hl4r.webp", quality:"verified_model_choice", selectable:true },
+  { id:"solar_panel.sunpower_x21_335_blk", asset_type:"solar_panel", label:"SunPower SPR-X21-335-BLK", brand:"SunPower", model:"SPR-X21-335-BLK", variant:"X21 Black · 335 W", profile_patterns:[], package_path:"energy/sunpower_spr_x21_335_blk.webp", quality:"verified_model_choice", selectable:true },
+  { id:"solar_panel.jinkosolar_jkm435n_54hl4r", asset_type:"solar_panel", label:"JinkoSolar JKM435N-54HL4R", brand:"JinkoSolar", model:"JKM435N-54HL4R", variant:"Tiger Neo N-Type · 435 W", profile_patterns:[], package_path:"energy/jinkosolar_jkm435n_54hl4r.webp", quality:"verified_model_choice", selectable:true },
+  { id:"solar_inverter.solaredge_rwb_10k", asset_type:"solar_inverter", label:"SolarEdge Home Hub 10 kW", brand:"SolarEdge", model:"SE10K-RWB48BFN4", variant:"RWB 10K Home", profile_patterns:[], package_path:"energy/solaredge_rwb_10k.svg", quality:"verified_model_choice", selectable:true },
+  { id:"solar_inverter.solaredge_rws_8k", asset_type:"solar_inverter", label:"SolarEdge StorEdge 8 kW", brand:"SolarEdge", model:"SE8K-RWS48BEN4", variant:"RWS 8K", profile_patterns:[], package_path:"energy/solaredge_rws_8k.webp", quality:"verified_model_choice", selectable:true },
+  { id:"solar_inverter.solaredge", asset_type:"solar_inverter", label:"SolarEdge inverter", brand:"SolarEdge", model:"Solar inverter", variant:"Inverter", integration_domains:["solaredge","solaredge_modbus_multi"], package_path:"heroes/solar-hero.webp", quality:"representative_brand", selectable:true },
+  { id:"solar_inverter.generic", asset_type:"solar_inverter", label:"Solar inverter", brand:"Generic", model:"Solar inverter", variant:"Inverter", profile_patterns:["energy.solar_inverter."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
+  { id:"solar_inverter_phase.generic", asset_type:"solar_inverter_phase", label:"Solar inverter phase", brand:"Generic", model:"Inverter phase", variant:"Phase", profile_patterns:["energy.solar_inverter_phase."], package_path:"heroes/flow-hero.webp", quality:"representative", selectable:true },
+  { id:"solar_optimizer.solaredge_s500b", asset_type:"solar_optimizer", label:"SolarEdge Power Optimizer S500B", brand:"SolarEdge", model:"S500B-1GM4MRM-NA02", variant:"Power Optimizer", profile_patterns:[], package_path:"energy/solaredge_s500b_optimizer.webp", quality:"verified_model_choice", selectable:true },
+  { id:"solar_optimizer.solaredge", asset_type:"solar_optimizer", label:"Solar optimizer", brand:"SolarEdge", model:"Power Optimizer", variant:"Optimizer", integration_domains:["solaredge_optimizers"], package_path:"heroes/solar-hero.webp", quality:"representative_brand", selectable:true },
+  { id:"backup_interface.solaredge_3phase", asset_type:"backup_interface", label:"SolarEdge Home Backup Interface 3 Phase", brand:"SolarEdge", model:"BI-NEUNU-3P-01", variant:"BI-EU3P", profile_patterns:[], package_path:"energy/solaredge_backup_interface_3phase.webp", quality:"verified_model_choice", selectable:true },
+  { id:"solar_optimizer.generic", asset_type:"solar_optimizer", label:"Solar optimizer", brand:"Generic", model:"PV optimizer", variant:"Optimizer", profile_patterns:["energy.solar_optimizer."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
+  { id:"solar_forecast.provider", asset_type:"solar_forecast", label:"Solar forecast", brand:"Generic", model:"Forecast provider", variant:"Forecast", profile_patterns:["energy.solar_forecast."], package_path:"heroes/outlook-hero.webp", quality:"representative", selectable:true },
+
+  { id:"gas_meter.smart_meter", asset_type:"gas_meter", label:"Gas meter", brand:"Generic", model:"Smart gas meter", variant:"Meter", profile_patterns:["energy.gas_meter."], package_path:"heroes/gas-hero.webp", quality:"representative", selectable:true },
+  { id:"price_source.market", asset_type:"price_source", label:"Energy price source", brand:"Generic", model:"Energy market", variant:"Price source", profile_patterns:["energy.price_source."], package_path:"heroes/pricing-hero.webp", quality:"representative", selectable:true },
+  { id:"home_consumption.home", asset_type:"home_consumption", label:"Home consumption", brand:"Generic", model:"Home", variant:"Consumption", profile_patterns:["energy.home_consumption."], package_path:"heroes/consumers-hero.webp", quality:"representative", selectable:true },
+
+  // Producer-domain flexible loads keep producer visual_ref when available. This
+  // same-type fallback is only used when no producer visual identity is published.
+  { id:"flexible_load.generic", asset_type:"flexible_load", label:"Flexible load", brand:"Generic", model:"Controllable load", variant:"Flexible load", profile_patterns:["energy.flexible_load."], package_path:"heroes/consumers-hero.webp", quality:"generic_fallback", selectable:true },
+  { id:"flexible_asset.generic", asset_type:"flexible_asset", label:"Flexible asset", brand:"Generic", model:"Controllable asset", variant:"Flexible asset", profile_patterns:["energy.flexible_asset."], package_path:"heroes/consumers-hero.webp", quality:"representative", selectable:true },
+  { id:"consumer.generic", asset_type:"consumer", label:"Energy consumer", brand:"Generic", model:"Consumer", variant:"Load", profile_patterns:["energy.consumer."], package_path:"heroes/consumers-hero.webp", quality:"representative", selectable:true },
+  { id:"solar_array.generic", asset_type:"solar_array", label:"Solar array", brand:"Generic", model:"PV array", variant:"Array", profile_patterns:["energy.solar_array."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
+  { id:"inverter.generic", asset_type:"inverter", label:"Solar inverter", brand:"Generic", model:"Inverter", variant:"Inverter", profile_patterns:["energy.inverter."], package_path:"heroes/solar-hero.webp", quality:"representative", selectable:true },
+  { id:"site_consumption.home", asset_type:"site_consumption", label:"Site consumption", brand:"Generic", model:"Home", variant:"Consumption", profile_patterns:["energy.site_consumption."], package_path:"heroes/consumers-hero.webp", quality:"representative", selectable:true },
+  { id:"energy_system.home", asset_type:"energy_system", label:"Home energy system", brand:"Generic", model:"Home energy system", variant:"System", profile_patterns:["energy.energy_system."], package_path:"heroes/overview-hero.webp", quality:"representative", selectable:true }
+]);
+
+function rhiEnergyVisualCatalog() {
+  return RHI_ENERGY_LOGICAL_VISUALS.map(row => ({ ...row }));
+}
+
+function rhiEnergyVisualCatalogForType(assetType = "") {
+  const type = String(assetType || "").trim().toLowerCase();
+  return rhiEnergyVisualCatalog().filter(row => row.asset_type === type && row.selectable !== false);
+}
+
+function rhiEnergyVisualRef(entryOrId = "") {
+  const id = typeof entryOrId === "object" ? String(entryOrId?.id || "") : String(entryOrId || "");
+  return id ? `energy.logical.${id}` : "";
+}
+
+function rhiEnergyVisualEntryFromRef(visualRef = "") {
+  const ref = String(visualRef || "").trim();
+  if (!ref.startsWith("energy.logical.")) return null;
+  const id = ref.slice("energy.logical.".length);
+  return RHI_ENERGY_LOGICAL_VISUALS.find(row => row.id === id) || null;
+}
+
+function rhiEnergyVisualEntryMatchesAsset(entry = {}, asset = {}) {
+  const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
+  if (!assetType || entry.asset_type !== assetType) return false;
+  const profileId = String(asset.profile_id || asset.raw?.profile_id || "").trim();
+  const integrationDomain = String(asset.integration_domain || asset.raw?.integration_domain || "").trim();
+  const profileMatch = (entry.profile_patterns || []).some(prefix => profileId.startsWith(prefix));
+  const integrationMatch = (entry.integration_domains || []).includes(integrationDomain);
+  return profileMatch || integrationMatch;
+}
+
+function rhiEnergyDefaultVisualEntry(asset = {}) {
+  const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
+  const candidates = rhiEnergyVisualCatalogForType(assetType);
+  if (!candidates.length) return null;
+  return candidates.find(entry => rhiEnergyVisualEntryMatchesAsset(entry, asset))
+    || candidates.find(entry => /generic|home|provider|market|array|smart_meter/.test(entry.id))
+    || candidates[0]
+    || null;
+}
+
+function rhiEnergyReadVisualPreferences() {
+  try {
+    const raw = globalThis?.localStorage?.getItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function rhiEnergySelectedVisualRef(assetId = "") {
+  const id = String(assetId || "").trim();
+  if (!id) return "";
+  return String(rhiEnergyReadVisualPreferences()[id] || "").trim();
+}
+
+function rhiEnergySetVisualPreference(asset = {}, visualRef = "") {
+  const assetId = String(asset.asset_id || asset.id || "").trim();
+  const ref = String(visualRef || "").trim();
+  if (!assetId || !ref) return false;
+  const entry = rhiEnergyVisualEntryFromRef(ref);
+  const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
+  if (!entry || entry.asset_type !== assetType) return false;
+  try {
+    const preferences = rhiEnergyReadVisualPreferences();
+    preferences[assetId] = ref;
+    globalThis?.localStorage?.setItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY, JSON.stringify(preferences));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function rhiEnergyClearVisualPreference(assetId = "") {
+  const id = String(assetId || "").trim();
+  if (!id) return false;
+  try {
+    const preferences = rhiEnergyReadVisualPreferences();
+    delete preferences[id];
+    globalThis?.localStorage?.setItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY, JSON.stringify(preferences));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+// ---- src/runtime/mobility-visual-manifest.js ----
+// GENERATED from npinguin/rhi-mobility-ux canonical visual catalog.
+// Presentation identity only; no Mobility runtime semantics are copied here.
+// Source candidate: v1.0.0-rc.67 (Mobility #100).
+const RHI_ENERGY_MOBILITY_VISUAL_MANIFEST = Object.freeze([
+  {
+    "visual_ref": "mobility.charger.fibaro.wall-plug-2.zwave-plus.be-fr.white",
+    "kind": "charger",
+    "image_key": "charger_utility_plug",
+    "filter": "none",
+    "brand": "Fibaro",
+    "model": "Wall Plug 2",
+    "appearance": "white"
+  },
+  {
+    "visual_ref": "mobility.charger.peblar.business.socket.factory",
+    "kind": "charger",
+    "image_key": "charger_peblar",
+    "filter": "none",
+    "brand": "Peblar",
+    "model": "Business",
+    "appearance": "factory"
+  },
+  {
+    "visual_ref": "mobility.charger.wallbox.commander2.black",
+    "kind": "charger",
+    "image_key": "charger_wallbox_black",
+    "filter": "none",
+    "brand": "Wallbox",
+    "model": "Commander 2",
+    "appearance": "black"
+  },
+  {
+    "visual_ref": "mobility.charger.wallbox.commander2.white",
+    "kind": "charger",
+    "image_key": "charger_wallbox_white",
+    "filter": "none",
+    "brand": "Wallbox",
+    "model": "Commander 2",
+    "appearance": "white"
+  },
+  {
+    "visual_ref": "mobility.vehicle.audi.q8.4m.2024-2026.tfsi-e.daytona-grey",
+    "kind": "vehicle",
+    "image_key": "vehicle_audi_q8",
+    "filter": "none",
+    "brand": "Audi",
+    "model": "Q8",
+    "appearance": "daytona-grey"
+  },
+  {
+    "visual_ref": "mobility.vehicle.audi.q8.4m.2024-2026.tfsi-e.glacier-white",
+    "kind": "vehicle",
+    "image_key": "vehicle_audi_q8",
+    "filter": "brightness(1.35) saturate(.45) contrast(.88)",
+    "brand": "Audi",
+    "model": "Q8",
+    "appearance": "glacier-white"
+  },
+  {
+    "visual_ref": "mobility.vehicle.audi.q8.4m.2024-2026.tfsi-e.mythos-black",
+    "kind": "vehicle",
+    "image_key": "vehicle_audi_q8",
+    "filter": "brightness(.42) contrast(1.14) saturate(.7)",
+    "brand": "Audi",
+    "model": "Q8",
+    "appearance": "mythos-black"
+  },
+  {
+    "visual_ref": "mobility.vehicle.audi.q8.4m.2024-2026.tfsi-e.navarra-blue",
+    "kind": "vehicle",
+    "image_key": "vehicle_audi_q8",
+    "filter": "sepia(.32) saturate(2.4) hue-rotate(170deg) brightness(.78)",
+    "brand": "Audi",
+    "model": "Q8",
+    "appearance": "navarra-blue"
+  },
+  {
+    "visual_ref": "mobility.vehicle.audi.q8.4m.2024-2026.tfsi-e.tango-red",
+    "kind": "vehicle",
+    "image_key": "vehicle_audi_q8",
+    "filter": "sepia(.45) saturate(3.2) hue-rotate(305deg) brightness(.82)",
+    "brand": "Audi",
+    "model": "Q8",
+    "appearance": "tango-red"
+  },
+  {
+    "visual_ref": "mobility.vehicle.bmw.x1.u11.2025-2026.phev.black-sapphire",
+    "kind": "vehicle",
+    "image_key": "vehicle_bmw_x1_phev",
+    "filter": "brightness(.40) contrast(1.18) saturate(.7)",
+    "brand": "BMW",
+    "model": "X1",
+    "appearance": "black-sapphire"
+  },
+  {
+    "visual_ref": "mobility.vehicle.bmw.x1.u11.2025-2026.phev.fire-red",
+    "kind": "vehicle",
+    "image_key": "vehicle_bmw_x1_phev",
+    "filter": "sepia(.45) saturate(3.1) hue-rotate(305deg) brightness(.85)",
+    "brand": "BMW",
+    "model": "X1",
+    "appearance": "fire-red"
+  },
+  {
+    "visual_ref": "mobility.vehicle.bmw.x1.u11.2025-2026.phev.mineral-white",
+    "kind": "vehicle",
+    "image_key": "vehicle_bmw_x1_phev",
+    "filter": "none",
+    "brand": "BMW",
+    "model": "X1",
+    "appearance": "mineral-white"
+  },
+  {
+    "visual_ref": "mobility.vehicle.bmw.x1.u11.2025-2026.phev.phytonic-blue",
+    "kind": "vehicle",
+    "image_key": "vehicle_bmw_x1_phev",
+    "filter": "sepia(.28) saturate(2.5) hue-rotate(170deg) brightness(.82)",
+    "brand": "BMW",
+    "model": "X1",
+    "appearance": "phytonic-blue"
+  },
+  {
+    "visual_ref": "mobility.vehicle.bmw.x1.u11.2025-2026.phev.skyscraper-grey",
+    "kind": "vehicle",
+    "image_key": "vehicle_bmw_x1_phev",
+    "filter": "grayscale(.55) brightness(.86)",
+    "brand": "BMW",
+    "model": "X1",
+    "appearance": "skyscraper-grey"
+  },
+  {
+    "visual_ref": "mobility.vehicle.generic.guest.current.ev-3phase.carbon-black",
+    "kind": "vehicle",
+    "image_key": "vehicle_guest",
+    "filter": "brightness(.42) contrast(1.16)",
+    "brand": "Generic",
+    "model": "Guest EV",
+    "appearance": "carbon-black"
+  },
+  {
+    "visual_ref": "mobility.vehicle.generic.guest.current.ev-3phase.deep-blue",
+    "kind": "vehicle",
+    "image_key": "vehicle_guest",
+    "filter": "sepia(.3) saturate(2.4) hue-rotate(170deg) brightness(.76)",
+    "brand": "Generic",
+    "model": "Guest EV",
+    "appearance": "deep-blue"
+  },
+  {
+    "visual_ref": "mobility.vehicle.generic.guest.current.ev-3phase.pearl-white",
+    "kind": "vehicle",
+    "image_key": "vehicle_guest",
+    "filter": "brightness(1.32) saturate(.40)",
+    "brand": "Generic",
+    "model": "Guest EV",
+    "appearance": "pearl-white"
+  },
+  {
+    "visual_ref": "mobility.vehicle.generic.guest.current.ev-3phase.slate-grey",
+    "kind": "vehicle",
+    "image_key": "vehicle_guest",
+    "filter": "none",
+    "brand": "Generic",
+    "model": "Guest EV",
+    "appearance": "slate-grey"
+  },
+  {
+    "visual_ref": "mobility.vehicle.generic.guest.current.ev-3phase.urban-green",
+    "kind": "vehicle",
+    "image_key": "vehicle_guest",
+    "filter": "sepia(.4) saturate(1.9) hue-rotate(70deg) brightness(.72)",
+    "brand": "Generic",
+    "model": "Guest EV",
+    "appearance": "urban-green"
+  },
+  {
+    "visual_ref": "mobility.vehicle.generic.guest.current.phev-1phase.carbon-black",
+    "kind": "vehicle",
+    "image_key": "vehicle_guest",
+    "filter": "brightness(.42) contrast(1.16)",
+    "brand": "Generic",
+    "model": "Guest PHEV",
+    "appearance": "carbon-black"
+  },
+  {
+    "visual_ref": "mobility.vehicle.generic.guest.current.phev-1phase.deep-blue",
+    "kind": "vehicle",
+    "image_key": "vehicle_guest",
+    "filter": "sepia(.3) saturate(2.4) hue-rotate(170deg) brightness(.76)",
+    "brand": "Generic",
+    "model": "Guest PHEV",
+    "appearance": "deep-blue"
+  },
+  {
+    "visual_ref": "mobility.vehicle.generic.guest.current.phev-1phase.pearl-white",
+    "kind": "vehicle",
+    "image_key": "vehicle_guest",
+    "filter": "brightness(1.32) saturate(.40)",
+    "brand": "Generic",
+    "model": "Guest PHEV",
+    "appearance": "pearl-white"
+  },
+  {
+    "visual_ref": "mobility.vehicle.generic.guest.current.phev-1phase.slate-grey",
+    "kind": "vehicle",
+    "image_key": "vehicle_guest",
+    "filter": "none",
+    "brand": "Generic",
+    "model": "Guest PHEV",
+    "appearance": "slate-grey"
+  },
+  {
+    "visual_ref": "mobility.vehicle.generic.guest.current.phev-1phase.urban-green",
+    "kind": "vehicle",
+    "image_key": "vehicle_guest",
+    "filter": "sepia(.4) saturate(1.9) hue-rotate(70deg) brightness(.72)",
+    "brand": "Generic",
+    "model": "Guest PHEV",
+    "appearance": "urban-green"
+  },
+  {
+    "visual_ref": "mobility.vehicle.mercedes.gla.h247.2023-2026.phev.mountain-grey",
+    "kind": "vehicle",
+    "image_key": "vehicle_mercedes_gla",
+    "filter": "none",
+    "brand": "Mercedes-Benz",
+    "model": "GLA",
+    "appearance": "mountain-grey"
+  },
+  {
+    "visual_ref": "mobility.vehicle.mercedes.gla.h247.2023-2026.phev.night-black",
+    "kind": "vehicle",
+    "image_key": "vehicle_mercedes_gla",
+    "filter": "brightness(.42) contrast(1.15) saturate(.7)",
+    "brand": "Mercedes-Benz",
+    "model": "GLA",
+    "appearance": "night-black"
+  },
+  {
+    "visual_ref": "mobility.vehicle.mercedes.gla.h247.2023-2026.phev.patagonia-red",
+    "kind": "vehicle",
+    "image_key": "vehicle_mercedes_gla",
+    "filter": "sepia(.45) saturate(3.1) hue-rotate(305deg) brightness(.82)",
+    "brand": "Mercedes-Benz",
+    "model": "GLA",
+    "appearance": "patagonia-red"
+  },
+  {
+    "visual_ref": "mobility.vehicle.mercedes.gla.h247.2023-2026.phev.polar-white",
+    "kind": "vehicle",
+    "image_key": "vehicle_mercedes_gla",
+    "filter": "brightness(1.35) saturate(.45) contrast(.88)",
+    "brand": "Mercedes-Benz",
+    "model": "GLA",
+    "appearance": "polar-white"
+  },
+  {
+    "visual_ref": "mobility.vehicle.mercedes.gla.h247.2023-2026.phev.spectral-blue",
+    "kind": "vehicle",
+    "image_key": "vehicle_mercedes_gla",
+    "filter": "sepia(.30) saturate(2.5) hue-rotate(170deg) brightness(.80)",
+    "brand": "Mercedes-Benz",
+    "model": "GLA",
+    "appearance": "spectral-blue"
+  },
+  {
+    "visual_ref": "mobility.vehicle.renault.scenic.e-tech.2024-2026.techno.flame-red",
+    "kind": "vehicle",
+    "image_key": "vehicle_renault_scenic_techno_ev",
+    "filter": "sepia(.45) saturate(3.0) hue-rotate(305deg) brightness(.84)",
+    "brand": "Renault",
+    "model": "Scenic",
+    "appearance": "flame-red"
+  },
+  {
+    "visual_ref": "mobility.vehicle.renault.scenic.e-tech.2024-2026.techno.midnight-blue",
+    "kind": "vehicle",
+    "image_key": "vehicle_renault_scenic_techno_ev",
+    "filter": "sepia(.28) saturate(2.2) hue-rotate(170deg) brightness(.72)",
+    "brand": "Renault",
+    "model": "Scenic",
+    "appearance": "midnight-blue"
+  },
+  {
+    "visual_ref": "mobility.vehicle.renault.scenic.e-tech.2024-2026.techno.pearl-white",
+    "kind": "vehicle",
+    "image_key": "vehicle_renault_scenic_techno_ev",
+    "filter": "none",
+    "brand": "Renault",
+    "model": "Scenic",
+    "appearance": "pearl-white"
+  },
+  {
+    "visual_ref": "mobility.vehicle.renault.scenic.e-tech.2024-2026.techno.schiste-grey",
+    "kind": "vehicle",
+    "image_key": "vehicle_renault_scenic_techno_ev",
+    "filter": "grayscale(.55) brightness(.82)",
+    "brand": "Renault",
+    "model": "Scenic",
+    "appearance": "schiste-grey"
+  },
+  {
+    "visual_ref": "mobility.vehicle.renault.scenic.e-tech.2024-2026.techno.starry-black",
+    "kind": "vehicle",
+    "image_key": "vehicle_renault_scenic_techno_ev",
+    "filter": "brightness(.42) contrast(1.16) saturate(.65)",
+    "brand": "Renault",
+    "model": "Scenic",
+    "appearance": "starry-black"
+  },
+  {
+    "visual_ref": "mobility.vehicle.volkswagen.id4.2024-2026.ev.costa-azul",
+    "kind": "vehicle",
+    "image_key": "vehicle_vw_id4",
+    "filter": "none",
+    "brand": "Volkswagen",
+    "model": "ID.4",
+    "appearance": "costa-azul"
+  },
+  {
+    "visual_ref": "mobility.vehicle.volkswagen.id4.2024-2026.ev.glacier-white",
+    "kind": "vehicle",
+    "image_key": "vehicle_vw_id4",
+    "filter": "brightness(1.35) saturate(.42) contrast(.88)",
+    "brand": "Volkswagen",
+    "model": "ID.4",
+    "appearance": "glacier-white"
+  },
+  {
+    "visual_ref": "mobility.vehicle.volkswagen.id4.2024-2026.ev.moonstone-grey",
+    "kind": "vehicle",
+    "image_key": "vehicle_vw_id4",
+    "filter": "grayscale(.65) brightness(.78)",
+    "brand": "Volkswagen",
+    "model": "ID.4",
+    "appearance": "moonstone-grey"
+  },
+  {
+    "visual_ref": "mobility.vehicle.volkswagen.id4.2024-2026.ev.mythos-black",
+    "kind": "vehicle",
+    "image_key": "vehicle_vw_id4",
+    "filter": "brightness(.40) contrast(1.18) saturate(.65)",
+    "brand": "Volkswagen",
+    "model": "ID.4",
+    "appearance": "mythos-black"
+  },
+  {
+    "visual_ref": "mobility.vehicle.volkswagen.id4.2024-2026.ev.scale-silver",
+    "kind": "vehicle",
+    "image_key": "vehicle_vw_id4",
+    "filter": "grayscale(.85) brightness(1.05)",
+    "brand": "Volkswagen",
+    "model": "ID.4",
+    "appearance": "scale-silver"
+  }
+]);
+const RHI_ENERGY_MOBILITY_ASSET_TRANSPORT = Object.freeze({
+  vehicle_audi_q8:"mobility/vehicle_audi_q8.png",
+  vehicle_bmw_x1_phev:"mobility/vehicle_bmw_x1_phev.png",
+  vehicle_mercedes_gla:"mobility/vehicle_mercedes_gla.png",
+  vehicle_vw_id4:"mobility/vehicle_vw_id4.webp",
+  vehicle_renault_scenic_techno_ev:"mobility/vehicle_renault_scenic_techno_ev.webp",
+  vehicle_guest:"mobility/vehicle_fallback.png",
+  vehicle_fallback:"mobility/vehicle_fallback.png",
+  charger_wallbox:"mobility/charger_wallbox_white.svg",
+  charger_wallbox_white:"mobility/charger_wallbox_white.svg",
+  charger_wallbox_black:"mobility/charger_wallbox_black.svg",
+  charger_peblar:"mobility/charger_peblar.svg",
+  charger_utility_plug:"mobility/charger_utility_plug.svg",
+  charger_fallback:"mobility/charger_fallback.png"
+});
+function rhiEnergyMobilityVisualEntry(visualRef=""){
+  return RHI_ENERGY_MOBILITY_VISUAL_MANIFEST.find(row=>row.visual_ref===String(visualRef||"").trim())||null;
+}
+
+// ---- src/runtime/visual-asset-resolver.js ----
+// Package-local resolver for Foundation/Mobility visual_ref identities.
+// The backend publishes only package-neutral keys. Energy UX owns these image files.
+function rhiEnergyVisualAssetUrl(relativePath = "") {
+  const normalized = String(relativePath || "").replace(/^\/+/, "");
+  return `/hacsfiles/rhi-energy-ux/assets/${normalized}?v=${encodeURIComponent(UX_VERSION)}`;
+}
+
+function resolveEnergyOwnedVisualRef(visualRef = "") {
+  const ref = String(visualRef || "").trim();
+  const entry = typeof rhiEnergyVisualEntryFromRef === "function" ? rhiEnergyVisualEntryFromRef(ref) : null;
+  if (!entry) return null;
+  const inlineAssets = {
+    byd_lvs20: typeof HERO_IMAGE_BYD_LVS20 === "string" ? HERO_IMAGE_BYD_LVS20 : "",
+    solaredge_48v_9_6: typeof HERO_IMAGE_SOLAREDGE_92 === "string" ? HERO_IMAGE_SOLAREDGE_92 : ""
+  };
+  const url = entry.inline_asset
+    ? inlineAssets[String(entry.inline_asset || "")] || ""
+    : rhiEnergyVisualAssetUrl(entry.package_path || "");
+  if (!url) return null;
+  return Object.freeze({
+    visual_ref: ref,
+    kind: "energy_logical_device",
+    asset_type: entry.asset_type,
+    catalog_id: entry.id,
+    quality: entry.quality || "representative",
+    url,
+    filter: "none"
+  });
+}
+
+function resolveEnergyAssetVisual(asset = {}) {
+  const sourceRef = String(asset.visual_ref || asset.visualRef || asset.raw?.visual_ref || "").trim();
+  // Producer visual identity stays authoritative across the domain boundary.
+  if (sourceRef.startsWith("mobility.")) return resolveEnergyVisualRef(sourceRef);
+
+  const assetId = String(asset.asset_id || asset.id || "").trim();
+  const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
+  const selectedRef = typeof rhiEnergySelectedVisualRef === "function"
+    ? rhiEnergySelectedVisualRef(assetId)
+    : "";
+  const selectedEntry = typeof rhiEnergyVisualEntryFromRef === "function"
+    ? rhiEnergyVisualEntryFromRef(selectedRef)
+    : null;
+  if (selectedEntry && selectedEntry.asset_type === assetType) {
+    return resolveEnergyOwnedVisualRef(selectedRef);
+  }
+
+  const sourceEntry = typeof rhiEnergyVisualEntryFromRef === "function"
+    ? rhiEnergyVisualEntryFromRef(sourceRef)
+    : null;
+  if (sourceEntry && sourceEntry.asset_type === assetType) {
+    return resolveEnergyOwnedVisualRef(sourceRef);
+  }
+
+  const fallbackEntry = typeof rhiEnergyDefaultVisualEntry === "function"
+    ? rhiEnergyDefaultVisualEntry(asset)
+    : null;
+  return fallbackEntry ? resolveEnergyOwnedVisualRef(rhiEnergyVisualRef(fallbackEntry)) : null;
+}
+
+function resolveEnergyVisualRef(visualRef = "") {
+  const ref = String(visualRef || "").trim();
+  if (!ref) return null;
+  if (ref.startsWith("energy.logical.")) return resolveEnergyOwnedVisualRef(ref);
+  if (ref === "mobility.vehicle.generic.fallback") {
+    return Object.freeze({ visual_ref:ref, kind:"vehicle", url:rhiEnergyVisualAssetUrl("mobility/vehicle_fallback.png"), filter:"none" });
+  }
+  if (ref === "mobility.charger.generic.fallback") {
+    return Object.freeze({ visual_ref:ref, kind:"charger", url:rhiEnergyVisualAssetUrl("mobility/charger_fallback.png"), filter:"none" });
+  }
+  if (ref.startsWith("mobility.vehicle.") || ref.startsWith("mobility.charger.")) {
+    const entry = typeof rhiEnergyMobilityVisualEntry === "function" ? rhiEnergyMobilityVisualEntry(ref) : null;
+    if (entry) {
+      const file = RHI_ENERGY_MOBILITY_ASSET_TRANSPORT[entry.image_key] || "";
+      if (file) return Object.freeze({ visual_ref:ref, kind:entry.kind, url:rhiEnergyVisualAssetUrl(file), filter:entry.filter || "none", fallback:false });
+    }
+    const vehicle = ref.startsWith("mobility.vehicle.");
+    return Object.freeze({
+      visual_ref:ref,
+      kind:vehicle ? "vehicle" : "charger",
+      url:rhiEnergyVisualAssetUrl(vehicle ? "mobility/vehicle_fallback.png" : "mobility/charger_fallback.png"),
+      filter:"none",
+      fallback:true
+    });
+  }
+  return null;
+}
+
+// ---- src/runtime/asset-profile-contract.js ----
+// Canonical Energy Public Contract V2 asset/profile reader.
+// The backend owns semantic asset type, profile context and publication completeness.
+// UX may select and present this context but never infer it from labels or artwork.
+function readEnergyAssetContext(gateway, assetId = "") {
+  const v2 = readEnergyPublicV2(gateway);
+  if (!v2.available) return { available:false, asset:null, profile:null, publication:null };
+  const asset = v2.object(assetId);
+  if (!asset) return { available:true, asset:null, profile:null, publication:null };
+  const profile = v2.profile(asset.profile_id);
+  const publication = asset.property_publication && typeof asset.property_publication === "object"
+    ? asset.property_publication
+    : null;
+  return { available:true, asset, profile, publication };
+}
+
+function energyAssetPublicationGap(gateway, assetId = "") {
+  const context = readEnergyAssetContext(gateway, assetId);
+  const publication = context.publication;
+  if (!publication) return { status:"unavailable", missing:[] };
+  const missing = Array.isArray(publication.missing_required_property_keys)
+    ? publication.missing_required_property_keys.map(String).filter(Boolean)
+    : [];
+  const unresolved = Array.isArray(publication.unresolved_required_property_keys)
+    ? publication.unresolved_required_property_keys.map(String).filter(Boolean)
+    : [];
+  return {
+    status: publication.complete === true && missing.length === 0 ? "complete" : "incomplete",
+    missing,
+    unresolved,
+    resolution_complete: publication.resolution_complete === true,
+    authority: String(publication.authority || "RHI_ENERGY_PUBLIC_CONTRACT_V2"),
+    v1_fallback_allowed: publication.v1_fallback_allowed === true
+  };
+}
+
+// ---- src/runtime/consumption-contract.js ----
+// Canonical live consumption reader from RHI_ENERGY_PUBLIC_CONTRACT_V2.
+// Energy owns all balance semantics; the UX only selects already-resolved core values.
+function readLiveConsumptionContract(gateway) {
+  const v2 = readEnergyPublicV2(gateway);
+  const site = v2.field('site_consumption.power_kw');
+  const home = v2.field('home_consumption.power_kw');
+  const flexible = v2.field('flexible_loads.power_kw');
+  const attributed = v2.field('flexible_loads.attributed_power_kw');
+  const contributors = (v2.flexibleAssets || []).map(row => Object.freeze({
+    ...row,
+    asset_id:String(row.asset_id || ''),
+    power_kw:asNumber(firstDefined(row.power_kw,row.current_power_kw,row.actual_power_kw))
+  }));
+  const statusFor = field => String(field.status || field.state || (field.resolved ? 'AVAILABLE' : 'UNAVAILABLE')).toUpperCase();
+  return Object.freeze({
+    envelope:v2.envelope,
+    siteConsumptionKw:asNumber(site.value),
+    homeConsumptionKw:asNumber(home.value),
+    flexibleLoadsKw:asNumber(flexible.value),
+    attributedFlexibleLoadsKw:asNumber(attributed.value),
+    flexibleLoadContributors:Object.freeze(contributors),
+    siteStatus:statusFor(site),
+    homeStatus:statusFor(home),
+    flexibleStatus:statusFor(flexible),
+    siteReason:String(site.reason || ''),
+    homeReason:String(home.reason || ''),
+    flexibleReason:String(flexible.reason || ''),
+    available:site.status === 'AVAILABLE' || home.status === 'AVAILABLE' || flexible.status === 'AVAILABLE',
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.core'
+  });
+}
+
+// ---- src/domain/models/current-energy-view-model.js ----
+// Canonical current-energy view model. Literal contract keys and direction
+// semantics are confined to this adapter so screen renderers cannot drift.
+function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
+  // interfaceKey is retained in the signature for call-site stability while the
+  // canonical source is exclusively RHI_ENERGY_PUBLIC_CONTRACT_V2.
+  const v2 = readEnergyPublicV2(gateway);
+  const row = v2.property(propertyKey);
+  const projected = v2.field(propertyKey);
+  return Object.freeze({
+    envelope:v2.envelope,
+    row:row || projected.raw || {},
+    value:projected.value,
+    number:asNumber(projected.value),
+    text:String(projected.value ?? ''),
+    health:String(projected.status || projected.state || 'UNAVAILABLE').toUpperCase(),
+    quality:String(projected.quality || ''),
+    reason:String(projected.reason || ''),
+    source:projected.source
+  });
+}
+
+function canonicalBatteryState(value) {
+  const state = String(value || '').trim().toLowerCase();
+  if (['charging','charge'].includes(state)) return 'charging';
+  if (['discharging','discharge'].includes(state)) return 'discharging';
+  if (['idle','standby','available','ready'].includes(state)) return 'idle';
+  return state || 'unavailable';
+}
+
+function createBatteryCurrentFlowViewModel(gateway) {
+  const signed = readTypedPropertyContract(gateway, 'battery', 'battery.power_kw');
+  const stateProperty = readTypedPropertyContract(gateway, 'battery', 'battery.state');
+  const soc = readTypedPropertyContract(gateway, 'battery', 'battery.soc_pct');
+  const available = readTypedPropertyContract(gateway, 'battery', 'battery.available_kwh');
+  const capacity = readTypedPropertyContract(gateway, 'battery', 'battery.capacity_kwh');
+  const reserve = readTypedPropertyContract(gateway, 'battery', 'battery.reserve_target_pct');
+  const state = canonicalBatteryState(stateProperty.value);
+  const projectedPowerKw = signed.number === null ? null : Math.abs(signed.number);
+  let displayPowerKw = projectedPowerKw;
+  let signedFlowKw = signed.number;
+  let direction = 'unknown';
+  let label = 'Unavailable';
+  let detail = 'Battery flow unavailable';
+
+  if (state === 'charging') {
+    direction = 'into_storage';
+    label = 'Charging';
+    detail = 'Charging from Home Bus';
+    signedFlowKw = projectedPowerKw === null ? null : -projectedPowerKw;
+  } else if (state === 'discharging') {
+    direction = 'out_of_storage';
+    label = 'Discharging';
+    detail = 'Supplying the Home Bus';
+    signedFlowKw = projectedPowerKw;
+  } else if (state === 'idle') {
+    displayPowerKw = signed.number === null ? null : Math.abs(signed.number);
+    signedFlowKw = signed.number === null ? null : 0;
+    direction = 'idle';
+    label = 'Idle';
+    detail = 'No active battery flow';
+  }
+
+  const health = signed.health === 'AVAILABLE' && stateProperty.health === 'AVAILABLE' ? 'OK' : 'UNAVAILABLE';
+  return Object.freeze({
+    state,
+    health,
+    reason:String(firstDefined(signed.reason, stateProperty.reason, '')),
+    signedPowerKw:signed.number,
+    chargePowerKw:state === 'charging' ? projectedPowerKw : (signed.number === null ? null : 0),
+    dischargePowerKw:state === 'discharging' ? projectedPowerKw : (signed.number === null ? null : 0),
+    displayPowerKw,
+    signedFlowKw,
+    direction,
+    label,
+    detail,
+    flowRole:direction === 'out_of_storage' ? 'producer' : direction === 'into_storage' ? 'consumer' : 'inactive',
+    uxVisible:displayPowerKw !== null,
+    socPct:soc.number,
+    availableKwh:available.number,
+    capacityKwh:capacity.number,
+    reserveTargetPct:reserve.number,
+    valueAvailable:displayPowerKw !== null
+  });
+}
+
+function createGridCurrentFlowViewModel(gateway) {
+  const netPower = readTypedPropertyContract(gateway, 'grid', 'grid.net_power_kw');
+  const importPower = readTypedPropertyContract(gateway, 'grid', 'grid_import.power_kw');
+  const exportPower = readTypedPropertyContract(gateway, 'grid', 'grid_export.power_kw');
+  const directionProperty = readTypedPropertyContract(gateway, 'grid', 'grid.flow_direction');
+  const rawDirection = String(firstDefined(directionProperty.value, '') || '').toLowerCase();
+  const direction = /export/.test(rawDirection) ? 'exporting' : /import/.test(rawDirection) ? 'importing' : /balanc|idle|none/.test(rawDirection) ? 'balanced' : 'unknown';
+  const displayPowerKw = direction === 'exporting' ? exportPower.number : direction === 'importing' ? importPower.number : direction === 'balanced' ? 0 : (netPower.number === null ? null : Math.abs(netPower.number));
+  return Object.freeze({
+    netPowerKw:netPower.number,
+    importPowerKw:importPower.number,
+    exportPowerKw:exportPower.number,
+    displayPowerKw,
+    direction,
+    label:direction === 'exporting' ? 'Exporting' : direction === 'importing' ? 'Importing' : direction === 'balanced' ? 'Balanced' : 'Unavailable'
+  });
+}
+
+function createSolarCurrentViewModel(gateway) {
+  const power = readTypedPropertyContract(gateway, 'solar', 'solar.power_kw');
+  return Object.freeze({ powerKw:power.number, health:power.health, reason:power.reason });
+}
+
+function createCurrentEnergyViewModel(gateway) {
+  return Object.freeze({
+    battery:createBatteryCurrentFlowViewModel(gateway),
+    grid:createGridCurrentFlowViewModel(gateway),
+    solar:createSolarCurrentViewModel(gateway),
+    consumption:readLiveConsumptionContract(gateway)
+  });
+}
+
+// ---- src/domain/models/physical-flow-view-model.js ----
+// R1.89.39 physical-flow model. Consumers and physical connections are
+// separate semantic views and may show the same measured kW. They are never
+// summed together. Connection totals and rows come only from one coherent
+// backend-owned connection snapshot.
+  function buildPhysicalFlowViewModel(runtime, gateway, consumers = [], connections = [], connectionSnapshot = {}) {
+    const consumption = readLiveConsumptionContract(gateway);
+    const physicalPower = (row, id) => asNumber(firstDefined(
+      row?.actual_power_kw,
+      row?.current_power_kw,
+      row?.power_kw,
+      id ? runtime.number(`${id}.actual_power_kw`) : null,
+      id ? runtime.number(`${id}.current_power_kw`) : null,
+      id ? runtime.number(`${id}.power_kw`) : null
+    ));
+    const consumerRows = consumers.map(row => {
+      const assetId = String(firstDefined(row.asset_id,row.flexible_asset_id,row.target_asset_id,'') || '');
+      return Object.freeze({ ...row, asset_id:assetId, physical_power_kw:physicalPower(row, assetId) });
+    });
+    const connectionRows = connections.map(row => {
+      const assetId = String(firstDefined(row.connection_asset_id,row.asset_id,row.charger_id,'') || '');
+      return Object.freeze({ ...row, asset_id:assetId, connection_asset_id:assetId, physical_power_kw:asNumber(firstDefined(row.power_kw,row.physical_power_kw)) });
+    });
+    return Object.freeze({
+      consumption,
+      siteConsumptionKw:consumption.siteConsumptionKw,
+      homeConsumptionKw:consumption.homeConsumptionKw,
+      flexibleLoadsKw:consumption.flexibleLoadsKw,
+      consumers:Object.freeze(consumerRows),
+      connections:Object.freeze(connectionRows),
+      connectionPowerKw:asNumber(connectionSnapshot.totalPowerKw),
+      snapshotRevision:String(connectionSnapshot.snapshotRevision || ''),
+      observedAt:String(connectionSnapshot.observedAt || ''),
+      connectionHealth:connectionSnapshot.available ? 'OK' : 'UNAVAILABLE'
+    });
+  }
+
+// ---- src/domain/models/metering-status-model.js ----
+// R1.89.43 end-user mapping. status_label is authoritative when published;
+// null energy is never interpreted without measurement state and measured zero remains visible.
+  function createMeteringStatusModel(row = {}) {
+    const state = String(firstDefined(row.measurement_state,row.status,row.health,row.quality,'UNAVAILABLE') || 'UNAVAILABLE').toUpperCase();
+    const labels = {
+      MEASURED: 'Measured', TRUSTED: 'Measured', COMPLETE: 'Complete', OK: 'Measured',
+      ATTRIBUTION_PENDING: 'Waiting for trusted meter attribution',
+      PENDING: 'Waiting for period baseline',
+      NOT_APPLICABLE: 'Not applicable',
+      UNAVAILABLE: 'Unavailable', UNKNOWN: 'Unavailable', FAILED: 'Measurement failed',
+      INCOMPLETE: 'Incomplete measurement', PARTIAL: 'Incomplete measurement'
+    };
+    const label = String(firstDefined(row.status_label, labels[state], human(state, 'Unavailable')) || 'Unavailable');
+    const measured = row.value !== null && row.value !== undefined && ['MEASURED','TRUSTED','COMPLETE','OK'].includes(state);
+    const technicalKey = String(firstDefined(row.metric_key,row.semantic_key,row.property_key,row.key,row.asset_id,'') || '').toLowerCase();
+    const unattributed = /unattributed|unassigned/.test(technicalKey);
+    const value = asNumber(row.value);
+    const degraded = /DEGRADED|FAIL|ERROR|INCOMPLETE|PENDING|ATTRIBUTION/.test(state) || asBool(row.attribution_degraded, false);
+    const applicable = state !== 'NOT_APPLICABLE' && row.applicable !== false;
+    const explicitlyVisible = row.ux_visible === undefined ? true : asBool(row.ux_visible, false);
+    return Object.freeze({
+      state, label, measured, applicable, unattributed,
+      userActionRequired:asBool(row.user_action_required, false),
+      visible: explicitlyVisible && applicable && (!unattributed || (value !== null && value > 0.0001) || degraded)
+    });
+  }
+
+// ---- src/runtime/command-contract.js ----
+// Canonical Energy V2 command reader. UX visibility and enablement are backend-owned.
+function readEnergyCommandContract(gateway) {
+  const v2 = readEnergyPublicV2(gateway);
+  const envelope = v2.envelope;
+  const roleFor = row => String(row.role || '').trim().toLowerCase();
+  const rows = (v2.commands || []).map((value, index) => {
+    const row = objectFrom(value);
+    const commandId = String(firstDefined(row.command_id, row.action_id, row.command_key, row.id, '') || '');
+    const targetAssetId = String(firstDefined(row.target_asset_id, row.asset_id, row.flexible_asset_id, row.planning_target_asset_id, '') || '');
+    const visible = asBool(firstDefined(row.visible, row.ux_visible, row.supported), false);
+    const enabled = visible && asBool(firstDefined(row.enabled, row.ux_enabled, String(row.availability || '').toUpperCase() === 'AVAILABLE'), false);
+    return Object.freeze({
+      command_row_id: row.command_instance_id || row.command_row_id || `command_${index + 1}`,
+      entity_id: envelope.entityId,
+      ...row,
+      command_id: commandId,
+      target_asset_id: targetAssetId,
+      role: roleFor(row),
+      contract_valid: !!commandId && !!targetAssetId && !!row.invoke,
+      command_owner: String(firstDefined(row.command_owner, row.owner, 'energy') || 'energy'),
+      action_kind: String(firstDefined(row.action_kind, row.kind, 'command') || 'command'),
+      command_resolved: !!row.invoke,
+      currently_applicable: enabled,
+      visible,
+      enabled,
+      blocked_reason:String(firstDefined(row.blocked_reason, row.reason?.message, row.reason?.code, '')),
+      user_action_text:String(firstDefined(row.user_action_text, ''))
+    });
+  });
+  return Object.freeze({ envelope, rows, source:'RHI_ENERGY_PUBLIC_CONTRACT_V2' });
+}
+
+// ---- src/runtime/command-action-model.js ----
+// Stable R1.89.39 UX action model. Labels, visibility, enablement and blocked
+// guidance are published by the command owner and are not reconstructed.
+  function createCommandActionModel(command) {
+    if (!command || command.visible !== true || !command.invoke) return null;
+    const role = String(command.role || '').toLowerCase();
+    const reason = String(firstDefined(command.blocked_reason, command.user_action_text, command.enabled ? 'Available' : 'Currently unavailable') || 'Currently unavailable');
+    return Object.freeze({
+      id: command.command_id,
+      rowId: command.command_instance_id || command.command_row_id || '',
+      targetAssetId: command.target_asset_id || '',
+      role,
+      label: String(firstDefined(command.label, human(role)) || ''),
+      owner: command.command_owner || '',
+      kind: command.action_kind || '',
+      visible: true,
+      enabled: command.enabled === true,
+      currentlyApplicable: command.enabled === true,
+      reason,
+      userActionText:String(command.user_action_text || ''),
+      command
+    });
+  }
+  function commandActionModelsForAsset(commandContract, assetId) {
+    const wanted = String(assetId || '');
+    const order = { start: 10, stop: 20, pause: 30, resume: 40 };
+    return commandContract.rows
+      .filter(row => String(row.target_asset_id || '') === wanted && row.contract_valid === true)
+      .map(createCommandActionModel)
+      .filter(Boolean)
+      .sort((a, b) => (order[a.role] || 99) - (order[b.role] || 99));
+  }
+  const ENGINEERING_DIAGNOSTICS = [
+    'sensor.energy_runtime_deployment_health',
+    'sensor.energy_runtime_proof_health',
+    'sensor.energy_audit_closure_health',
+    'sensor.energy_contract_version_consistency_health',
+    'sensor.energy_home_intelligence_contract_standard_health'
+  ];
+  const SUPPLEMENTAL_DIAGNOSTICS = [
+    'sensor.energy_solar_excess_supervisor_health',
+    'sensor.energy_property_index_health',
+    'sensor.energy_command_index_health',
+    'sensor.energy_activity_index_health',
+    'sensor.energy_relationship_index_health',
+    'sensor.energy_intelligence_index_health',
+    'sensor.energy_metering_integrity_health',
+    'sensor.energy_publication_health',
+    'sensor.energy_contract_traceability_health'
+  ];
+
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const parseMaybeJson = (value, fallback = null) => {
+    if (value === undefined || value === null || value === '') return fallback;
+    if (typeof value !== 'string') return value;
+    const text = value.trim();
+    if (!text) return fallback;
+    try { return JSON.parse(text); } catch { return value; }
+  };
+  const asArray = (value) => {
+    const parsed = parseMaybeJson(value, value);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === 'object') return Object.values(parsed);
+    if (typeof parsed === 'string') return parsed.split(',').map(s => s.trim()).filter(Boolean);
+    return [];
+  };
+  const asBool = (value, fallback = false) => {
+    if (value === true || value === false) return value;
+    const s = String(value ?? '').trim().toLowerCase();
+    if (['true','1','yes','on','ok','ready','active','enabled','available'].includes(s)) return true;
+    if (['false','0','no','off','fail','degraded','blocked','disabled','inactive','unavailable'].includes(s)) return false;
+    return fallback;
+  };
+  const asNumber = (value) => {
+    // Missing values are semantically different from a measured numeric zero.
+    // Number(null), Number('') and Number(undefined) must never leak as 0 into UX.
+    if (value === undefined || value === null || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+  const rowValue = (row, fallback = null) => {
+    if (!row || typeof row !== 'object') return row ?? fallback;
+    const value = row.value ?? row.current_value ?? row.state ?? row.native_value ?? row.numeric_value ?? row.last_value;
+    return value === undefined || value === null || value === '' ? fallback : value;
+  };
+  const fmtNumber = (value, decimals = 1, fallback = '—') => {
+    const n = asNumber(value);
+    return n === null ? fallback : n.toFixed(decimals);
+  };
+  const fmtKw = (value, fallback = '—') => {
+    const n = asNumber(value);
+    return n === null ? fallback : `${Math.abs(n).toFixed(1)} kW`;
+  };
+  const fmtKwh = (value, fallback = '—') => {
+    const n = asNumber(value);
+    return n === null ? fallback : `${Math.abs(n).toFixed(1)} kWh`;
+  };
+  const fmtPct = (value, fallback = '—') => {
+    const n = asNumber(value);
+    return n === null ? fallback : `${Math.round(n)}%`;
+  };
+  const fmtEur = (value, fallback = '—') => {
+    const n = asNumber(value);
+    return n === null ? fallback : `€${n.toFixed(2)}`;
+  };
+
+  const rowState = (row) => {
+    if (!row || row.missing) return 'missing';
+    const value = rowValue(row, null);
+    const health = String(row.health ?? row.quality ?? row.value_status ?? row.status ?? '').trim().toLowerCase();
+    if (['fail','failed','error','critical','unavailable'].includes(health)) return 'fail';
+    if (['degraded','stale','warning','warn','low_quality','partial','estimated','estimate','forecast','forecasted','modelled','modeled'].includes(health)) return 'warn';
+    if (['unknown','not_published','not_available','missing'].includes(health)) return value === null ? 'missing' : 'unknown';
+    if (['ok','ready','healthy','good','valid','fresh'].includes(health)) return 'ok';
+    return value === null ? 'not-measured' : 'unknown';
+  };
+  const rowStatusLabel = (row) => {
+    const state = rowState(row);
+    if (state === 'ok') return 'OK';
+    if (state === 'warn') return human(row.health || row.quality || 'Degraded');
+    if (state === 'fail') return human(row.health || row.quality || 'Fail');
+    if (state === 'missing') return 'Not available';
+    if (state === 'not-measured') return 'Not measured';
+    return 'Unknown';
+  };
+  const rowDisplayValue = (row, fallback = '—') => {
+    if (!row || row.missing) return fallback;
+    const value = rowValue(row, null);
+    if (value === null || value === undefined || value === '') return 'Not measured';
+    if (typeof value === 'number') return `${value}${row.unit ? ` ${row.unit}` : ''}`;
+    return `${human(value, fallback)}${row.unit ? ` ${row.unit}` : ''}`;
+  };
+
+  const human = (value, fallback = '—') => {
+    if (value === undefined || value === null || value === '') return fallback;
+    if (Array.isArray(value)) return value.length ? value.map(v => human(v, '')).filter(Boolean).join(', ') : fallback;
+    if (typeof value === 'object') return value.display_name || value.name || value.label || value.summary || value.reason || fallback;
+    return String(value)
+      .replace(/^energy_intelligence\./, '')
+      .replace(/^battery_strategy\./, '')
+      .replace(/^consumer_strategy\./, '')
+      .replace(/^forecast\./, '')
+      .replace(/[_.]+/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  const humanReason = (value, fallback = '—') => {
+    if (value === undefined || value === null || value === '') return fallback;
+    const raw = typeof value === 'object' ? (value.message || value.user_label || value.label || value.display_name || value.reason || value.reason_code || value.code || '') : String(value);
+    const key = String(raw || '').trim();
+    if (!key) return fallback;
+    const normalized = key.toLowerCase().replace(/[\s.-]+/g, '_');
+    const labels = {
+      policy_mode_off: 'Energy Intelligence is off',
+      mode_off: 'Energy Intelligence is off',
+      intelligence_off: 'Energy Intelligence is off',
+      energy_intelligence_off: 'Energy Intelligence is off',
+      automation_disabled: 'Automation is disabled',
+      disabled: 'Disabled',
+      not_available: 'Not available',
+      not_published: 'Not published',
+      no_battery_policy_reason_published: 'No battery policy reason published'
+    };
+    return labels[normalized] || human(key, fallback);
+  };
+
+  const normalizeHealthState = (state) => String(state ?? '').trim();
+  const isOkHealth = (state) => normalizeHealthState(state).toUpperCase() === 'OK';
+  const isIgnoredDiagnosticState = (state) => ['unknown','unavailable',''].includes(normalizeHealthState(state).toLowerCase());
+  const labelHealthEntity = (entityId) => human(String(entityId || '')
+    .replace(/^sensor\.energy_/, '')
+    .replace(/_health$/, '') || entityId);
+
+
+  function canonicalEditableProperty(row = {}) {
+    const write = objectFrom(row.write || row.write_operation || {});
+    const operationId = String(firstDefined(write.operation_id, row.write_operation, row.operation_id, '') || '');
+    return asBool(firstDefined(row.editable, row.write_supported, operationId === 'energy.property.write'), false)
+      && operationId === 'energy.property.write'
+      && !!String(firstDefined(write.readback_property, row.readback_property, row.property_id, row.key, '') || '');
+  }
+  class EnergyRuntime {
+    constructor(hass) {
+      this.hass = hass || {};
+      this._allowed = null;
+      this._rows = null;
+      this._assets = null;
+      this._commands = null;
+      this._activities = null;
+      this._flexibleAssets = null;
+      this._consumerMixRows = null;
+      this._consumerMixSummary = null;
+      this._planningExperienceRows = null;
+      this._commandReadiness = null;
+      this._planningOutcomes = null;
+      this._effectiveStrategies = null;
+      this._strategyProfiles = null;
+      this._outlookHorizons = null;
+      this._meteringHorizons = null;
+      this._meteringPeriods = null;
+      this._meteringRemediations = null;
+    }
+    rawState(entityId) { return this.hass?.states?.[entityId] || null; }
+    releaseState() { return this.rawState(RELEASE_ENTITY); }
+    releaseAttrs() { return this.releaseState()?.attributes || {}; }
+    publicUxEntities() {
+      if (!this._allowed) this._allowed=[UX_INTERFACES.publicV2];
+      return this._allowed;
+    }
+    isCanonicalUxInterface(entityId) {
+      // The canonical interface is defined by its exact published entity id and
+      // validated contract_id/core contract in readEnergyPublicV2(). Do not add
+      // optional transport metadata as a second availability gate.
+      return entityId === UX_INTERFACES.publicV2 && !!this.rawState(entityId);
+    }
+    isAllowed(entityId) {
+      return entityId === RELEASE_ENTITY || this.isCanonicalUxInterface(entityId);
+    }
+    state(entityId) { return this.isAllowed(entityId) ? this.rawState(entityId) : null; }
+    attrs(entityId) { return this.state(entityId)?.attributes || {}; }
+    contractGateway() { return createEnergyContractGateway(this); }
+    interfaceEntity(interfaceKey) {
+      return interfaceKey === 'publicV2' && this.isCanonicalUxInterface(UX_INTERFACES.publicV2)
+        ? UX_INTERFACES.publicV2
+        : null;
+    }
+    entityForKey(_key) { return UX_INTERFACES.publicV2; }
+    rowsForEntity(entityId) {
+      return entityId === UX_INTERFACES.publicV2 ? this.propertyRows() : [];
+    }
+    allRows() {
+      if (this._rows) return this._rows;
+      const v2 = this.publicV2();
+      const result = new Map();
+      const add = row => {
+        const key = String(row?.property_id || row?.property_key || row?.key || '');
+        if (!key || result.has(key)) return;
+        result.set(key, {
+          entity_id:v2.envelope.entityId,
+          ...row,
+          property_id:String(row.property_id || key),
+          property_key:key,
+          key
+        });
+      };
+      (v2.allPropertyRows || []).forEach(add);
+      // Core is the only authority for current home-energy facts. Expose the
+      // canonical SemanticValue fields through the existing row API so screens
+      // cannot fall back to object property indexes for aggregate truth.
+      for (const [key, field] of (v2.coreByKey || new Map()).entries()) {
+        add({
+          asset_id:'core',
+          property_id:key,
+          property_key:key,
+          key,
+          value:field.value,
+          unit:field.unit,
+          availability:field.status,
+          status:field.status,
+          quality:field.quality,
+          reason:field.reason,
+          source_type:'canonical_v2_core'
+        });
+      }
+
+      // Preserve the existing view API without creating another truth source:
+      // intelligence fields are direct projections of the canonical V2 object.
+      Object.entries(v2.intelligence || {}).forEach(([key,value]) => add({
+        asset_id:'energy_intelligence',
+        property_id:`energy_intelligence.${key}`,
+        property_key:`energy_intelligence.${key}`,
+        key:`energy_intelligence.${key}`,
+        value,
+        availability:value === undefined || value === null ? 'UNAVAILABLE' : 'AVAILABLE',
+        quality:'authoritative',
+        source_type:'canonical_v2_intelligence'
+      }));
+      this._rows = result;
+      return result;
+    }
+    propertyRows() { return [...this.allRows().values()]; }
+    row(key) {
+      const wanted=String(key || '');
+      return this.allRows().get(wanted)
+        || { key:wanted, property_id:wanted, property_key:wanted, value:null, unit:'', health:'NOT_PUBLISHED', quality:'missing', missing:true };
+    }
+    editablePropertyRows() {
+      return (this.publicV2().allPropertyRows || [])
+        .filter(row => row?.editable === true || row?.write_supported === true || row?.write?.supported === true)
+        .map(row => ({
+          entity_id:this.publicV2().envelope.entityId,
+          ...row,
+          key:String(row.property_id || row.property_key || row.key || ''),
+          property_key:String(row.property_key || row.property_id || row.key || ''),
+          property_id:String(row.property_id || row.property_key || row.key || '')
+        }));
+    }
+    editableProperty(propertyId) {
+      const wanted=String(propertyId || '');
+      return this.editablePropertyRows().find(row => String(row.property_id || row.key || row.property_key || '') === wanted) || null;
+    }
+    value(key, fallback = null) { return rowValue(this.row(key), fallback); }
+    number(key) { return asNumber(this.value(key, null)); }
+    text(key, fallback = '—') { return human(this.value(key, fallback), fallback); }
+    rawText(key, fallback = '') {
+      const v = this.value(key, fallback);
+      return v === undefined || v === null || v === '' ? fallback : String(v);
+    }
+    release() {
+      const attrs = this.releaseAttrs();
+      return {
+        ux_version: UX_VERSION,
+        backend_release: attrs.backend_release || 'unknown',
+        contract_version: attrs.contract_version || 'unknown',
+        release_contract_entity: RELEASE_ENTITY,
+        governance_gate: attrs.governance_gate || attrs.health || this.releaseState()?.state || 'unknown',
+        public_ux_entities_json: this.publicUxEntities()
+      };
+    }
+    backendStatus() {
+      // Product trust is owned by the canonical public V2 transport. Optional
+      // diagnostic/release entities must never create a product-facing error.
+      const v2 = this.publicV2();
+      return {
+        runtimeTrusted: v2.available === true,
+        showMainWarning: false,
+        failedHardGates: [],
+        diagnosticsNotes: [],
+        statusText: v2.available
+          ? 'Canonical Energy contract active'
+          : (v2.compatibilityReason || 'Canonical Energy contract unavailable'),
+        warningText: ''
+      };
+    }
+    footerModel() {
+      const v2 = this.publicV2();
+      const backendStatus = this.backendStatus();
+      return {
+        uxVersion: UX_VERSION,
+        backendVersion: v2.release || 'Unknown',
+        releaseContractEntity: UX_INTERFACES.publicV2,
+        contractVersion: v2.contractVersion || 'Unknown',
+        runtimeTrusted: backendStatus.runtimeTrusted,
+        failedHardGates: [],
+        diagnosticsNotes: [],
+        statusText: backendStatus.statusText,
+        warningText: '',
+        showMainWarning: false
+      };
+    }
+    publicV2() {
+      if (!this._publicV2) this._publicV2 = readEnergyPublicV2(this.contractGateway());
+      return this._publicV2;
+    }
+    contractCompatibility() {
+      const v2=this.publicV2();
+      return Object.freeze({
+        available:v2.available === true,
+        reason:String(v2.compatibilityReason || ''),
+        release:String(v2.release || ''),
+        contractVersion:String(v2.contractVersion || ''),
+        capabilities:v2.capabilities || {}
+      });
+    }
+    contractEntityId() { return this.publicV2().envelope.entityId; }
+    assetProjection(assetId) { return selectEnergyAsset(this.publicV2(), assetId); }
+    overviewProjection() { return selectEnergyOverview(this.publicV2()); }
+    planningProjection(horizon = 'D0') { return selectEnergyPlanning(this.publicV2(), horizon); }
+    strategyProjection() { return selectEnergyStrategies(this.publicV2()); }
+    pricingProjection() { return selectEnergyPricing(this.publicV2()); }
+    valueProjection(period = 'today') { return selectEnergyValue(this.publicV2(), period); }
+    meteringProjection(period = 'today') { return selectEnergyMetering(this.publicV2(), period); }
+    activityProjection() { return selectEnergyActivity(this.publicV2()); }
+    commandProjection(assetId = '') { return selectEnergyCommands(this.publicV2(), assetId); }
+    coverage() { return selectEnergyCoverage(this.publicV2()); }
+    assets() {
+      if (this._assets) return this._assets;
+      const v2 = this.publicV2();
+      this._assets = v2.available ? [...v2.objects] : [];
+      return this._assets;
+    }
+    asset(assetId) { return this.assets().find(a => String(a.asset_id || '') === String(assetId)) || null; }
+    assetName(assetId) { return this.asset(assetId)?.display_name || human(assetId, '—'); }
+    assetField(assetId, propertyKey) {
+      return this.publicV2().field(String(propertyKey || ''), String(assetId || ''));
+    }
+    assetValue(assetId, propertyKey, fallback = null) {
+      const field = this.assetField(assetId, propertyKey);
+      return field?.resolved === true ? field.value : fallback;
+    }
+    assetNumber(assetId, propertyKey) {
+      return asNumber(this.assetValue(assetId, propertyKey, null));
+    }
+    assetText(assetId, propertyKey, fallback = '') {
+      const value = this.assetValue(assetId, propertyKey, fallback);
+      return value === undefined || value === null || value === '' ? fallback : String(value);
+    }
+    childrenOfType(parentAssetId, childType = '') {
+      const wanted = String(childType || '').toLowerCase();
+      return this.containsChildren(parentAssetId).filter(id => {
+        if (!wanted) return true;
+        const asset = this.asset(id) || {};
+        return [asset.asset_type, asset.object_class].some(value => String(value || '').toLowerCase() === wanted);
+      });
+    }
+    commandContract() {
+      if (!this._commandContract) this._commandContract = readEnergyCommandContract(this.contractGateway());
+      return this._commandContract;
+    }
+    commands() { return this.commandProjection().rows.map(row => this.commandContract().rows.find(candidate => candidate.command_id === row.command_id && candidate.target_asset_id === row.target_asset_id) || row); }
+    commandVisible(command) { return !!command && command.command_resolved === true && command.visible === true; }
+    commandResolved(command) { return !!command && command.command_resolved === true; }
+    commandApplicable(command) { return !!command && command.currently_applicable === true; }
+    commandEnabled(command) { return !!command && command.enabled === true; }
+    commandReasonObject(command) { return objectFrom(command?.reason || {}); }
+    commandReason(command) {
+      const model = createCommandActionModel(command);
+      return model?.reason || 'Currently unavailable';
+    }
+    commandReasonCode(command) { return String(this.commandReasonObject(command).code || ''); }
+    commandRole(command) { return String(command?.role || '').toLowerCase(); }
+    commandsForAsset(assetId) { return this.commands().filter(command => String(command.target_asset_id || '') === String(assetId)); }
+    commandForAssetRole(assetId, role) {
+      const wanted = String(role || '').toLowerCase();
+      return this.commandsForAsset(assetId).find(command => this.commandRole(command) === wanted && this.commandVisible(command)) || null;
+    }
+    commandActionModelsForAsset(assetId) { return commandActionModelsForAsset(this.commandContract(), assetId); }
+    visibleCommands(targetAssetId = null) {
+      return this.commands().filter(command => this.commandVisible(command) && (!targetAssetId || String(command.target_asset_id || '') === String(targetAssetId)));
+    }
+    activities() {
+      if (!this._activities) this._activities = [...this.activityProjection().rows];
+      return this._activities;
+    }
+    activity(type) { return this.activities().find(a => String(a.activity_type || '').toLowerCase() === String(type).toLowerCase()) || null; }
+    decision() {
+      const d = this.value('energy_intelligence.decision', null);
+      if (d && typeof d === 'object') return d;
+      return {
+        goal: this.value('energy_intelligence.goal', ''),
+        observation: this.value('energy_intelligence.observation', ''),
+        assessment: this.value('energy_intelligence.assessment', ''),
+        recommendation: this.value('energy_intelligence.recommendation', ''),
+        automation_mode: this.value('energy_intelligence.automation_mode', ''),
+        automation_status: this.value('energy_intelligence.automation_status', ''),
+        status: this.value('energy_intelligence.status', ''),
+        reason: this.value('energy_intelligence.reason', ''),
+        confidence: this.value('energy_intelligence.confidence', ''),
+        affected_assets: this.value('energy_intelligence.affected_assets', []),
+        next_review: this.value('energy_intelligence.next_review', '')
+      };
+    }
+    overviewExperience() {
+      const projection=this.overviewProjection();
+      return projection.available ? { entity_id:this.contractEntityId(), ...projection.raw } : null;
+    }
+    pilotReadiness() {
+      const v2=this.publicV2();
+      const coverage=this.coverage();
+      return {
+        entity_id:v2.envelope.entityId,
+        state:v2.available ? (coverage.complete ? 'READY' : 'PARTIAL') : 'UNAVAILABLE',
+        contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+        contract_version:v2.contractVersion,
+        release:v2.release,
+        coverage
+      };
+    }
+    planningExperienceRows() {
+      if (this._planningExperienceRows) return this._planningExperienceRows;
+      const v2=this.publicV2();
+      this._planningExperienceRows=(v2.layers?.planning_objects || []).map((row,index)=>({
+        experience_id:row.experience_id || row.id || row.asset_id || `planning_experience_${index+1}`,
+        entity_id:v2.envelope.entityId,
+        ...objectFrom(row)
+      }));
+      return this._planningExperienceRows;
+    }
+    planningExperienceFor(assetId) {
+      return this.planningExperienceRows().find(row => String(row.asset_id || row.target_asset_id || '') === String(assetId)) || null;
+    }
+    consumerMixIndexEntity() { return this.publicV2().envelope.entityId; }
+    consumerMixRows() {
+      if (this._consumerMixRows) return this._consumerMixRows;
+      const v2=this.publicV2();
+      this._consumerMixRows=(v2.flexibleAssets || []).map((raw,index)=>{
+        const row=objectFrom(raw);
+        const assetId=String(row.asset_id || `flexible_${index+1}`);
+        const projected=this.assetProjection(assetId);
+        const power=asNumber(projected?.property?.('power_kw')?.value ?? row.power_kw);
+        const need=asNumber(projected?.property?.('energy_to_target_kwh')?.value ?? row.energy_to_target_kwh);
+        return {
+          mix_row_id:assetId,
+          entity_id:v2.envelope.entityId,
+          ...row,
+          asset_id:assetId,
+          display_name:row.display_name || this.assetName(assetId),
+          category:row.asset_type || row.object_class || 'flexible_asset',
+          controllability:'FLEXIBLE',
+          current_power_kw:power,
+          energy_today_kwh:null,
+          energy_need_kwh:need,
+          availability:row.availability_state || row.health || 'UNAVAILABLE',
+          visible:true,
+          flexible:true,
+          source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.objects'],
+          metering_state:'UNAVAILABLE',
+          metering_reason:'Canonical per-asset period energy is not published by the current public contract.'
+        };
+      });
+      return this._consumerMixRows;
+    }
+    consumerMixSummary() {
+      if (this._consumerMixSummary) return this._consumerMixSummary;
+      const rows=this.consumerMixRows();
+      const power=rows.map(row=>asNumber(row.current_power_kw));
+      const need=rows.map(row=>asNumber(row.energy_need_kwh)).filter(value=>value!==null);
+      this._consumerMixSummary={
+        current_power_kw:power.length && power.every(value=>value!==null) ? power.reduce((sum,value)=>sum+value,0) : null,
+        known_energy_need_kwh:need.length ? need.reduce((sum,value)=>sum+value,0) : null,
+        asset_count:rows.length,
+        energy_kwh:null,
+        energy_by_asset_kwh:{},
+        health:'PARTIAL',
+        reason:'Canonical current flexible-asset truth is available; category/per-asset period energy is not published by the current public contract.',
+        source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.objects']
+      };
+      return this._consumerMixSummary;
+    }
+    consumerRows() {
+      return this.assets().filter(a => String(a.asset_type || '') === 'consumer' && String(a.parent_asset_id || '') === 'consumer').map(asset => {
+        const id = asset.asset_id;
+        return {
+          ...asset,
+          current_power_kw: this.number(`${id}.power_kw`) ?? this.number(`${id}.current_power_kw`) ?? this.number(`${id}.actual_power_kw`),
+          active: asBool(this.value(`${id}.active`, false)),
+          enabled: asBool(this.value(`${id}.enabled`, false)),
+          flexibility_available: asBool(this.value(`${id}.flexibility_available`, false)),
+          connected: asBool(this.value(`${id}.connected`, false)),
+          charging: asBool(this.value(`${id}.charging`, false)),
+          min_power_kw: this.number(`${id}.min_power_kw`),
+          max_power_kw: this.number(`${id}.max_power_kw`),
+          effective_charger: this.value(`${id}.effective_charger`, ''),
+          health: this.value(`${id}.health`, this.row(`${id}.health`).health || 'UNKNOWN')
+        };
+      });
+    }
+
+    flexibleRuntimePropertyRow(assetId, names) {
+      const exact = [];
+      names.forEach(name => {
+        exact.push(`${assetId}.${name}`);
+        exact.push(`${assetId}.${name.replace(/^energy_control_/, '')}`);
+      });
+      const direct = exact.map(key => this.row(key)).find(r => r && !r.missing);
+      if (direct) return direct;
+      const rows = this.propertyRows().filter(row => String(row.asset_id || '') === String(assetId));
+      return rows.find(row => names.some(name => String(row.key || row.property_key || '').toLowerCase().endsWith(`.${name.toLowerCase()}`) || String(row.key || row.property_key || '').toLowerCase() === name.toLowerCase())) || { missing: true };
+    }
+    isDeprecatedTargetEnergyAlias(row) {
+      if (!row || row.missing) return false;
+      const text = `${row.key || row.property_key || ''} ${row.quality || ''} ${row.source_type || ''} ${row.resolution_mode || ''} ${row.alias_of || ''} ${row.deprecated_alias_of || ''} ${row.migration_role || ''}`.toLowerCase();
+      return /deprecated|source_alias|derived_alias|alias/.test(text);
+    }
+    targetEnergyForAsset(assetId, sourceRow = {}) {
+      const canonical = this.flexibleRuntimePropertyRow(assetId, ['energy_to_target_kwh']);
+      if (canonical && !canonical.missing) return rowValue(canonical, null);
+      if (sourceRow && sourceRow.energy_to_target_kwh !== undefined) return asNumber(sourceRow.energy_to_target_kwh);
+      const aliases = [this.flexibleRuntimePropertyRow(assetId, ['remaining_energy_kwh']), this.flexibleRuntimePropertyRow(assetId, ['energy_needed_kwh'])];
+      for (const row of aliases) {
+        if (row && !row.missing && this.isDeprecatedTargetEnergyAlias(row)) return rowValue(row, null);
+      }
+      const rowText = `${sourceRow.alias_of || ''} ${sourceRow.deprecated_alias_of || ''} ${sourceRow.migration_role || ''} ${sourceRow.source_type || ''}`.toLowerCase();
+      if (/deprecated|source_alias|derived_alias|alias/.test(rowText)) return asNumber(sourceRow.remaining_energy_kwh ?? sourceRow.energy_needed_kwh);
+      return null;
+    }
+    normalizeFlexibleAssetRow(row) {
+      const id = row.asset_id || row.flexible_asset_id || row.target_asset_id;
+      // R1.59.4AKL: active flexible-load/runtime path is canonical-only.
+      // Use power_kw + energy_flow_direction. Legacy actual/current power aliases are not active UX truth.
+      const actual = this.number(`${id}.power_kw`) ?? asNumber(row.power_kw);
+      const targetEnergy = this.targetEnergyForAsset(id, row);
+      const remaining = this.number(`${id}.remaining_energy_kwh`) ?? asNumber(row.remaining_energy_kwh);
+      const required = this.number(`${id}.required_energy_kwh`) ?? asNumber(row.required_energy_kwh);
+      const requestedEffective = this.number(`${id}.requested_power_kw_effective`) ?? this.number(`${id}.requested_power_kw`) ?? asNumber(row.requested_power_kw_effective ?? row.requested_power_kw);
+      return {
+        ...row,
+        asset_id: id,
+        display_name: row.display_name || this.assetName(id),
+        ux_asset_type: row.ux_asset_type || row.asset_type || (String(row.flexible_role || '').includes('storage') ? 'storage' : 'flexible_asset'),
+        flexible_role: row.flexible_role || (String(row.asset_type || '').toLowerCase().includes('storage') ? 'storage' : 'load'),
+        cluster_role: row.cluster_role || 'standalone',
+        show_in_primary_ux: row.show_in_primary_ux ?? true,
+        show_in_engineering: row.show_in_engineering ?? false,
+        planning_enabled: row.planning_enabled ?? true,
+        contributor_asset_ids: asArray(row.contributor_asset_ids),
+        actual_power_kw: actual,
+        current_power_kw: actual,
+        power_kw: actual,
+        energy_flow_direction: this.value(`${id}.energy_flow_direction`, row.energy_flow_direction || 'unknown'),
+        power_direction: this.value(`${id}.energy_flow_direction`, row.energy_flow_direction || 'unknown'),
+        energy_to_target_kwh: targetEnergy,
+        remaining_energy_kwh: remaining,
+        required_energy_kwh: required,
+        energy_needed_kwh: targetEnergy,
+        requested_power_kw_effective: requestedEffective,
+        min_power_kw: this.number(`${id}.min_power_kw`) ?? asNumber(row.min_power_kw),
+        max_power_kw: this.number(`${id}.max_power_kw`) ?? asNumber(row.max_power_kw),
+        energy_control_priority: this.value(`${id}.energy_control_priority`, row.energy_control_priority ?? row.priority ?? 'normal'),
+        availability_state: this.value(`${id}.availability_state`, row.availability_state || 'unknown'),
+        availability_reason: this.value(`${id}.availability_reason`, row.availability_reason || ''),
+        operating_state: this.value(`${id}.operating_state`, row.operating_state || 'unknown'),
+        energy_control_hold_state: this.value(`${id}.energy_control_hold_state`, row.energy_control_hold_state || 'none'),
+        energy_control_mode: this.value(`${id}.energy_control_mode`, row.energy_control_mode || row.current_mode || 'automatic'),
+        can_execute_energy_action_now: asBool(this.value(`${id}.can_execute_energy_action_now`, row.can_execute_energy_action_now), false),
+        energy_planning: this.planningOutcomeFor(id)
+      };
+    }
+    flexibleAssetIndexRows() {
+      if (this._flexibleAssets) return this._flexibleAssets;
+      const v2=this.publicV2();
+      this._flexibleAssetSource='RHI_ENERGY_PUBLIC_CONTRACT_V2.flexible_assets';
+      this._flexibleAssets=(v2.flexibleAssets || []).map(row=>this.normalizeFlexibleAssetRow({
+        ...row,
+        compatibility_fallback:false,
+        contract_source:v2.envelope.entityId
+      })).filter(row=>row.asset_id);
+      return this._flexibleAssets;
+    }
+    primaryFlexibleAssets() {
+      // R1.59.4AKL / R3.45.16: Solar and Consumers must use the same
+      // broad Flexible Loads interpretation. The projection is already the
+      // UX-safe list of Energy-controllable flexible-load assets and may
+      // include the battery storage cluster. Do not restrict Solar to
+      // ux_asset_type=flexible_load, Mobility/vehicle assets, or a narrow
+      // cluster_role list; that hides storage_cluster rows. Visibility is
+      // controlled by the projection flags only.
+      return this.flexibleAssetIndexRows().filter(asset => {
+        const visible = asset.visible !== undefined
+          ? asBool(asset.visible, true)
+          : asBool(asset.show_in_primary_ux, true);
+        const showPrimary = asset.show_in_primary_ux !== undefined
+          ? asBool(asset.show_in_primary_ux, true)
+          : true;
+        return visible && showPrimary;
+      });
+    }
+    commandReadinessRows() {
+      return this.commands();
+    }
+    readinessFor(assetId, role) {
+      return this.commandForAssetRole(assetId, role);
+    }
+    commandFromReadiness(assetId, role) {
+      return this.commandForAssetRole(assetId, role);
+    }
+
+    planningIndexRows() {
+      if (this._planningOutcomes) return this._planningOutcomes;
+      const v2=this.publicV2();
+      this._planningOutcomes=(v2.layers?.planning_objects || [])
+        .map((row,i)=>({
+          planning_id:row.planning_id || row.id || row.plan_id || `planning_${i+1}`,
+          entity_id:v2.envelope.entityId,
+          ...objectFrom(row),
+          asset_id:row.asset_id || row.target_asset_id || row.flexible_asset_id || row.planning_target_asset_id
+        }))
+        .filter(row=>row.asset_id);
+      return this._planningOutcomes;
+    }
+    planningOutcomeFor(assetId) {
+      return this.planningIndexRows().find(row => String(row.asset_id || '') === String(assetId || '')) || null;
+    }
+
+    planningHorizons() {
+      const planning=this.publicV2().planning || {};
+      const horizons=planning.horizons && typeof planning.horizons === 'object' ? planning.horizons : {};
+      return Object.entries(horizons).map(([id,value])=>({ horizon_id:String(id).toUpperCase(), ...planningObject(value) }));
+    }
+    planningHorizon(id = 'D0') {
+      return this.planningProjection(id).horizon || null;
+    }
+    planningHorizonTotals(id = 'D0') {
+      return this.planningProjection(id).lane_totals;
+    }
+    planningBuckets(id = 'D0') {
+      return this.planningProjection(id).buckets;
+    }
+
+    relationships() {
+      return this.publicV2().available ? [...this.publicV2().relationships] : [];
+    }
+    flowRelationships() {
+      return this.relationships().filter(r => String(r.relationship_type || '').toLowerCase() === 'flows_to');
+    }
+    connectedRelationships() {
+      return this.relationships().filter(r => String(r.relationship_type || '').toLowerCase() === 'connected_to');
+    }
+    containsChildren(parentAssetId) {
+      const relChildren = this.relationships()
+        .filter(r => String(r.relationship_type || '').toLowerCase() === 'contains' && String(r.source_asset_id || r.from_asset_id || '') === String(parentAssetId))
+        .map(r => String(r.target_asset_id || r.to_asset_id || '')).filter(Boolean);
+      const assetChildren = this.assets().filter(a => String(a.parent_asset_id || '') === String(parentAssetId)).map(a => String(a.asset_id || '')).filter(Boolean);
+      return [...new Set([...relChildren, ...assetChildren])];
+    }
+    powerForAsset(assetId) {
+      const id = String(assetId || '');
+      const asset = this.asset(id) || {};
+      const type = String(asset.asset_type || asset.object_class || '').toLowerCase();
+      const candidatesByType = {
+        battery: ['battery.power_kw','battery.charge_power_kw','battery.discharge_power_kw'],
+        inverter: ['inverter.power_kw','solar.power_kw'],
+        solar_inverter: ['solar.power_kw','inverter.power_kw'],
+        grid_phase: ['grid_phase.power_kw'],
+        flexible_load: ['flexible_load.power_kw','flexible_load.current_power_kw']
+      };
+      const candidates = candidatesByType[type] || ['power_kw'];
+      for (const key of candidates) {
+        const n = this.assetNumber(id, key);
+        if (n !== null) return n;
+      }
+      return null;
+    }
+    rowsByAsset(assetId) {
+      return [...this.allRows().values()].filter(row => String(row.asset_id || '') === String(assetId));
+    }
+    rowsByPrefix(prefix) {
+      const p = String(prefix || '');
+      return [...this.allRows().values()].filter(row => String(row.key || '').startsWith(p));
+    }
+    editableRows() {
+      return [...this.allRows().values()].filter(row => asBool(row.editable, false) || String(row.access || '').toLowerCase() === 'editable');
+    }
+    strategyIntentRows() { return []; }
+    strategyProfileRows() {
+      if (this._strategyProfiles) return this._strategyProfiles;
+      const v2=this.publicV2();
+      const rows=asArray(v2.configuration?.strategy?.configured?.properties);
+      const labels={home:'Home Intelligence',battery:'Home Battery',solar:'Solar',grid:'Grid',flexible_loads:'Flexible Loads',resilience:'Resilience'};
+      const groups=new Map();
+      rows.forEach(raw=>{
+        const row=objectFrom(raw);
+        const group=String(row.group || row.asset_id || 'home');
+        const current=groups.get(group) || {
+          strategy_id:group, profile_id:group, profile_type:group, asset_type:group,
+          profile_label:labels[group] || human(group),
+          display_name:labels[group] || human(group),
+          entity_id:v2.envelope.entityId,
+          contract_role:'editable_strategy_profile',
+          ux_primary_behavior_source:false,
+          not_planning_outcome:true,
+          not_command_readiness:true,
+          editable_field_rows:[],
+          properties:[]
+        };
+        const normalized={ entity_id:v2.envelope.entityId, ...row, profile_id:group, strategy_profile_id:group };
+        current.properties.push(normalized);
+        if (canonicalEditableProperty(normalized)) current.editable_field_rows.push(normalized);
+        groups.set(group,current);
+      });
+      this._strategyProfiles=[...groups.values()];
+      return this._strategyProfiles;
+    }
+    strategyProfileFor(profileId) {
+      const wanted = String(profileId || '').toLowerCase();
+      if (!wanted) return null;
+      return this.strategyProfileRows().find(row => String(row.profile_id || '').toLowerCase() === wanted || String(row.profile_type || '').toLowerCase() === wanted || String(row.asset_type || '').toLowerCase() === wanted) || null;
+    }
+    strategyProfileEditableFieldRows(profile = {}) {
+      const profileId=String(profile.profile_id || profile.strategy_profile_id || '').trim().toLowerCase();
+      if (!profileId) return [];
+      const labels={
+        objective:'Objective', surplus_objective:'Objective', reserve_target_pct:'Minimum reserve',
+        minimum_target_value:'Minimum target', preferred_target_value:'Preferred target', maximum_useful_value:'Maximum useful',
+        deadline:'Default deadline', deadline_time:'Default deadline', grid_policy:'Grid policy', solar_policy:'Solar policy',
+        battery_policy:'Home Battery policy', surplus_policy:'Surplus policy', confidence_policy:'Confidence',
+        minimum_run_minutes:'Minimum run time', minimum_off_minutes:'Minimum off time', adjust_deadband_kw:'Deadband'
+      };
+      return asArray(profile.editable_field_rows).map(row=>{
+        const key=String(row.property_id || row.key || row.property_key || '');
+        const suffix=key.split('.').pop();
+        return {
+          ...row,
+          entity_id:this.publicV2().envelope.entityId,
+          source_index:'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy',
+          contract_role:'canonical_strategy_property',
+          profile_id:profileId,
+          strategy_profile_id:profileId,
+          field_key:suffix,
+          display_name:firstDefined(row.display_name,row.label,labels[suffix],human(suffix)),
+          allowed_values:firstDefined(row.allowed_values,row.choices,objectFrom(row.constraints).allowed,[]),
+          min:firstDefined(row.min,objectFrom(row.constraints).min,''),
+          max:firstDefined(row.max,objectFrom(row.constraints).max,''),
+          step:firstDefined(row.step,objectFrom(row.constraints).step,''),
+          editable_reason:firstDefined(row.reason_text,row.reason_code,'Canonical public property is not writable')
+        };
+      });
+    }
+    strategyProfileEditableRowByKey(propertyKey) {
+      const key = String(propertyKey || '');
+      if (!key) return null;
+      for (const profile of this.strategyProfileRows()) {
+        const hit = this.strategyProfileEditableFieldRows(profile).find(row => String(row.key || row.property_key || '') === key);
+        if (hit) return hit;
+      }
+      return null;
+    }
+    effectiveStrategyRows() {
+      if (this._effectiveStrategies) return this._effectiveStrategies;
+      const v2=this.publicV2();
+      const rows=asArray(v2.configuration?.strategy?.effective?.properties);
+      const byGroup=new Map();
+      rows.forEach(raw=>{
+        const row=objectFrom(raw);
+        const group=String(row.group || row.asset_id || 'home');
+        const current=byGroup.get(group) || {
+          strategy_id:group, policy_id:group, asset_id:group,
+          entity_id:v2.envelope.entityId,
+          contract_role:'effective_strategy_policy',
+          effective_state:v2.configuration?.strategy?.effective?.status || 'UNAVAILABLE',
+          reason_code:v2.configuration?.strategy?.effective?.reason || ''
+        };
+        const key=String(row.property_id || row.key || row.property_key || '');
+        if(key) current[key]=row.value;
+        current.properties=[...(current.properties || []),row];
+        byGroup.set(group,current);
+      });
+      this._effectiveStrategies=[...byGroup.values()];
+      return this._effectiveStrategies;
+    }
+    effectiveStrategyFor(assetId) {
+      return this.effectiveStrategyRows().find(row => String(row.asset_id || '') === String(assetId || '')) || null;
+    }
+    commandState(command) {
+      if (!this.commandVisible(command)) return 'hidden';
+      return this.commandEnabled(command) ? 'enabled' : 'disabled';
+    }
+    statusForKeys(keys) {
+      const rows = asArray(keys).map(key => this.row(key));
+      if (!rows.length) return 'unknown';
+      const states = rows.map(row => rowState(row));
+      if (states.includes('fail')) return 'fail';
+      if (states.includes('warn')) return 'warn';
+      if (states.every(s => s === 'missing')) return 'missing';
+      if (states.includes('not-measured')) return 'not-measured';
+      if (states.includes('unknown')) return 'unknown';
+      return 'ok';
+    }
+
+    outlookHorizons() {
+      if (!this._outlookHorizons) this._outlookHorizons=this.planningHorizons();
+      return this._outlookHorizons;
+    }
+    meteringHorizons() {
+      if (!this._meteringHorizons) {
+        this._meteringHorizons=this.planningHorizons().map(row=>({ ...row, contract_kind:'metering_context' }));
+      }
+      return this._meteringHorizons;
+    }
+    meteringPeriods() {
+      if (this._meteringPeriods) return this._meteringPeriods;
+      const periods=objectFrom(this.publicV2().valueAccounting?.periods || {});
+      const labels={today:'Today',day:'Today',week:'This week',month:'This month',year:'This year'};
+      const order={today:1,day:1,week:2,month:3,year:4};
+      this._meteringPeriods=Object.keys(periods).map(period_id=>{
+        const id=String(period_id).toLowerCase();
+        return {
+          entity_id:this.publicV2().envelope.entityId,
+          period_id:id,
+          label:labels[id] || human(id),
+          selector_order:order[id] || 99,
+          graph_support:false,
+          bucket_support:false,
+          measurement_state:'UNAVAILABLE',
+          reason:'Canonical metering energy is not published by the current public contract.'
+        };
+      }).sort((a,b)=>(a.selector_order||99)-(b.selector_order||99));
+      return this._meteringPeriods;
+    }
+    valuePeriods() {
+      if (this._valuePeriods) return this._valuePeriods;
+      const v2=this.publicV2();
+      const periods=objectFrom(v2.valueAccounting?.periods || {});
+      const order={today:1,day:1,week:2,month:3,year:4};
+      const labels={today:'Today',day:'Today',week:'This week',month:'This month',year:'This year'};
+      this._valuePeriods=Object.entries(periods).map(([period_id,row])=>({
+        entity_id:v2.envelope.entityId,
+        period_id:String(period_id).toLowerCase(),
+        label:labels[String(period_id).toLowerCase()] || human(period_id),
+        selector_order:order[String(period_id).toLowerCase()] || 99,
+        summary:{ cost:objectFrom(row), quality:{ financial:row?.quality || 'UNKNOWN' } },
+        ...objectFrom(row)
+      })).sort((a,b)=>(a.selector_order||99)-(b.selector_order||99));
+      return this._valuePeriods;
+    }
+    meteringRemediations() {
+      if (this._meteringRemediations) return this._meteringRemediations;
+      this._meteringRemediations=this.commands()
+        .filter(command=>command.command_id === 'energy.command.reset_metering_baseline' && command.visible === true)
+        .map(command=>({
+          remediation_id:command.command_instance_id || command.command_row_id,
+          period_id:String(command.period_id || '').toLowerCase(),
+          command_id:command.command_id,
+          command,
+          applicable:true,
+          requires_confirmation:command.requires_confirmation !== false
+        }));
+      return this._meteringRemediations;
+    }
+    meteringRemediationsForPeriod(periodId) {
+      const wanted = String(periodId || '').toLowerCase();
+      return this.meteringRemediations().filter(row => !row.period_id || !wanted || row.period_id === wanted);
+    }
+    meteringResetCommandFor(remediation = {}, periodId = '') {
+      const commandId = String(firstDefined(remediation.command_id,remediation.command_ref,remediation.command_key,'') || '');
+      if (!commandId) return null;
+      return this.commands().find(command => String(command.command_id || '') === commandId && command.visible === true) || null;
+    }
+    meteringResetRemediationForPeriod(periodId = '') {
+      return this.meteringRemediationsForPeriod(periodId)[0] || null;
+    }
+
+    commandBindingMismatches() {
+      return this.commands().filter(command =>
+        !command.command_id
+        || !command.target_asset_id
+        || !command.role
+        || !command.invoke
+        || typeof command.visible !== 'boolean'
+        || typeof command.enabled !== 'boolean'
+        || !command.label
+        || (!command.enabled && !String(firstDefined(command.blocked_reason,command.user_action_text,'')))
+      ).map(command => ({
+        command_instance_id:command.command_instance_id || command.command_row_id || '',
+        target_asset_id:command.target_asset_id || '',
+        role:command.role || '',
+        problem:'invalid_R1_89_39_public_command_shape'
+      }));
+    }
+
+    coverageReport() {
+      const rows = [...this.allRows().values()];
+      return {
+        release: this.release(),
+        allowed_public_entities: this.publicUxEntities().length,
+        assets: this.assets().length,
+        properties: rows.length,
+        commands: this.commands().length,
+        activities: this.activities().length,
+        relationships: this.relationships().length,
+        strategy_profiles: this.strategyProfileRows().length,
+        effective_strategies: this.effectiveStrategyRows().length,
+        flow_relationships: this.flowRelationships().length,
+        command_binding_mismatches: this.commandBindingMismatches(),
+        connected_relationships: this.connectedRelationships().length,
+        missing_core_keys: [
+          'solar.power_kw','forecast.solar_today_kwh','forecast.next_hour_energy_kwh','battery.soc_pct','home_consumption.power_kw','energy_intelligence.recommendation'
+        ].filter(key => this.row(key).missing)
+      };
+    }
+  }
+
+  const firstDefined = (...values) => values.find(value => value !== undefined && value !== null && value !== '');
+  const objectFrom = (value) => {
+    const parsed = parseMaybeJson(value, value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  };
+  const splitService = (service) => {
+    const text = String(service || '').trim();
+    if (!text || !text.includes('.')) return { domain: '', action: '' };
+    const [domain, ...rest] = text.split('.');
+    return { domain, action: rest.join('.') };
+  };
+  const allowedValuesForRow = (row) => {
+    if (!row || typeof row !== 'object') return [];
+    const validation = objectFrom(row.validation);
+    let values = firstDefined(row.allowed_values, row.allowedValues, row.options, row.choices, validation.allowed_values, validation.options, validation.choices);
+    if (!values && typeof row.validation === 'string' && row.validation.includes('|')) values = row.validation.split('|');
+    return asArray(values).map(v => (v && typeof v === 'object') ? (v.value ?? v.id ?? v.key ?? v.label ?? v.name) : v).filter(v => v !== undefined && v !== null && v !== '');
+  };
+  const coerceAllowedValue = (row, value) => {
+    const allowed = allowedValuesForRow(row);
+    if (!allowed.length) return value;
+    const wanted = String(value ?? '').trim().toLowerCase();
+    const hit = allowed.find(v => String(v).trim().toLowerCase() === wanted)
+      || allowed.find(v => human(v, '').trim().toLowerCase() === wanted)
+      || allowed.find(v => String(v).replace(/[\s_\-]+/g, '').toLowerCase() === wanted.replace(/[\s_\-]+/g, ''));
+    return hit ?? value;
+  };
+  const valueAtPath = (source, path) => {
+    if (!source || !path) return undefined;
+    const parts = String(path).split('.').filter(Boolean);
+    let current = source;
+    for (const part of parts) {
+      if (current === undefined || current === null || typeof current !== 'object') return undefined;
+      current = current[part];
+    }
+    return current;
+  };
+  const renderTemplateValue = (value, context = {}) => {
+    if (Array.isArray(value)) return value.map(item => renderTemplateValue(item, context));
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, renderTemplateValue(v, context)]));
+    }
+    if (typeof value !== 'string') return value;
+    const replaced = value.replace(/{{\s*([a-zA-Z0-9_\.]+)\s*}}/g, (_, key) => {
+      const direct = context[key];
+      const nested = valueAtPath(context, key);
+      const result = direct !== undefined ? direct : nested;
+      return result === undefined || result === null ? '' : String(result);
+    });
+    return replaced;
+  };
+  const renderPayloadTemplate = (template, context = {}) => {
+    if (template === undefined || template === null || template === '') return {};
+    const parsed = parseMaybeJson(template, template);
+    const rendered = renderTemplateValue(parsed, context);
+    if (typeof rendered === 'string') return objectFrom(parseMaybeJson(rendered, {}));
+    return objectFrom(rendered);
+  };
+
+
+  // __RHI_FLEXIBLE_ASSET_MODULES__
+
+  // __RHI_PLANNING_MODULES__
+
+  // __RHI_PRESENTATION_MODULES__
+
+  class HomeBrainEnergyCard extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+      const interaction = this.restoreInteractionContext();
+      const restoredView = interaction.view || this.restoreView();
+      const navigation = this.resolveNavigation(interaction.navSection, interaction.navItem, restoredView);
+      this.navSection = navigation.section;
+      this.navItem = navigation.item;
+      this.view = navigation.view;
+      this.navSelectionBySection = interaction.navSelectionBySection && typeof interaction.navSelectionBySection === 'object'
+        ? interaction.navSelectionBySection
+        : { [this.navSection]: this.navItem };
+      this.navSelectionBySection[this.navSection] = this.navItem;
+      this.loadSort = interaction.loadSort || 'priority';
+      this.detailOpen = {};
+      this.selectedStrategyProfileId = interaction.selectedStrategyProfileId || '';
+      this.strategyEditProfileId = '';
+      this.selectedOutlookHorizonId = interaction.selectedOutlookHorizonId || 'D0';
+      this.selectedPlanningHorizonId = interaction.selectedPlanningHorizonId || 'D0';
+      this.selectedMeteringHorizonId = interaction.selectedMeteringHorizonId || 'D0';
+      this.selectedMeteringPeriodId = interaction.selectedMeteringPeriodId || 'today';
+      this._meteringPeriodHydrated = Object.prototype.hasOwnProperty.call(interaction, 'selectedMeteringPeriodId');
+      this.meteringSort = interaction.meteringSort || 'default';
+      this.consumerSort = interaction.consumerSort || 'power';
+      this.consumerFilter = interaction.consumerFilter || 'all';
+      this.writeFeedback = {};
+      this.remediationFeedback = {};
+      this.editSession = null;
+      this.pendingRuntimeRender = false;
+      this.editDrafts = {};
+      this.disclosureOpen = interaction.disclosureOpen && typeof interaction.disclosureOpen === 'object' ? interaction.disclosureOpen : {};
+      this.navScrollLeft = Number(interaction.navScrollLeft) || 0;
+      this.planningScrollLeft = Number(interaction.planningScrollLeft) || 0;
+      this.planningScrollTop = Number(interaction.planningScrollTop) || 0;
+      this._renderTimer = null;
+      this._lastRuntimeSignature = '';
+      this._lastMarkup = '';
+      this._forceRender = true;
+      this.energyVisualPickerAssetId = '';
+    }
+    restoreView() {
+      try {
+        const saved = window.sessionStorage.getItem('homebrain.energy.active_view');
+        return ['overview','outlook','flow','solar','battery','consumers','strategies','metering','intelligence','value','planning','retrospective'].includes(saved) ? saved : 'overview';
+      } catch (_) { return 'overview'; }
+    }
+    persistView() {
+      try { window.sessionStorage.setItem('homebrain.energy.active_view', this.view); } catch (_) {}
+      this.persistInteractionContext();
+    }
+    restoreInteractionContext() {
+      try {
+        const raw = window.sessionStorage.getItem('homebrain.energy.interaction_context.v1');
+        const parsed = raw ? JSON.parse(raw) : {};
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+      } catch (_) { return {}; }
+    }
+    persistInteractionContext() {
+      try {
+        const context = {
+          view: this.view,
+          navSection: this.navSection,
+          navItem: this.navItem,
+          navSelectionBySection: this.navSelectionBySection,
+          loadSort: this.loadSort,
+          selectedStrategyProfileId: this.selectedStrategyProfileId,
+          selectedOutlookHorizonId: this.selectedOutlookHorizonId,
+          selectedPlanningHorizonId: this.selectedPlanningHorizonId,
+          selectedMeteringHorizonId: this.selectedMeteringHorizonId,
+          selectedMeteringPeriodId: this.selectedMeteringPeriodId,
+          meteringSort: this.meteringSort,
+          consumerSort: this.consumerSort,
+          consumerFilter: this.consumerFilter,
+          disclosureOpen: this.disclosureOpen,
+          navScrollLeft: this.navScrollLeft,
+          planningScrollLeft: this.planningScrollLeft,
+          planningScrollTop: this.planningScrollTop
+        };
+        window.sessionStorage.setItem('homebrain.energy.interaction_context.v1', JSON.stringify(context));
+      } catch (_) {}
+    }
+    setConfig(config) { this.config = config || {}; }
+    set hass(hass) {
+      this._hass = hass;
+      this.reconcileWriteFeedback();
+      this.syncMeteringPeriodFromRuntime();
+      if (this.editSession) { this.pendingRuntimeRender = true; return; }
+      this._preserveViewportOnRender = true;
+      this.scheduleRender();
+    }
+    connectedCallback() { this.scheduleRender(true); }
+    disconnectedCallback() {
+      if (this._renderTimer) clearTimeout(this._renderTimer);
+      this._renderTimer = null;
+    }
+    scheduleRender(immediate = false) {
+      if (!this._hass) return;
+      if (this._renderTimer) clearTimeout(this._renderTimer);
+      this._renderTimer = setTimeout(() => {
+        this._renderTimer = null;
+        this.render();
+      }, immediate ? 0 : 350);
+    }
+    relevantEntityIds() {
+      const byView = {
+        overview:['overviewExperience','solar','battery','grid','consumption','forecast','intelligence'],
+        outlook:['outlook','forecast','battery','consumption','flexibleAssets'],
+        flow:['solar','battery','grid','consumption','connection','flexibleAssets','relationships'],
+        'solar-generation':['solar','forecast','battery','grid'],
+        solar:['solar','forecast','planning','flexibleAssets','commands','intelligence'],
+        battery:['battery','strategyEffective','planning'],
+        consumers:['consumer','consumerMix','flexibleAssets'],
+        gas:['consumer'],
+        strategies:['strategyProfiles','strategyEffective','editableProperties'],
+        metering:['metering'],
+        intelligence:['intelligence','activity','planning'],
+        value:['value','metering','pricing'],
+        planning:['planning','flexibleAssets','forecast','battery'],
+        'strategic-planning':['intelligence','planning','forecast','strategyEffective'],
+        retrospective:['retrospective']
+      };
+      const keys = ['release', ...(byView[this.view] || [])];
+      return [...new Set(keys.map(key => UX_INTERFACES[key]).filter(Boolean))];
+    }
+    runtimeSignature() {
+      const states = this._hass?.states || {};
+      const entities = this.relevantEntityIds().map(id => {
+        const state = states[id];
+        return `${id}:${state?.state ?? ''}:${state?.last_updated ?? ''}`;
+      }).join('|');
+      return `${this.navSection}|${this.navItem}|${this.view}|${this.selectedMeteringPeriodId}|${this.selectedOutlookHorizonId}|${this.selectedPlanningHorizonId}|${this.selectedMeteringHorizonId}|${this.selectedStrategyProfileId}|${this.loadSort}|${this.meteringSort}|${this.consumerSort}|${this.consumerFilter}|${entities}`;
+    }
+
+    syncMeteringPeriodFromRuntime() {
+      const feedback = this.writeFeedback['metering.selected_period'];
+      if (feedback && ['pending','verifying'].includes(String(feedback.state || '').toLowerCase())) return;
+      const row = this.runtime().row('metering.selected_period');
+      if (!row || row.missing) return;
+      const value = String(rowValue(row, '') || '').toLowerCase();
+      if (!['hour','today','day','week','month','year'].includes(value)) return;
+      if (!this._meteringPeriodHydrated) {
+        this.selectedMeteringPeriodId = value === 'day' ? 'today' : value;
+        this._meteringPeriodHydrated = true;
+      }
+    }
+    selectMeteringPeriod(value, source) {
+      const normalized = String(value || 'today').toLowerCase();
+      const period = normalized === 'day' ? 'today' : normalized;
+      if (!['hour','today','week','month','year'].includes(period)) return;
+      this.selectedMeteringPeriodId = period;
+      this._meteringPeriodHydrated = true;
+      this.persistInteractionContext();
+      this.requestPropertyWrite('metering.selected_period', period, { source });
+    }
+    runtime() { return new EnergyRuntime(this._hass || {}); }
+    navigationModel() {
+      return HB_ENERGY_NAVIGATION;
+    }
+    resolveNavigation(sectionId = '', itemId = '', legacyView = '') {
+      const sections = this.navigationModel();
+      const bySection = sections.find(section => section.id === String(sectionId || ''));
+      const byItem = bySection?.items.find(item => item.id === String(itemId || ''));
+      if (bySection && byItem) return { section:bySection.id, item:byItem.id, view:byItem.view };
+      const legacy = {
+        overview:['energy','overview'], flow:['energy','flow'], battery:['energy','battery'], consumers:['energy','consumers'], gas:['energy','gas'],
+        strategies:['intelligence','strategy'], intelligence:['intelligence','strategy'], solar:['energy','solar'], 'operational-planning':['intelligence','operational-planning'],
+        planning:['intelligence','tactical-planning'], outlook:['intelligence','tactical-planning'],
+        metering:['insights','metering'], value:['insights','value'], retrospective:['insights','retrospective'],
+        'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','strategic-planning']
+      };
+      const [fallbackSection,fallbackItem] = legacy[String(legacyView || '')] || ['energy','overview'];
+      const section = sections.find(row => row.id === fallbackSection) || sections[0];
+      const item = section.items.find(row => row.id === fallbackItem) || section.items[0];
+      return { section:section.id, item:item.id, view:item.view };
+    }
+    activeNavigation() {
+      return this.resolveNavigation(this.navSection, this.navItem, this.view);
+    }
+    activeNavigationItem() {
+      const active = this.activeNavigation();
+      return this.navigationModel().find(section => section.id === active.section)?.items.find(item => item.id === active.item)
+        || this.navigationModel()[0].items[0];
+    }
+    selectNavigation(sectionId, itemId = '') {
+      const sections = this.navigationModel();
+      const section = sections.find(row => row.id === sectionId) || sections[0];
+      const remembered = this.navSelectionBySection?.[section.id];
+      const item = section.items.find(row => row.id === itemId)
+        || section.items.find(row => row.id === remembered)
+        || section.items[0];
+      this.navSection = section.id;
+      this.navItem = item.id;
+      this.view = item.view;
+      this.navSelectionBySection = { ...(this.navSelectionBySection || {}), [section.id]:item.id };
+      this.persistView();
+      this._forceRender = true;
+      this.render();
+    }
+    navigateToView(view) {
+      const target = this.resolveNavigation('', '', view);
+      this.selectNavigation(target.section, target.item);
+    }
+    title() { return this.activeNavigationItem().title || 'Energy'; }
+    subtitle() { return this.activeNavigationItem().description || ''; }
+    nav() {
+      const sections = this.navigationModel();
+      const active = this.activeNavigation();
+      const modules = sections.map(section => ({
+        id:section.id,
+        label:section.label,
+        items:section.items.map(item => ({ id:item.id, label:item.label }))
+      }));
+      return `<div class="rhiEnergyNav rhiEnergyNav-${escapeHtml(active.section)}">${rhiUxDomainShell({
+        product:'Home Intelligence',
+        domain:'ENERGIE',
+        modules,
+        activeModule:active.section,
+        activeItem:active.item
+      })}</div>`;
+    }
+    onClick(event) {
+      const coreModule = event.target.closest('[data-rhi-module]');
+      if (coreModule) {
+        this.selectNavigation(coreModule.dataset.rhiModule || 'energy', '');
+        return;
+      }
+      const coreItem = event.target.closest('[data-rhi-item]');
+      if (coreItem) {
+        this.selectNavigation(this.navSection, coreItem.dataset.rhiItem || '');
+        return;
+      }
+      const visualBackdrop = event.target.closest('[data-energy-visual-backdrop]');
+      if (visualBackdrop && event.target === visualBackdrop) {
+        this.energyVisualPickerAssetId = '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const visualClose = event.target.closest('[data-energy-visual-close-button]');
+      if (visualClose) {
+        this.energyVisualPickerAssetId = '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const visualReset = event.target.closest('[data-energy-visual-reset]');
+      if (visualReset) {
+        if (typeof rhiEnergyClearVisualPreference === 'function') rhiEnergyClearVisualPreference(visualReset.dataset.energyVisualReset || '');
+        this.energyVisualPickerAssetId = '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const visualSelect = event.target.closest('[data-energy-visual-select]');
+      if (visualSelect) {
+        const assetId = visualSelect.dataset.energyVisualAsset || '';
+        const visualRef = visualSelect.dataset.energyVisualSelect || '';
+        const rt = this.runtime();
+        const asset = typeof rt.asset === 'function'
+          ? rt.asset(assetId)
+          : (typeof rt.assets === 'function' ? rt.assets().find(row => String(row?.asset_id || '') === String(assetId)) : null);
+        if (asset && typeof rhiEnergySetVisualPreference === 'function') rhiEnergySetVisualPreference(asset, visualRef);
+        this.energyVisualPickerAssetId = '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const visualOpen = event.target.closest('[data-energy-visual-open]');
+      if (visualOpen) {
+        this.energyVisualPickerAssetId = visualOpen.dataset.energyVisualOpen || '';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const strategyEdit = event.target.closest('[data-strategy-edit]');
+      if (strategyEdit && !strategyEdit.disabled) { this.strategyEditProfileId = strategyEdit.dataset.strategyEdit || ''; this.render(); return; }
+      const strategyCancel = event.target.closest('[data-strategy-cancel]');
+      if (strategyCancel && !strategyCancel.disabled) {
+        const profileId = strategyCancel.dataset.strategyCancel || '';
+        this.clearProfileDrafts(this.runtime(), profileId);
+        this.strategyEditProfileId = '';
+        this.render();
+        return;
+      }
+      const strategySave = event.target.closest('[data-strategy-save]');
+      if (strategySave && !strategySave.disabled) {
+        const profileId = strategySave.dataset.strategySave || '';
+        this.savePropertyDrafts(profileId);
+        return;
+      }
+      const saveAll = event.target.closest('[data-save-property-drafts]');
+      if (saveAll && !saveAll.disabled) { this.savePropertyDrafts(); return; }
+      const discardAll = event.target.closest('[data-discard-property-drafts]');
+      if (discardAll && !discardAll.disabled) { this.editDrafts = {}; this.render(); return; }
+      const tabTarget = event.target.closest('[data-tab-target]');
+      if (tabTarget) {
+        event.preventDefault();
+        this.navigateToView(tabTarget.dataset.tabTarget || this.view);
+        return;
+      }
+      const sectionTab = event.target.closest('[data-nav-section]:not([data-nav-item])');
+      if (sectionTab) {
+        this.selectNavigation(sectionTab.dataset.navSection || 'energy');
+        return;
+      }
+      const itemTab = event.target.closest('[data-nav-item]');
+      if (itemTab) {
+        const tabs = this.shadowRoot.querySelector('.navItems');
+        if (tabs) this.navScrollLeft = tabs.scrollLeft;
+        this.selectNavigation(itemTab.dataset.navSection || this.navSection, itemTab.dataset.navItem || '');
+        return;
+      }
+      const scrollTarget = event.target.closest('[data-scroll-target]');
+      if (scrollTarget) { this.shadowRoot.getElementById(scrollTarget.dataset.scrollTarget)?.scrollIntoView({ behavior: 'auto', block: 'start' }); return; }
+      const sort = event.target.closest('[data-load-sort]');
+      if (sort && !sort.disabled) { this.loadSort = sort.dataset.loadSort || 'priority'; this.render(); return; }
+      const meteringSort = event.target.closest('[data-metering-sort]');
+      if (meteringSort && !meteringSort.disabled) { this.meteringSort = meteringSort.dataset.meteringSort || 'default'; this.render(); return; }
+      const consumerSort = event.target.closest('[data-consumer-sort]');
+      if (consumerSort && !consumerSort.disabled) { this.consumerSort = consumerSort.dataset.consumerSort || 'power'; this.render(); return; }
+      const consumerFilter = event.target.closest('[data-consumer-filter]');
+      if (consumerFilter && !consumerFilter.disabled) { this.consumerFilter = consumerFilter.dataset.consumerFilter || 'all'; this.render(); return; }
+      const profilePick = event.target.closest('[data-strategy-profile-id]');
+      if (profilePick && !profilePick.disabled) { this.selectedStrategyProfileId = profilePick.dataset.strategyProfileId || ''; this.render(); return; }
+      const planningHorizon = event.target.closest('[data-planning-horizon]');
+      if (planningHorizon && !planningHorizon.disabled) { this.selectedPlanningHorizonId = planningHorizon.dataset.planningHorizon || 'D0'; this.render(); return; }
+      const scopePick = event.target.closest('[data-scope-id]');
+      if (scopePick && !scopePick.disabled) {
+        const context = scopePick.dataset.scopeContext || 'outlook';
+        const id = scopePick.dataset.scopeId || '';
+        if (context === 'metering-period') this.selectMeteringPeriod(id, 'metering_period_selector');
+        else if (context === 'metering') this.selectedMeteringHorizonId = id || 'D0';
+        else if (context === 'value') this.selectMeteringPeriod(id, 'value_period_selector');
+        else this.selectedOutlookHorizonId = id || 'D0';
+        this.render();
+        return;
+      }
+      const horizonPick = event.target.closest('[data-horizon-id]');
+      if (horizonPick && !horizonPick.disabled) {
+        const context = horizonPick.dataset.horizonContext || 'outlook';
+        if (context === 'metering') this.selectedMeteringHorizonId = horizonPick.dataset.horizonId || 'D0';
+        else this.selectedOutlookHorizonId = horizonPick.dataset.horizonId || 'D0';
+        this.render();
+        return;
+      }
+      const detailSummary = event.target.closest('summary[data-detail-id]');
+      if (detailSummary) {
+        // Native details behaviour is intentional. Never rebuild the page merely
+        // because the user opens or closes a disclosure.
+        return;
+      }
+      const mode = event.target.closest('[data-mode-value]');
+      if (mode && !mode.disabled) {
+        this.requestPropertyWrite(mode.dataset.propertyKey, mode.dataset.modeValue, { source: 'segmented_mode' });
+        return;
+      }
+      const remediationButton = event.target.closest('[data-metering-remediation-command-row-id]');
+      if (remediationButton && !remediationButton.disabled) {
+        const runtime = this.runtime();
+        const command = runtime.commands().find(c => String(c.command_row_id || c.composite_key || '') === String(remediationButton.dataset.meteringRemediationCommandRowId || '')) || null;
+        const remediation = runtime.meteringRemediations().find(r => String(r.remediation_id || '') === String(remediationButton.dataset.remediationId || '')) || {};
+        this.requestMeteringRemediation(command, remediation);
+        return;
+      }
+      const cmd = event.target.closest('[data-command-key]');
+      if (cmd) {
+        if (cmd.dataset.executable !== 'true') return;
+        const runtime = this.runtime();
+        const target = cmd.dataset.targetAssetId || '';
+        const role = cmd.dataset.commandRole || '';
+        const command = (target && role ? runtime.commandForAssetRole(target, role) : null)
+          || runtime.commands().find(c => String(c.command_instance_id || c.command_row_id || '') === String(cmd.dataset.commandRowId || ''))
+          || runtime.commands().find(c => String(c.command_id || '') === String(cmd.dataset.commandKey || '') && (!target || String(c.asset_id || c.target_asset_id || '') === String(target)))
+          || null;
+        this.requestCommandExecution(command, target);
+      }
+    }
+    onInput(event) {
+      const profileSelect = event.target.closest('[data-strategy-profile-select]');
+      if (profileSelect && !profileSelect.disabled) {
+        this.selectedStrategyProfileId = profileSelect.value || '';
+        this.render();
+        return;
+      }
+      const editor = event.target.closest('[data-property-key]');
+      if (editor) {
+        const key = editor.dataset.propertyKey || '';
+        if (key) {
+          this.editDrafts[key] = editor.type === 'checkbox' ? editor.checked : editor.value;
+          editor.classList.add('dirty');
+          editor.closest('.strategyTableRow')?.classList.add('changed');
+          this.refreshDraftUi(editor.dataset.profileId || this.strategyEditProfileId || '');
+        }
+      }
+      const input = event.target.closest('input[type=range][data-property-key]');
+      if (!input) return;
+      const value = Number(input.value);
+      const field = input.closest('.sliderField');
+      const live = field?.querySelector('[data-live-range-value]');
+      if (live) {
+        const unit = input.dataset.rangeUnit || '';
+        live.textContent = Number.isFinite(value) ? `${value}${unit ? ` ${unit}` : ''}` : '—';
+      }
+    }
+    onFocusIn(event) {
+      const editor = event.target.closest('input,select,textarea');
+      if (!editor) return;
+      this.editSession = { propertyKey: editor.dataset.propertyKey || '', started: Date.now() };
+      this.shadowRoot.querySelector('main')?.classList.add('editing');
+    }
+    onFocusOut(event) {
+      const leaving = event.target.closest('input,select,textarea');
+      if (!leaving) return;
+      queueMicrotask(() => {
+        const active = this.shadowRoot.activeElement;
+        if (active && active.matches && active.matches('input,select,textarea')) return;
+        this.editSession = null;
+        this.shadowRoot.querySelector('main')?.classList.remove('editing');
+        if (this.pendingRuntimeRender) {
+          this.pendingRuntimeRender = false;
+          this.render();
+        }
+      });
+    }
+    onKeyDown(event) {
+      const input = event.target.closest('[data-property-key]');
+      if (!input || input.disabled || event.key !== 'Enter') return;
+      event.preventDefault();
+      this.savePropertyDrafts();
+    }
+    onToggle(event) {
+      const details = event.target.closest('details');
+      if (!details) return;
+      const key = details.dataset.persistKey || details.querySelector('summary')?.dataset.detailId || '';
+      if (key) { this.disclosureOpen[key] = details.open; this.persistInteractionContext(); }
+    }
+    restoreInteractionState() {
+      const details = [...this.shadowRoot.querySelectorAll('details')];
+      details.forEach((node, index) => {
+        const summary = node.querySelector('summary');
+        const key = summary?.dataset.detailId || `${this.view}:${index}:${(summary?.textContent || 'details').trim()}`;
+        node.dataset.persistKey = key;
+        if (Object.prototype.hasOwnProperty.call(this.disclosureOpen, key)) node.open = !!this.disclosureOpen[key];
+      });
+      Object.entries(this.editDrafts).forEach(([key, value]) => {
+        const selector = `[data-property-key="${CSS.escape(key)}"]`;
+        const control = this.shadowRoot.querySelector(selector);
+        if (!control) return;
+        if (control.type === 'checkbox') control.checked = !!value;
+        else control.value = value;
+        control.classList.add('dirty');
+      });
+    }
+    onChange(event) {
+      const commandSelect = event.target.closest('[data-hold-command-select]');
+      if (commandSelect && !commandSelect.disabled) {
+        const runtime = this.runtime();
+        const value = String(commandSelect.value || '').toLowerCase();
+        const key = commandSelect.dataset.commandKey || '';
+        const target = commandSelect.dataset.targetAssetId || '';
+        if (key) {
+          const command = runtime.commands().find(c => String(c.command_id || '') === String(key)) || null;
+          this.requestCommandExecution(command, target);
+        }
+        return;
+      }
+      const meteringSortSelect = event.target.closest('[data-metering-sort-select]');
+      if (meteringSortSelect && !meteringSortSelect.disabled) { this.meteringSort = meteringSortSelect.value || 'default'; this.render(); return; }
+      const consumerSortSelect = event.target.closest('[data-consumer-sort-select]');
+      if (consumerSortSelect && !consumerSortSelect.disabled) { this.consumerSort = consumerSortSelect.value || 'power'; this.render(); return; }
+      const consumerFilterSelect = event.target.closest('[data-consumer-filter-select]');
+      if (consumerFilterSelect && !consumerFilterSelect.disabled) { this.consumerFilter = consumerFilterSelect.value || 'all'; this.render(); return; }
+      const profileSelect = event.target.closest('[data-strategy-profile-select]');
+      if (profileSelect && !profileSelect.disabled) { this.selectedStrategyProfileId = profileSelect.value || ''; this.render(); return; }
+      const scopeSelect = event.target.closest('[data-scope-select]');
+      if (scopeSelect && !scopeSelect.disabled) {
+        const context = scopeSelect.dataset.scopeContext || 'outlook';
+        if (context === 'metering-period') this.selectMeteringPeriod(scopeSelect.value, 'metering_period_selector');
+        else if (context === 'value') this.selectMeteringPeriod(scopeSelect.value, 'value_period_selector');
+        else if (context === 'metering') this.selectedMeteringHorizonId = scopeSelect.value || 'D0';
+        else this.selectedOutlookHorizonId = scopeSelect.value || 'D0';
+        this.render();
+        return;
+      }
+      const horizonSelect = event.target.closest('[data-horizon-select]');
+      if (horizonSelect && !horizonSelect.disabled) {
+        const context = horizonSelect.dataset.horizonContext || 'outlook';
+        if (context === 'metering') this.selectedMeteringHorizonId = horizonSelect.value || 'D0';
+        else this.selectedOutlookHorizonId = horizonSelect.value || 'D0';
+        this.render();
+        return;
+      }
+      const input = event.target.closest('[data-property-key]');
+      if (!input || input.disabled) return;
+      if (input.dataset.strategyProfileField && this.strategyEditProfileId) {
+        const key = input.dataset.propertyKey || '';
+        if (!key) return;
+        this.editDrafts[key] = input.type === 'checkbox' ? input.checked : input.value;
+        input.classList.add('dirty');
+        this.refreshDraftUi(input.dataset.profileId || this.strategyEditProfileId || '');
+        this.render();
+        return;
+      }
+      const value = input.type === 'checkbox' ? input.checked : input.value;
+      if (input.dataset.propertyImmediateWrite === 'true') {
+        this.requestPropertyWrite(input.dataset.propertyKey, value, { source:'editable_property', profile_id:input.dataset.profileId || '', field_key:input.dataset.fieldKey || '' });
+        return;
+      }
+      // Free-form and range editors remain local drafts until the shared Save action.
+      // Selects and toggles are discrete stable-ID choices and commit immediately.
+      if (['number','range','text','time','date','datetime-local','email','url','tel','password','search','textarea'].includes(String(input.type || input.tagName).toLowerCase())) return;
+      this.requestPropertyWrite(input.dataset.propertyKey, value, { source: input.dataset.strategyProfileField ? 'strategy_profile_field' : 'editable_property', profile_id: input.dataset.profileId || '', field_key: input.dataset.fieldKey || '' });
+    }
+    validationMeta(row) {
+      const validation = parseMaybeJson(row?.validation, row?.validation || {});
+      const meta = (validation && typeof validation === 'object') ? { ...validation } : {};
+      const text = typeof validation === 'string' ? validation : '';
+      const nums = text.match(/-?\d+(?:\.\d+)?/g)?.map(Number) || [];
+      if (meta.min === undefined && nums.length >= 1) meta.min = nums[0];
+      if (meta.max === undefined && nums.length >= 2) meta.max = nums[1];
+      if (meta.step === undefined) {
+        const stepMatch = text.match(/step\s+(-?\d+(?:\.\d+)?)/i);
+        if (stepMatch) meta.step = Number(stepMatch[1]);
+      }
+      return meta;
+    }
+    isEditableRow(row) {
+      return !!row && (asBool(row.editable, false) || String(row.access || '').toLowerCase() === 'editable');
+    }
+    writeMeta(row) {
+      const rawOperation = row?.write_operation;
+      const write = objectFrom(row?.write || row?.write_contract || row?.write_metadata || (typeof rawOperation === 'object' ? rawOperation : {}));
+      const operationId = String(firstDefined(write.operation_id, typeof rawOperation === 'string' ? rawOperation : null, row?.operation_id, '') || '').trim();
+      const supported = asBool(firstDefined(write.supported, row?.write_supported, operationId === 'energy.property.write'), false);
+      const data = objectFrom(firstDefined(write.data, row?.write_data, {}));
+      const propertyId = String(firstDefined(row?.property_id, row?.property_key, row?.key, data.property_id, '') || '').trim();
+      const valueParameter = String(firstDefined(write.value_parameter, row?.value_parameter, 'value') || 'value');
+      const readbackProperty = String(firstDefined(write.readback_property, row?.readback_property, propertyId, '') || '').trim();
+      const service=String(firstDefined(write.service,row?.service,'') || '').trim();
+      const split=splitService(service);
+      return { supported, operationId, service, domain:split.domain, action:split.action, data:{...data, property_id:propertyId}, valueParameter, readbackProperty, propertyId };
+    }
+    hasPublicWriteRoute(row) {
+      const meta = this.writeMeta(row);
+      return meta.supported && meta.operationId === 'energy.property.write' && meta.service === 'rhi_energy.write_property' && !!meta.propertyId && !!meta.readbackProperty;
+    }
+    isWritableRow(row) { return this.hasPublicWriteRoute(row); }
+    refreshDraftUi(profileId = '') {
+      const rt = this.runtime();
+      const profile = profileId ? rt.strategyProfileFor(profileId) : null;
+      const keys = profile ? new Set(this.profileEditableRows(rt, profile).map(row => this.propertyKeyFor(row)).filter(Boolean)) : (profileId === 'pricing_settings' ? new Set(Object.keys(this.editDrafts || {}).filter(key => String(key).startsWith('pricing.'))) : null);
+      const count = Object.keys(this.editDrafts || {}).filter(key => !keys || keys.has(key)).length;
+      const save = profileId ? this.shadowRoot.querySelector(`[data-strategy-save="${CSS.escape(profileId)}"]`) : this.shadowRoot.querySelector('[data-save-property-drafts]');
+      if (save) save.disabled = count === 0;
+      const counter = save?.parentElement?.querySelector('.strategyChangeCount');
+      if (counter) counter.textContent = count ? `${count} changed` : 'No changes';
+    }
+    writeFeedbackFor(row = {}) {
+      const key = String(row.key || row.property_key || row.property_id || '');
+      return key ? (this.writeFeedback[key] || null) : null;
+    }
+    valuesEqual(expected, actual) {
+      const en = asNumber(expected), an = asNumber(actual);
+      if (en !== null && an !== null) return Math.abs(en - an) <= 0.000001;
+      return String(expected ?? '') === String(actual ?? '');
+    }
+    reconcileWriteFeedback() {
+      if (!this._hass || !Object.keys(this.writeFeedback || {}).length) return;
+      const runtime = this.runtime();
+      Object.entries(this.writeFeedback).forEach(([propertyKey, fb]) => {
+        if (!fb || !['pending','verifying'].includes(fb.state)) return;
+        const row = runtime.row(fb.readbackProperty || propertyKey);
+        const lifecycle = String(firstDefined(row.write_state, row.write_status, row.lifecycle_state, row.last_write_status, '') || '').toUpperCase();
+        const reason = firstDefined(row.reason_text, row.validation_message, row.write_message, row.reason, '');
+        if (['REJECTED','FAILED','INVALID'].includes(lifecycle)) {
+          this.writeFeedback[propertyKey] = { ...fb, state: 'rejected', reason: String(reason || 'Backend rejected the requested value'), updated: Date.now() };
+          return;
+        }
+        if (['TIMED_OUT','TIMEOUT'].includes(lifecycle) || Date.now() - fb.updated > 30000) {
+          this.writeFeedback[propertyKey] = { ...fb, state: 'timed_out', reason: String(reason || 'No authoritative readback received'), updated: Date.now() };
+          return;
+        }
+        const availability = String(firstDefined(row.availability, row.availability_state, row.state_code, '') || '').toUpperCase();
+        if ((availability === 'AVAILABLE' || lifecycle === 'ACCEPTED') && this.valuesEqual(fb.value, rowValue(row, null))) {
+          this.writeFeedback[propertyKey] = { ...fb, state: 'accepted', acceptedValue: rowValue(row, null), updated: Date.now() };
+          delete this.editDrafts[propertyKey];
+        } else if (fb.transportComplete) {
+          this.writeFeedback[propertyKey] = { ...fb, state: 'verifying' };
+        }
+      });
+    }
+    requestPropertyWrite(propertyKey, value, context = {}) {
+      const runtime = this.runtime();
+      const catalogRow = runtime.editableProperty(propertyKey);
+      const row = runtime.row(propertyKey);
+      const profileRow = catalogRow || (row && !row.missing ? null : runtime.strategyProfileEditableRowByKey(propertyKey));
+      const effectiveRow = catalogRow || profileRow || row;
+      if (!this.isWritableRow(effectiveRow)) return;
+      const meta = this.writeMeta(effectiveRow);
+      const finalValue = coerceAllowedValue(effectiveRow, value);
+      const propertyId = String(effectiveRow.property_id || effectiveRow.property_key || effectiveRow.key || propertyKey);
+      const payload = { ...meta.data, property_id: String(meta.data.property_id || propertyId), [meta.valueParameter]: finalValue };
+      this.writeFeedback[propertyKey] = { state: 'pending', value: finalValue, readbackProperty: meta.readbackProperty || propertyKey, operationId: meta.operationId, updated: Date.now() };
+      if (!this._hass?.callService) {
+        this.writeFeedback[propertyKey] = { ...this.writeFeedback[propertyKey], state: 'rejected', reason: 'Public property writer unavailable', updated: Date.now() };
+        this.render();
+        return;
+      }
+      const call = this._hass.callService(meta.domain, meta.action, payload);
+      Promise.resolve(call).then(() => {
+        this.writeFeedback[propertyKey] = { ...this.writeFeedback[propertyKey], state: 'verifying', transportComplete: true, updated: Date.now() };
+        this.render();
+      }).catch(error => {
+        this.writeFeedback[propertyKey] = { ...this.writeFeedback[propertyKey], state: 'rejected', reason: error?.message || String(error), updated: Date.now() };
+        this.render();
+      });
+      this.dispatchEvent(new CustomEvent('homebrain-energy-property-intent-sent', {
+        bubbles: true, composed: true, detail: { operation_id: meta.operationId, property_id: payload.property_id, value: finalValue, context }
+      }));
+    }
+    savePropertyDrafts(profileId = '') {
+      const runtime = this.runtime();
+      const selectedProfile = profileId ? runtime.strategyProfileFor(profileId) : null;
+      const allowedKeys = selectedProfile ? new Set(this.profileEditableRows(runtime, selectedProfile).map(row => this.propertyKeyFor(row)).filter(Boolean)) : (profileId === 'pricing_settings' ? new Set(Object.keys(this.editDrafts || {}).filter(key => String(key).startsWith('pricing.'))) : null);
+      const drafts = Object.entries(this.editDrafts || {}).filter(([key]) => !allowedKeys || allowedKeys.has(key));
+      if (!drafts.length) return;
+      let dispatched = 0;
+      drafts.forEach(([propertyKey, raw]) => {
+        const catalogRow = runtime.editableProperty(propertyKey);
+        const row = runtime.row(propertyKey);
+        const profileRow = runtime.strategyProfileEditableRowByKey(propertyKey);
+        const effectiveRow = catalogRow || profileRow || (row && !row.missing ? row : null);
+        if (!this.isWritableRow(effectiveRow)) {
+          this.writeFeedback[propertyKey] = { state: 'rejected', reason: effectiveRow?.editable_reason || 'No public write route published', updated: Date.now() };
+          return;
+        }
+        const control = this.shadowRoot.querySelector(`[data-property-key="${CSS.escape(propertyKey)}"]`);
+        const inputType = String(control?.type || '').toLowerCase();
+        const value = inputType === 'checkbox' ? !!raw : ((inputType === 'number' || inputType === 'range') ? Number(raw) : raw);
+        this.requestPropertyWrite(propertyKey, value, { source: 'strategy_save', profile_id: effectiveRow?.profile_id || profileId, field_key: effectiveRow?.field_key || '' });
+        dispatched += 1;
+      });
+      this.render();
+    }
+    propertyDraftBar() { return ''; }
+    commandMeta(command) {
+      const invoke = objectFrom(command?.invoke || {});
+      const service = String(invoke.service || '').trim();
+      const split = splitService(service);
+      return {
+        operationId: String(invoke.operation_id || ''),
+        service,
+        domain: split.domain,
+        action: split.action,
+        data: objectFrom(invoke.data || {})
+      };
+    }
+    requestCommandExecution(command, targetAssetId = '', parameterValues = {}) {
+      if (!command || !this.runtime().commandEnabled(command)) return;
+      const meta = this.commandMeta(command);
+      if (meta.operationId !== 'energy.command.execute' || meta.service !== 'rhi_energy.invoke_command' || !meta.domain || !meta.action || !this._hass?.callService) return;
+      const commandId = String(command.command_id || meta.data.command_id || '');
+      const target = String(targetAssetId || command.target_asset_id || meta.data.target_asset_id || '');
+      const parameters = { ...objectFrom(meta.data.parameters || {}), ...objectFrom(parameterValues || {}) };
+      const payload = { ...meta.data, command_id: commandId, target_asset_id: target, parameters };
+      this._hass.callService(meta.domain, meta.action, payload);
+      this.dispatchEvent(new CustomEvent('homebrain-energy-command-intent-sent', {
+        bubbles: true, composed: true, detail: { operation_id: meta.operationId, ...payload }
+      }));
+    }
+    requestMeteringRemediation(command, remediation = {}) {
+      if (!command || !this.runtime().commandEnabled(command)) return;
+      const id = String(remediation.remediation_id || remediation.problem_id || command.command_instance_id || command.command_id || 'metering_remediation');
+      const affected = asArray(remediation.affected_keys || []);
+      const requiresConfirmation = asBool(command.requires_confirmation ?? remediation.requires_confirmation ?? true, true);
+      if (requiresConfirmation) {
+        const period = human(remediation.period_id || command.period_id || 'selected period');
+        const ok = window.confirm(`Reset metering baseline for ${period}?\n\nThis calibrates only the selected period baseline. It does not change source lifetime totals or Home Assistant statistics.`);
+        if (!ok) return;
+      }
+      this.remediationFeedback[id] = { state: 'pending', updated: Date.now(), command_id: command.command_id };
+      try {
+        // The period is part of the authoritative public invoke payload. Do not
+        // reinterpret it as a typed parameter or add remediation-only fields.
+        this.requestCommandExecution(command, command.target_asset_id || 'metering', {});
+        this.remediationFeedback[id] = { state: 'pending_verification', updated: Date.now(), command_id: command.command_id };
+      } catch (error) {
+        this.remediationFeedback[id] = { state: 'failed', updated: Date.now(), reason: error?.message || String(error), command_id: command.command_id };
+      }
+      this.render();
+    }
+    componentActionButton(command, label, assetId) {
+      const model = createCommandActionModel(command);
+      if (!model) return '';
+      const effectiveLabel = label || model.label;
+      const target = assetId || model.targetAssetId;
+      return `<button class="hiAction rhiUxQuickAction ${model.enabled ? 'enabled' : 'disabled'}" ${model.enabled ? '' : 'disabled'} data-command-key="${escapeHtml(model.id)}" data-command-row-id="${escapeHtml(model.rowId)}" data-command-role="${escapeHtml(model.role)}" data-target-asset-id="${escapeHtml(target)}" data-executable="${model.enabled ? 'true' : 'false'}" title="${escapeHtml(model.reason)}">${escapeHtml(effectiveLabel)}</button>`;
+    }
+    componentActionModelButton(model) {
+      return model ? this.componentActionButton(model.command, model.label, model.targetAssetId) : '';
+    }
+    componentSegmentedControl(options, active, extraClass = '') {
+      return `<div class="hiSegmented ${escapeHtml(extraClass)}">${options.map(option => {
+        const activeClass = String(option.value).toLowerCase() === String(active || '').toLowerCase() ? 'active' : '';
+        const disabled = option.disabled ? 'disabled' : '';
+        const attrs = Object.entries(option.attrs || {}).map(([key, value]) => `${key}="${escapeHtml(value)}"`).join(' ');
+        return `<button class="hiSegment ${activeClass}" ${disabled} ${attrs}>${escapeHtml(option.label)}</button>`;
+      }).join('')}</div>`;
+    }
+    componentDetailsBlock(id, label, bodyHtml) {
+      const detailsOpen = this.detailOpen[id] ? ' open' : '';
+      return `<details class="hiDetails"${detailsOpen}><summary data-detail-id="${escapeHtml(id)}">${escapeHtml(label)}</summary><div class="softBox">${bodyHtml}</div></details>`;
+    }
+
+    componentQualityChip(status) {
+      const raw = String(status || '').trim();
+      const key = raw.toUpperCase().replace(/[\s-]+/g, '_');
+      const semantic = {
+        MEASURED:['ok','Measured'], TRUSTED:['ok','Measured'], COMPLETE:['ok','Complete'],
+        OK:['ok','OK'], READY:['ok','Ready'], VERIFIED:['ok','Verified'],
+        NOT_APPLICABLE:['missing','Not applicable'],
+        ATTRIBUTION_PENDING:['warn','Attribution pending'], PENDING:['warn','Pending'],
+        PARTIAL:['warn','Partial'], INCOMPLETE:['warn','Incomplete'],
+        UNAVAILABLE:['missing','Unavailable'], UNKNOWN:['missing','Unavailable'],
+        FAILED:['fail','Measurement failed'], ERROR:['fail','Error']
+      };
+      if (semantic[key]) {
+        const [tone,label] = semantic[key];
+        return `<span class="qs ${escapeHtml(tone)}">${escapeHtml(label)}</span>`;
+      }
+      const normalized = rowState({ health: status, value: status || null });
+      return `<span class="qs ${escapeHtml(normalized)}">${escapeHtml(rowStatusLabel({ health: status, value: status || null }))}</span>`;
+    }
+    componentKpiCard({ icon = '•', label = '', value = '—', sub = '', tone = '', status = '' } = {}) {
+      return `<div class="metric ${escapeHtml(tone)}"><div class="mi">${escapeHtml(icon)}</div><div><span class="ml">${escapeHtml(label)}</span><b class="mv">${escapeHtml(value)}</b><span class="ms">${escapeHtml(sub)}</span></div>${status ? this.componentQualityChip(status) : ''}</div>`;
+    }
+    componentInfoRow(label, value) {
+      return `<div class="kv"><span>${escapeHtml(label)}</span><b>${escapeHtml(value ?? '—')}</b></div>`;
+    }
+    componentProgressBar(value, max = null) {
+      const n = asNumber(value);
+      if (n === null) return 0;
+      const ceiling = asNumber(max);
+      if (ceiling !== null && ceiling > 0) return Math.max(0, Math.min(100, (n / ceiling) * 100));
+      return Math.max(0, Math.min(100, Math.abs(n) * 10));
+    }
+    componentAssetRow({ icon = '•', title = '', label = '', value = '—', pct = 0 } = {}) {
+      const width = Math.max(0, Math.min(100, asNumber(pct) ?? 0));
+      return `<div class="assetRow"><div class="round">${escapeHtml(icon)}</div><div class="grow"><b>${escapeHtml(title)}</b><span>${escapeHtml(label)}</span><div class="bar"><i style="width:${escapeHtml(width)}%"></i></div></div><strong>${escapeHtml(value)}</strong></div>`;
+    }
+    productStoryCard({ eyebrow = 'Current situation', title = '', why = '', recommendation = '', actions = '', details = '', tone = 'blue' } = {}) {
+      return `<section class="panel productStory ${escapeHtml(tone)}"><div class="productStoryCopy"><small>${escapeHtml(eyebrow)}</small><h2>${escapeHtml(title)}</h2>${why ? `<p>${escapeHtml(why)}</p>` : ''}${recommendation ? `<div class="productStoryRecommendation"><span>Home Intelligence recommendation</span><b>${escapeHtml(recommendation)}</b></div>` : ''}</div>${actions ? `<div class="productStoryActions">${actions}</div>` : ''}${details ? this.componentDetailsBlock(`story-${Math.abs(String(title).split('').reduce((a,c)=>a+c.charCodeAt(0),0))}`, 'Details', details) : ''}</section>`;
+    }
+    productStateLabel(value, fallback = 'Not available') {
+      const key = String(value ?? '').trim().toLowerCase().replace(/[\s.-]+/g, '_');
+      const map = {
+        available:'Ready', ready:'Ready', ok:'Ready', verified:'Verified', trusted:'Verified', complete:'Complete',
+        unavailable:'Not available', not_available:'Not available', missing:'Not available', not_published:'Not available',
+        disabled:'Not managed', excluded:'Not managed', off:'Off', advice:'Recommend', recommend:'Recommend', recommendation:'Recommend', automatic:'Automatic', automation:'Automatic',
+        waiting:'Waiting', planned:'Scheduled', scheduled:'Scheduled', active:'Running', running:'Running', charging:'Charging', discharging:'Discharging', paused:'Paused', busy:'In progress',
+        succeeded:'Completed', completed:'Completed', failed:'Could not complete', blocked:'Blocked', constrained:'Limited', overridden:'Overridden',
+        baseline_required:'Needs one-time reset', baseline_untrusted:'Needs one-time reset', verification_required:'Verification required', reset_pending:'Reset in progress',
+        partial:'Partial', estimated:'Estimated', incomplete:'Incomplete', configuration_required:'Setup required',
+        preparing:'Preparing', pending:'In progress', unknown:'Not available', trust_state:'Measurement quality'
+      };
+      return map[key] || fallback;
+    }
+    userStateText(value, fallback = 'Available') {
+      return this.productStateLabel(value, this.productStateLabel(fallback, 'Not available'));
+    }
+    componentRecommendationCard({ title = '', body = '', meta = '' } = {}) {
+      return `<div class="rec"><div class="check">✓</div><div><small>Recommendation</small><h2>${escapeHtml(title)}</h2><p>${escapeHtml(body)}</p>${meta ? `<div class="recMeta">${meta}</div>` : ''}</div><span>›</span></div>`;
+    }
+
+    // Backwards-compatible aliases keep the R3.44.8 visual output stable while making
+    // shared components the single place for reusable UI behavior.
+    qualityChip(status) { return this.componentQualityChip(status); }
+    metric(icon, label, value, sub, tone = '', status = '') { return this.componentKpiCard({ icon, label, value, sub, tone, status }); }
+    kv(label, value) { return this.componentInfoRow(label, value); }
+    flexibleAssetDomain(rt) {
+      if (!this._flexibleAssetDomains) this._flexibleAssetDomains = new WeakMap();
+      if (!this._flexibleAssetDomains.has(rt)) this._flexibleAssetDomains.set(rt, new FlexibleAssetDomainModel(rt));
+      return this._flexibleAssetDomains.get(rt);
+    }
+    dataRow(rt, keys) {
+      const list = asArray(keys);
+      const rows = list.map(key => rt.row(key));
+      return rows.find(row => !row.missing && rowValue(row, null) !== null) || rows[0] || { missing: true, value: null, health: 'NOT_PUBLISHED' };
+    }
+    selectedHorizon(horizons = [], wanted = 'D0') {
+      const list = Array.isArray(horizons) ? horizons : [];
+      if (!list.length) return null;
+      const w = String(wanted || 'D0').toLowerCase();
+      return list.find(h => String(h.horizon_id || '').toLowerCase() === w) || null;
+    }
+    selectedPeriod(periods = [], wanted = 'today') {
+      const list = Array.isArray(periods) ? periods : [];
+      if (!list.length) return null;
+      const w = String(wanted || 'today').toLowerCase();
+      return list.find(p => String(p.period_id || '').toLowerCase() === w) || null;
+    }
+    horizonValue(horizon, group, key, fallback = null) {
+      const summary = objectFrom(horizon?.summary || {});
+      const source = group ? objectFrom(summary[group] || {}) : summary;
+      const value = firstDefined(valueAtPath(source, key), source[key], fallback);
+      return value === undefined || value === '' ? fallback : value;
+    }
+    horizonNumber(horizon, group, key) { return asNumber(this.horizonValue(horizon, group, key, null)); }
+    horizonLabel(horizon) { return human(firstDefined(horizon?.label, horizon?.horizon_id, 'Horizon')); }
+    periodLabel(period) { return human(firstDefined(period?.label, period?.period_id, 'Period')); }
+    isFutureHorizon(horizon) { return String(horizon?.horizon_id || '').toUpperCase() === 'D1' || /tomorrow/i.test(String(horizon?.label || '')); }
+    componentScopeSelector({ context = 'outlook', title = 'Horizon', items = [], selectedId = '', idField = 'id', labelFn = item => human(item?.label || item?.id || '') }) {
+      const list = Array.isArray(items) ? items : [];
+      if (!list.length) return '';
+      const normalized = list.map(item => ({ item, id: String(item?.[idField] || item?.id || ''), label: labelFn(item) })).filter(row => row.id);
+      if (!normalized.length) return '';
+      const requestedId = String(selectedId || '');
+      const active = normalized.find(row => row.id.toLowerCase() === requestedId.toLowerCase()) || null;
+      const unavailableOption = requestedId && !active
+        ? `<option value="${escapeHtml(requestedId)}" selected disabled>Selected ${escapeHtml(title.toLowerCase())} temporarily unavailable</option>`
+        : '';
+      const buttons = normalized.map(row => `<button type="button" class="scopeOption ${active && row.id === active.id ? 'active' : ''}" data-scope-context="${escapeHtml(context)}" data-scope-id="${escapeHtml(row.id)}">${escapeHtml(row.label)}</button>`).join('');
+      const select = `<select data-scope-select data-scope-context="${escapeHtml(context)}">${unavailableOption}${normalized.map(row => `<option value="${escapeHtml(row.id)}" ${active && row.id === active.id ? 'selected' : ''}>${escapeHtml(row.label)}</option>`).join('')}</select>`;
+      return `<div class="scopeSelector"><div class="scopeSelectorTitle"><span>${escapeHtml(title)}</span><b>${escapeHtml(active ? active.label : (requestedId ? 'Temporarily unavailable' : 'Not selected'))}</b></div><div class="scopeButtons">${buttons}</div>${select}</div>`;
+    }
+    componentHorizonSelector(context, horizons = [], selectedId = 'D0') {
+      return this.componentScopeSelector({ context, title: 'Horizon', items: horizons, selectedId, idField: 'horizon_id', labelFn: h => this.horizonLabel(h) });
+    }
+    componentPeriodSelector(periods = [], selectedId = 'today', context = 'metering-period') {
+      return this.componentScopeSelector({ context, title: 'Period', items: periods, selectedId, idField: 'period_id', labelFn: p => this.periodLabel(p) });
+    }
+    listChips(values) {
+      const items = asArray(values).map(item => human(item, '')).filter(Boolean);
+      return items.length ? `<div class="warningChips">${items.map(item => `<span>${escapeHtml(item)}</span>`).join('')}</div>` : '';
+    }
+    contractGap(title, body, details = '') {
+      return `<section class="panel wide"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(body)}</p>${details ? this.componentDetailsBlock('contract-gap-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-'), 'Details', details) : ''}</section>`;
+    }
+    rowStatus(row) {
+      if (!row || row.missing) return 'missing';
+      return row.health || row.quality || row.value_status || row.status || rowState(row);
+    }
+    metricFromRow(rt, icon, label, keys, formatter, sub, tone = '', fallback = '—') {
+      const row = this.dataRow(rt, keys);
+      const value = rowValue(row, null);
+      const display = value === null || value === undefined || value === '' ? fallback : formatter(value);
+      return this.metric(icon, label, display, sub, tone, this.rowStatus(row));
+    }
+    energyAutomationMode(rt, d = null) {
+      const decision = d || rt.decision();
+      return String(firstDefined(decision.automation_mode, decision.mode, rt.value('energy_intelligence.automation_mode', ''), rt.value('energy_intelligence.mode', '')) || '').toLowerCase();
+    }
+    isEnergyIntelligenceActive(rt, d = null) {
+      const mode = this.energyAutomationMode(rt, d);
+      return mode && !['disabled','off','manual','observe_only','observe only'].includes(mode);
+    }
+    effectiveBatteryPolicy(rt) {
+      return rt.effectiveStrategyFor('battery')
+        || rt.effectiveStrategyFor('home_battery')
+        || rt.effectiveStrategyRows().find(row => /battery|storage/i.test(`${row.asset_id || ''} ${row.asset_type || ''} ${row.profile_id || ''} ${row.flexible_role || ''}`))
+        || {};
+    }
+    batteryReservePct(rt) {
+      const row = this.dataRow(rt, ['battery.protected_reserve_pct','battery.reserve_target_pct','battery.minimum_reserve_pct']);
+      const rowValueNumber = asNumber(rowValue(row, null));
+      if (rowValueNumber !== null) return rowValueNumber;
+      const effective = this.effectiveBatteryPolicy(rt);
+      return asNumber(firstDefined(effective.protected_reserve_pct, effective.reserve_target_pct, effective.minimum_target_value));
+    }
+    batteryProtectedReserveKwh(rt) {
+      const row = this.dataRow(rt, ['battery.protected_reserve_kwh','battery.reserve_target_kwh','battery.minimum_reserve_kwh']);
+      const rowValueNumber = asNumber(rowValue(row, null));
+      if (rowValueNumber !== null) return rowValueNumber;
+      const effective = this.effectiveBatteryPolicy(rt);
+      return asNumber(firstDefined(effective.protected_reserve_kwh, effective.reserve_target_kwh));
+    }
+    batteryAboveReserveKwh(rt) {
+      const row = this.dataRow(rt, ['battery.available_above_reserve_kwh','battery.usable_above_reserve_kwh']);
+      const rowValueNumber = asNumber(rowValue(row, null));
+      if (rowValueNumber !== null) return rowValueNumber;
+      const effective = this.effectiveBatteryPolicy(rt);
+      return asNumber(firstDefined(effective.available_above_reserve_kwh, effective.usable_above_reserve_kwh));
+    }
+    flexibleNeedKwh(rt) {
+      const values = this.flexibleAssetDomain(rt).participating().map(vm => asNumber(firstDefined(vm.raw.energy_to_target_kwh, vm.raw.energy_needed_kwh, vm.raw.remaining_energy_kwh))).filter(value => value !== null);
+      if (!values.length) return null;
+      return values.reduce((sum, value) => sum + Math.max(0, value), 0);
+    }
+    flexiblePowerNowKw(rt) {
+      const values = this.flexibleAssetDomain(rt).participating().map(vm => asNumber(firstDefined(vm.raw.power_kw, vm.raw.current_power_kw, vm.raw.actual_power_kw))).filter(value => value !== null);
+      if (!values.length) return null;
+      return values.reduce((sum, value) => sum + Math.abs(value), 0);
+    }
+    currentEnergyModel(rt) { return createCurrentEnergyViewModel(rt.contractGateway()); }
+    progress(value, max = null) { return this.componentProgressBar(value, max); }
+    assetRow(icon, title, label, value, pct) { return this.componentAssetRow({ icon, title, label, value, pct }); }
+    recCard(title, body, meta = '') { return this.componentRecommendationCard({ title, body, meta }); }
+    scene(rt) {
+      const current = this.currentEnergyModel(rt);
+      const solar = current.solar.powerKw;
+      const batteryShown = current.battery.displayPowerKw;
+      const batteryLabel = current.battery.label;
+      const gridExport = current.grid.exportPowerKw;
+      const gridShown = current.grid.displayPowerKw;
+      const gridLabel = current.grid.label;
+      return `<div class="energyScene liveFlow">
+        <div class="sceneTitle"><b>Energy Overview</b><span>Solar, battery, grid and demand in one calm view</span></div>
+        <div class="solarPath"></div><div class="batteryPath"></div><div class="gridPath"></div>
+        <div class="house"><div class="roof"></div><div class="wall"><i></i><i></i><i></i></div><div class="panels"><i></i><i></i><i></i><i></i><i></i></div></div>
+        <div class="car"></div>
+        <div class="float solar"><span>Solar</span><b>${fmtKw(solar)}</b><small>Producing</small></div>
+        <div class="float battery"><span>Home Battery</span><b>${fmtKw(batteryShown)}</b><small>${escapeHtml(batteryLabel)}</small></div>
+        <div class="float grid"><span>Grid</span><b>${fmtKw(gridShown)}</b><small>${escapeHtml(gridLabel)}</small></div>
+        <div class="float export">↔ ${fmtKw(gridExport, '0.0 kW')}</div>
+      </div>`;
+    }
+    overviewExperiencePanel(rt) { return ''; }
+    pilotReadinessPanel(rt) { return ''; }
+
+
+    pageContextControls(rt, tab) {
+      if (tab === 'outlook') return this.componentHorizonSelector('outlook', rt.outlookHorizons(), this.selectedOutlookHorizonId);
+      if (tab === 'consumers') return `<label class="hiQuickSelect"><span>Group</span><select data-consumer-filter-select>${this.consumerFilterOptions().map(([id,label])=>`<option value="${id}"${this.consumerFilter===id?' selected':''}>${label}</option>`).join('')}</select></label><label class="hiQuickSelect"><span>Sort</span><select data-consumer-sort-select>${this.consumerSortOptions().map(([id,label])=>`<option value="${id}"${this.consumerSort===id?' selected':''}>${label}</option>`).join('')}</select></label>`;
+      if (tab === 'metering') return this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId) + this.componentMeteringSort();
+      if (tab === 'planning') return `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">Today</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">Tomorrow</button></div>`;
+      if (tab === 'value') return this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId, 'value');
+      return '';
+    }
+
+    bodyContextBar(rt, tab, controlsId = '') {
+      const controls = this.pageContextControls(rt, tab);
+      if (!controls) return '';
+      const aria = controlsId ? ` aria-controls="${escapeHtml(controlsId)}"` : '';
+      return `<section class="rhiUxContextBar" aria-label="View"${aria}><small>View</small><div class="rhiUxContextControls">${controls}</div></section>`;
+    }
+
+    understandingFooter(rt, tab) {
+      const d = rt.decision();
+      const balanceVm = this.canonicalLiveEnergyBalance(rt);
+      const siteDemand = balanceVm.siteConsumptionKw;
+      const homeDemand = balanceVm.homeConsumptionKw;
+      const demand = siteDemand;
+      const solar = balanceVm.solarKw;
+      const gridImport = balanceVm.gridImportKw;
+      const gridExport = balanceVm.gridExportKw;
+      const batterySoc = balanceVm.battery.socPct;
+      const assets = rt.primaryFlexibleAssets();
+      const activeAssets = assets.filter(a => (asNumber(firstDefined(a.power_kw, a.current_power_kw, a.actual_power_kw),0) || 0) > 0.05).length;
+      const outlook = this.selectedHorizon(rt.outlookHorizons(), this.selectedOutlookHorizonId) || {};
+      const balance = asNumber(firstDefined(outlook.summary?.balance?.balance_kwh, outlook.summary?.balance?.outlook_balance_kwh, outlook.balance_kwh));
+      const value = this.valuePeriodContext(rt);
+      const period = this.periodLabel(this.selectedMeteringPeriodId);
+      const conclusions = {
+        overview: [siteDemand !== null ? `Site Consumption is ${fmtKw(siteDemand,'—')}.` : (homeDemand !== null ? `Home Consumption is ${fmtKw(homeDemand,'—')}; Site Consumption is unavailable.` : 'Site Consumption is unavailable.'), batterySoc !== null ? `Home Battery state of charge is ${fmtPct(batterySoc)}.` : 'Home Battery state of charge is unavailable.', 'Energy evidence'],
+        outlook: [balance !== null ? `${this.horizonLabel(outlook)} has an expected balance of ${fmtKwh(balance)}.` : 'The selected forecast balance is unavailable.', 'Forecast values remain estimates and may change as conditions develop.', 'Forecast evidence'],
+        flow: [gridExport > 0.05 ? `The home is exporting ${fmtKw(gridExport)}.` : gridImport > 0.05 ? `The home is importing ${fmtKw(gridImport)}.` : 'The home is balanced locally.', `${fmtKw(solar)} solar is currently available.`, 'Flow evidence'],
+        solar: [(solar || 0) > 0.05 ? `Solar is currently producing ${fmtKw(solar)}.` : 'No meaningful solar production is visible now.', 'Flexible loads use the surplus currently available for them.', 'Solar evidence'],
+        battery: [batterySoc !== null ? `Storage is at ${fmtPct(batterySoc)}.` : 'Storage state is unavailable.', 'Reserve and available actions follow the active strategy.', 'Storage evidence'],
+        consumers: [`${assets.length} controllable assets are available; ${activeAssets} are active now.`, 'Attribution is shown when reliable allocation is available.', 'Consumer evidence'],
+        strategies: ['Configured intent and effective strategy are shown separately.', 'The effective strategy can differ when current conditions require it.', 'Strategy evidence'],
+        metering: (() => { const vm=this.buildMeteringPeriodViewModel(rt); const measured=[['solar production',vm.solar],['consumption',vm.consumption],['grid import',vm.gridImport],['grid export',vm.gridExport]].filter(([,value])=>value!==null); const lead=measured.length ? `${vm.label} ${measured[0][0]} is ${fmtKwh(measured[0][1])}.` : `${vm.label} measurements are unavailable.`; return [lead, `${vm.qualityLabel} measurement quality for the selected period.`, 'Measurement evidence']; })(),
+        intelligence: [human(d.recommendation || 'No recommendation available.'), human(d.reason || 'No explanation available.'), 'Decision evidence'],
+        value: [value.interpretation, value.attention, 'Financial evidence'],
+        planning: ['The table shows only Planning-owned hourly allocations.', 'Unavailable hours remain empty rather than estimated.', 'Planning evidence'],
+        gas: (() => { const gas=this.gasModel(rt); return gas.asset ? [gas.totalM3 !== null ? `Gas meter total is ${this.gasVolume(gas.totalM3)}.` : 'Gas meter is connected; the total reading is not currently available.', gas.totalEntityId ? 'Measured daily consumption is available in the 30-day history.' : 'Consumption history will appear when the canonical total meter entity is available.', 'Gas evidence'] : ['Gas consumption is not measured yet.', 'Connect one authoritative total-increasing gas meter to enable measured usage and history.', 'Gas evidence']; })(),
+        retrospective: ['Energy Intelligence reviewed its measurable performance.', 'Scores reflect published evidence coverage and never invent missing results.', 'Retrospective evidence']
+      };
+      const [title, support, action] = conclusions[tab] || ['Energy information is available.','Open Diagnostics for technical details.','Evidence'];
+      return `<section class="hiConclusionFooter" id="hi-conclusion-${escapeHtml(tab)}"><div class="hiConclusionMain"><span class="hiConclusionIcon">✦</span><div><small>Conclusion</small><h2>${escapeHtml(title)}</h2><p>${escapeHtml(support)}</p></div></div></section>`;
+    }
+
+    valueStateLabel(state) {
+      const normalized = String(state || '').trim().toLowerCase();
+      if (['complete','ok','ready'].includes(normalized)) return 'Complete';
+      if (['incomplete','partial'].includes(normalized)) return 'Partial result';
+      if (['not_configured','configuration_required','not ready','not_ready'].includes(normalized)) return 'Configuration required';
+      if (['reset_pending','pending','baseline_reset_required'].includes(normalized)) return 'Awaiting reset';
+      return 'Unavailable';
+    }
+    valueMoney(value, currency = 'EUR', state = '', missingLabel = '—') {
+      const n = asNumber(value);
+      if (n === null) return missingLabel;
+      const symbol = String(currency || '').toUpperCase() === 'EUR' ? '€' : `${currency || ''} `;
+      return `${symbol}${n.toFixed(2)}`;
+    }
+    pricingMode(rt) {
+      const explicit = String(firstDefined(
+        rt.value('pricing.export_pricing_mode', null),
+        rt.value('pricing.export_compensation_mode', null),
+        rt.value('pricing.mode', null),
+        ''
+      )).trim().toUpperCase();
+      if (explicit === 'DIRECT_COMPENSATION' || explicit === 'SOURCE_MINUS_FEE') return explicit;
+      return rt.value('pricing.export_compensation_fallback_eur_kwh', null) !== null
+        ? 'DIRECT_COMPENSATION'
+        : 'SOURCE_MINUS_FEE';
+    }
+    pricingTariffSpecs(rt) {
+      const mode = this.pricingMode(rt);
+      const exportInput = mode === 'DIRECT_COMPENSATION'
+        ? { id:'export_compensation_fallback', label:'Export compensation', match:/export_compensation_fallback_eur_kwh/i, required:true, input:true }
+        : { id:'export_fee', label:'Export fee', match:/export_fee_eur_kwh/i, required:true, input:true };
+      return [
+        { id:'commodity', label:'Commodity', match:/(spot_price_current|commodity)(_eur_kwh)?$/i, required:true, input:true },
+        { id:'network', label:'Network', match:/(import_network|distribution).*eur_kwh/i, required:true, input:true },
+        { id:'taxes_levies', label:'Taxes & levies', match:/(import_levies|taxes|levies).*eur_kwh/i, required:true, input:true },
+        { id:'vat', label:'VAT', match:/(import_vat_pct|vat_pct)/i, required:true, input:true },
+        exportInput,
+        { id:'export_compensation', label:'Export compensation', match:/export_compensation_current_eur_kwh/i, required:true, input:false, derived:true }
+      ];
+    }
+    valueTariffRows(rt, breakdown = {}) {
+      const all = rt.allRows ? [...rt.allRows().values()] : [];
+      const findRow = (spec) => all.find(row => {
+        const text = [row.key,row.property_key,row.property_id,row.display_name,row.name].filter(Boolean).join(' ');
+        return spec.match.test(text);
+      }) || null;
+      const aliases = {
+        commodity:['commodity','spot_price_current_eur_kwh','spot_price'],
+        network:['network','distribution','import_network_eur_kwh'],
+        taxes_levies:['taxes_levies','taxes','levies','import_levies_eur_kwh'],
+        vat:['vat','import_vat_pct'],
+        export_fee:['export_fee','export_fee_eur_kwh'],
+        export_compensation_fallback:['export_compensation_fallback','export_compensation_fallback_eur_kwh'],
+        export_compensation:['export_compensation','export_compensation_current_eur_kwh']
+      };
+      const pickBreakdown = (id) => {
+        for (const key of aliases[id] || [id]) {
+          if (breakdown && Object.prototype.hasOwnProperty.call(breakdown,key)) return breakdown[key];
+        }
+        return undefined;
+      };
+      const directFacts = {
+        commodity: firstDefined(rt.value('pricing.spot_price_current_eur_kwh', null), rt.value('spot_price_current_eur_kwh', null), rt.value('pricing.raw_source_value', null)),
+        network: rt.value('pricing.import_network_eur_kwh', null),
+        taxes_levies: rt.value('pricing.import_levies_eur_kwh', null),
+        vat: rt.value('pricing.import_vat_pct', null),
+        export_fee: rt.value('pricing.export_fee_eur_kwh', null),
+        export_compensation_fallback: rt.value('pricing.export_compensation_fallback_eur_kwh', null),
+        export_compensation: rt.value('pricing.export_compensation_current_eur_kwh', null)
+      };
+      return this.pricingTariffSpecs(rt).map(spec => {
+        const row = findRow(spec);
+        const published = pickBreakdown(spec.id);
+        const rowVal = rowValue(row, null);
+        const direct = directFacts[spec.id];
+        const value = published !== undefined && published !== null ? published : (rowVal !== null ? rowVal : direct);
+        const configured = asNumber(value) !== null || (value !== undefined && value !== null && value !== '');
+        return { ...spec, row, value, configured, writable: !!spec.input && row ? this.isWritableRow(row) : false, pricingMode:this.pricingMode(rt) };
+      });
+    }
+    valuePeriodContext(rt) {
+      const selected=String(this.selectedMeteringPeriodId || 'today').toLowerCase();
+      const periodId=selected === 'day' ? 'today' : selected;
+      const valueProjection=rt.valueProjection(periodId);
+      const summary=objectFrom(valueProjection.value || {});
+      const label=({today:'Today',week:'This week',month:'This month',year:'This year'})[periodId] || human(periodId);
+      const currency='EUR';
+      const net=asNumber(summary.net_financial_result_eur);
+      const importCost=asNumber(summary.import_cost_eur);
+      const exportRevenue=asNumber(summary.export_revenue_eur);
+      const netEnergyCost=asNumber(summary.net_energy_cost_eur);
+      const accountingReady=summary.available === true;
+      const actualResultComplete=summary.actual_complete === true;
+      const state=actualResultComplete ? 'OK' : accountingReady ? 'PARTIAL' : 'UNAVAILABLE';
+      const stateLabel=actualResultComplete ? 'Available' : accountingReady ? 'Partial' : 'Unavailable';
+      const resultCompletenessLabel=actualResultComplete ? 'Actual result complete' : stateLabel;
+      const resultScopeLabel=actualResultComplete
+        ? 'Comparison and per-asset allocation are not evaluated.'
+        : String(summary.reason || 'Financial result is not complete.');
+      const interpretation=net !== null
+        ? `${label} financial result is ${net >= 0 ? 'positive' : 'negative'}.`
+        : `${label} financial result is unavailable.`;
+      const attention=actualResultComplete
+        ? `Measured import cost and export revenue are complete for ${label.toLowerCase()}.`
+        : String(summary.reason || 'Financial calculation is not available yet.');
+      return {
+        period:summary, periodId, label, state, stateLabel, resultCompletenessLabel, resultScopeLabel,
+        actualResultComplete, counterfactualEvaluated:false, attributionEvaluated:false,
+        currency, net, importCost, exportRevenue, netEnergyCost,
+        savings:null, avoided:null, selfConsumption:null, breakdown:{}, consumers:[],
+        interpretation, attention, reason:String(summary.reason || ''),
+        tariffs:this.valueTariffRows(rt, {}), accountingReady, pricingComplete:true
+      };
+    }
+
+    buildMeteringPeriodViewModel(rt) {
+      const publishedPeriods = rt.meteringPeriods();
+      const defaultPeriods = this.defaultMeteringPeriods();
+      const byPeriodId = new Map(defaultPeriods.map(period => [String(period.period_id).toLowerCase(), period]));
+      publishedPeriods.forEach(period => {
+        const id = String(period.period_id || '').toLowerCase();
+        if (id) byPeriodId.set(id, { ...(byPeriodId.get(id) || {}), ...period });
+      });
+      const periods = [...byPeriodId.values()].sort((a, b) => (asNumber(a.selector_order) || 99) - (asNumber(b.selector_order) || 99));
+      const requested = String(this.selectedMeteringPeriodId || rt.value('metering.selected_period','today') || 'today').toLowerCase();
+      const periodId = requested === 'day' ? 'today' : requested;
+      const period = byPeriodId.get(periodId) || { period_id:periodId, label:this.periodLabel({ period_id:periodId }), graph_support:false, bucket_support:false };
+      const rawPeriod={};
+      const effectivePeriod={ ...period, summary:{ ...(period.summary || {}), measured:{}, quality:{ period:'UNAVAILABLE' } } };
+      const flexibleLoadRows = this.flexibleLoadMeteringRows(rt, periodId);
+      const rows = this.meteringRowsFromPeriod(effectivePeriod);
+      const recordsHaveValues = this.meteringPeriodRowsAvailable(rows);
+      const summaryHasData = recordsHaveValues || Object.keys(rawPeriod).length > 0;
+      const quality = { health:rawPeriod.quality || 'UNAVAILABLE', measurement_state:rawPeriod.quality || 'UNAVAILABLE', user_action_required:false };
+      const normalizeMetricKey = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const allRows = Object.values(rows).flat().filter(Boolean);
+      const metricValue = aliases => {
+        const wanted = aliases.map(normalizeMetricKey);
+        const row = allRows.find(candidate => {
+          const keys = [candidate.metric_key, candidate.semantic_key, candidate.fact_key, candidate.property_key, candidate.key].map(normalizeMetricKey).filter(Boolean);
+          return keys.some(key => wanted.some(alias => key === alias || key.endsWith(`_${alias}`)));
+        });
+        return asNumber(row?.value);
+      };
+      const health = normalizeMetricKey(firstDefined(quality.health, quality.status, period.health, 'unavailable'));
+      const verifiedStates = new Set(['trusted','verified','complete','ok','ready']);
+      const verificationStates = new Set(['pending','verification_required','verify','reset_required','untrusted','baseline_untrusted','baseline_required','configuration_required']);
+      const partialStates = new Set(['partial','estimated','incomplete']);
+      const qualityState = verifiedStates.has(health) ? 'verified' : verificationStates.has(health) ? 'verification_required' : partialStates.has(health) ? 'partial' : 'unavailable';
+      const qualityLabel = qualityState === 'verified' ? 'Verified' : qualityState === 'verification_required' ? 'Verification required' : qualityState === 'partial' ? 'Partial' : 'Unavailable';
+      const remediations = rt.meteringRemediationsForPeriod(periodId);
+      const label = this.periodLabel(period);
+      const remediation = remediations[0] || null;
+      const userActionRequired = asBool(firstDefined(quality.user_action_required,effectivePeriod.user_action_required,false),false);
+      const command = remediation && userActionRequired ? (remediation.command || rt.meteringResetCommandFor(remediation, periodId)) : null;
+      const conclusion = qualityState === 'verified'
+        ? { title:`${label} totals are verified`, why:'These totals are measured and ready to use.', recommendation:'No action is needed.', tone:'green' }
+        : qualityState === 'partial'
+          ? { title:`${label} totals are partial`, why:'Measured values are available, but the selected period is not yet complete.', recommendation:'Use the available totals with the shown completeness in mind.', tone:'orange' }
+          : qualityState === 'verification_required'
+            ? { title:`${label} totals need verification`, why:'Measurements exist, but Home Intelligence cannot yet verify the complete period.', recommendation:command ? `Reset ${label.toLowerCase()} once and wait for confirmation.` : 'Wait for Home Intelligence to confirm the measured period.', tone:'orange' }
+            : { title:`${label} totals are unavailable`, why:'Reliable measured totals are not currently published for this period.', recommendation:'The totals will appear when measurements become available.', tone:'blue' };
+      return {
+        periodId, period, periods, label, rows, quality, health, qualityState, qualityLabel, conclusion, command,
+        available:this.meteringPeriodRowsAvailable(rows), summaryHasData,
+        solar:metricValue(['solar_production_kwh']),
+        consumption:metricValue(['site_consumption_kwh']),
+        homeConsumption:metricValue(['home_consumption_kwh']),
+        gridImport:metricValue(['grid_import_kwh']),
+        gridExport:metricValue(['grid_export_kwh']),
+        batteryCharge:metricValue(['battery_charge_kwh']),
+        batteryDischarge:metricValue(['battery_discharge_kwh']),
+        flexibleLoads:metricValue(['flexible_loads_energy_in_kwh']),
+        sourceRefs:firstDefined(period.summary?.source_refs, period.source_refs, []), flexibleLoadRows, remediations
+      };
+    }
+    meteringHeaderContext(rt) {
+      return this.buildMeteringPeriodViewModel(rt);
+    }
+
+    gasModel(rt) {
+      const assets = typeof rt.assets === 'function' ? rt.assets() : [];
+      const raw = assets.find(asset => String(firstDefined(asset?.asset_type, asset?.object_class, '') || '').toLowerCase() === 'gas_meter') || null;
+      const asset = raw ? this.energyAssetContext(rt, raw) : null;
+      const properties = Array.isArray(asset?.properties) ? asset.properties : [];
+      const propertyValue = key => {
+        const prop = properties.find(row => String(row?.property_key || '') === key);
+        return asNumber(firstDefined(prop?.value, prop?.resolution?.value, null));
+      };
+      const totalM3 = firstDefined(propertyValue('gas.total_m3'), asNumber(asset?.total_m3), asNumber(asset?.gas_total_m3));
+      const flowM3h = firstDefined(propertyValue('gas.flow_m3_h'), asNumber(asset?.flow_m3_h), asNumber(asset?.gas_flow_m3_h));
+      const health = String(firstDefined(asset?.health, asset?.normalization_status, 'UNKNOWN') || 'UNKNOWN');
+      const source = String(firstDefined(asset?.integration_domain, properties.find(row=>row?.integration_domain)?.integration_domain, 'Gas meter') || 'Gas meter');
+      const totalEntityId = this.gasTotalEntityId();
+      return Object.freeze({ asset, totalM3, flowM3h, health, source, totalEntityId });
+    }
+    gasTotalEntityId() {
+      const states = this._hass?.states || {};
+      for (const [entityId, state] of Object.entries(states)) {
+        const attrs = state?.attributes || {};
+        if (String(attrs.logical_object_class || '').toLowerCase() !== 'gas_meter') continue;
+        if (String(attrs.property_key || '') === 'gas.total_m3') return entityId;
+      }
+      return '';
+    }
+    gasVolume(value, fallback = '—') {
+      const number = asNumber(value);
+      return number === null ? fallback : `${number.toLocaleString(undefined,{maximumFractionDigits:3})} m³`;
+    }
+    gasFlow(value, fallback = '—') {
+      const number = asNumber(value);
+      return number === null ? fallback : `${number.toLocaleString(undefined,{maximumFractionDigits:3})} m³/h`;
+    }
+    async mountGasStatisticsGraph() {
+      if (this.view !== 'gas') return;
+      const host = this.shadowRoot?.querySelector('[data-gas-statistics-host]');
+      if (!host || host.firstElementChild || host.dataset.loading === 'true') return;
+      const entityId = String(host.dataset.entityId || this.gasTotalEntityId() || '');
+      if (!entityId) return;
+      host.dataset.loading = 'true';
+      try {
+        if (typeof window.loadCardHelpers !== 'function') throw new Error('Home Assistant card helpers unavailable');
+        const helpers = await window.loadCardHelpers();
+        if (this.view !== 'gas' || !host.isConnected) return;
+        const card = await helpers.createCardElement({
+          type:'statistics-graph',
+          title:'Gas consumption',
+          entities:[entityId],
+          stat_types:['change'],
+          period:'day',
+          days_to_show:30,
+          chart_type:'bar',
+          hide_legend:true
+        });
+        card.hass = this._hass;
+        host.replaceChildren(card);
+      } catch (error) {
+        if (host.isConnected) {
+          host.innerHTML = '<div class="empty"><b>Gas history temporarily unavailable</b><span>The meter is available, but Home Assistant could not load the Statistics Graph card.</span></div>';
+        }
+      } finally {
+        delete host.dataset.loading;
+      }
+    }
+
+    buildPageViewModel(rt, tab) {
+      const current = this.currentEnergyModel(rt);
+      const solar = current.solar.powerKw;
+      const flexibleLoadBudget = null; // R1.89.22 does not register a canonical public budget field.
+      const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
+      const solarForecast = rt.number('forecast.solar_today_kwh');
+      const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
+      const batterySoc = current.battery.socPct;
+      const batteryAvailable = current.battery.availableKwh;
+      const gridImport = current.grid.importPowerKw;
+      const gridExport = current.grid.exportPowerKw;
+      const liveConsumption = current.consumption;
+      const siteConsumption = liveConsumption.siteConsumptionKw;
+      const demand = siteConsumption;
+      const demandUnit = 'site consumption now';
+      const flexPower = this.flexiblePowerNowKw(rt);
+      const flexNeed = this.flexibleNeedKwh(rt);
+      const decision = rt.decision();
+      const status = this.productStateLabel(decision.status || rt.value('energy_intelligence.status', 'observed'), 'Observed');
+      const recommendation = humanReason(decision.recommendation || rt.value('energy_intelligence.recommendation', 'No action needed'), 'No action needed');
+      const flowValue = current.grid.displayPowerKw;
+      const flowState = current.grid.direction === 'exporting' ? 'Exporting surplus' : current.grid.direction === 'importing' ? 'Importing from grid' : 'Balanced locally';
+      const batteryPower = current.battery.displayPowerKw;
+      const batteryState = current.battery.label;
+      const selectedContext = this.selectedHorizon(rt.outlookHorizons(), this.selectedOutlookHorizonId);
+      const meteringContext = this.meteringHeaderContext(rt);
+      const valueContext = this.valuePeriodContext(rt);
+      const contextTomorrow = this.isFutureHorizon(selectedContext);
+      const contextLabel = contextTomorrow ? 'Tomorrow' : 'Today';
+      const contextSupply = objectFrom(selectedContext?.summary?.supply || {});
+      const contextDemand = objectFrom(selectedContext?.summary?.demand || {});
+      const contextBalance = objectFrom(selectedContext?.summary?.balance || {});
+      const contextSolar = asNumber(firstDefined(contextSupply.solar_forecast_kwh, contextSupply.solar_today_kwh, solarForecast));
+      const contextRemaining = asNumber(firstDefined(contextSupply.solar_remaining_kwh, contextTomorrow ? null : solarRemaining));
+      const contextDemandTotal = asNumber(firstDefined(contextDemand.total_expected_demand_kwh, contextDemand.expected_demand_kwh, flexNeed));
+      const contextBalanceTotal = asNumber(firstDefined(contextBalance.balance_kwh, contextBalance.outlook_balance_kwh));
+      const contextGridCost = asNumber(firstDefined(contextBalance.expected_grid_cost_eur, contextBalance.grid_cost_eur));
+      const contextGridImport = asNumber(firstDefined(contextBalance.expected_grid_import_kwh, contextBalance.grid_import_kwh));
+      const gas = this.gasModel(rt);
+      const profiles = {
+        overview: { image:hbEnergyHeroAsset('overview'), icon:'✦', eyebrow:'Energy overview', title:'Site Consumption', value:fmtKw(demand,'—'), unit:'current site demand', explanation:`${flowState} · ${fmtKw(solar)} solar · ${fmtKw(current.grid.displayPowerKw)} grid`, tone:'blue', metrics:[['☀','Solar now',fmtKw(solar),solar===null?'Unavailable':solar>0.05?'Producing now':'Not producing'],['▣','Home Battery',fmtPct(batterySoc),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['↗','Solar remaining',fmtKwh(solarRemaining),solarRemaining===null?'Unavailable':'Forecast left today']] },
+        outlook: { image:hbEnergyHeroAsset('outlook'), icon:'↗', eyebrow:'Energy outlook', title:`${contextLabel} outlook`, value:fmtKwh(contextSolar), unit:`solar forecast ${contextLabel.toLowerCase()}`, explanation:human(firstDefined(selectedContext?.summary?.reason, rt.value('energy_intelligence.outlook_reason','Forecast, demand and planning in one view'))), tone:'purple', metrics:[['☀',`${contextLabel} forecast`,fmtKwh(contextSolar),`Expected solar ${contextLabel.toLowerCase()}`],['↗',contextTomorrow?'Expected demand':'Remaining',contextTomorrow?fmtKwh(contextDemandTotal):fmtKwh(contextRemaining),contextTomorrow?'Known demand tomorrow':'Forecast left today'],['⌂','Demand',fmtKwh(contextDemandTotal),'Expected demand'],['✓','Balance',fmtKwh(contextBalanceTotal),'Supply minus demand']] },
+        flow: { image:hbEnergyHeroAsset('flow'), icon:'⚡', eyebrow:'Live energy flow', title:flowState, value:fmtKw(flowValue), unit:current.grid.direction === 'exporting' ? 'to grid' : current.grid.direction === 'importing' ? 'from grid' : 'grid flow', explanation:`${fmtKw(solar)} solar · ${fmtKw(demand)} demand`, tone:'purple', metrics:[['☀','Solar',fmtKw(solar),'Supplying the home'],['▣','Home Battery',fmtKw(batteryPower),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['⌂','Demand',fmtKw(demand),'Home consumption']] },
+        solar: { image:hbEnergyHeroAsset('solar-generation'), icon:'☀', eyebrow:'Solar', title:(solar||0)>0.05?'Generating now':'Not generating', value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
+        battery: { image:hbEnergyHeroAsset('battery'), icon:'▣', eyebrow:'Home Battery', title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(this.batteryReservePct(rt)),'Protected minimum']] },
+        consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',flexibleLoadBudget===null?'Not published':fmtKw(flexibleLoadBudget),flexibleLoadBudget===null?'Planning budget not published':'Current planning budget'],['◷','Planning',flexibleLoadBudget===null && flexNeed===null?'Incomplete':this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),flexibleLoadBudget===null?'Budget not published':'Planning data available']] },
+        gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:'Gas', title:gas.asset ? 'Gas consumption' : 'Gas meter not connected', value:this.gasVolume(gas.totalM3), unit:'total meter reading', explanation:gas.asset ? 'Measured gas use, meter health and 30-day history.' : 'Connect one authoritative gas meter to start measured consumption history.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),gas.flowM3h===null?'Not measured':'Current measured flow'],['◫','Meter total',this.gasVolume(gas.totalM3),gas.totalM3===null?'Not measured':'Cumulative meter reading'],['↺','History',gas.totalEntityId?'30 days':'Not available',gas.totalEntityId?'Daily measured consumption':'Waiting for total meter'],['✓','Health',gas.asset?human(gas.health):'Not configured',gas.asset?'Gas meter health':'Authoritative source required']] },
+        strategies: { image:hbEnergyHeroAsset('strategies'), icon:'◎', eyebrow:'Strategies', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Configured intent and the strategy currently in effect', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
+        'operational-planning': { image:hbEnergyHeroAsset('operational-planning'), icon:'◷', eyebrow:'Operational Planning', title:this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'), value:fmtKw(flexPower), unit:'managed power now', explanation:'Current flexible-load execution and next actions', tone:'purple', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Managed power now'],['⌂','Energy need',fmtKwh(flexNeed),'Known remaining need'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Current operational state'],['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'),'Energy control mode']] },
+        metering: { image:hbEnergyHeroAsset('metering'), icon:'▥', eyebrow:'Metering', title:meteringContext.label, value:meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar), unit:'Solar production', explanation:`Measured energy flows this ${meteringContext.label.toLowerCase()}`, tone:'blue', metrics:[['▥','Consumption',meteringContext.consumption === null ? 'Unavailable' : fmtKwh(meteringContext.consumption),meteringContext.label],['☀','Solar',meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar),meteringContext.label],['↓','Grid import',meteringContext.gridImport === null ? 'Unavailable' : fmtKwh(meteringContext.gridImport),meteringContext.label],['↑','Grid export',meteringContext.gridExport === null ? 'Unavailable' : fmtKwh(meteringContext.gridExport),meteringContext.label]] },
+        intelligence: { image:hbEnergyHeroAsset('intelligence'), icon:'✦', eyebrow:'Home Intelligence', title:status, value:this.productStateLabel(rt.value('energy_intelligence.automation_mode','automatic'), 'Automatic'), unit:'automation mode', explanation:'Your home energy control center', tone:'orange', metrics:[['✓','Status',status,'Current intelligence state'],['✦','Confidence',this.productStateLabel(decision.confidence || rt.value('energy_intelligence.confidence','unknown'), 'Not available'),'Decision confidence'],['◎','Recommendation',recommendation,'What Home Intelligence advises'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
+        retrospective: (() => { const review=this.retrospectiveModel(); return { image:hbEnergyHeroAsset('intelligence'), icon:'↺', eyebrow:'Energy retrospective', title:review.rating, value:review.scoreText, unit:'intelligence performance', explanation:review.explanation, tone:'purple', metrics:[['◎','Coverage',review.coverageText,'Measured evidence'],['✦','Confidence',review.confidence,'Assessment confidence'],['↗','Trend',review.trendText,'Compared with previous period'],['✓','Objectives',String(review.kpis.length),'Measured goals']] }; })(),
+        value: { image:hbEnergyHeroAsset('value'), icon:'€', eyebrow:'Energy value', title:valueContext.label, value:this.valueMoney(valueContext.net,valueContext.currency,valueContext.state), unit:'net financial result', explanation:valueContext.attention, tone:'green', metrics:[['✓','Result',valueContext.resultCompletenessLabel,'Measured site accounting'],['↓','Import cost',this.valueMoney(valueContext.importCost,valueContext.currency,valueContext.state),valueContext.label],['↑','Export revenue',this.valueMoney(valueContext.exportRevenue,valueContext.currency,valueContext.state),valueContext.label],['€','Net energy cost',this.valueMoney(valueContext.netEnergyCost,valueContext.currency,valueContext.state),valueContext.label]] }
+      };
+      const profileKey = hbEnergyProfileKey(tab);
+      const baseProfile = profiles[profileKey] || profiles.overview;
+      const p = { ...baseProfile, image: hbEnergyHeroAsset(tab) };
+      const badgeKey = tab === 'gas' ? '' : tab === 'solar' ? 'solar.power_kw' : tab === 'battery' ? 'battery.soc_pct' : tab === 'flow' ? 'grid.flow_direction' : tab === 'metering' ? 'metering.integrity_state' : tab === 'value' ? 'value_accounting.state' : 'energy_intelligence.status';
+      let rawBadge = badgeKey ? String(this.rowStatus(rt.row(badgeKey)) || '').trim().toLowerCase() : '';
+      if (tab === 'metering') rawBadge = String(meteringContext.health || rawBadge).toLowerCase();
+      if (tab === 'value') rawBadge = String(valueContext.state || rawBadge).toLowerCase();
+      const attentionBadgeByTab = {gas:'Gas meter needs attention',overview:'Overview needs attention',outlook:'Forecast needs attention',flow:'Flow needs attention',solar:'Solar needs attention',battery:'Home Battery needs attention',consumers:'Consumers need attention',strategies:'Strategy needs attention',metering:'Measurements need attention',intelligence:'Guidance needs attention',retrospective:'Review needs evidence',value:'Financial setup needs attention'};
+      // R3.70.0: hero availability is based on required tab interfaces, not optional row completeness.
+      // Optional fields remain local to their own cards and Diagnostics and may not degrade the whole tab.
+      const requiredInterfacesWorking = this.diagnosticSpec(tab)
+        .map(spec => this.diagnosticEntity(rt, ...spec))
+        .every(row => row.working);
+      const explicitAttention = ['fail','error','blocked'].includes(rawBadge);
+      let badgeText = requiredInterfacesWorking ? 'Available' : attentionBadgeByTab[tab];
+      let badgeTone = requiredInterfacesWorking ? 'ok' : 'attention';
+      if (tab === 'gas') {
+        const gm = this.gasModel(rt);
+        badgeText = !gm.asset ? 'Setup needed' : /ok|ready|available/i.test(gm.health) ? 'Available' : human(gm.health);
+        badgeTone = !gm.asset ? 'neutral' : /ok|ready|available/i.test(gm.health) ? 'ok' : 'attention';
+      } else if (tab === 'retrospective') {
+        const review=this.retrospectiveModel();
+        badgeText = review.available ? 'Available' : 'Collecting evidence';
+        badgeTone = review.available ? 'ok' : 'neutral';
+      } else if (tab === 'value') {
+        const valueUnavailable = !valueContext.accountingReady;
+        badgeText = valueUnavailable ? valueContext.stateLabel : 'Available';
+        badgeTone = valueUnavailable ? 'neutral' : 'ok';
+      } else if (tab === 'metering') {
+        badgeText = meteringContext.qualityLabel;
+        badgeTone = meteringContext.qualityLabel === 'Verified' ? 'ok' : meteringContext.qualityLabel === 'Unavailable' ? 'neutral' : 'attention';
+      }
+      return { tab, ...p, badgeText, badgeTone, facts:{ solar, flexibleLoadBudget, solarToday, solarForecast, solarRemaining, batterySoc, batteryAvailable, batteryCharge:current.battery.chargePowerKw, batteryDischarge:current.battery.dischargePowerKw, batteryPower, batteryState, gridImport, gridExport, demand, flexPower, flexNeed, flowValue, flowState, status, recommendation }, selectedPeriod: tab === 'metering' ? meteringContext : null, selectedHorizon: tab === 'outlook' ? selectedContext : null, valueContext: tab === 'value' ? valueContext : null };
+    }
+    tabExperienceHeader(rt, tab, pageViewModel = null) {
+      const p = pageViewModel || this.buildPageViewModel(rt, tab);
+      const navItem = this.activeNavigationItem();
+      const navSection = this.navigationModel().find(section => section.id === this.navSection);
+      const semanticTitle = navItem?.title || p.title;
+      const semanticDescription = navItem?.description || p.explanation;
+      const heroKey = navItem?.id || tab;
+      return rhiEnergyPageHeader({
+        sectionLabel:navSection?.label || 'Energy',
+        itemLabel:navItem?.label || p.eyebrow,
+        title:semanticTitle,
+        description:semanticDescription,
+        hero:hbEnergyHeroAsset(heroKey),
+        metrics:p.metrics,
+        commandActions:this.pageQuickActions(rt, tab),
+        tone:p.tone
+      });
+    }
+
+    pageQuickActions(rt, tab) {
+      const typeSets = {
+        overview:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer','solar_production','solar_array','solar_inverter','inverter']),
+        flow:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer']),
+        solar:new Set(['solar_production','solar_array','solar_inverter','inverter','battery_system','battery']),
+        battery:new Set(['battery_system','battery']),
+        consumers:new Set(['flexible_load','flexible_asset','consumer']),
+        gas:new Set(['gas_meter']),
+        strategies:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer','energy_system']),
+        'operational-planning':new Set(['flexible_load','flexible_asset','consumer','battery_system','battery']),
+        planning:new Set(['flexible_load','flexible_asset','consumer','battery_system','battery']),
+        'strategic-planning':new Set(['energy_system','battery_system','battery','flexible_load','flexible_asset','consumer']),
+        metering:new Set(['gas_meter','battery_system','battery','flexible_load','flexible_asset','consumer']),
+        value:new Set(['energy_system','battery_system','battery','flexible_load','flexible_asset','consumer']),
+        retrospective:new Set(['energy_system','battery_system','battery','flexible_load','flexible_asset','consumer'])
+      };
+      const allowed = typeSets[tab] || typeSets.overview;
+      const assets = new Map(rt.assets().map(asset => [String(asset.asset_id || ''), asset]));
+      const commands = rt.visibleCommands().filter(command => {
+        const target = String(command.target_asset_id || '');
+        const asset = assets.get(target);
+        const type = String(asset?.asset_type || asset?.object_class || '').toLowerCase();
+        if (tab === 'gas') return !!target && type === 'gas_meter';
+        return !target || !type || allowed.has(type);
+      });
+      const seen = new Set();
+      const models = [];
+      for (const command of commands) {
+        const model = createCommandActionModel(command);
+        if (!model) continue;
+        const semantic = `${model.targetAssetId || command.target_asset_id || ''}::${model.role || model.id}`;
+        if (seen.has(semantic)) continue;
+        seen.add(semantic);
+        models.push(model);
+        if (models.length >= 4) break;
+      }
+      return models.map(model => this.componentActionModelButton(model)).join('');
+    }
+
+    assetQuickActions(rt, assetId, limit = 3) {
+      const id = String(assetId || '');
+      if (!id) return '';
+      const models = rt.commandActionModelsForAsset(id).filter(Boolean).slice(0, limit);
+      if (!models.length) return '';
+      return `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${models.map(model => this.componentActionModelButton(model)).join('')}</div></div>`;
+    }
+    measuredAssetPower(asset = {}) {
+      return asNumber(firstDefined(asset.actual_power_kw, asset.current_power_kw, asset.power_kw));
+    }
+    explicitExecutionState(asset = {}) {
+      return String(firstDefined(asset.execution_state, asset.operating_state, asset.operation_state, asset.physical_state, '') || '').toLowerCase();
+    }
+    canonicalOperationalStatus(rt, asset = {}, planning = {}) {
+      const id = String(firstDefined(asset.asset_id, asset.flexible_asset_id, asset.target_asset_id, '') || '');
+      const actualPowerKw = this.measuredAssetPower(asset);
+      const executionState = this.explicitExecutionState(asset);
+      const connectionState = String(firstDefined(asset.connection_state, asset.physical_connection_state, asset.assignment_state, '') || '').toLowerCase();
+      const plannedTodayKwh = asNumber(firstDefined(planning.planned_today_kwh, planning.today_planned_kwh));
+      const explicitException = firstDefined(planning.exception_state, planning.risk_state, planning.plan_conformance_state, asset.exception_state, null);
+      const blockedReason = String(firstDefined(planning.operational_blocked_reason, planning.blocked_reason, asset.blocked_reason, '') || '');
+      const isCharging = actualPowerKw !== null && actualPowerKw > 0.05;
+      const unavailable = /unavailable|offline|disconnected|failed/.test(`${executionState} ${connectionState}`);
+      const exceptional = explicitException === null
+        ? (/blocked|failed|exception|at.?risk/.test(`${executionState} ${blockedReason}`) ? true : null)
+        : /exception|at.?risk|blocked|failed|degraded|mismatch/.test(String(explicitException).toLowerCase());
+      return Object.freeze({ id, actualPowerKw, executionState, connectionState, plannedTodayKwh, isCharging, unavailable, exceptional, blockedReason });
+    }
+    canonicalLiveEnergyBalance(rt) {
+      const current = this.currentEnergyModel(rt);
+      const consumption = current.consumption;
+      const contributors = consumption.flexibleLoadContributors.map(row => {
+        const id = String(firstDefined(row.asset_id,row.flexible_asset_id,row.consumer_asset_id,'') || '');
+        return Object.freeze({ id, name:firstDefined(row.display_name,rt.assetName(id),human(id)), powerKw:asNumber(firstDefined(row.power_kw,row.actual_power_kw,row.current_power_kw)), raw:row });
+      });
+      return Object.freeze({
+        consumption,
+        siteConsumptionKw:consumption.siteConsumptionKw,
+        homeConsumptionKw:consumption.homeConsumptionKw,
+        flexibleLoadsKw:consumption.flexibleLoadsKw,
+        flexible:contributors,
+        solarKw:current.solar.powerKw,
+        battery:current.battery,
+        batteryChargeKw:current.battery.chargePowerKw,
+        batteryDischargeKw:current.battery.dischargePowerKw,
+        grid:current.grid,
+        gridImportKw:current.grid.importPowerKw,
+        gridExportKw:current.grid.exportPowerKw
+      });
+    }
+    overviewEnergyRow({ icon = '', label = '', subtitle = '', value = '—', variant = 'normal', progress = null, asset = null } = {}) {
+      const progressBar = progress === null ? '' : `<div class="bar"><i style="width:${escapeHtml(progress)}%"></i></div>`;
+      const identity = asset ? `<span class="overviewEnergyAssetVisual">${this.assetVisual(asset,{size:'xs',fallbackIcon:icon || this.flexibleAssetIcon(asset)})}</span>` : `<span class="overviewEnergyIcon">${icon}</span>`;
+      return `<div class="overviewEnergyRow ${escapeHtml(variant)}">${identity}<div class="overviewEnergyCopy"><b>${escapeHtml(label)}</b><small>${escapeHtml(subtitle)}</small>${progressBar}</div><strong>${escapeHtml(value)}</strong></div>`;
+    }
+    overview(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'overview');
+      const compatibility = rt.contractCompatibility();
+      if (!compatibility.available && compatibility.reason) {
+        return `${this.tabExperienceHeader(rt,'overview',pageVm)}
+          <section class="panel" style="padding:18px">
+            <h2 style="margin:0 0 8px">Energy contract unavailable</h2>
+            <p style="margin:0 0 8px">The canonical Energy product contract or required core capability is not available.</p>
+            <p style="margin:0;color:var(--muted)">Backend: ${escapeHtml(compatibility.release || 'unknown')} · ${escapeHtml(compatibility.reason)}</p>
+          </section>`;
+      }
+      const d = rt.decision();
+      const balanceVm = this.canonicalLiveEnergyBalance(rt);
+      const batterySoc = balanceVm.battery.socPct;
+      const reasonRaw = firstDefined(objectFrom(d.reason || {}).message, d.reason_label, rt.rawText('energy_intelligence.reason', null));
+      const reasonCandidate = reasonRaw ? humanReason(reasonRaw, '') : '';
+      const reason = /residual|reconciliation|canonical|bucket|projection|not.?published|completed|unsustainable/i.test(reasonCandidate)
+        ? 'Current production, demand and grid exchange are being monitored against the active strategy.'
+        : (reasonCandidate || 'Current production, demand and grid exchange are being monitored against the active strategy.');
+      const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
+      const reservePct = this.batteryReservePct(rt);
+      const sourceRows = [];
+      if (balanceVm.solarKw !== null && balanceVm.solarKw > 0.05) sourceRows.push(this.overviewEnergyRow({icon:'☀',label:'Solar',subtitle:'Producing now',value:fmtKw(balanceVm.solarKw),progress:this.progress(balanceVm.solarKw)}));
+      if (balanceVm.battery.direction === 'out_of_storage' && balanceVm.battery.displayPowerKw !== null) sourceRows.push(this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}));
+      if (balanceVm.gridImportKw !== null && balanceVm.gridImportKw > 0.05) sourceRows.push(this.overviewEnergyRow({icon:'⚡',label:'Grid Import',subtitle:'Importing',value:fmtKw(balanceVm.gridImportKw),progress:this.progress(balanceVm.gridImportKw)}));
+      const contributors = balanceVm.flexible.filter(row => row.powerKw !== null && row.powerKw > 0.05);
+      const contributorRows = contributors.map(row => this.overviewEnergyRow({icon:this.flexibleAssetIcon(row.raw || {display_name:row.name}),asset:row.raw || null,label:row.name,subtitle:'Flexible Load contributor',value:fmtKw(row.powerKw,'—'),variant:'child'})).join('');
+      const siteConsumptionText = fmtKw(balanceVm.siteConsumptionKw,'—');
+      const homeConsumptionSubtitle = balanceVm.homeConsumptionKw === null
+        ? (String(balanceVm.homeStatus || '').toUpperCase() === 'INCOMPLETE' ? 'Unavailable · Flexible Load power incomplete' : 'Household consumption unavailable')
+        : 'Household consumption excluding Flexible Loads';
+      const flexibleLoadsSubtitle = balanceVm.flexibleLoadsKw === null
+        ? (String(balanceVm.flexibleStatus || '').toUpperCase() === 'INCOMPLETE' ? 'Measurement incomplete' : 'Measurement unavailable')
+        : `${contributors.length} active contributor${contributors.length===1?'':'s'}`;
+      const gridDirection = balanceVm.grid.label;
+      const gridValue = balanceVm.grid.displayPowerKw;
+      const recommendation = String(firstDefined(d.what_text, d.recommendation_text, d.recommendation, d.summary, 'Monitoring current energy flow') || 'Monitoring current energy flow');
+      return `${this.tabExperienceHeader(rt,'overview',pageVm)}
+        <div class="overviewCoreGrid">
+          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon orange">☀</span><div><h2>Production & supply</h2><p>Energy available to the home now.</p></div></div>${sourceRows.join('') || `<div class="empty compact"><b>Supply unavailable</b><span>Current supply cannot be determined from canonical measurements.</span></div>`}</section>
+          <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(reason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>Grid</small><b>${escapeHtml(fmtKw(gridValue,'—'))} ${escapeHtml(gridDirection)}</b></div><div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div></div></div></section>
+          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>Consumption</h2><p>Site demand and its active components.</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'})}${contributorRows}${balanceVm.battery.direction === 'into_storage' && balanceVm.battery.displayPowerKw !== null ? this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}) : ''}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${this.overviewEnergyRow({icon:'',label:gridDirection === 'Exporting' ? 'Grid Export' : gridDirection === 'Importing' ? 'Grid Import' : 'Grid',subtitle:'Grid boundary',value:fmtKw(gridValue,'—'),variant:'boundary'})}</section>
+        </div>
+        <div class="bottomInsights overviewSupportFacts"><div class="insight"><span>Solar remaining today</span><b>${fmtKwh(solarRemaining)}</b><small>Forecast left</small></div><div class="insight"><span>Home Battery reserve</span><b>${reservePct===null?'Not available':fmtPct(reservePct)}</b><small>${reservePct===null?'Reserve setting unavailable':'Protected minimum'}</small></div></div>${this.overviewExperiencePanel(rt)}`;
+    }
+    commandForLoad(rt, assetId, role) {
+      // Manual flexible-load controls bind only to the public operational
+      // command projection. No planning, activity, automatic-readiness or
+      // internal resolution fallback is allowed to override button state.
+      return rt.commandForAssetRole(assetId, role);
+    }
+    commandButton(command, label, assetId) { return this.componentActionButton(command, label, assetId); }
+    segmentedControl(options, active, attrName, extraClass = '') { return this.componentSegmentedControl(options, active, extraClass); }
+    propertyKeyFor(row = {}) { return String(row.key || row.property_key || row.field_key || ''); }
+    draftValueForRow(row = {}, fallback = null) {
+      const key = this.propertyKeyFor(row);
+      return key && Object.prototype.hasOwnProperty.call(this.editDrafts, key) ? this.editDrafts[key] : rowValue(row, fallback);
+    }
+    clearProfileDrafts(rt, profileId) {
+      const profile = rt.strategyProfileFor(profileId);
+      const keys = profile
+        ? new Set(this.profileEditableRows(rt, profile).map(row => this.propertyKeyFor(row)).filter(Boolean))
+        : new Set(Object.keys(this.editDrafts || {}).filter(key => profileId === 'pricing_settings' && String(key).startsWith('pricing.')));
+      Object.keys(this.editDrafts || {}).forEach(key => { if (keys.has(key)) delete this.editDrafts[key]; });
+    }
+    editValueLabel(row, value, fallback = '—') {
+      if (value === undefined || value === null || value === '') return fallback;
+      const unit = row?.unit || '';
+      const n = asNumber(value);
+      if (n !== null) return `${n}${unit ? ` ${unit}` : ''}`;
+      return `${value}${unit ? ` ${unit}` : ''}`;
+    }
+    editableNumberControl(row, label, description = '') {
+      if (!row || row.missing) return '';
+      const value = this.draftValueForRow(row, null);
+      const writable = this.isWritableRow(row);
+      const meta = this.validationMeta(row);
+      const min = meta.min !== undefined ? ` min="${escapeHtml(meta.min)}"` : '';
+      const max = meta.max !== undefined ? ` max="${escapeHtml(meta.max)}"` : '';
+      const step = meta.step !== undefined ? ` step="${escapeHtml(meta.step)}"` : ' step="0.1"';
+      const editor = `<label class="editField"><input type="number" inputmode="decimal" value="${escapeHtml(value ?? '')}" ${min}${max}${step} ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}"><em>${escapeHtml(row.unit || '')}</em></label>`;
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'numberProperty' });
+    }
+    editablePropertyFeedback(row) {
+      const fb = this.writeFeedbackFor(row);
+      if (!fb) return '';
+      const labels = { pending:'Changing…', verifying:'Confirming…', accepted:'Updated', rejected:'Change failed' };
+      const label = labels[String(fb.state || '').toLowerCase()] || this.productStateLabel(fb.state, 'Updating');
+      return `<small class="writeState ${escapeHtml(fb.state || '')}">${escapeHtml(label)}${fb.reason ? ` · ${escapeHtml(fb.reason)}` : ''}</small>`;
+    }
+    editablePropertyShell({ row, title, description = '', editor = '', readback = '', className = '' } = {}) {
+      const writable = this.isWritableRow(row);
+      const disabledReason = writable ? '' : (row?.editable_reason || 'This setting is not currently editable.');
+      return `<div class="editableProperty ${escapeHtml(className)} ${writable ? 'writable' : 'readonly'}"><div class="editablePropertyCopy"><span>${escapeHtml(title || row?.display_name || 'Setting')}</span>${description ? `<small>${escapeHtml(description)}</small>` : ''}</div><div class="editablePropertyEditor">${editor}${readback ? `<em class="editablePropertyReadback">${escapeHtml(readback)}</em>` : ''}${this.editablePropertyFeedback(row)}${disabledReason ? `<small class="editablePropertyDisabled">${escapeHtml(disabledReason)}</small>` : ''}</div></div>`;
+    }
+    editablePropertyControl(row, { title = '', description = '', type = 'number', fallbackValue = null, fallbackOptions = [], immediateWrite = false } = {}) {
+      if (!row || row.missing) return '';
+      if (type === 'range') return this.editableRangeControl(row, title, fallbackValue, immediateWrite, description);
+      if (type === 'select') return this.editableSelectControl(row, title, fallbackValue, fallbackOptions, description);
+      if (type === 'toggle') return this.editableToggleControl(row, title, description);
+      if (type === 'time') return this.editableTimeControl(row, title, description);
+      return this.editableNumberControl(row, title, description);
+    }
+    editableRangeControl(row, label, fallbackValue = null, immediateWrite = false, description = '') {
+      if (!row || row.missing) return '';
+      const value = this.draftValueForRow(row, fallbackValue);
+      const writable = this.isWritableRow(row);
+      const meta = this.validationMeta(row);
+      const min = meta.min ?? asNumber(row.min) ?? asNumber(row.minimum) ?? 0;
+      const max = meta.max ?? asNumber(row.max) ?? asNumber(row.maximum) ?? Math.max(10, Number(value || 0));
+      const step = meta.step ?? asNumber(row.step) ?? 0.1;
+      const title = writable ? 'Editable profile setting' : (row.editable_reason || 'Read-only public property');
+      const unit = row.unit || '';
+      const editor = `<label class="sliderField"><div><b data-live-range-value="true">${escapeHtml(this.editValueLabel(row, value, '—'))}</b></div><input type="range" value="${escapeHtml(value ?? '')}" min="${escapeHtml(min)}" max="${escapeHtml(max)}" step="${escapeHtml(step)}" ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(row.key || row.property_key || '')}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}" data-property-immediate-write="${immediateWrite ? 'true' : 'false'}" data-range-unit="${escapeHtml(unit)}" title="${escapeHtml(title)}"></label>`;
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'rangeProperty' });
+    }
+    editableTimeControl(row, label, description = '') {
+      if (!row || row.missing) return '';
+      const value = this.draftValueForRow(row, '');
+      const writable = this.isWritableRow(row);
+      const editor = `<label class="editField"><input type="time" value="${escapeHtml(value ?? '')}" ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}"></label>`;
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'timeProperty' });
+    }
+    editableToggleControl(row, label, description = '') {
+      if (!row || row.missing) return '';
+      const value = asBool(this.draftValueForRow(row, false), false);
+      const writable = this.isWritableRow(row);
+      const editor = `<label class="toggleField"><input type="checkbox" ${value ? 'checked' : ''} ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}"><b>${escapeHtml(value ? 'On' : 'Off')}</b></label>`;
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${value ? 'On' : 'Off'}`, className:'toggleProperty' });
+    }
+    editableSelectControl(row, label, fallbackValue = '', fallbackOptions = [], description = '') {
+      if (!row || row.missing) return '';
+      const writable = this.isWritableRow(row);
+      const value = this.draftValueForRow(row, fallbackValue);
+      const allowed = allowedValuesForRow(row);
+      const opts = allowed.length ? allowed.map(v => ({ value:v, label:this.productStateLabel(v, human(v)) })) : fallbackOptions;
+      let editor = '';
+      if (!opts.length) {
+        editor = `<label class="selectField noOptions"><select disabled data-property-key="${escapeHtml(this.propertyKeyFor(row))}"><option>${escapeHtml(value ? this.productStateLabel(value, human(value)) : 'Options not published')}</option></select></label>`;
+      } else {
+        const options = opts.map(option => { const optValue=(option&&typeof option==='object')?(option.value??option.id??option.key??option.label):option; const optLabel=(option&&typeof option==='object')?(option.label??option.name??this.productStateLabel(optValue,human(optValue))):this.productStateLabel(optValue,human(optValue)); const selected=String(optValue).toLowerCase()===String(value??'').toLowerCase()?' selected':''; return `<option value="${escapeHtml(optValue)}"${selected}>${escapeHtml(optLabel)}</option>`; }).join('');
+        editor = `<label class="selectField"><select ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}">${options}</select></label>`;
+      }
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${this.productStateLabel(rowValue(row, value), human(rowValue(row, value), '—'))}`, className:'selectProperty' });
+    }
+    flexiblePropertyRow(rt, assetId, names) {
+      for (const name of names) {
+        const direct = rt.editableProperty(`${assetId}.${name}`);
+        if (direct) return direct;
+      }
+      const matches = row => {
+        const key = String(row?.property_id || row?.key || row?.property_key || '').toLowerCase();
+        return String(row?.asset_id || '').toLowerCase() === String(assetId).toLowerCase()
+          && names.some(name => key === `${String(assetId).toLowerCase()}.${name.toLowerCase()}` || key.endsWith(`.${name.toLowerCase()}`));
+      };
+      const canonical = rt.propertyRows().find(matches) || null;
+      return canonical ? { entity_id:rt.contractEntityId(), ...canonical } : { missing:true };
+    }
+    isDeprecatedTargetEnergyAlias(row) {
+      if (!row || row.missing) return false;
+      const text = `${row.key || row.property_key || ''} ${row.quality || ''} ${row.source_type || ''} ${row.resolution_mode || ''} ${row.alias_of || ''} ${row.deprecated_alias_of || ''} ${row.migration_role || ''}`.toLowerCase();
+      return /deprecated|source_alias|derived_alias|alias/.test(text);
+    }
+    targetEnergyValue(rt, assetId, sourceRow = {}) {
+      const canonical = this.flexiblePropertyRow(rt, assetId, ['energy_to_target_kwh']);
+      if (canonical && !canonical.missing) return rowValue(canonical, null);
+      const aliases = [this.flexiblePropertyRow(rt, assetId, ['remaining_energy_kwh']), this.flexiblePropertyRow(rt, assetId, ['energy_needed_kwh'])];
+      for (const row of aliases) {
+        if (row && !row.missing && this.isDeprecatedTargetEnergyAlias(row)) return rowValue(row, null);
+      }
+      if (sourceRow && sourceRow.energy_to_target_kwh !== undefined) return asNumber(sourceRow.energy_to_target_kwh);
+      return null;
+    }
+    pauseModeControl(rt, assetId) {
+      const row = this.flexiblePropertyRow(rt, assetId, ['pause_mode', 'energy_control_hold_state', 'control_hold_state', 'hold_state']);
+      if (row && !row.missing) {
+        const allowed = allowedValuesForRow(row);
+        const options = (allowed.some(v => String(v).toLowerCase() === 'none') || allowed.some(v => String(v).toLowerCase() === 'paused'))
+          ? [{ value: 'none', label: 'Automatic' }, { value: 'paused', label: 'Forced pause' }]
+          : [{ value: 'automatic', label: 'Automatic' }, { value: 'forced', label: 'Forced' }];
+        return this.editableSelectControl(row, 'Pause mode', rowValue(row, options[0].value), options);
+      }
+      const pauseCommand = this.commandForLoad(rt, assetId, 'pause');
+      const resumeCommand = this.commandForLoad(rt, assetId, 'resume');
+      const runtime = this.runtime();
+      const pauseReady = pauseCommand && runtime.commandEnabled(pauseCommand);
+      const resumeReady = resumeCommand && runtime.commandEnabled(resumeCommand);
+      if (pauseReady || resumeReady) {
+        const key = pauseReady ? pauseCommand.command_id : resumeCommand.command_id;
+        const title = pauseReady ? 'Uses public pause command because no editable hold-state property is published' : 'Uses public resume command because no editable hold-state property is published';
+        return `<label class="selectField"><span>Pause mode</span><select data-hold-command-select="true" data-command-key="${escapeHtml(key)}" data-target-asset-id="${escapeHtml(assetId)}" title="${escapeHtml(title)}"><option value="automatic">Automatic</option><option value="forced">Forced pause</option></select></label>`;
+      }
+      return `<label class="selectField"><span>Pause mode</span><select disabled title="No public pause/hold property or executable pause command published"><option>Automatic</option></select></label>`;
+    }
+    strategySettingsPanel(rt) {
+      const wanted = [
+        { match: /min.*start.*time|minimum.*start.*time|start.*delay/i, label: 'Min start time' },
+        { match: /surplus.*start|start.*surplus|minimum.*start.*power|minimum_start_power/i, label: 'Surplus start' },
+        { match: /min.*stop.*time|minimum.*stop.*time|stop.*delay/i, label: 'Min stop time' },
+        { match: /surplus.*stop|stop.*surplus|minimum.*stop.*power/i, label: 'Surplus stop' },
+        { match: /max.*start.*attempt|start.*attempt/i, label: 'Max start attempts' },
+        { match: /retry.*delay|cooldown/i, label: 'Retry delay' }
+      ];
+      const editable = rt.editableRows().filter(row => {
+        const key = String(row.key || row.property_key || '');
+        const asset = String(row.asset_id || '');
+        return /consumer_strategy|solar_strategy|planning|flexible|policy|intent/i.test(`${asset}.${key}`);
+      });
+      const rows = [];
+      wanted.forEach(spec => {
+        const hit = editable.find(row => spec.match.test(String(row.key || row.property_key || row.display_name || '')) || spec.match.test(String(row.display_name || row.name || '')));
+        if (hit && !rows.some(item => String(item.row.key || item.row.property_key) === String(hit.key || hit.property_key))) rows.push({ row: hit, label: spec.label });
+      });
+      const controls = rows.map(({ row, label }) => {
+        const editor = String(row.editor || row.ui_control || row.control || '').toLowerCase();
+        if (editor.includes('select') || allowedValuesForRow(row).length) return this.editableSelectControl(row, label);
+        return this.editableNumberControl(row, label);
+      }).join('');
+      return `<div class="strategySettingsRow"><div class="strategySettingsIntro"><b>⚙ Strategy settings</b><span>Editable planning properties for flexible-load execution.</span></div><div class="strategySettingsControls">${controls || `<span class="noStrategySettings">No editable flexible-load strategy settings published.</span>`}</div></div>`;
+    }
+    normalizeEnergyModeValue(value) {
+      const text = String(value || '').toLowerCase().trim();
+      const map = { off: 'disabled', disabled: 'disabled', recommend: 'advice', recommendation: 'advice', advice: 'advice', automatic: 'automation', automation: 'automation' };
+      return map[text] || text || 'disabled';
+    }
+    automationModeRow(rt) {
+      const exactKeys = [
+        'energy_intelligence.automation_mode',
+        'consumer.automation_mode',
+        'energy.automation_mode',
+        'automation.mode'
+      ];
+      const exact = exactKeys.map(key => rt.row(key)).filter(row => row && !row.missing);
+      const discovered = rt.propertyRows().filter(row => {
+        const key = String(row.key || row.property_key || row.property_id || '').toLowerCase();
+        const asset = String(row.asset_id || '').toLowerCase();
+        return /(^|\.)(automation_mode|automation\.mode|control_mode)$/.test(key)
+          && (!asset || /energy|intelligence|consumer/.test(asset));
+      });
+      const candidates = [...exact, ...discovered].filter((row, index, all) => {
+        const key = String(row.key || row.property_key || row.property_id || '');
+        return key && all.findIndex(other => String(other.key || other.property_key || other.property_id || '') === key) === index;
+      });
+      return candidates.find(row => this.isWritableRow(row)) || candidates[0] || { missing:true };
+    }
+    automationModeWriteValue(row, normalized) {
+      const aliases = {
+        disabled: ['disabled','off','none','manual'],
+        advice: ['advice','recommend','recommendation','recommended'],
+        automation: ['automation','automatic','auto']
+      };
+      const allowed = allowedValuesForRow(row);
+      if (!allowed.length) {
+        const canonical = { disabled: 'off', advice: 'recommend', automation: 'automatic' };
+        return canonical[normalized] || normalized;
+      }
+      const wanted = aliases[normalized] || [normalized];
+      const hit = allowed.find(value => wanted.includes(String(value).trim().toLowerCase()))
+        || allowed.find(value => wanted.includes(human(value,'').trim().toLowerCase()));
+      return hit ?? normalized;
+    }
+    automationModeValue(rt, fallback = 'Automatic') {
+      const row = this.automationModeRow(rt);
+      return row && !row.missing ? rowValue(row, fallback) : fallback;
+    }
+    modeSelector(rt, activeMode) {
+      const modeRow = this.automationModeRow(rt);
+      const writable = this.isWritableRow(modeRow);
+      const active = this.normalizeEnergyModeValue(activeMode);
+      const propertyKey = modeRow.key || modeRow.property_key || modeRow.property_id || 'energy_intelligence.automation_mode';
+      const opts = [
+        { value: 'disabled', label: 'Off' },
+        { value: 'advice', label: 'Recommend' },
+        { value: 'automation', label: 'Automatic' }
+      ].map(opt => ({
+        ...opt,
+        disabled: !writable,
+        attrs: {
+          'data-mode-value': this.automationModeWriteValue(modeRow, opt.value),
+          'data-property-key': propertyKey
+        }
+      }));
+      const explanation = writable ? 'Choose how Home Intelligence manages flexible energy.' : 'Automation control is unavailable because no writable public mode property is published.';
+      const editor = `<div class="automationQuickControl">${this.segmentedControl(opts, active, 'mode')}</div>`;
+      return this.editablePropertyShell({ row:modeRow, title:'Automation mode', description:explanation, editor, readback:`Current: ${{disabled:'Off',advice:'Recommend',automation:'Automatic'}[active] || 'Not available'}`, className:'automationProperty' });
+    }
+    automationQuickAction(rt, activeMode, context = 'intelligence') {
+      const normalized = this.normalizeEnergyModeValue(activeMode);
+      const descriptions = {
+        disabled:'Home Intelligence observes but does not start managed devices.',
+        advice:'Home Intelligence recommends actions and waits for approval.',
+        automation:'Home Intelligence can act within your configured strategies.'
+      };
+      return `<section class="panel automationQuickAction ${escapeHtml(context)}"><div class="automationQuickCopy"><small>Quick action</small><h2>Home Intelligence control</h2><p>${escapeHtml(descriptions[normalized] || descriptions.disabled)}</p></div>${this.modeSelector(rt, activeMode)}</section>`;
+    }
+    automationQuickInline(rt, activeMode) {
+      const modeRow = this.automationModeRow(rt);
+      const writable = this.isWritableRow(modeRow);
+      const active = this.normalizeEnergyModeValue(activeMode);
+      const propertyKey = modeRow.key || modeRow.property_key || modeRow.property_id || 'energy_intelligence.automation_mode';
+      const opts = [
+        { value: 'disabled', label: 'Off' },
+        { value: 'advice', label: 'Recommend' },
+        { value: 'automation', label: 'Automatic' }
+      ].map(opt => ({
+        ...opt,
+        disabled: !writable,
+        attrs: {
+          'data-mode-value': this.automationModeWriteValue(modeRow, opt.value),
+          'data-property-key': propertyKey
+        }
+      }));
+      const label = writable ? 'Automation' : 'Automation unavailable';
+      return `<div class="quickAutomation" aria-label="Automation quick action"><span class="quickAutomationLabel">✧ ${escapeHtml(label)}</span>${this.segmentedControl(opts, active, 'mode', 'compact')}</div>`;
+    }
+    automationModeSummary(activeMode) {
+      const normalized = this.normalizeEnergyModeValue(activeMode);
+      const labels = { disabled:'Off', advice:'Recommend', automation:'Automatic' };
+      const descriptions = { disabled:'Home Intelligence is observing only.', advice:'Home Intelligence will recommend actions.', automation:'Home Intelligence is managing participating assets automatically.' };
+      return `<div class="automationModeSummary"><span>Home Intelligence</span><b>${escapeHtml(labels[normalized] || human(activeMode))}</b><em>${escapeHtml(descriptions[normalized] || '')}</em></div>`;
+    }
+    flexibleAssetIcon(load) {
+      const type = `${load?.ux_asset_type || ''} ${load?.asset_type || ''} ${load?.asset_id || ''} ${load?.display_name || ''}`.toLowerCase();
+      if (/storage|battery/.test(type)) return '▣';
+      if (/vehicle|ev|phev|car|bmw|renault|audi|mercedes/.test(type)) return '🚗';
+      if (/heat|pump|hvac/.test(type)) return '♨';
+      if (/boiler|water/.test(type)) return '♨';
+      if (/plug|socket/.test(type)) return '🔌';
+      return '⚡';
+    }
+    flexibleConnectionLabel(rt, load, id) {
+      const availability = String(load.availability_state || rt.value(`${id}.availability_state`, '') || '').toLowerCase();
+      const reason = String(load.availability_reason || rt.value(`${id}.availability_reason`, '') || '').toLowerCase();
+      if (/not.?connected|disconnected|unplugged|no_connection|charger_not_connected/.test(`${availability} ${reason}`)) return { label: 'Not connected', tone: 'warn', hint: 'Connect to enable planning and charging.' };
+      if (/disabled|inactive/.test(String(load.lifecycle_status || '').toLowerCase())) return { label: 'Disabled', tone: 'off', hint: 'This load is disabled and excluded from planning.' };
+      if (/available|connected|ready|active/.test(`${availability} ${reason}`) || load.effective_charger || load.parent_asset_id) return { label: 'Connected', tone: 'ok', hint: '' };
+      return { label: human(load.availability_state || 'Unknown'), tone: 'neutral', hint: human(load.availability_reason || '') };
+    }
+    planningDisplayFor(rt, load, id, planning, powerKw, energyNeed) {
+      const todayStatus = String(firstDefined(planning.today_status, planning.expected_today_status, '') || '').toLowerCase();
+      const todayLabel = String(firstDefined(planning.today_label, planning.what_text, '') || '');
+      const whyText = String(firstDefined(planning.why_text, planning.user_reason_label, planning.reason_label, '') || '');
+      const plannedToday = asNumber(planning.planned_today_kwh);
+      const plannedTomorrow = asNumber(planning.planned_tomorrow_kwh);
+      const rawState = String(firstDefined(planning.state, planning.planning_state, todayStatus, '') || '').toLowerCase();
+      const operating = String(load.operating_state || rt.value(`${id}.operating_state`, '') || '').toLowerCase();
+      const powerActive = (asNumber(powerKw) || 0) > 0.05 || /running|charging|executing/.test(operating);
+      const canonical = todayLabel || whyText || todayStatus || plannedToday !== null || plannedTomorrow !== null;
+      if (canonical) {
+        const status = todayStatus || (plannedToday !== null && plannedToday > 0 ? 'planned_today' : (plannedTomorrow !== null && plannedTomorrow > 0 ? 'planned_later' : 'not_planned_today'));
+        const expected = /planned_today|charging_today/.test(status) || (plannedToday !== null && plannedToday > 0)
+          ? 'Planned today'
+          : /planned_later/.test(status) || (plannedTomorrow !== null && plannedTomorrow > 0)
+            ? 'Planned later'
+            : /paused/.test(status) ? 'Paused' : /no_charge_needed/.test(status) ? 'No charge needed' : 'Not planned today';
+        const state = todayLabel || (plannedToday !== null && plannedToday > 0 ? `${fmtKwh(plannedToday)} planned today` : human(status));
+        const tone = /planned today|charging|completed|no charge needed/i.test(`${state} ${expected}`) ? 'ok' : /paused|not planned|waiting|later/i.test(`${state} ${expected}`) ? 'wait' : 'neutral';
+        return { state, tone, why: whyText || 'Published by Tactical Planning', sub: planning.what_text && planning.what_text !== state ? planning.what_text : '', expected, expectedSub: plannedToday !== null ? `${fmtKwh(plannedToday)} planned today` : '' };
+      }
+      const rawReason = String(planning.reason || planning.blocked_reason || load.availability_reason || rt.value(`${id}.availability_reason`, '') || '').toLowerCase();
+      if (powerActive) return { state: 'Charging now', tone: 'ok', why: human(planning.reason || 'Charging now'), sub: '', expected: '—', expectedSub: '' };
+      if (/waiting|scheduled|planned/.test(rawState)) return { state: human(rawState), tone: 'wait', why: human(planning.reason || 'Waiting'), sub: '', expected: '—', expectedSub: '' };
+      if (/blocked|failed|unavailable/.test(rawState)) return { state: human(rawState), tone: 'warn', why: human(planning.blocked_reason || planning.reason || 'Blocked'), sub: '', expected: '—', expectedSub: '' };
+      return { state: planning.state ? human(planning.state) : 'No plan published', tone: 'neutral', why: planning.reason ? human(planning.reason) : '', sub: '', expected: '—', expectedSub: '' };
+    }
+    etaDisplayFor(planning) {
+      // R1.64.0 UX brief: UX must not invent ready-in or infer ETA from energy/power.
+      const explicitMinutes = asNumber(planning.eta_minutes ?? planning.eta_to_target_minutes ?? planning.ready_in_minutes ?? planning.estimated_duration_minutes ?? planning.duration_minutes);
+      const explicitAt = planning.ready_at || planning.expected_ready_at || planning.target_time || '';
+      if (explicitMinutes !== null && Number.isFinite(explicitMinutes) && explicitMinutes >= 0) {
+        const total = Math.round(explicitMinutes);
+        const h = Math.floor(total / 60);
+        const m = total % 60;
+        return { main: h > 0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m`, sub: explicitAt ? `≈ ${human(explicitAt)}` : 'backend ETA' };
+      }
+      if (explicitAt) return { main: human(explicitAt), sub: 'backend ready time' };
+      return { main: '—', sub: '' };
+    }
+    automationDisplayFor(rt, load, id) {
+      const allowed = load.automation?.allowed ?? load.automation_allowed ?? rt.value(`${id}.automation.allowed`, rt.value(`${id}.automation_allowed`, null));
+      const blocked = load.automation?.blocked_reason || load.automation_blocked_reason || rt.value(`${id}.automation.blocked_reason`, rt.value(`${id}.automation_blocked_reason`, ''));
+      if (allowed === null || allowed === undefined) return { label: human(load.energy_control_mode || 'Automatic'), sub: human(blocked || 'Normal priority'), on: !/off|manual|disabled|not automatic/i.test(String(load.energy_control_mode || '')) };
+      return { label: asBool(allowed, false) ? 'Automatic' : 'Not automatic', sub: asBool(allowed, false) ? human(load.priority_label || 'Normal priority') : human(blocked || 'Not automatic'), on: asBool(allowed, false) };
+    }
+    priorityControl(rt, load, id) {
+      const row = this.flexiblePropertyRow(rt, id, ['energy_control_priority', 'priority', 'planning_priority']);
+      if (row && !row.missing && this.isWritableRow(row)) return this.editableSelectControl(row, 'Priority', rowValue(row, load.priority_label || load.priority || 'normal'), [
+        { value: 'high', label: 'High' }, { value: 'normal', label: 'Normal' }, { value: 'low', label: 'Low' }
+      ]);
+      return `<div class="readOnlyPriority"><span>Priority</span><b>${escapeHtml(human(load.priority_label || load.priority || 'Normal'))}</b></div>`;
+    }
+    firstPublishedValue(...values) { return firstDefined(...values); }
+    genericValueWithUnit(value, unit = '') {
+      const n = asNumber(value);
+      if (n === null) return human(value, '—');
+      const u = String(unit || '').trim();
+      if (u === '%') return fmtPct(n);
+      if (/kwh/i.test(u)) return fmtKwh(n);
+      if (/kw/i.test(u)) return fmtKw(n);
+      if (/°|celsius|temperature/i.test(u)) return `${n.toFixed(1)} °C`;
+      return `${n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)}${u ? ` ${u}` : ''}`;
+    }
+    isMeaningfulPrimaryValue(value, options = {}) {
+      if (value === undefined || value === null) return false;
+      const text = String(value).trim();
+      if (!text) return false;
+      if (/^(—|-|none|null|undefined|unknown)$/i.test(text)) return false;
+      if (/^(00:?00(?::?00)?|0:00:00)$/i.test(text)) return false;
+      if (/not published|no .*published|no route|no target|no deadline|grid policy not published|confidence not published|goal not published|no backend/i.test(text)) return false;
+      const n = asNumber(value);
+      if (n !== null && !options.allowZero && Math.abs(n) < 0.000001) return false;
+      return true;
+    }
+    firstMeaningfulPrimary(options, ...values) {
+      for (const value of values) {
+        if (this.isMeaningfulPrimaryValue(value, options)) return value;
+      }
+      return undefined;
+    }
+    targetSummaryFor(planning = {}, strategy = {}) {
+      const unit = this.firstPublishedValue(planning.target_unit, strategy.target_unit, planning.unit, strategy.unit, '');
+      const min = this.firstMeaningfulPrimary({}, planning.minimum_target_value, planning.minimum_target, strategy.minimum_target_value, strategy.minimum, strategy.minimum_target);
+      const preferred = this.firstMeaningfulPrimary({}, planning.preferred_target_value, planning.preferred_target, strategy.preferred_target_value, strategy.preferred, strategy.preferred_target);
+      const max = this.firstMeaningfulPrimary({}, planning.maximum_useful_value, planning.maximum_target, strategy.maximum_useful_value, strategy.maximum, strategy.maximum_target);
+      const parts = [];
+      if (min !== undefined) parts.push(`min ${this.genericValueWithUnit(min, unit)}`);
+      if (preferred !== undefined) parts.push(`preferred ${this.genericValueWithUnit(preferred, unit)}`);
+      if (max !== undefined) parts.push(`max ${this.genericValueWithUnit(max, unit)}`);
+      return parts.join(' · ');
+    }
+    routeLabelFor(planning = {}) {
+      const route = objectFrom(planning.source_route || {});
+      return this.firstMeaningfulPrimary({ allowZero: true }, planning.route_label, planning.selected_route_label, route.route_label, route.label, planning.selected_route, planning.user_summary_label) || '';
+    }
+    goalContextStrip(rt, load, planning = {}) {
+      const id = load.asset_id;
+      const strategy = rt.effectiveStrategyFor(id) || {};
+      const items = [];
+      const goal = this.firstMeaningfulPrimary({ allowZero: true }, planning.goal_label, strategy.goal_label, planning.goal_type, strategy.goal_type);
+      const target = this.targetSummaryFor(planning, strategy);
+      const deadline = this.firstMeaningfulPrimary({ allowZero: true }, planning.deadline, planning.deadline_time, strategy.deadline, strategy.deadline_time);
+      const route = this.routeLabelFor(planning);
+      const grid = this.firstMeaningfulPrimary({ allowZero: true }, planning.grid_use_state, strategy.grid_use_policy, strategy.grid_policy);
+      const confidence = this.firstMeaningfulPrimary({ allowZero: true }, planning.confidence_state, planning.confidence, strategy.confidence_policy);
+      const mode = this.firstMeaningfulPrimary({ allowZero: true }, strategy.mode, strategy.energy_control_mode);
+      if (goal !== undefined) items.push(`<div><small>Goal</small><b>${escapeHtml(human(goal))}</b></div>`);
+      if (target) items.push(`<div><small>Target</small><b>${escapeHtml(target)}</b></div>`);
+      if (deadline !== undefined) items.push(`<div><small>Deadline</small><b>${escapeHtml(human(deadline))}</b></div>`);
+      if (route || grid !== undefined) items.push(`<div><small>Route / grid</small>${route ? `<b>${escapeHtml(human(route))}</b>` : ''}${grid !== undefined ? `<span>${escapeHtml(human(grid))}</span>` : ''}</div>`);
+      if (mode !== undefined || confidence !== undefined) items.push(`<div><small>Mode / confidence</small>${mode !== undefined ? `<b>${escapeHtml(human(mode))}</b>` : ''}${confidence !== undefined ? `<span>${escapeHtml(human(confidence))}</span>` : ''}</div>`);
+      return items.length ? `<div class="r164GoalContext">${items.join('')}</div>` : '';
+    }
+    effectiveStrategyCard(rt, strategy) {
+      const id = strategy.asset_id || '';
+      const target = this.targetSummaryFor({}, strategy);
+      return `<div class="effectiveStrategyCard"><div><b>${escapeHtml(rt.assetName(id))}</b><span>${escapeHtml(id)}</span></div><div class="effectiveStrategyFacts">${this.kv('Mode', human(strategy.mode || strategy.energy_control_mode || '—'))}${this.kv('Target', target)}${this.kv('Deadline', human(strategy.deadline || strategy.deadline_time || '—'))}${this.kv('Objective', human(strategy.objective_mode || '—'))}${this.kv('Grid policy', human(strategy.grid_use_policy || strategy.grid_policy || '—'))}${this.kv('Surplus policy', human(strategy.surplus_policy || '—'))}${this.kv('Confidence policy', human(strategy.confidence_policy || '—'))}${this.kv('Stability', human(strategy.stability || '—'))}</div></div>`;
+    }
+    isStorageFlexibleAsset(load = {}) {
+      return /battery|storage/i.test(`${load.ux_asset_type || ''} ${load.asset_type || ''} ${load.flexible_role || ''} ${load.energy_asset_role || ''} ${load.cluster_role || ''}`);
+    }
+    isDisabledFlexibleAsset(rt, load = {}, planning = {}) {
+      const id = String(load.asset_id || load.flexible_asset_id || '');
+      const lifecycle = String(firstDefined(load.lifecycle_status, load.lifecycle_state, rt.value(`${id}.lifecycle_status`, ''), rt.value(`${id}.lifecycle_state`, '')) || '').toLowerCase();
+      const participation = String(firstDefined(load.participation_state, load.automation_participation, load.planning_participation, '') || '').toLowerCase();
+      const explicitEnabled = firstDefined(load.enabled, load.participating, load.automation_enabled, load.planning_enabled);
+      const reason = String(firstDefined(load.lifecycle_reason, load.disabled_reason, planning.waiting_reason_code, planning.reason_code, planning.reason, '') || '').toLowerCase();
+      return /disabled|excluded|not.participating|inactive.by.user/.test(`${lifecycle} ${participation} ${reason}`)
+        || explicitEnabled === false
+        || (planning.eligible === false && /disabled|excluded|not.participating/.test(reason));
+    }
+    disabledFlexibleAssetCard(rt, load = {}, planning = {}) {
+      const id = String(load.asset_id || load.flexible_asset_id || load.target_asset_id || '');
+      const name = load.display_name || rt.assetName(id) || human(id);
+      const explicitReason = firstDefined(load.disabled_reason, load.lifecycle_reason, load.participation_reason, planning.disabled_reason, planning.disabled_reason_code, '');
+      const reason = explicitReason ? humanReason(explicitReason, '') : '';
+      return `<article class="disabledAssetCompact"><div class="disabledAssetLead">${this.assetVisual(load,{size:'sm',fallbackIcon:this.flexibleAssetIcon(load)})}<div><b>${escapeHtml(name)}</b><span>Not managed by Home Intelligence</span>${reason ? `<small>${escapeHtml(reason)}</small>` : ''}</div></div></article>`;
+    }
+    operationalLoadCard(rt, load, recommendation, targetId) {
+      const id = load.asset_id;
+      const actionModels = rt.commandActionModelsForAsset(id).filter(action => ['start','stop','pause','resume'].includes(action.role));
+      const actionByRole = role => actionModels.find(action => action.role === role) || null;
+      const startCommand = actionByRole('start')?.command || null;
+      const stopCommand = actionByRole('stop')?.command || null;
+      const pauseCommand = actionByRole('pause')?.command || null;
+      const resumeCommand = actionByRole('resume')?.command || null;
+      const actionButtons = actionModels.map(action => this.componentActionModelButton(action)).join('');
+      const charger = load.effective_charger ? rt.assetName(load.effective_charger) : (load.parent_asset_id ? rt.assetName(load.parent_asset_id) : human(load.flexible_role || load.energy_asset_role || 'Flexible load'));
+      const requestedRow = this.flexiblePropertyRow(rt, id, ['requested_charge_power_kw', 'requested_power_kw', 'energy_control_requested_power_kw', 'target_power_kw', 'setpoint_power_kw', 'charge_power_setpoint_kw']);
+      const requestedEffectiveRow = this.flexiblePropertyRow(rt, id, ['requested_power_kw_effective']);
+      const requested = rowValue(requestedRow, null) ?? rowValue(requestedEffectiveRow, null) ?? load.requested_charge_power_kw ?? load.requested_power_kw ?? load.requested_power_kw_effective ?? load.min_power_kw;
+      const planning = load.energy_planning || rt.planningOutcomeFor(id) || {};
+      if (this.isDisabledFlexibleAsset(rt, load, planning)) return this.disabledFlexibleAssetCard(rt, load, planning);
+      const powerKw = load.power_kw;
+      const energyNeed = load.energy_to_target_kwh ?? this.targetEnergyValue(rt, id, load);
+      const detailsId = `operational-load-${id}`;
+      const connection = this.flexibleConnectionLabel(rt, load, id);
+      const planningView = this.planningDisplayFor(rt, load, id, planning, powerKw, energyNeed);
+      const eta = this.etaDisplayFor(planning);
+      const automation = this.automationDisplayFor(rt, load, id);
+      const requestedControl = requestedRow && !requestedRow.missing
+        ? this.editablePropertyControl(requestedRow, { title:'Requested charge power', description:'Maximum charging power requested from this device.', type:'range', fallbackValue:requested, immediateWrite:true })
+        : '';
+      const priority = this.priorityControl(rt, load, id);
+      const whyHint = planningView.sub || human(planning.blocked_reason || load.availability_reason || '');
+      const showWhy = this.isMeaningfulPrimaryValue(planningView.why, { allowZero: true }) || this.isMeaningfulPrimaryValue(whyHint, { allowZero: true });
+      const showEta = this.isMeaningfulPrimaryValue(eta.main, { allowZero: true });
+      const showExpected = this.isMeaningfulPrimaryValue(planningView.expected, { allowZero: true });
+      const cardFlags = `${showWhy ? '' : ' noWhy'}${showEta ? '' : ' noEta'}${showExpected ? '' : ' noExpected'}`;
+      const infoBanner = connection.hint ? `<div class="loadNotice"><span>ⓘ</span><b>${escapeHtml(connection.label)}</b><em>${escapeHtml(connection.hint)}</em></div>` : '';
+      const publishedMaxPower = asNumber(requestedRow?.max ?? requestedRow?.maximum ?? this.validationMeta(requestedRow).max);
+      const maxPowerText = publishedMaxPower !== null ? fmtKw(publishedMaxPower) : '';
+      const commandAvailability = actionModels
+        .filter(action => action.visible && !action.enabled)
+        .map(action => `<span><b>${escapeHtml(action.label || human(action.role))}:</b> ${escapeHtml(humanReason(action.reason, 'Currently unavailable'))}</span>`)
+        .join('');
+      const powerAvailability = requestedControl && this.isWritableRow(requestedRow) ? '' : ((!requestedRow || requestedRow.missing) ? '<span>Requested charge power is not published.</span>' : `<span><b>Requested power:</b> ${escapeHtml(requestedRow.editable_reason || 'Requested charge power is currently read-only.')}</span>`);
+      const controlAvailability = commandAvailability || powerAvailability ? `<div class="controlAvailability">${commandAvailability}${powerAvailability}</div>` : '';
+      const plannedTodayKwh = asNumber(planning.planned_today_kwh);
+      const nextAction = String(firstDefined(planning.what_text, planning.next_action_label, planning.next_action, planningView.state, 'Wait'));
+      const canonicalWhy = String(firstDefined(planning.why_text, planning.user_reason_label, planning.reason_label, planningView.why, whyHint, 'No explanation published.'));
+      const liveState = human(firstDefined(load.operating_state, load.current_status, 'Unavailable'));
+      const priorityLabel = human(firstDefined(load.priority_label, load.energy_control_priority, 'Normal'));
+      const operationalStatus = this.canonicalOperationalStatus(rt, load, planning);
+      const exceptional = operationalStatus.exceptional === true;
+      const conformanceKnown = operationalStatus.exceptional !== null;
+      return `<article class="flexLoadCard solarLoadRow ${exceptional?'exceptional':''}">
+        <div class="solarLoadSummary"><div class="solarLoadIdentity">${this.assetVisual(load,{size:'sm',fallbackIcon:this.flexibleAssetIcon(load)})}<div><div class="solarLoadName"><h3>${escapeHtml(load.display_name || human(id))}</h3><span class="priorityBadge">${escapeHtml(priorityLabel)}</span></div><small><i class="dot green"></i>${escapeHtml(connection.label)}</small></div></div>
+        <div class="solarLoadFact"><small>Now / live</small><b>${escapeHtml(liveState)}</b><span>${fmtKw(powerKw,'—')}</span></div><div class="solarLoadFact"><small>Next action</small><b class="nextActionBadge">${escapeHtml(nextAction)}</b></div><div class="solarLoadFact"><small>Power target</small><b>${fmtKw(requested,'—')}</b></div><div class="solarLoadFact"><small>Planned today</small><b>${fmtKwh(plannedTodayKwh,'—')}</b></div><div class="solarLoadFact solarLoadWhy"><small>Why / reason</small><b>${escapeHtml(canonicalWhy)}</b></div><div class="solarLoadFact"><small>Status</small><b class="planStatusBadge ${exceptional?'exception':(conformanceKnown?'ok':'unknown')}">${exceptional?'Exceptional !':(conformanceKnown?'No published exception':'Status unavailable')}</b></div></div>
+        <div class="solarLoadControls"><div class="requestedSlot"><small class="controlTitle">Requested charge power</small>${requestedControl || `<label class="sliderField unavailable"><div><span>Requested charge power</span><b>—</b></div><input type="range" disabled></label>`}${maxPowerText ? `<em class="maxPowerHint">${escapeHtml(maxPowerText)}</em>` : ''}</div>${actionButtons ? `<div class="loadActions decisionActions"><span>Manual intervention</span>${actionButtons}</div>` : ''}</div>${controlAvailability}${infoBanner}<div class="loadDetailsFull">${this.componentDetailsBlock(detailsId, 'Details', `${this.kv('Planning', human(planning.state || '—'))}${this.kv('Why', canonicalWhy)}${this.kv('Asset id', id)}`)}</div>
+      </article>`;
+    }
+    energyAssetContext(rt, asset = {}) {
+      const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
+      const context = id && typeof readEnergyAssetContext === 'function'
+        ? readEnergyAssetContext(rt.contractGateway(), id)
+        : { asset:null, profile:null, publication:null };
+      return {
+        ...asset,
+        ...objectFrom(context.asset || {}),
+        profile_id:firstDefined(context.asset?.profile_id, asset.profile_id, ''),
+        profile:objectFrom(context.profile || {}),
+        publication:objectFrom(context.publication || {})
+      };
+    }
+    energyAssetFacts(rt, asset = {}, limit = 4) {
+      const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
+      if (!id) return [];
+      const type = this.energyAssetType(asset);
+      const byType = {
+        battery:[
+          ['battery.soc_pct','State of charge'],
+          ['battery.power_kw','Power now'],
+          ['battery.available_kwh','Available energy'],
+          ['battery.capacity_kwh','Capacity'],
+          ['battery.state','State'],
+          ['battery.temperature_c','Temperature']
+        ],
+        battery_system:[
+          ['battery.soc_pct','State of charge'],
+          ['battery.power_kw','Power now'],
+          ['battery.available_kwh','Available energy'],
+          ['battery.capacity_kwh','Capacity'],
+          ['battery.reserve_target_pct','Reserve'],
+          ['battery.state','State']
+        ],
+        home_battery_system:[
+          ['battery.soc_pct','State of charge'],
+          ['battery.power_kw','Power now'],
+          ['battery.available_kwh','Available energy'],
+          ['battery.capacity_kwh','Capacity'],
+          ['battery.reserve_target_pct','Reserve'],
+          ['battery.state','State']
+        ],
+        solar_production:[
+          ['solar.power_kw','Production now'],
+          ['solar.energy_today_kwh','Produced today'],
+          ['solar.capacity_kwp','Installed capacity'],
+          ['solar.state','State']
+        ],
+        solar_array:[
+          ['solar.power_kw','Production now'],
+          ['solar.energy_today_kwh','Produced today'],
+          ['solar.capacity_kwp','Installed capacity'],
+          ['solar.state','State']
+        ],
+        solar_panel:[
+          ['solar.power_kw','Production now'],
+          ['solar.energy_today_kwh','Produced today'],
+          ['solar.state','State']
+        ],
+        solar_inverter:[
+          ['inverter.power_kw','Power now'],
+          ['solar.power_kw','Solar power'],
+          ['inverter.efficiency_pct','Efficiency'],
+          ['inverter.state','State']
+        ],
+        inverter:[
+          ['inverter.power_kw','Power now'],
+          ['solar.power_kw','Solar power'],
+          ['inverter.efficiency_pct','Efficiency'],
+          ['inverter.state','State']
+        ],
+        grid_connection:[
+          ['grid.net_power_kw','Grid power'],
+          ['grid_import.power_kw','Import'],
+          ['grid_export.power_kw','Export'],
+          ['grid.flow_direction','Direction']
+        ],
+        gas_meter:[
+          ['gas.flow_m3_h','Flow now'],
+          ['gas.total_m3','Meter total'],
+          ['gas.state','State']
+        ],
+        flexible_load:[
+          ['flexible_load.power_kw','Power now'],
+          ['flexible_load.energy_to_target_kwh','Energy needed'],
+          ['flexible_load.state','State'],
+          ['flexible_load.automation_mode','Automation']
+        ],
+        flexible_asset:[
+          ['flexible_load.power_kw','Power now'],
+          ['flexible_load.energy_to_target_kwh','Energy needed'],
+          ['flexible_load.state','State'],
+          ['flexible_load.automation_mode','Automation']
+        ],
+        consumer:[
+          ['consumer.power_kw','Power now'],
+          ['consumer.energy_today_kwh','Energy today'],
+          ['consumer.state','State']
+        ]
+      };
+      const candidates = byType[type] || [];
+      const facts = [];
+      const seen = new Set();
+      for (const [key,label] of candidates) {
+        if (seen.has(key)) continue;
+        const field = rt.assetField(id, key);
+        if (!field?.resolved) continue;
+        seen.add(key);
+        const value = field.display && field.display !== '—'
+          ? field.display
+          : (field.value === null || field.value === undefined ? '—' : `${field.value}${field.unit ? ` ${field.unit}` : ''}`);
+        facts.push({ label, value, status:field.status || field.quality || 'AVAILABLE', key });
+        if (facts.length >= limit) break;
+      }
+      return facts;
+    }
+
+    energyAssetAreaLabel(asset = {}) {
+      const raw = firstDefined(
+        asset.ha_area_name,
+        asset.area_name,
+        asset.area_label,
+        asset.location_name,
+        asset.location,
+        ''
+      );
+      if (typeof raw === 'string') return raw.trim();
+      if (raw && typeof raw === 'object') return String(firstDefined(raw.name, raw.label, '') || '').trim();
+      return '';
+    }
+
+    energyAssetDetailDisclosure(rt, asset = {}) {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      if (!id) return '';
+      const profile = objectFrom(enriched.profile || {});
+      const publication = objectFrom(enriched.publication || {});
+      const projection = rt.assetProjection(id) || {};
+      const lifecycle = objectFrom(projection.lifecycle || {});
+      const parentId = this.energyAssetParentId(enriched);
+      const area = this.energyAssetAreaLabel(enriched);
+      const telemetry = publication.resolution_complete === false ? 'Incomplete'
+        : publication.complete === false ? 'Partial'
+        : publication.complete === true ? 'Complete' : 'Unknown';
+      const rows = [
+        ['Area', area || '—'],
+        ['Type', human(firstDefined(enriched.asset_type,enriched.object_class,'device'))],
+        ['Parent', parentId || '—'],
+        ['Profile', firstDefined(profile.display_name,profile.label,profile.name,enriched.profile_id,'—')],
+        ['Lifecycle', firstDefined(lifecycle.state,enriched.health,enriched.status,'—')],
+        ['Telemetry', telemetry],
+        ['Source', firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'—')],
+        ['Asset id', id]
+      ];
+      const missing = Array.isArray(publication.missing) ? publication.missing : Array.isArray(publication.missing_fields) ? publication.missing_fields : [];
+      return `<details class="energyAssetDetails"><summary>Details</summary><div class="energyAssetDetailGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value ?? '—'))}</b></span>`).join('')}${missing.length ? `<span class="wide"><small>Missing publication fields</small><b>${escapeHtml(missing.join(' · '))}</b></span>` : ''}</div></details>`;
+    }
+    energyDeviceStatusCard(rt, asset = {}, roleLabel = '') {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
+      const type = String(firstDefined(enriched.asset_type,enriched.object_class,'device') || 'device');
+      const facts = this.energyAssetFacts(rt,enriched,4);
+      const projection = id ? rt.assetProjection(id) : null;
+      const lifecycle = String(firstDefined(projection?.lifecycle?.state, enriched.health, enriched.status, '') || '');
+      const availability = String(firstDefined(enriched.availability_state,enriched.connection_state,'') || '');
+      const unavailable = /unavailable|offline|disconnected|failed/i.test(`${availability} ${lifecycle}`);
+      const degraded = /degraded|warning|attention|incomplete/i.test(lifecycle);
+      const statusLabel = unavailable ? 'Unavailable' : degraded ? 'Needs attention' : lifecycle && !/unknown/i.test(lifecycle) ? human(lifecycle) : 'Available';
+      const area = this.energyAssetAreaLabel(enriched);
+      const actions = this.assetQuickActions(rt,id,3);
+      const details = facts.length
+        ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
+        : `<span><small>Status</small><b>${escapeHtml(statusLabel)}</b></span>`;
+      return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
+        <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
+        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div><span class="energyDeviceState">${escapeHtml(statusLabel)}</span></div>
+        <div class="energyDeviceFacts">${details}</div>${actions}${this.energyAssetDetailDisclosure(rt,enriched)}</div>
+      </article>`;
+    }
+
+    energyAssetType(asset = {}) {
+      return String(firstDefined(asset.asset_type,asset.object_class,'') || '').trim().toLowerCase();
+    }
+    energyAssetParentId(asset = {}) {
+      return String(firstDefined(asset.parent_asset_id,asset.parent_id,asset.system_asset_id,asset.group_asset_id,asset.array_asset_id,asset.zone_asset_id,'') || '').trim();
+    }
+    solarHardwareSection(title, description, body, meta = '') {
+      if (!body) return '';
+      return `<section class="panel solarHardwareSection"><div class="solarHardwareSectionHead"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${meta ? `<span>${escapeHtml(meta)}</span>` : ''}</div>${body}</section>`;
+    }
+    solarModuleCard(rt, panel, optimizers = []) {
+      const enriched = this.energyAssetContext(rt,panel);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id),'Solar module');
+      const area = this.energyAssetAreaLabel(enriched);
+      const panelFacts = this.energyAssetFacts(rt,enriched,3);
+      const optimizerFacts = optimizers.flatMap(optimizer => this.energyAssetFacts(rt,this.energyAssetContext(rt,optimizer),2).map(f=>({
+        label:`Optimizer · ${f.label}`, value:f.value
+      }))).slice(0,3);
+      const optimizerDetails = optimizers.map(optimizer=>this.energyAssetDetailDisclosure(rt,optimizer)).join('');
+      return `<article class="solarModuleCard">
+        <div class="solarModuleVisual">${this.assetVisual(enriched,{size:'md',fallbackIcon:'☀',decorative:false})}</div>
+        <div class="solarModuleBody"><div class="solarModuleHead"><div><small>SOLAR MODULE</small><h4>${escapeHtml(name)}</h4>${area ? `<span>${escapeHtml(area)}</span>` : ''}</div><b>${optimizers.length ? `${optimizers.length} optimizer${optimizers.length===1?'':'s'}` : 'Optimizer not linked'}</b></div>
+        <div class="solarModuleFacts">${[...panelFacts,...optimizerFacts].map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') || '<span><small>Status</small><b>Published module</b></span>'}</div>
+        ${this.energyAssetDetailDisclosure(rt,enriched)}
+        ${optimizerDetails ? `<details class="solarTopologyDetails"><summary>Optimizer details</summary>${optimizerDetails}</details>` : ''}
+        </div>
+      </article>`;
+    }
+
+    solarArrayCard(rt, asset, childPanels = [], childOptimizers = []) {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id),'Solar array');
+      const facts = this.energyAssetFacts(rt,enriched,4);
+      const optimizerByPanel = new Map();
+      const zoneLevelOptimizers = [];
+      for (const optimizer of childOptimizers) {
+        const parentId = this.energyAssetParentId(optimizer);
+        const panel = childPanels.find(item => String(firstDefined(item.asset_id,item.id,'') || '') === parentId);
+        if (!panel) { zoneLevelOptimizers.push(optimizer); continue; }
+        const panelId = String(firstDefined(panel.asset_id,panel.id,'') || '');
+        optimizerByPanel.set(panelId,[...(optimizerByPanel.get(panelId)||[]),optimizer]);
+      }
+      const modules = childPanels.map(panel => {
+        const panelId = String(firstDefined(panel.asset_id,panel.id,'') || '');
+        return this.solarModuleCard(rt,panel,optimizerByPanel.get(panelId)||[]);
+      }).join('');
+      return `<article class="solarAggregateCard solarArrayCard">
+        <div class="solarAggregateHead">
+          <div class="solarAggregateVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:'☀',decorative:false})}</div>
+          <div class="solarAggregateCopy"><small>SOLAR ZONE</small><h3>${escapeHtml(name)}</h3><p>Published zone with its physical modules and canonical optimizer relationships.</p></div>
+          <span class="solarAggregateCount">${childPanels.length ? `${childPanels.length} module${childPanels.length===1?'':'s'}` : 'No modules linked'}</span>
+        </div>
+        <div class="solarAggregateFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span><small>Status</small><b>Published zone</b></span>`}</div>
+        ${this.energyAssetDetailDisclosure(rt,enriched)}
+        ${modules ? `<div class="solarModuleGrid">${modules}</div>` : '<div class="empty"><b>No panels linked to this zone</b><span>Panel relationships are not currently published for this zone.</span></div>'}
+        ${zoneLevelOptimizers.length ? `<details class="solarTopologyDetails"><summary>Optimizers without panel relationship (${zoneLevelOptimizers.length})</summary><p>These optimizers are related to the zone, but no panel parent is published. Home Intelligence does not guess the module relationship.</p><div class="solarChildGrid">${zoneLevelOptimizers.map(item=>this.energyDeviceStatusCard(rt,item,'Power optimizer')).join('')}</div></details>` : ''}
+      </article>`;
+    }
+    solarInverterSystem(rt, inverters = []) {
+      if (!inverters.length) return '';
+      return this.solarHardwareSection(
+        'Inverter system',
+        'Physical inverters converting solar DC production for the Home Bus.',
+        `<div class="solarChildGrid">${inverters.map(asset=>this.energyDeviceStatusCard(rt,asset,'Solar inverter')).join('')}</div>`,
+        `${inverters.length} inverter${inverters.length===1?'':'s'}`
+      );
+    }
+    solarBatterySystem(rt, systems = [], batteries = []) {
+      if (!systems.length && !batteries.length) return '';
+      const system = systems[0] || null;
+      const systemSummary = system ? this.energyAssetContext(rt,system) : null;
+      const systemId = String(firstDefined(systemSummary?.asset_id,systemSummary?.id,'') || '');
+      const systemName = systemSummary ? firstDefined(systemSummary.display_name,systemSummary.name,rt.assetName(systemId),'Home Battery System') : 'Home Battery System';
+      const facts = systemSummary ? this.energyAssetFacts(rt,systemSummary,5) : [];
+      const head = `<div class="solarSystemSummary"><div><small>BATTERY SYSTEM</small><h3>${escapeHtml(systemName)}</h3><p>Aggregate storage state with the physical batteries shown underneath.</p></div><div class="solarAggregateFacts">${facts.length ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') : `<span><small>Batteries</small><b>${batteries.length}</b></span>`}</div></div>`;
+      const children = batteries.length ? `<div class="solarChildGrid">${batteries.map(asset=>this.energyDeviceStatusCard(rt,asset,'Battery')).join('')}</div>` : '';
+      return this.solarHardwareSection('Battery system','Storage connected to the solar/home energy system.',head+children,`${batteries.length} batter${batteries.length===1?'y':'ies'}`);
+    }
+    solarHardwareExperience(rt) {
+      const assets = rt.assets().map(asset=>this.energyAssetContext(rt,asset));
+      const arrays = assets.filter(asset=>['solar_production','solar_array'].includes(this.energyAssetType(asset)));
+      const panels = assets.filter(asset=>this.energyAssetType(asset)==='solar_panel');
+      const inverters = assets.filter(asset=>this.energyAssetType(asset)==='solar_inverter');
+      const systems = assets.filter(asset=>['battery_system','home_battery_system'].includes(this.energyAssetType(asset)));
+      const batteries = assets.filter(asset=>this.energyAssetType(asset)==='battery');
+      const optimizers = assets.filter(asset=>this.energyAssetType(asset)==='solar_optimizer');
+      const backup = assets.filter(asset=>this.energyAssetType(asset)==='backup_interface');
+
+      const panelsFor = array => {
+        const id = String(firstDefined(array.asset_id,array.id,'') || '');
+        return panels.filter(panel => this.energyAssetParentId(panel) === id);
+      };
+      const optimizersFor = (array, childPanels = []) => {
+        const ids = new Set([String(firstDefined(array.asset_id,array.id,'') || ''), ...childPanels.map(panel=>String(firstDefined(panel.asset_id,panel.id,'') || ''))]);
+        return optimizers.filter(optimizer => ids.has(this.energyAssetParentId(optimizer)));
+      };
+      const assignedPanelIds = new Set(arrays.flatMap(array => panelsFor(array).map(panel=>String(firstDefined(panel.asset_id,panel.id,'')||''))));
+      const unassignedPanels = panels.filter(panel => !assignedPanelIds.has(String(firstDefined(panel.asset_id,panel.id,'')||'')));
+      const assignedOptimizerIds = new Set(arrays.flatMap(array => optimizersFor(array,panelsFor(array)).map(item=>String(firstDefined(item.asset_id,item.id,'')||''))));
+      const unassignedOptimizers = optimizers.filter(item => !assignedOptimizerIds.has(String(firstDefined(item.asset_id,item.id,'')||'')));
+
+      const inverterSection = this.solarInverterSystem(rt,inverters);
+      const batterySection = this.solarBatterySystem(rt,systems,batteries);
+      const zoneCards = arrays.map(array=>this.solarArrayCard(rt,array,panelsFor(array),optimizersFor(array,panelsFor(array)))).join('');
+      const zonesSection = this.solarHardwareSection(
+        'Solar zones',
+        'Published zones with one physical module card per panel. Optimizer measurements stay attached to their canonical panel relationship.',
+        zoneCards,
+        arrays.length ? `${arrays.length} zone${arrays.length===1?'':'s'}` : ''
+      );
+      const unassignedBody = [
+        unassignedPanels.length ? `<div class="solarUnassignedPanels"><h3>Panels without zone relationship</h3><p>Published panels remain visible when no zone parent is available.</p><div class="solarChildGrid">${unassignedPanels.map(panel=>this.energyDeviceStatusCard(rt,panel,'Solar panel')).join('')}</div></div>` : '',
+        unassignedOptimizers.length ? `<div class="solarUnassignedPanels"><h3>Optimizers without module relationship</h3><p>Published optimizers remain visible; Home Intelligence does not infer a panel association.</p><div class="solarChildGrid">${unassignedOptimizers.map(item=>this.energyDeviceStatusCard(rt,item,'Power optimizer')).join('')}</div></div>` : '',
+        backup.length ? `<div class="solarUnassignedPanels"><h3>Support devices</h3><div class="solarChildGrid">${backup.map(asset=>this.energyDeviceStatusCard(rt,asset,'Backup interface')).join('')}</div></div>` : ''
+      ].join('');
+      const unassignedSection = unassignedBody ? this.solarHardwareSection('Other published hardware','Hardware that cannot be placed deeper in the canonical hierarchy remains explicit.',unassignedBody) : '';
+      return `<div class="solarHardwareExperience">${inverterSection}${batterySection}${zonesSection}${unassignedSection}</div>`;
+    }
+
+    solarEnergyStory(rt) {
+      const current = this.currentEnergyModel(rt);
+      const solar = current.solar.powerKw;
+      const site = current.consumption.siteConsumptionKw;
+      const home = current.consumption.homeConsumptionKw;
+      const battery = current.battery;
+      const gridImport = current.grid.importPowerKw;
+      const gridExport = current.grid.exportPowerKw;
+      const solarText = solar === null ? 'Solar production is not currently measured.' : `Your solar system is producing ${fmtKw(solar)} now.`;
+      const homeText = site === null ? 'Current site consumption is not available.' : `The home bus is supplying ${fmtKw(site)} of site consumption${home === null ? '' : `, including ${fmtKw(home)} non-flexible home consumption`}.`;
+      const batteryText = battery.state === 'charging'
+        ? `The Home Battery is charging at ${fmtKw(battery.displayPowerKw,'—')}. Exact solar-versus-grid charge allocation is not separately published.`
+        : battery.state === 'discharging'
+          ? `The Home Battery is supplying ${fmtKw(battery.displayPowerKw,'—')} to the Home Bus.`
+          : battery.state === 'idle'
+            ? 'The Home Battery is idle.'
+            : 'Battery flow is currently unavailable.';
+      const gridText = current.grid.direction === 'exporting'
+        ? `The site is exporting ${fmtKw(gridExport,'—')} to the grid.`
+        : current.grid.direction === 'importing'
+          ? `The site is importing ${fmtKw(gridImport,'—')} from the grid.`
+          : 'Grid flow is balanced locally.';
+      const whereSolar = solar !== null && solar > 0.05
+        ? (current.grid.direction === 'exporting'
+          ? 'Solar feeds the Home Bus first; the measured site balance currently includes export to the grid.'
+          : battery.state === 'charging'
+            ? 'Solar feeds the Home Bus while the battery is charging. The backend does not publish a source split, so the UX does not invent how much charge came from solar versus grid.'
+            : 'Solar feeds the Home Bus, where it is consumed by the home and active loads before any measured grid exchange.')
+        : 'There is no meaningful solar production to route right now.';
+      return `<section class="panel solarEnergyStory"><div class="solarStoryHead"><div><small>From panel to home</small><h2>What is happening with my solar?</h2><p>Live measured facts are kept separate from inferred source allocation.</p></div><div class="solarStoryRoute"><span>Panel</span><i>→</i><span>Inverter</span><i>→</i><span>Home Bus</span><i>↔</i><span>Battery / Grid</span></div></div>
+        <div class="solarAnswerGrid">
+          <article><small>What are my panels doing?</small><b>${escapeHtml(solarText)}</b></article>
+          <article><small>What is my home using?</small><b>${escapeHtml(homeText)}</b></article>
+          <article><small>What is the battery doing?</small><b>${escapeHtml(batteryText)}</b></article>
+          <article><small>What is happening at the grid?</small><b>${escapeHtml(gridText)}</b></article>
+        </div>
+        <div class="solarWhereAnswer"><span>Where is my solar going?</span><b>${escapeHtml(whereSolar)}</b></div>
+      </section>`;
+    }
+    energyHardwareStyles() {
+      return `
+        .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceCard{max-width:720px}.gasMeterPanel .energyDeviceGrid{grid-template-columns:minmax(0,720px)}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasContextGrid,.planningContextGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gasStatisticsHost{min-height:220px}}
+
+        .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead,.solarStoryHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
+        .energyDeviceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.energyDeviceCard{display:grid;grid-template-columns:126px minmax(0,1fr);gap:12px;border:1px solid #e5ebf3;background:#fff;border-radius:14px;padding:12px;min-height:166px}.energyDeviceVisual{height:138px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fbfdff,#f6f8fb);border-radius:11px;overflow:hidden}.energyDeviceVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.energyDeviceVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:5px;box-sizing:border-box}.energyDeviceBody{min-width:0}.energyDeviceTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.energyDeviceTop small{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.energyDeviceTop h3{font-size:13px;line-height:1.25;margin:3px 0 8px}.energyDeviceArea{display:block;margin:-4px 0 7px;color:#64748b;font-size:9px}.batteryContributorArea{display:block;margin-top:3px;color:#64748b;font-size:9px}.energyDeviceState{font-size:9px;background:#eef7f1;color:#3f7f5a;border-radius:999px;padding:5px 7px;white-space:nowrap}.energyDeviceConfig{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.energyDeviceConfig span{font-size:9px;color:#64748b;background:#f8fafc;border-radius:7px;padding:5px 6px}.energyDeviceConfig b{color:#334155;margin-right:4px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyDeviceFacts span{background:#f8fafc;border-radius:7px;padding:6px;min-width:0}.energyDeviceFacts small,.energyDeviceFacts b{display:block}.energyDeviceFacts small{font-size:8px;color:#64748b}.energyDeviceFacts b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.energyDeviceNoFacts{grid-column:1/-1}.energyAssetQuickActions{grid-column:1/-1;display:grid;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid #edf1f6}.energyAssetQuickActions>small{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700}.energyAssetQuickActions>div{display:flex;gap:6px;flex-wrap:wrap}.energyAssetQuickActions .hiAction{min-height:30px;padding:0 9px;font-size:9.5px}
+        .energyAssetDetails{margin-top:8px;border-top:1px solid #edf1f6;padding-top:7px}.energyAssetDetails>summary{cursor:pointer;color:#355D96;font-size:9px;font-weight:650;list-style:none}.energyAssetDetails>summary::-webkit-details-marker{display:none}.energyAssetDetails>summary:after{content:" ▾";color:#94a3b8}.energyAssetDetails[open]>summary:after{content:" ▴"}.energyAssetDetailGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:7px}.energyAssetDetailGrid span{min-width:0;background:#f8fafc;border-radius:7px;padding:6px}.energyAssetDetailGrid span.wide{grid-column:1/-1}.energyAssetDetailGrid small,.energyAssetDetailGrid b{display:block}.energyAssetDetailGrid small{font-size:8px;color:#64748b}.energyAssetDetailGrid b{font-size:9.5px;line-height:1.3;overflow-wrap:anywhere}
+        .gasContextGrid,.planningContextGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:10px}.gasContextGrid span,.planningContextGrid span{min-width:0;border:1px solid #e5ebf3;border-radius:10px;background:#f8fafc;padding:9px 10px}.gasContextGrid small,.planningContextGrid small,.gasContextGrid b,.planningContextGrid b{display:block}.gasContextGrid small,.planningContextGrid small{font-size:8.5px;color:#64748b}.gasContextGrid b,.planningContextGrid b{font-size:10.5px;line-height:1.3;margin-top:3px;overflow-wrap:anywhere}.planningContextPanel>p{margin:9px 0 0;color:#64748b;font-size:10.5px;line-height:1.4}.planningContextPanel>.empty{margin-top:9px}
+        .solarProductionStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 12px}.solarProductionStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:10px 12px}.solarProductionStrip small,.solarProductionStrip b{display:block}.solarProductionStrip small{font-size:9px;color:#64748b}.solarProductionStrip b{font-size:15px;margin-top:3px}.managedAssetIdentity,.strategyAssetIdentity,.meteringAssetIdentity,.effectivePolicyIdentity{display:flex;align-items:center;gap:8px;min-width:0}.managedAssetIdentity>div,.strategyAssetIdentity>div,.meteringAssetIdentity>span{min-width:0}.meteringAssetIdentity b,.meteringAssetIdentity small{display:block}.effectivePolicyIdentity b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.solarHardwareExperience{display:grid;gap:12px;margin:12px 0}.solarHardwareSection{margin:0}.solarHardwareSectionHead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}.solarHardwareSectionHead h2{margin:0 0 4px}.solarHardwareSectionHead p{margin:0;color:#64748b;font-size:11px}.solarHardwareSectionHead>span,.solarAggregateCount{font-size:10px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}.solarAggregateCard{border:1px solid #e5ebf3;border-radius:14px;padding:12px;background:#fff}.solarAggregateCard+.solarAggregateCard{margin-top:10px}.solarAggregateHead{display:grid;grid-template-columns:116px minmax(0,1fr) auto;gap:12px;align-items:center}.solarAggregateVisual{height:104px;display:flex;align-items:center;justify-content:center;background:#f8fafc;border-radius:11px;overflow:hidden}.solarAggregateVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.solarAggregateVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:6px;box-sizing:border-box}.solarAggregateCopy small,.solarSystemSummary small{font-size:9px;font-weight:750;color:#64748b;letter-spacing:.08em}.solarAggregateCopy h3,.solarSystemSummary h3{margin:3px 0 5px;font-size:15px}.solarAggregateCopy p,.solarSystemSummary p{margin:0;color:#64748b;font-size:10.5px;line-height:1.4}.solarAggregateFacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.solarAggregateFacts span{min-width:96px;background:#f8fafc;border-radius:8px;padding:7px 8px}.solarAggregateFacts small,.solarAggregateFacts b{display:block}.solarAggregateFacts small{font-size:8px;color:#64748b}.solarAggregateFacts b{font-size:10px;margin-top:2px}.solarChildGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}.solarModuleGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.solarModuleCard{display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;border:1px solid #e5ebf3;border-radius:12px;padding:10px;background:#fbfdff}.solarModuleVisual{height:96px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:9px;overflow:hidden}.solarModuleVisual .assetVisual,.solarModuleVisual img{width:100%;height:100%;object-fit:contain}.solarModuleHead{display:flex;justify-content:space-between;gap:8px}.solarModuleHead small,.solarModuleHead span{display:block;font-size:8px;color:#64748b}.solarModuleHead h4{margin:2px 0;font-size:11px}.solarModuleHead>b{font-size:8.5px;color:#476487;white-space:nowrap}.solarModuleFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:7px}.solarModuleFacts span{padding:5px 6px;border-radius:7px;background:#fff}.solarModuleFacts small,.solarModuleFacts b{display:block}.solarModuleFacts small{font-size:7.5px;color:#64748b}.solarModuleFacts b{font-size:9px}.consumerPrimarySummary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.consumerPrimarySummary>span{padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#fff}.consumerPrimarySummary small,.consumerPrimarySummary b{display:block}.consumerPrimarySummary small{font-size:8.5px;color:var(--muted)}.consumerPrimarySummary b{margin-top:3px;font-size:13px}.managedAssetRelationship{margin-top:7px;padding:7px 8px;border-radius:8px;background:#f8fafc}.managedAssetRelationship small,.managedAssetRelationship b{display:block}.managedAssetRelationship small{font-size:8px;color:#64748b}.managedAssetRelationship b{font-size:9.5px;margin-top:2px}.solarSystemSummary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start}.solarUnassignedPanels{margin-top:12px}.solarUnassignedPanels h3{font-size:12px;margin:0 0 6px}.solarUnassignedPanels p{font-size:10px;color:#64748b;margin:0 0 7px}.solarTopologyDetails{margin-top:9px;border-top:1px solid #edf1f6;padding-top:7px}.solarTopologyDetails>summary{cursor:pointer;color:#355D96;font-size:10px;font-weight:650}
+                .solarStoryHead{align-items:center}.solarStoryHead small{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#d97706;font-weight:750}.solarStoryHead h2{margin:3px 0}.solarStoryRoute{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}.solarStoryRoute span{font-size:10px;font-weight:700;padding:6px 9px;border-radius:999px;background:#fff7ed;border:1px solid #fed7aa}.solarStoryRoute i{font-style:normal;color:#94a3b8}.solarAnswerGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.solarAnswerGrid article{background:#f8fafc;border:1px solid #edf1f6;border-radius:10px;padding:10px}.solarAnswerGrid small{display:block;color:#64748b;font-size:9px;margin-bottom:4px}.solarAnswerGrid b{font-size:11px;line-height:1.4;font-weight:650}.solarWhereAnswer{margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:11px 12px}.solarWhereAnswer span{display:block;color:#9a5b17;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}.solarWhereAnswer b{display:block;margin-top:3px;font-size:11.5px;line-height:1.4}
+        @media(max-width:1100px){.energyDeviceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.energyDeviceCard{grid-template-columns:112px minmax(0,1fr)}.energyDeviceVisual{height:128px}.solarAnswerGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.solarChildGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.energyDeviceGrid{grid-template-columns:1fr}.energyDeviceCard{grid-template-columns:96px minmax(0,1fr);gap:10px;padding:10px;min-height:142px}.energyDeviceVisual{height:112px}.energyDeviceFacts{grid-template-columns:repeat(2,minmax(0,1fr))}.energyAssetQuickActions>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.energyAssetQuickActions .hiAction{width:100%;min-width:0}.solarStoryHead{display:block}.solarStoryRoute{justify-content:flex-start;margin-top:10px}.solarAnswerGrid{grid-template-columns:1fr}.solarChildGrid{grid-template-columns:1fr}.solarAggregateHead{grid-template-columns:92px minmax(0,1fr)}.solarAggregateCount{grid-column:2}.solarAggregateVisual{height:88px}.solarSystemSummary{grid-template-columns:1fr}}
+        @media(max-width:720px){.solarProductionStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.solarModuleGrid,.consumerPrimarySummary{grid-template-columns:1fr}.solarModuleCard{grid-template-columns:76px minmax(0,1fr)}.solarModuleVisual{height:78px}}
+      `;
+    }
+
+    solar(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'solar');
+      const solarPower = rt.number('solar.power_kw');
+      const forecastToday = rt.number('forecast.solar_today_kwh');
+      const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
+      const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
+      const gridExportToday = rt.number('metering.grid_export_today_kwh');
+      return `${this.tabExperienceHeader(rt,'solar',pageVm)}<div class="solarPage solarHardwarePage">
+        ${this.solarEnergyStory(rt)}
+        ${this.solarHardwareExperience(rt)}
+        <section class="panel solarEnergyFacts"><h2>Solar energy facts</h2><p>Measured and forecast solar facts are already summarized in the canonical status row above. Hardware and measured detail remain below.</p></section>
+      </div>`;
+    }
+
+    operationalPlanning(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'operational-planning');
+      const d = rt.decision();
+      const recommendation = firstDefined(d.recommendation, d.advice, rt.rawText('energy_intelligence.recommendation', null), 'Observe');
+      const targetId = firstDefined(d.recommended_target_asset_id, rt.value('energy_intelligence.recommended_target_asset_id', null), '');
+      const assetDomain = this.flexibleAssetDomain(rt);
+      const loads = assetDomain.all().filter(vm => !vm.isStorage).map(vm => vm.raw);
+      const participating = loads.filter(load => !assetDomain.byId(load.asset_id)?.isDisabled);
+      const disabled = loads.filter(load => assetDomain.byId(load.asset_id)?.isDisabled);
+      const cards = participating.map(load => this.operationalLoadCard(rt, load, recommendation, targetId)).join('');
+      const disabledCards = disabled.map(load => this.disabledFlexibleAssetCard(rt, load, load.energy_planning || rt.planningOutcomeFor(load.asset_id) || {})).join('');
+      const active = participating.filter(load => (asNumber(load.power_kw) || 0) > 0.05 || /running|charging|executing/i.test(String(load.operating_state || load.current_status || ''))).length;
+      const planned = participating.filter(load => {
+        const p = load.energy_planning || rt.planningOutcomeFor(load.asset_id) || {};
+        return /planned|scheduled|expected today|done today/i.test(String(firstDefined(p.state,p.status,p.today_status,p.expected,'')));
+      }).length;
+      const waiting = participating.filter(load => {
+        const p = load.energy_planning || rt.planningOutcomeFor(load.asset_id) || {};
+        return /waiting|blocked|uncertain|not eligible/i.test(String(firstDefined(p.state,p.status,p.today_status,p.expected,'')));
+      }).length;
+      return `${this.tabExperienceHeader(rt,'operational-planning',pageVm)}<div class="operationalPlanningPage">
+        <section class="panel operationalPlanningLoads"><div class="energySectionHead"><div><h2>Flexible loads</h2><p>Current execution, next action, requested power and operational reason. Hardware configuration is not shown here.</p></div></div><div class="flexLoadList">${cards || '<div class="empty"><b>No participating flexible loads</b><span>No controllable load currently participates in operational planning.</span></div>'}</div></section>
+        ${disabledCards ? `<details class="panel compactDisclosure"><summary>Other assets (${disabled.length})</summary><p>These assets are excluded from operational planning.</p><div class="disabledAssetList">${disabledCards}</div></details>` : ''}
+      </div>`;
+    }
+    outlook(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'outlook');
+      const horizons = rt.outlookHorizons();
+      if (!horizons.length) return `${this.tabExperienceHeader(rt,'outlook',pageVm)}<div class="outlookPage">${this.contractGap('Outlook unavailable','The canonical Outlook contract is not published.')}</div>`;
+      const horizon = this.selectedHorizon(horizons, this.selectedOutlookHorizonId);
+      if (!horizon) return `${this.tabExperienceHeader(rt,'outlook',pageVm)}<div class="outlookPage">${this.contractGap('Selected horizon temporarily unavailable', `The requested ${this.selectedOutlookHorizonId || 'D0'} horizon is not currently published. Your selection is preserved.`)}</div>`;
+      const isTomorrow = this.isFutureHorizon(horizon);
+      const supply = objectFrom(horizon.summary?.supply || {});
+      const demand = objectFrom(horizon.summary?.demand || {});
+      const balanceGroup = objectFrom(horizon.summary?.balance || {});
+      const quality = objectFrom(horizon.summary?.quality || {});
+      const mode = objectFrom(horizon.summary?.mode || {});
+      const solarForecast = asNumber(firstDefined(supply.solar_forecast_kwh,supply.solar_today_kwh));
+      const solarRemaining = asNumber(supply.solar_remaining_kwh);
+      const batteryAboveReserve = asNumber(firstDefined(supply.battery_available_above_reserve_kwh,supply.available_above_reserve_kwh));
+      const batteryReserve = asNumber(firstDefined(supply.battery_reserve_kwh,supply.protected_reserve_kwh));
+      const totalAvailable = asNumber(firstDefined(supply.total_available_kwh,supply.expected_available_kwh));
+      const homeConsumption = asNumber(firstDefined(demand.home_consumption_forecast_kwh,demand.base_load_forecast_kwh,demand.home_load_forecast_kwh));
+      const knownNeed = asNumber(firstDefined(demand.flexible_known_need_kwh,demand.known_flexible_need_kwh));
+      const scheduledFlexible = asNumber(firstDefined(demand.flexible_scheduled_kwh,demand.scheduled_flexible_load_kwh));
+      const flexibleTotal = scheduledFlexible !== null ? scheduledFlexible : knownNeed;
+      const totalDemand = asNumber(firstDefined(demand.total_expected_demand_kwh,demand.expected_demand_kwh));
+      const gridImport = asNumber(firstDefined(balanceGroup.expected_grid_import_kwh,balanceGroup.grid_import_kwh));
+      const gridExport = asNumber(firstDefined(balanceGroup.expected_grid_export_kwh,balanceGroup.grid_export_kwh));
+      const gridBalance = gridImport !== null && gridExport !== null ? gridImport-gridExport : null;
+      const confidence = human(firstDefined(quality.confidence,horizon.confidence,'Not available'));
+      const basis = human(firstDefined(supply.solar_basis,supply.forecast_basis,isTomorrow?'Full day forecast':'Remaining forecast'));
+      const planningRows = this.flexibleAssetDomain(rt).all().filter(vm => !vm.isDisabled && !vm.isStorage).map(vm => {
+        const load=vm.raw||{}; const id=load.asset_id||load.flexible_asset_id||''; const planning=load.energy_planning||rt.planningOutcomeFor(id)||{};
+        const amount=asNumber(firstDefined(planning.planned_today_kwh,planning.scheduled_kwh,planning.known_need_kwh,planning.energy_to_target_kwh,load.energy_to_target_kwh,load.required_energy_kwh));
+        return amount===null?null:`<div class="outlookChildRow">${this.assetVisual(load,{size:'xs',fallbackIcon:this.flexibleAssetIcon(load)})}<b>${escapeHtml(load.display_name||rt.assetName(id)||human(id))}</b><strong>${escapeHtml(fmtKwh(amount))}</strong></div>`;
+      }).filter(Boolean).join('');
+      const storageDemand = asNumber(firstDefined(demand.home_battery_charge_kwh,demand.battery_charge_kwh,0));
+      const totalRow=(label,value,formatter=fmtKwh)=>`<div class="outlookTotalRow"><span>${escapeHtml(label)}</span><b>${escapeHtml(formatter(value,'—'))}</b></div>`;
+      return `${this.tabExperienceHeader(rt,'outlook',pageVm)}${this.bodyContextBar(rt,'outlook','outlook-body')}<div class="outlookPage outlookPageV2" id="outlook-body"><div class="outlookThreeGrid">
+        <section class="panel outlookBalanceCard"><h2>Supply</h2><p>Expected usable energy for the selected horizon.</p>${isTomorrow?this.kv('Solar forecast',fmtKwh(solarForecast)):this.kv('Solar remaining',fmtKwh(solarRemaining))}${batteryAboveReserve!==null?this.kv('Home Battery above reserve',fmtKwh(batteryAboveReserve)):''}${batteryReserve!==null?this.kv('Protected reserve',fmtKwh(batteryReserve)):''}${totalRow('Total usable supply',totalAvailable)}</section>
+        <section class="panel outlookBalanceCard"><h2>Demand</h2><p>Expected Home Consumption, Flexible Loads and storage charging.</p>${this.kv('Home Consumption forecast',fmtKwh(homeConsumption))}<div class="outlookAggregateRow"><span>Flexible Loads</span><b>${escapeHtml(fmtKwh(flexibleTotal,'—'))}</b></div><div class="outlookChildren">${planningRows||'<span class="muted">No per-asset demand published</span>'}</div>${this.kv('Home Battery',fmtKwh(storageDemand,'0.0 kWh'))}${totalRow('Total expected demand',totalDemand)}</section>
+        <section class="panel outlookBalanceCard"><h2>Grid impact</h2><p>Expected grid exchange for the selected horizon.</p>${this.kv('Expected Grid Import',fmtKwh(gridImport,'—'))}${this.kv('Expected Grid Export',fmtKwh(gridExport,'—'))}${totalRow('Grid Balance',gridBalance,v=>v===null?'—':`${v.toFixed(1)} kWh`)}<small class="outlookBalanceMeaning">${gridBalance===null?'Balance unavailable':gridBalance<0?`${Math.abs(gridBalance).toFixed(1)} kWh net export`:gridBalance>0?`${gridBalance.toFixed(1)} kWh net import`:'Balanced'}</small></section>
+      </div></div>`;
+    }
+    flowNode(icon, title, value, subtitle, cls = '') {
+      return `<div class="flowNode ${cls}"><div class="flowIcon">${escapeHtml(icon)}</div><div><span>${escapeHtml(title)}</span><b>${escapeHtml(value)}</b><small>${escapeHtml(subtitle)}</small></div></div>`;
+    }
+    flowLine(label, value, cls = '') {
+      return `<div class="flowLine ${cls}"><i></i><span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b></div>`;
+    }
+    connectorCard(rt, charger) {
+      const id = charger.asset_id || charger.connection_asset_id || '';
+      const consumerId = String(charger.connected_consumer_id || '');
+      const connectionState = String(charger.connection_state || '');
+      const operatingState = String(charger.operating_state || '');
+      const power = asNumber(charger.physical_power_kw);
+      const powerText = power === null ? '—' : fmtKw(power);
+      const context = [
+        connectionState ? human(connectionState) : '',
+        consumerId ? (rt.assetName(consumerId) || human(consumerId)) : '',
+        operatingState ? human(operatingState) : ''
+      ].filter(Boolean).join(' · ');
+      const visual = typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(charger.visual_ref) : null;
+      const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
+      return `<div class="flowConnectionCard">${art}<div><b>${escapeHtml(charger.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(context || 'Connection state unavailable')}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+    }
+    consumerCard(rt, consumer) {
+      const id = consumer.asset_id;
+      const power = asNumber(firstDefined(consumer.physical_power_kw, consumer.power_kw, consumer.current_power_kw, consumer.actual_power_kw));
+      const powerText = power === null ? '—' : fmtKw(power);
+      const operating = firstDefined(consumer.operating_state, consumer.state, rt.value(`${id}.operating_state`, null));
+      const active = asBool(firstDefined(consumer.active, rt.value(`${id}.active`, false)));
+      const charging = asBool(firstDefined(consumer.charging, rt.value(`${id}.charging`, false))) || /charging/i.test(String(operating || ''));
+      const connected = asBool(firstDefined(consumer.connected, consumer.connection_state === 'connected', rt.value(`${id}.connected`, false)));
+      const available = !/unavailable|offline|disconnected/i.test(String(firstDefined(consumer.availability_state, '')));
+      const charger = firstDefined(consumer.effective_charger, consumer.charger_asset_id, consumer.connection_asset_id, consumer.execution_target_asset_id, '');
+      const requested = asNumber(firstDefined(consumer.requested_power_kw_effective, consumer.requested_power_kw));
+      const state = charging ? 'Charging' : active || (power !== null && power > 0.05) ? 'Active' : connected ? 'Connected' : available ? 'Available' : 'Unavailable';
+      const visual = typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(consumer.visual_ref) : null;
+      const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
+      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(state)}${charger ? ` · ${escapeHtml(rt.assetName(charger) || human(charger))}` : ''}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+    }
+    flowConsumers(rt) {
+      const domain = this.flexibleAssetDomain(rt);
+      const physical = domain.physicalFlowParticipants().map(vm => vm.raw);
+      const explicit = rt.assets().filter(a => {
+        const id = String(a.asset_id || '');
+        if (!id) return false;
+        const vm = domain.byId(id);
+        if (vm?.isDisabled || vm?.isStorage) return false;
+        return String(a.asset_type || '').toLowerCase() === 'consumer' && String(a.parent_asset_id || '').toLowerCase() === 'consumer';
+      });
+      const byId = new Map();
+      [...explicit, ...physical].forEach(row => {
+        const id = row.asset_id || row.flexible_asset_id || row.target_asset_id;
+        if (!id) return;
+        const vm = domain.byId(id);
+        if (vm?.isDisabled || vm?.isStorage) return;
+        byId.set(String(id), { ...(byId.get(String(id)) || {}), ...row, asset_id:id });
+      });
+      return [...byId.values()];
+    }
+    canonicalConnectionSnapshot(rt) {
+      // Connection materialization is projection-only: consume explicit public
+      // V2 asset links/relationships and asset-scoped measurements. Do not infer
+      // charger assignments from names and do not recalculate Energy aggregates.
+      const rows = new Map();
+      const assetType = asset => String(firstDefined(asset?.asset_type, asset?.object_class, '') || '').trim().toLowerCase();
+      const isCharger = asset => /(^|_)(charger|charging_point|charge_point)(_|$)/.test(assetType(asset));
+      const materialize = (chargerId, consumerId = '', relationship = {}) => {
+        const chargerKey = String(chargerId || '').trim();
+        const consumerKey = String(consumerId || '').trim();
+        if (!chargerKey) return;
+        const charger = rt.asset(chargerKey) || {};
+        const consumer = consumerKey ? (rt.asset(consumerKey) || {}) : {};
+        const power = asNumber(firstDefined(
+          charger.actual_power_kw,
+          charger.current_power_kw,
+          charger.power_kw,
+          rt.number(`${chargerKey}.actual_power_kw`),
+          rt.number(`${chargerKey}.current_power_kw`),
+          rt.number(`${chargerKey}.power_kw`)
+        ));
+        const row = {
+          ...charger,
+          asset_id:chargerKey,
+          connection_asset_id:chargerKey,
+          connected_consumer_id:consumerKey,
+          connected_consumer_visual_ref:String(firstDefined(consumer.visual_ref, '') || ''),
+          connection_state:String(firstDefined(
+            relationship.connection_state,
+            relationship.state,
+            charger.connection_state,
+            consumer.connection_state,
+            consumer.connected === true ? 'connected' : ''
+          ) || ''),
+          operating_state:String(firstDefined(
+            charger.operating_state,
+            charger.operation_state,
+            consumer.operating_state,
+            consumer.operation_state,
+            ''
+          ) || ''),
+          physical_power_kw:power,
+          visual_ref:String(firstDefined(charger.visual_ref, '') || ''),
+          source_relationship_id:String(firstDefined(relationship.relationship_id, relationship.id, '') || '')
+        };
+        rows.set(`${chargerKey}::${consumerKey}`, row);
+      };
+
+      // Flexible assets may publish their exact execution/charger target directly.
+      this.flexibleAssetDomain(rt).all()
+        .filter(vm => !vm.isDisabled && !vm.isStorage)
+        .forEach(vm => {
+          const asset = vm.raw || {};
+          const chargerId = firstDefined(
+            asset.effective_charger,
+            asset.charger_asset_id,
+            asset.connection_asset_id,
+            asset.execution_target_asset_id,
+            ''
+          );
+          if (chargerId) materialize(chargerId, vm.id, { connection_state:asset.connection_state });
+        });
+
+      // Public connected_to relationships remain authoritative when present.
+      rt.connectedRelationships().forEach(relationship => {
+        const fromId = String(firstDefined(relationship.from_asset_id, relationship.source_asset_id, '') || '');
+        const toId = String(firstDefined(relationship.to_asset_id, relationship.target_asset_id, '') || '');
+        if (!fromId || !toId) return;
+        const from = rt.asset(fromId) || {};
+        const to = rt.asset(toId) || {};
+        if (isCharger(from)) materialize(fromId, toId, relationship);
+        else if (isCharger(to)) materialize(toId, fromId, relationship);
+      });
+
+      // Topology is not the same as active power flow: keep published chargers
+      // visible when idle or currently unassigned.
+      rt.assets().filter(isCharger).forEach(charger => {
+        const id=String(charger.asset_id || '');
+        if (!id) return;
+        const already=[...rows.values()].some(row => String(row.asset_id || '') === id);
+        if (!already) materialize(id, '', {});
+      });
+
+      const projected = Object.freeze([...rows.values()].map(row => Object.freeze(row)));
+      const observedAt = projected.map(row => String(firstDefined(row.observed_at, row.updated_at, '') || '')).filter(Boolean).sort().pop() || '';
+      return Object.freeze({
+        available:rt.publicV2().available === true,
+        rows:projected,
+        // Deliberately not derived from row power: Energy aggregate truth stays backend-owned.
+        totalPowerKw:null,
+        observedAt,
+        reason:projected.length ? '' : 'No explicit charging connection is currently published.',
+        source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+      });
+    }
+    flow(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'flow');
+      const current = this.currentEnergyModel(rt);
+      const solar = current.solar.powerKw;
+      const gridImport = current.grid.importPowerKw;
+      const gridExport = current.grid.exportPowerKw;
+      const battery = current.battery;
+      const rawConsumers = this.flowConsumers(rt);
+      const connectionSnapshot = this.canonicalConnectionSnapshot(rt);
+      const rawChargers = connectionSnapshot.rows;
+      const physicalFlow = buildPhysicalFlowViewModel(rt, rt.contractGateway(), rawConsumers, rawChargers, connectionSnapshot);
+      const siteConsumption = physicalFlow.siteConsumptionKw;
+      const homeConsumption = physicalFlow.homeConsumptionKw;
+      const flexibleLoadsPower = physicalFlow.flexibleLoadsKw;
+      const consumers = physicalFlow.consumers;
+      const chargers = physicalFlow.connections;
+      const connectionPower = physicalFlow.connectionPowerKw;
+      const homeBus = rt.asset('home_bus') || { display_name: 'Home Bus' };
+      const switchboard = rt.asset('main_switchboard') || { display_name: 'Main Switchboard' };
+      return `${this.tabExperienceHeader(rt,'flow',pageVm)}<div class="flowPage">
+        <section class="panel physicalFlowHero">
+          <div class="flowHeader"><div><h2>Physical Energy Flow</h2><p>Live measured energy paths only. Disabled and planning-only assets are excluded.</p></div></div>
+          <div class="flowCanvas">
+            <div class="flowColumn producers">
+              <h3>Producers</h3>
+              ${this.flowNode('☀','Solar',fmtKw(solar,'0.0 kW'),'solar → home bus','solarNode')}
+              ${this.flowNode('▣','Home Battery',fmtKw(battery.displayPowerKw,'—'),battery.detail,'batteryNode')}
+              ${this.flowNode('⚡','Grid import',fmtKw(gridImport,'—'),'grid import → home bus','gridNode')}
+            </div>
+            <div class="flowCenter">
+              <div class="busStack">
+                <div class="switchboardNode"><span>Main Switchboard</span><b>${escapeHtml(switchboard.display_name || 'Main Switchboard')}</b></div>
+                <div class="homeBusNode"><span>Physical bus</span><b>${escapeHtml(homeBus.display_name || 'Home Bus')}</b><small>${escapeHtml(fmtKw(siteConsumption,'—'))} Site Consumption</small></div>
+              </div>
+              <div class="flowLines">
+                ${this.flowLine('Solar feed', fmtKw(solar,'—'), 'solar')}
+                ${this.flowLine('Battery feed / charge', fmtKw(battery.signedFlowKw,'—'), 'battery')}
+                ${this.flowLine('Grid import', fmtKw(gridImport,'—'), 'grid')}
+                ${this.flowLine('Grid export', fmtKw(gridExport,'—'), 'export')}
+              </div>
+            </div>
+            <div class="flowColumn sinks">
+              <h3>Consumers</h3>
+              ${this.flowNode('⌂','Home Consumption',fmtKw(homeConsumption,'—'),'household consumption excluding Flexible Loads','homeNode')}
+              ${this.flowNode('🚘','Flexible Loads',fmtKw(flexibleLoadsPower,'—'),`${consumers.length} published contributor${consumers.length === 1 ? '' : 's'}`,'consumerNode')}
+            </div>
+          </div>
+        </section>
+        <div class="flowDetailsGrid flowDetailsGridTwoUp">
+          <section class="panel"><h2>Charging connections</h2><p>Chargers and vehicle assignments currently visible to Energy.</p>${chargers.map(charger => this.connectorCard(rt, charger)).join('') || `<div class="empty"><b>${connectionSnapshot.available ? 'No charging topology published' : 'Connection data unavailable'}</b><span>${connectionSnapshot.available ? 'No charger or charger assignment is currently published.' : 'The canonical connection snapshot is not available.'}</span></div>`}</section>
+          <section class="panel"><h2>Physical consumers</h2><p>Participating loads with a published physical relationship; idle assets remain visible.</p>${consumers.map(consumer => this.consumerCard(rt, consumer)).join('') || `<div class="empty"><b>No flexible consumers available</b><span>No controllable loads are currently available.</span></div>`}</section>
+        </div>
+      </div>`;
+    }
+    propertyRow(row, label = null, formatter = null) {
+      const title = label || row.display_name || human(row.key || row.property_key || row.asset_id || 'Property');
+      const value = formatter ? formatter(rowValue(row, null), row) : rowDisplayValue(row);
+      const state = rowState(row);
+      return `<div class="propertyRow ${escapeHtml(state)}"><div><b>${escapeHtml(title)}</b><span>${escapeHtml(row.key || row.property_key || '')}</span></div><strong>${escapeHtml(value)}</strong><small class="qs ${escapeHtml(state)}">${escapeHtml(rowStatusLabel(row))}</small></div>`;
+    }
+    commandRow(rt, command) {
+      const state = rt.commandState(command);
+      const reason = rt.commandReasonObject(command);
+      return `<div class="commandRow ${escapeHtml(state)}"><div><b>${escapeHtml(human(command.role || command.command_id))}</b><span>${escapeHtml(command.command_id || '')}</span></div><strong>${escapeHtml(human(state))}</strong><small>${escapeHtml(reason.message || reason.code || 'Command is available')}</small></div>`;
+    }
+    visibleProfileValue(...values) {
+      const value = firstDefined(...values);
+      if (value === undefined || value === null || value === '') return '';
+      const text = String(value).trim();
+      if (!text || /^not[_\s-]?published$/i.test(text) || /^unknown$/i.test(text)) return '';
+      return human(value);
+    }
+    policyLine(label, value) {
+      const display = this.visibleProfileValue(value);
+      if (!display) return '';
+      return `<div class="profilePolicyLine"><span>${escapeHtml(label)}</span><b>${escapeHtml(display)}</b></div>`;
+    }
+    profileKind(profile = {}) {
+      return String(profile.profile_id || profile.strategy_profile_id || profile.profile_type || profile.asset_type || '').toLowerCase();
+    }
+    profileUserLabel(profile = {}) {
+      const explicit = firstDefined(profile.user_label, profile.profile_user_label, profile.display_label, profile.profile_label, profile.display_name, profile.name, profile.label, '');
+      if (explicit) return human(explicit);
+      const key = this.profileKind(profile);
+      const map = {
+        vehicle: 'Vehicle charging',
+        home_battery: 'Home battery reserve',
+        battery: 'Home battery reserve',
+        generic_flexible_load: 'Generic flexible loads',
+        thermal_flexible_load: 'Thermal loads',
+        outdoor_flexible_load: 'Outdoor loads',
+        solar_surplus: 'Solar surplus allocation',
+        resilience: 'Resilience'
+      };
+      return map[key] || human(key || 'Energy strategy');
+    }
+    profileUserDescription(profile = {}) {
+      const explicit = firstDefined(profile.user_description, profile.description, profile.summary, profile.user_summary_label, '');
+      if (explicit) return human(explicit);
+      const key = this.profileKind(profile);
+      const map = {
+        vehicle: 'Targets, deadline and energy source rules for vehicle charging.',
+        home_battery: 'Reserve, charge policy and support rules for home storage.',
+        battery: 'Reserve, charge policy and support rules for home storage.',
+        generic_flexible_load: 'Default policy for Energy-controllable flexible loads.',
+        thermal_flexible_load: 'Policy for domain-published thermal loads such as heating or jacuzzi.',
+        outdoor_flexible_load: 'Policy for domain-published outdoor loads such as pool or irrigation.',
+        solar_surplus: 'How excess solar should be allocated before export.',
+        resilience: 'How Energy protects essential goals and reserve during resilience mode.'
+      };
+      return map[key] || 'Type-level Energy policy. Planning decides the actual outcome.';
+    }
+    profileTargetSummary(profile = {}) {
+      const unit = this.visibleProfileValue(profile.target_unit || profile.unit || '');
+      const min = firstDefined(profile.minimum_target_value, profile.minimum_target, profile.minimum);
+      const preferred = firstDefined(profile.preferred_target_value, profile.preferred_target, profile.preferred);
+      const max = firstDefined(profile.maximum_useful_value, profile.maximum_target, profile.maximum);
+      const parts = [];
+      if (min !== undefined && min !== null && min !== '') parts.push(`minimum ${min}${unit}`);
+      if (preferred !== undefined && preferred !== null && preferred !== '') parts.push(`preferred ${preferred}${unit}`);
+      if (max !== undefined && max !== null && max !== '') parts.push(`maximum ${max}${unit}`);
+      return parts.join(' · ');
+    }
+    profileFieldLabel(row = {}) {
+      const explicit = firstDefined(row.user_label, row.display_name, row.label, row.title, '');
+      if (explicit) return human(explicit);
+      const key = String(row.field_key || row.key || row.property_key || '').split('.').pop().toLowerCase();
+      const labels = {
+        minimum_target_value: 'Minimum target', minimum_target: 'Minimum target',
+        preferred_target_value: 'Preferred target', preferred_target: 'Preferred target',
+        maximum_useful_value: 'Maximum useful', maximum_target: 'Maximum useful',
+        deadline_time: 'Default deadline', deadline: 'Default deadline',
+        grid_policy: 'Grid use', grid_use_policy: 'Grid use',
+        solar_policy: 'Solar use', surplus_policy: 'Solar surplus', battery_policy: 'Battery support',
+        confidence_policy: 'Confidence', confidence: 'Confidence',
+        minimum_run_minutes: 'Minimum run time', minimum_off_minutes: 'Minimum off time', adjust_deadband_kw: 'Deadband',
+        temporary_import_allowed: 'Temporary import', temporary_import_limit_kw: 'Temporary import limit',
+        reserve_target_pct: 'Reserve target', protected_reserve_pct: 'Protected reserve', essentiality_level: 'Essentiality', shed_allowed: 'Can be shed',
+        mode: 'Mode', energy_control_mode: 'Mode', objective_mode: 'Objective'
+      };
+      return labels[key] || human(key || 'Setting');
+    }
+    profileFieldCategory(row = {}) {
+      const key = String(row.field_key || row.key || row.property_key || row.display_name || '').toLowerCase();
+      if (/minimum|preferred|maximum|target|deadline|objective|mode/.test(key)) return 'goal';
+      if (/grid|solar|surplus|battery|source/.test(key)) return 'source';
+      if (/confidence|stability|run|off|deadband|import/.test(key)) return 'stability';
+      if (/reserve|essential|shed|resilience/.test(key)) return 'resilience';
+      return 'other';
+    }
+    profileControlForRow(row) {
+      const label = this.profileFieldLabel(row);
+      const editor = String(row.editor || row.ui_control || row.control || row.value_type || '').toLowerCase();
+      if (editor.includes('toggle') || editor.includes('boolean') || editor === 'bool') return this.editableToggleControl(row, label);
+      if (editor.includes('time')) return this.editableTimeControl(row, label);
+      if (editor.includes('select') || editor.includes('enum') || allowedValuesForRow(row).length) return this.editableSelectControl(row, label);
+      if (editor.includes('slider') || editor.includes('range')) return this.editableRangeControl(row, label);
+      return this.editableNumberControl(row, label);
+    }
+    profileEditableRows(rt, profile = {}) {
+      const unique = [];
+      rt.strategyProfileEditableFieldRows(profile).forEach(row => {
+        const key = this.propertyKeyFor(row);
+        if (key && !unique.some(existing => this.propertyKeyFor(existing) === key)) unique.push(row);
+      });
+      return unique.slice(0, 24);
+    }
+    strategyReferenceForRow(row = {}) {
+      const recommended = firstDefined(row.recommended_value, row.recommendation_value, row.preferred_value, row.suggested_value, null);
+      const reason = firstDefined(row.recommendation_reason, row.guidance, row.user_guidance, row.description, row.help_text, '');
+      const defaultValue = firstDefined(row.default_value, row.default, null);
+      if (recommended !== null && recommended !== undefined && recommended !== '') {
+        return { value: row.unit ? `${recommended} ${row.unit}` : human(recommended), text: reason ? String(reason) : 'Recommended by Energy.' };
+      }
+      if (defaultValue !== null && defaultValue !== undefined && defaultValue !== '') {
+        return { value: row.unit ? `${defaultValue} ${row.unit}` : human(defaultValue), text: reason ? String(reason) : 'Published default.' };
+      }
+      return reason ? { value: '', text: String(reason) } : null;
+    }
+    strategyValueForRow(row = {}) {
+      const value = Object.prototype.hasOwnProperty.call(this.editDrafts, String(row.key || row.property_key || row.field_key || ''))
+        ? this.editDrafts[String(row.key || row.property_key || row.field_key || '')]
+        : rowValue(row, null);
+      if (value === null || value === undefined || value === '') return '—';
+      if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+      return `${human(value)}${row.unit ? ` ${row.unit}` : ''}`;
+    }
+    strategyTable(rt, profile = {}, options = {}) {
+      const id = String(profile.profile_id || options.profileId || 'strategy_profile');
+      const rows = this.profileEditableRows(rt, profile);
+      const editing = this.strategyEditProfileId === id;
+      const changed = rows.filter(row => Object.prototype.hasOwnProperty.call(this.editDrafts, String(row.key || row.property_key || row.field_key || '')));
+      const title = options.title || this.profileUserLabel(profile);
+      const description = options.description || this.profileUserDescription(profile);
+      const rowHtml = rows.map(row => {
+        const key = String(row.key || row.property_key || row.field_key || '');
+        const label = this.profileFieldLabel(row);
+        const ref = this.strategyReferenceForRow(row);
+        const changedClass = Object.prototype.hasOwnProperty.call(this.editDrafts, key) ? ' changed' : '';
+        const value = editing ? this.profileControlForRow({ ...row, __strategyProfileField: true, profile_id: row.profile_id || id }) : `<span class="strategyReadValue">${escapeHtml(this.strategyValueForRow(row))}</span>`;
+        const guidance = ref ? `<div class="strategyGuidance"><i>${escapeHtml(ref.value ? `${ref.value}${ref.text ? ` · ${ref.text}` : ''}` : ref.text)}</i></div>` : '';
+        return `<div class="strategyTableRow${changedClass}"><div class="strategyPrimaryRow"><span class="strategySetting">${escapeHtml(label)}</span><div class="strategyValue">${value}</div></div>${guidance}</div>`;
+      }).join('');
+      const actions = editing
+        ? `<span class="strategyChangeCount">${changed.length ? `${changed.length} changed` : 'No changes'}</span><button class="strategyTextAction" data-strategy-cancel="${escapeHtml(id)}">Cancel</button><button class="strategySaveAction" data-strategy-save="${escapeHtml(id)}"${changed.length ? '' : ' disabled'}>Save</button>`
+        : `<button class="strategyTextAction" data-strategy-edit="${escapeHtml(id)}"${rows.length ? '' : ' disabled'}>Edit</button>`;
+      return `<section class="panel strategyTablePanel"><div class="strategyTableHead"><div><h2>${escapeHtml(title)}</h2>${description ? `<p>${escapeHtml(description)}</p>` : ''}</div><div class="strategySetActions">${actions}</div></div><div class="strategyTable"><div class="strategyColumnHead"><span>Setting</span><span>Value</span></div>${rowHtml || `<div class="profileNoControls">No editable strategy settings are published.</div>`}</div>${options.details || ''}</section>`;
+    }
+    strategyProfileForDomain(rt, domain) {
+      const wanted = String(domain || '').toLowerCase();
+      return rt.strategyProfileRows().find(profile => `${profile.profile_id || ''} ${profile.profile_type || ''} ${profile.asset_type || ''} ${profile.display_name || ''}`.toLowerCase().includes(wanted)) || null;
+    }
+    profileGroup(title, rows = [], staticLines = '') {
+      const controls = rows.map(row => this.profileControlForRow(row)).join('');
+      const content = `${staticLines || ''}${controls || ''}`;
+      if (!content) return '';
+      return `<section class="profileSettingGroup"><h3>${escapeHtml(title)}</h3><div class="profileSettingGrid">${content}</div></section>`;
+    }
+    strategyProfileCard(rt, profile = {}) {
+      const id = profile.profile_id || 'strategy_profile';
+      const details = this.componentDetailsBlock(`strategy-profile-${id}-details`, 'Diagnostics', `${this.kv('Profile id', id)}${this.kv('Raw profile type', profile.profile_type || profile.asset_type || '—')}${this.kv('Editable fields published', String(this.profileEditableRows(rt, profile).length))}${this.kv('Contract role', profile.contract_role || 'editable_strategy_profile')}${this.kv('Planning outcome source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning')}${this.kv('Command source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.commands')}${this.kv('Engineer reason', human(profile.engineer_reason || '—'))}`);
+      return this.strategyTable(rt, profile, { details });
+    }
+    effectivePolicyPreviewCard(rt, strategy = {}) {
+      const assetId = strategy.asset_id || strategy.target_asset_id || '';
+      const planning = rt.planningOutcomeFor(assetId) || {};
+      const profileId = strategy.profile_id || strategy.strategy_profile_id || strategy.profile_type || strategy.asset_type || '';
+      const planLabel = planning.user_summary_label || planning.state || 'No plan';
+      const mode = human(strategy.mode || strategy.energy_control_mode || '—');
+      const asset = assetId ? this.energyAssetContext(rt, rt.asset(assetId) || { ...strategy, asset_id:assetId }) : null;
+      const identity = asset ? `<span class="effectivePolicyIdentity">${this.assetVisual(asset,{size:'xs',fallbackIcon:this.flexibleAssetIcon(asset)})}<b>${escapeHtml(rt.assetName(assetId) || human(assetId))}</b></span>` : `<b>${escapeHtml(human(strategy.strategy_id || 'Asset'))}</b>`;
+      return `<div class="effectivePolicyRow compact">${identity}<span>${escapeHtml(human(profileId || strategy.policy_profile || 'Not published'))}</span><strong>${escapeHtml(human(planLabel))}</strong>${mode !== '—' ? `<small>${escapeHtml(mode)}</small>` : ''}</div>`;
+    }
+    strategyIntentCard(rt, intent) {
+      const state = intent.state || intent.intent_state || 'observed';
+      const power = asNumber(intent.available_power_kw);
+      const required = asNumber(intent.required_power_kw);
+      const target = intent.target_asset_id ? rt.assetName(intent.target_asset_id) : human(intent.strategy_family || 'Energy');
+      const command = intent.recommended_action_id || '';
+      return `<div class="intentCard"><div><small>${escapeHtml(human(intent.strategy_family || intent.intent_type || 'Strategy'))}</small><h3>${escapeHtml(human(state))}</h3><p>${escapeHtml(intent.reason || intent.blocked_reason || 'Strategy intent published by Energy backend.')}</p></div><div class="intentFacts">${this.kv('Target', target)}${this.kv('Available', power === null ? '—' : fmtKw(power))}${this.kv('Required', required === null ? '—' : fmtKw(required))}${this.kv('Command', command ? human(command) : 'No command')}</div></div>`;
+    }
+    batteryHeroImagePath(assetId, name = '') {
+      const key = `${assetId || ''} ${name || ''}`.toLowerCase();
+      if (/solaredge|48v|9\.2/.test(key)) return hbEnergyAssetUrl('energy/solaredge_home_battery_48v_9_6.webp');
+      if (/byd|lvs|20\.0/.test(key)) return hbEnergyAssetUrl('energy/byd_lvs_20.webp');
+      return hbEnergyAssetUrl('heroes/battery-hero.webp');
+    }
+    batteryChildCard(rt, assetId) {
+      const name = rt.assetName(assetId);
+      const soc = rt.assetNumber(assetId, 'battery.soc_pct');
+      const power = rt.assetNumber(assetId, 'battery.power_kw');
+      const available = rt.assetNumber(assetId, 'battery.available_kwh');
+      const capacity = rt.assetNumber(assetId, 'battery.capacity_kwh');
+      const state = String(rt.assetText(assetId, 'battery.state', '') || '').toLowerCase();
+      const published = rt.asset(assetId) || {};
+      const projection = rt.assetProjection(assetId);
+      const health = firstDefined(projection?.lifecycle?.state, published.health, published.status, 'UNKNOWN');
+      const asset = this.energyAssetContext(rt, published.asset_id ? published : { asset_id:assetId, display_name:name, asset_type:'battery' });
+      const area = this.energyAssetAreaLabel(asset);
+      const explicitlyUnavailable = /unavailable|offline|disconnected|failed/i.test(String(firstDefined(published.availability_state,published.connection_state,health,'')));
+      const stateLabel = explicitlyUnavailable ? 'Unavailable'
+        : state === 'charging' ? 'Charging'
+        : state === 'discharging' ? 'Discharging'
+        : state === 'idle' ? 'Idle'
+        : power === null ? 'Telemetry limited'
+        : Math.abs(power) <= 0.05 ? 'Idle'
+        : power < 0 ? 'Charging' : 'Discharging';
+      const stateDetail = stateLabel === 'Charging' ? 'Absorbing energy from the Home Bus'
+        : stateLabel === 'Discharging' ? 'Supplying energy to the Home Bus'
+        : stateLabel === 'Idle' ? 'No active battery flow'
+        : stateLabel === 'Telemetry limited' ? 'Battery is available; per-battery power is not published'
+        : 'Battery is currently unavailable';
+      const quickFacts = [
+        ['Power now',fmtKw(power,'—')],
+        ['Available',available === null ? '' : fmtKwh(available)],
+        ['Capacity',capacity === null ? '' : fmtKwh(capacity)]
+      ].filter(([,value])=>value);
+      const actions = this.assetQuickActions(rt,assetId,3);
+      return `<article class="batteryContributorCard"><div class="batteryContributorVisual">${this.assetVisual(asset,{size:'lg',fallbackIcon:'▣',decorative:false})}</div><div class="batteryContributorBody"><div class="batteryContributorHeader"><div><b>${escapeHtml(name)}</b>${area ? `<small class="batteryContributorArea">${escapeHtml(area)}</small>` : ''}<span class="batteryHealth">${escapeHtml(human(health))}</span></div><strong>${fmtPct(soc)}</strong></div><div class="batteryContributorFacts">${quickFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div><div class="batteryContributorState"><span>${escapeHtml(stateLabel)}</span><small>${escapeHtml(stateDetail)}</small></div><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div>${actions}${this.energyAssetDetailDisclosure(rt,asset)}</div></article>`;
+    }
+    gas(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'gas');
+      const gas = this.gasModel(rt);
+      const hasMeter = !!gas.asset;
+      const meter = hasMeter ? this.energyDeviceStatusCard(rt, gas.asset, 'Gas meter') : '';
+      const historyAvailable = !!gas.totalEntityId;
+      const graph = historyAvailable
+        ? `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily measured gas use from Home Assistant long-term statistics on the canonical total-increasing meter.</p></div><span>Last 30 days</span></div><div class="gasStatisticsHost" data-gas-statistics-host data-entity-id="${escapeHtml(gas.totalEntityId)}"></div></section>`
+        : `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily gas consumption will appear here when a canonical total-increasing gas meter is available.</p></div></div><div class="empty"><b>No measured gas history yet</b><span>Connect the authoritative gas meter to enable Home Assistant long-term statistics. The UX never estimates missing consumption.</span></div></section>`;
+      const setupOrMeter = hasMeter
+        ? `<section class="panel gasMeterPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Gas meter</h2><p>Current meter state and measured values.</p></div></div>${meter}</section>`
+        : `<section class="panel gasSetupPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Connect your gas meter</h2><p>RHI Energy needs one authoritative gas source before it can show consumption history.</p></div></div><div class="gasSetupFacts"><div><small>Required</small><b>Total gas meter</b><span>A cumulative total-increasing reading in m³.</span></div><div><small>Optional</small><b>Live gas flow</b><span>An instantaneous m³/h reading when the source publishes it.</span></div><div><small>History</small><b>Home Assistant statistics</b><span>Daily changes are shown without frontend estimation.</span></div></div></section>`;
+      return `${this.tabExperienceHeader(rt,'gas',pageVm)}<div class="gasPage">
+        ${setupOrMeter}
+        ${graph}
+      </div>`;
+    }
+
+    battery(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'battery');
+      const batteryVm = this.currentEnergyModel(rt).battery;
+      const soc = batteryVm.socPct;
+      const capacity = batteryVm.capacityKwh;
+      const available = batteryVm.availableKwh;
+      const power = batteryVm.displayPowerKw;
+      const charge = batteryVm.chargePowerKw;
+      const discharge = batteryVm.dischargePowerKw;
+      const state = batteryVm.label;
+      const batterySystem = rt.assets().find(asset => ['battery_system','home_battery_system'].includes(String(asset.asset_type || asset.object_class || '').toLowerCase())) || rt.asset('battery_system');
+      const children = batterySystem
+        ? rt.childrenOfType(String(batterySystem.asset_id || 'battery_system'), 'battery')
+        : rt.assets().filter(asset => String(asset.asset_type || asset.object_class || '').toLowerCase() === 'battery').map(asset => String(asset.asset_id || '')).filter(Boolean);
+      return `${this.tabExperienceHeader(rt,'battery',pageVm)}<div class="batteryPage">
+        <div class="batteryGrid batteryGridTwoUp">
+          <section class="panel batteryHero"><h2>Home Battery state</h2><p>Combined state of your home batteries.</p><div class="batteryGauge"><b>${escapeHtml(fmtPct(soc))}</b><span>${escapeHtml(fmtKwh(available))} / ${escapeHtml(fmtKwh(capacity))}</span><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div>${this.kv('State', human(state))}${this.kv('Capacity', fmtKwh(capacity))}${this.kv('Available energy', fmtKwh(available))}${this.kv('Health', human(batteryVm.health))}</section>
+          <section class="panel" id="battery-contributors"><h2>Home Battery contributors</h2><p>Physical batteries contributing to the aggregate.</p><div class="batteryContributorList">${children.map(id => this.batteryChildCard(rt, id)).join('') || `<div class="empty"><b>No Home Battery units published</b><span>Home Battery aggregate only.</span></div>`}</div></section>
+          ${(() => { const profile = this.strategyProfileForDomain(rt, 'battery'); return profile ? this.strategyTable(rt, profile, { title: 'Home Battery strategy', description: 'Configured Home Battery policy.' }) : `<section class="panel strategyTablePanel"><div class="strategyTableHead"><div><h2>Home Battery strategy</h2><p>No Home Battery strategy profile is published.</p></div></div></section>`; })()}
+        </div>
+      </div>`;
+    }
+    consumerSortOptions() {
+      return [
+        ['power','Current power'],['energy','Energy today'],['need','Known need'],['cost','Cost today'],['name','Name']
+      ];
+    }
+    consumerFilterOptions() {
+      return [
+        ['all','All'],['flexible','Flexible'],['fixed','Fixed'],['vehicles','Vehicles'],['heating','Heating'],['storage','Storage'],['outdoor','Outdoor']
+      ];
+    }
+
+    consumerMixBar(row = {}) {
+      const solar = asNumber(row.solar_share_pct);
+      const battery = asNumber(row.battery_share_pct);
+      const lowGrid = asNumber(row.low_cost_grid_share_pct);
+      let grid = asNumber(row.grid_share_pct);
+      if (grid === null && row.grid_supplied_kwh !== null && row.energy_today_kwh) grid = Math.max(0, row.grid_supplied_kwh / row.energy_today_kwh * 100);
+      const otherGrid = grid === null ? null : Math.max(0, grid - (lowGrid || 0));
+      const values = [solar || 0, battery || 0, lowGrid || 0, otherGrid || 0];
+      const total = values.reduce((a,b)=>a+b,0);
+      if (!total) return `<div class="consumerMixUnavailable">Source attribution not published</div>`;
+      return `<div class="consumerMixBar" aria-label="Energy source mix"><span class="solar" style="width:${Math.max(0,values[0])}%"></span><span class="battery" style="width:${Math.max(0,values[1])}%"></span><span class="lowGrid" style="width:${Math.max(0,values[2])}%"></span><span class="grid" style="width:${Math.max(0,values[3])}%"></span></div><div class="consumerMixLegend"><span>Solar ${fmtPct(solar)}</span><span>Battery ${fmtPct(battery)}</span><span>Low-cost grid ${fmtPct(lowGrid)}</span><span>Other grid ${fmtPct(otherGrid)}</span></div>`;
+    }
+    consumerExplorerCard(rt, row = {}) {
+      const id = row.asset_id || row.consumer_id || row.id || 'consumer';
+      const vm = this.flexibleAssetDomain(rt).byId(id);
+      if (vm?.isDisabled) return this.disabledFlexibleAssetCard(rt, vm.raw || row, vm.planning || {});
+      const planning = vm?.planning || rt.planningOutcomeFor(id) || {};
+      const raw = vm?.raw || row;
+      const asset = this.energyAssetContext(rt, { ...raw, ...row, visual_ref:firstDefined(raw.visual_ref,row.visual_ref,'') });
+      const status = this.canonicalOperationalStatus(rt, asset, planning);
+      const commands = rt.commandsForAsset(id);
+      const startCommand = commands.find(c => rt.commandRole(c) === 'start');
+      const stop = commands.find(c => rt.commandRole(c) === 'stop');
+      const pause = commands.find(c => rt.commandRole(c) === 'pause');
+      const resume = commands.find(c => rt.commandRole(c) === 'resume');
+      const stateRaw = firstDefined(planning.product_state, planning.status, planning.state, row.status, planning.active ? 'active' : planning.waiting ? 'waiting' : planning.planned ? 'planned' : asset.operating_state, 'available');
+      const state = this.userStateText(stateRaw);
+      const availability = String(firstDefined(asset.availability_state, status.unavailable ? 'unavailable' : 'available') || '').toLowerCase();
+      const healthRaw = firstDefined(asset.health, asset.lifecycle_state, asset.status, '');
+      const health = status.unavailable ? 'Unavailable' : healthRaw ? human(healthRaw) : 'Available';
+      const area = this.energyAssetAreaLabel(asset);
+      const chargerId = String(firstDefined(asset.effective_charger, asset.charger_asset_id, asset.connection_asset_id, asset.execution_target_asset_id, '') || '');
+      const relation = chargerId ? `${rt.assetName(chargerId) || human(chargerId)} · ${human(firstDefined(asset.connection_state,'linked'))}` : '';
+      const paused = /paused|hold/.test(String(stateRaw || '').toLowerCase()) || rt.commandEnabled(resume);
+      const actions = [
+        paused ? this.componentActionButton(resume, 'Resume automatic control', id) : this.componentActionButton(pause, 'Pause automatic control', id),
+        /active|charging|running/.test(String(stateRaw || '').toLowerCase()) ? this.componentActionButton(stop, 'Stop now', id) : this.componentActionButton(startCommand, 'Start now', id)
+      ].join('');
+      const currentPower = asNumber(firstDefined(row.current_power_kw, row.actual_power_kw, row.power_kw, raw.current_power_kw, raw.power_kw));
+      const requestedPower = asNumber(firstDefined(row.requested_power_kw, raw.requested_power_kw));
+      const need = asNumber(firstDefined(planning.energy_to_target_kwh,planning.energy_needed_kwh,planning.known_need_kwh,row.expected_energy_kwh,row.energy_need_kwh,raw.energy_to_target_kwh,raw.required_energy_kwh));
+      const planned = asNumber(firstDefined(planning.planned_today_kwh,planning.scheduled_kwh,row.planned_today_kwh,row.planned_energy_kwh));
+      const remaining = asNumber(firstDefined(planning.still_unresolved_kwh,planning.unresolved_horizon_kwh,planning.remaining_need_kwh,row.remaining_need_kwh,raw.remaining_need_kwh));
+      const facts = [
+        ['Power now', fmtKw(currentPower,'0.0 kW')],
+        need !== null ? ['Required', fmtKwh(need)] : null,
+        planned !== null ? ['Planned today', fmtKwh(planned)] : null,
+        remaining !== null ? ['Still to plan', fmtKwh(remaining)] : null
+      ].filter(Boolean);
+      const details = `${this.kv('Status', health)}${area ? this.kv('Area', area) : ''}${this.kv('Availability', human(availability))}${this.kv('Requested power', fmtKw(requestedPower, '—'))}${relation ? this.kv('Relationship', relation) : ''}${this.kv('Automation', human(firstDefined(row.automation_mode, raw.automation_mode, 'Automatic')))}`;
+      return `<article class="managedAssetCard"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${escapeHtml(state)} · ${escapeHtml(health)}${area ? ` · ${escapeHtml(area)}` : ''}</span></div></div><b>${fmtKw(currentPower, '0.0 kW')}</b></div><div class="managedAssetFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>${relation ? `<div class="managedAssetRelationship"><small>Connected via</small><b>${escapeHtml(relation)}</b></div>` : ''}${actions ? `<div class="managedAssetActions">${actions}</div>` : ''}${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}${this.energyAssetDetailDisclosure(rt,asset)}</article>`;
+    }
+
+    filterAndSortConsumers(rows = []) {
+      const filter = this.consumerFilter || 'all';
+      let filtered = rows.filter(row => {
+        const text = `${row.category || ''} ${row.asset_type || ''} ${row.display_name || ''}`.toLowerCase();
+        if (filter === 'flexible') return asBool(row.flexible, false) || String(row.controllability || '').toLowerCase() === 'flexible';
+        if (filter === 'fixed') return !asBool(row.flexible, false) && String(row.controllability || '').toLowerCase() !== 'flexible';
+        if (filter === 'vehicles') return /vehicle|car|mobility/.test(text);
+        if (filter === 'heating') return /heat|thermal|boiler|hvac/.test(text);
+        if (filter === 'storage') return asBool(row.storage, false) || /battery|storage/.test(text);
+        if (filter === 'outdoor') return /outdoor|pool|jacuzzi|irrigation/.test(text);
+        return true;
+      });
+      const value = (row, key) => asNumber(row[key]) ?? -Infinity;
+      const sort = this.consumerSort || 'cost';
+      return filtered.sort((a,b) => {
+        if (sort === 'name') return String(a.display_name || '').localeCompare(String(b.display_name || ''));
+        if (sort === 'status') return String(a.status || '').localeCompare(String(b.status || ''));
+        if (sort === 'energy') return value(b,'energy_today_kwh') - value(a,'energy_today_kwh');
+        if (sort === 'power') return value(b,'current_power_kw') - value(a,'current_power_kw');
+        if (sort === 'grid') return value(b,'grid_supplied_kwh') - value(a,'grid_supplied_kwh');
+        if (sort === 'low-grid') return value(b,'low_cost_grid_kwh') - value(a,'low_cost_grid_kwh');
+        if (sort === 'solar') return value(b,'solar_supplied_kwh') - value(a,'solar_supplied_kwh');
+        if (sort === 'battery') return value(b,'battery_supplied_kwh') - value(a,'battery_supplied_kwh');
+        if (sort === 'need') return value(b,'expected_energy_kwh') - value(a,'expected_energy_kwh');
+        return value(b,'cost_today_eur') - value(a,'cost_today_eur');
+      });
+    }
+    consumers(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'consumers');
+      const publishedRows = rt.consumerMixRows();
+      const summary = rt.consumerMixSummary();
+      const domain = this.flexibleAssetDomain(rt);
+      const publishedById = new Map(publishedRows.map(row => [String(row.asset_id||row.consumer_id||row.id||''), row]));
+      const canonicalRows = domain.all().filter(vm => !vm.isStorage).map(vm => {
+        const raw = vm.raw || {};
+        const published = publishedById.get(vm.id) || {};
+        return {
+          ...raw,
+          ...published,
+          asset_id:vm.id,
+          visual_ref:firstDefined(raw.visual_ref, published.visual_ref, ''),
+          charger_asset_id:firstDefined(raw.charger_asset_id, raw.effective_charger, raw.connection_asset_id, published.charger_asset_id, published.effective_charger, published.connection_asset_id, ''),
+          connection_state:firstDefined(raw.connection_state, published.connection_state, ''),
+          participation_state:vm.participation,
+          operational_state:vm.operation
+        };
+      });
+      const canonicalIds = new Set(canonicalRows.map(row => String(row.asset_id||row.consumer_id||row.id||'')));
+      const rows = canonicalRows.concat(publishedRows.filter(row => !canonicalIds.has(String(row.asset_id||row.consumer_id||row.id||''))));
+      const visibleRows = this.filterAndSortConsumers(rows);
+      const participating = visibleRows.filter(row => { const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return !vm || (vm.isParticipating && !vm.isDisabled); });
+      const disabled = visibleRows.filter(row => domain.byId(row.asset_id||row.consumer_id||row.id)?.isDisabled);
+      const statuses = participating.map(row => {
+        const vm=domain.byId(row.asset_id||row.consumer_id||row.id);
+        return this.canonicalOperationalStatus(rt, vm?.raw||row, vm?.planning||{});
+      });
+      const activeCount = statuses.filter(state => state.isCharging).length;
+      const unavailableCount = statuses.filter(state => state.unavailable).length;
+      const totalPower = asNumber(summary.current_power_kw);
+      const planningVm = this.buildPlanningViewModel(rt);
+      const todayTotals = objectFrom(planningVm.todayTotals || {});
+      const totalNeed = asNumber(firstDefined(todayTotals.flexible_total_need_kwh,summary.flexible_total_need_kwh,summary.required_energy_kwh));
+      const totalPlanned = asNumber(firstDefined(todayTotals.planned_flexible_energy_kwh,todayTotals.planned_today_kwh,summary.planned_today_kwh));
+      const stillToPlan = asNumber(firstDefined(todayTotals.still_unresolved_kwh,todayTotals.unresolved_horizon_kwh,summary.still_to_plan_kwh));
+      const summaryFacts = [
+        ['Power now',totalPower === null ? '—' : fmtKw(totalPower)],
+        ['Required today',totalNeed === null ? '—' : fmtKwh(totalNeed)],
+        ['Planned today',totalPlanned === null ? '—' : fmtKwh(totalPlanned)],
+        ['Still to plan',stillToPlan === null ? '—' : fmtKwh(stillToPlan)]
+      ];
+      const story = activeCount
+        ? `${activeCount} managed asset${activeCount===1?' is':'s are'} using measured power now.`
+        : participating.length ? `Home Intelligence is managing ${participating.length} asset${participating.length===1?'':'s'}; none has measured active power now.` : 'No assets are currently managed by Home Intelligence.';
+      const why = unavailableCount ? `${unavailableCount} asset${unavailableCount===1?' is':'s are'} currently unavailable.` : 'Planning state is shown separately from live execution.';
+      const cards = participating.map(row=>this.consumerExplorerCard(rt,row)).join('');
+      const disabledRows = disabled.map(row=>{ const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return this.disabledFlexibleAssetCard(rt,vm?.raw||row,vm?.planning||{}); }).join('');
+      return `${this.tabExperienceHeader(rt,'consumers',pageVm)}${this.bodyContextBar(rt,'consumers','consumer-list')}<div class="consumersPage productPortalPage">
+        <section class="consumerPrimarySummary" aria-label="Managed energy summary">${summaryFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</section>
+        ${this.productStoryCard({ eyebrow:'Managed energy', title:story, why, recommendation:unavailableCount?'Review unavailable assets and published reasons.':'No manual action is required unless a published command is offered.', tone:'blue' })}
+        <section class="panel consumerExplorer" id="consumer-list"><div class="consumerExplorerHeader"><div><h2>Managed assets</h2><p>Primary cards show current power and published energy need. Details hold the deeper technical context.</p></div><strong>${fmtKw(totalPower,'—')}</strong></div><div class="consumerExplorerList">${cards || `<div class="empty"><b>No managed assets</b><span>Enable participation for an asset to let Home Intelligence manage it.</span></div>`}</div></section>
+        ${disabledRows ? `<details class="panel compactDisclosure"><summary>Other assets (${disabled.length})</summary><p>These assets are not managed by Home Intelligence.</p><div class="disabledAssetList">${disabledRows}</div></details>` : ''}
+      </div>`;
+    }
+    strategies(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'strategies');
+      const d = rt.decision();
+      const profiles = rt.strategyProfileRows();
+      const effectiveStrategies = rt.effectiveStrategyRows();
+      const planningRows = this.flexibleAssetDomain(rt).planningRows();
+      const visibleCommands = rt.visibleCommands().filter(c => rt.commandVisible(c));
+      const fallbackProfile = profiles[0] || null;
+      const selected = this.selectedStrategyProfileId
+        ? (rt.strategyProfileFor(this.selectedStrategyProfileId) || null)
+        : fallbackProfile;
+      if (selected && !this.selectedStrategyProfileId) this.selectedStrategyProfileId = selected.profile_id;
+      const selectedId = selected?.profile_id || '';
+      const unavailableSelectedProfile = this.selectedStrategyProfileId && !selected
+        ? `<option value="${escapeHtml(this.selectedStrategyProfileId)}" selected disabled>Selected profile temporarily unavailable</option>`
+        : '';
+      const profilePicker = profiles.length ? `<section class="panel strategyProfilePicker compact"><div><h2>Strategy profile</h2><p>Choose the policy set you want to review or adjust.</p></div><label class="strategyProfileSelect"><span>Profile</span><select data-strategy-profile-select>${unavailableSelectedProfile}${profiles.map(profile => `<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>${selected ? `<small>${escapeHtml(this.profileUserDescription(selected))}</small>` : `<small>The selected profile is temporarily unavailable. Your selection is preserved.</small>`}</section>` : '';
+      const effectiveRowsForProfile = selectedId
+        ? effectiveStrategies.filter(strategy => {
+            const text = `${strategy.profile_id || ''} ${strategy.strategy_profile_id || ''} ${strategy.profile_type || ''} ${strategy.asset_type || ''} ${strategy.policy_profile || ''}`.toLowerCase();
+            const wanted = String(selectedId).toLowerCase();
+            return text.includes(wanted) || text.includes(String(selected.profile_type || '').toLowerCase()) || text.includes(String(selected.asset_type || '').toLowerCase());
+          })
+        : effectiveStrategies;
+      const effectiveRows = (effectiveRowsForProfile.length ? effectiveRowsForProfile : effectiveStrategies).map(strategy => this.effectivePolicyPreviewCard(rt, strategy)).join('');
+      const diagnostics = `${this.kv('Editable strategy source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy')}${this.kv('Effective context source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy.effective_properties')}${this.kv('Planning outcome source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning')}${this.kv('Explanation source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.intelligence')}${this.kv('Action source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.commands')}${this.kv('Selected profile', selectedId || 'None')}`;
+      return `${this.tabExperienceHeader(rt,'strategies',pageVm)}<div class="strategiesPage strategyProfilesPage strategyProfileUx">
+        ${profilePicker || `<section class="panel"><h2>No strategy profiles published</h2><p>Waiting for canonical V2 strategy configuration.</p></section>`}
+        <div class="profileEditorColumn">${selected ? this.strategyProfileCard(rt, selected) : ''}</div>
+        <section class="panel effectivePolicyPreview"><h2>Current policy effect${selected ? ` · ${escapeHtml(this.profileUserLabel(selected))}` : ''}</h2><p>Configured, effective and influencing policy state.</p><div class="effectivePolicyList">${effectiveRows || `<div class="empty"><b>No effective strategy published</b><span>Waiting for canonical V2 effective strategy.</span></div>`}</div></section>
+        <section class="panel strategyParticipation"><h2>Participating assets</h2><p>The same central participation model used across Energy.</p><div class="effectivePolicyList">${this.flexibleAssetDomain(rt).all().filter(vm=>!vm.isStorage).map(vm=>`<div class="planningTransparencyRow"><div class="strategyAssetIdentity">${this.assetVisual(vm.raw,{size:'xs',fallbackIcon:this.flexibleAssetIcon(vm.raw)})}<div><b>${escapeHtml(rt.assetName(vm.id))}</b><span>${escapeHtml(vm.isDisabled?'Excluded from planning':'Included in flexible planning')}</span></div></div><strong>${escapeHtml(human(vm.participation))}</strong></div>`).join('') || `<div class="empty"><b>No flexible assets published</b></div>`}</div></section>
+      </div>`;
+    }
+
+    meteringPeriodRow(title, todayKey, monthKey, yearKey, totalKey) {
+      const rt = this.runtime();
+      const today = rt.number(todayKey);
+      const month = rt.number(monthKey);
+      const year = rt.number(yearKey);
+      const total = rt.number(totalKey);
+      return `<div class="meteringRow"><div><b>${escapeHtml(title)}</b><span>${escapeHtml(todayKey)}</span></div><strong>${fmtKwh(today)}</strong><small>Month ${escapeHtml(fmtKwh(month))} · Year ${escapeHtml(fmtKwh(year))} · Total ${escapeHtml(fmtKwh(total))}</small></div>`;
+    }
+    defaultMeteringPeriods() {
+      return [
+        { period_id: 'hour', label: 'This hour', selector_order: 0 },
+        { period_id: 'today', label: 'Today', selector_order: 1 },
+        { period_id: 'week', label: 'Week', selector_order: 2 },
+        { period_id: 'month', label: 'Month', selector_order: 3 },
+        { period_id: 'year', label: 'Year', selector_order: 4 }
+      ];
+    }
+    meteringSortOptions() {
+      return [
+        { value: 'default', label: 'Default' },
+        { value: 'name', label: 'Name' },
+        { value: 'value_desc', label: 'Highest value' },
+        { value: 'value_asc', label: 'Lowest value' },
+        { value: 'status', label: 'Status' }
+      ];
+    }
+    componentMeteringSort() {
+      const active = this.meteringSort || 'default';
+      const options = this.meteringSortOptions();
+      const buttons = options.map(option => `<button type="button" class="scopeOption ${option.value === active ? 'active' : ''}" data-metering-sort="${escapeHtml(option.value)}">${escapeHtml(option.label)}</button>`).join('');
+      const select = `<select data-metering-sort-select>${options.map(option => `<option value="${escapeHtml(option.value)}" ${option.value === active ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('')}</select>`;
+      const activeLabel = options.find(option => option.value === active)?.label || 'Default';
+      return `<div class="scopeSelector meteringSortSelector"><div class="scopeSelectorTitle"><span>Sort</span><b>${escapeHtml(activeLabel)}</b></div><div class="scopeButtons">${buttons}</div>${select}</div>`;
+    }
+    sortMeteringRows(rows = []) {
+      const sort = this.meteringSort || 'default';
+      const statusRank = { fail: 0, warn: 1, missing: 2, 'not-measured': 3, unknown: 4, ok: 5 };
+      const list = [...rows];
+      if (sort === 'name') list.sort((a, b) => String(a.label || '').localeCompare(String(b.label || '')));
+      if (sort === 'value_desc') list.sort((a, b) => (asNumber(b.value) ?? -Infinity) - (asNumber(a.value) ?? -Infinity));
+      if (sort === 'value_asc') list.sort((a, b) => (asNumber(a.value) ?? Infinity) - (asNumber(b.value) ?? Infinity));
+      if (sort === 'status') list.sort((a, b) => (statusRank[rowState({ health: a.status, missing: a.value === null })] ?? 9) - (statusRank[rowState({ health: b.status, missing: b.value === null })] ?? 9));
+      return list;
+    }
+    meteringDisplayValue(row) {
+      if (!row || row.value === null || row.value === undefined || row.value === '') return 'Not published';
+      const unit = String(row.unit || 'kWh');
+      if (/eur|€/.test(unit.toLowerCase())) {
+        const n = asNumber(row.value);
+        return n === null ? String(row.value) : `€${n.toFixed(2)}`;
+      }
+      if (/kwh/i.test(unit)) return fmtKwh(row.value, 'Not published');
+      if (/kw/i.test(unit)) return fmtKw(row.value, 'Not published');
+      const n = asNumber(row.value);
+      return n === null ? String(row.value) : `${n.toFixed(1)}${unit ? ` ${unit}` : ''}`;
+    }
+    meteringStatus(row) { return row?.status || 'unknown'; }
+    meteringClusterCard(title, rows = [], description = '') {
+      const sorted = this.sortMeteringRows(rows);
+      const body = sorted.length ? sorted.map(row => `<div class="meteringCleanRow ${escapeHtml(rowState({ health: this.meteringStatus(row), missing: row.value === null }))}"><div><b>${escapeHtml(row.label)}</b>${row.sub ? `<span>${escapeHtml(row.sub)}</span>` : ''}</div><strong>${escapeHtml(this.meteringDisplayValue(row))}</strong>${['unknown','unavailable',''].includes(String(this.meteringStatus(row)||'').toLowerCase()) ? '' : this.componentQualityChip(this.meteringStatus(row))}</div>`).join('') : `<div class="empty"><b>No values published</b><span>This cluster has no public metering values for the selected period.</span></div>`;
+      return `<section class="panel meteringCleanCard"><div class="meteringCardHead"><div><h2>${escapeHtml(title)}</h2>${description ? `<p>${escapeHtml(description)}</p>` : ''}</div></div><div class="meteringCleanRows">${body}</div></section>`;
+    }
+    meteringRawRowsDetails(rows = [], id = 'metering-raw-rows') {
+      const sorted = this.sortMeteringRows(rows);
+      const body = sorted.length ? sorted.map(row => `<div class="meteringCleanRow raw"><div><b>${escapeHtml(row.label || row.key || 'Metering row')}</b><span>${escapeHtml(row.key || row.source_key || '')}</span></div><strong>${escapeHtml(this.meteringDisplayValue(row))}</strong>${this.componentQualityChip(row.status || row.health || '')}</div>`).join('') : `<div class="empty"><b>No raw rows</b><span>No metering rows were published.</span></div>`;
+      return ''; // Engineering rows remain outside the end-user portal.
+    }
+    meteringRemediationCard(period = {}, remediations = []) {
+      if (!remediations.length) return '';
+      const runtime = this.runtime();
+      const items = remediations.map(remediation => {
+        const advice = objectFrom(remediation.advice || {});
+        const problem = objectFrom(remediation.problem || {});
+        const action = objectFrom(remediation.action || {});
+        const id = String(remediation.remediation_id || remediation.problem_id || 'metering_remediation');
+        const command = runtime.meteringResetCommandFor(remediation, period?.period_id || remediation.period_id || '');
+        const enabled = command ? runtime.commandEnabled(command) : false;
+        const reason = command ? runtime.commandReason(command) : 'Reset command not published';
+        const feedback = this.remediationFeedback[id] || null;
+        const affected = asArray(remediation.affected_keys || problem.affected_keys || action.affected_keys);
+        const title = firstDefined(advice.title, remediation.title, problem.title, 'Metering baseline reset required');
+        const message = firstDefined(advice.message, remediation.message, problem.message, 'This period cannot be trusted until the period baseline is reset and verified.');
+        const impact = firstDefined(advice.consequence_if_ignored, advice.impact, remediation.impact, 'Period values may stay hidden or excluded from evidence until this is fixed.');
+        const scope = firstDefined(action.reset_scope, remediation.reset_scope, command?.readback?.reset_scope, 'period_baseline_only');
+        const button = command
+          ? `<button type="button" class="hiAction remediationAction ${enabled ? 'enabled' : 'disabled'}" ${enabled ? '' : 'disabled'} data-metering-remediation-command-row-id="${escapeHtml(command.command_instance_id || command.command_row_id || '')}" data-remediation-id="${escapeHtml(id)}" title="${escapeHtml(reason)}">Reset baseline</button>`
+          : `<button type="button" class="hiAction disabled" disabled title="Reset command not published">Reset baseline</button>`;
+        return `<div class="meteringRemediationItem"><div class="meteringRemediationText"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(message)}</p><div class="remediationImpact"><b>Impact</b><span>${escapeHtml(impact)}</span></div>${feedback ? `<div class="writeFeedback ${escapeHtml(feedback.state)}">${escapeHtml(humanReason(feedback.reason || feedback.state, feedback.state))}</div>` : ''}</div><div class="meteringRemediationAction">${button}<small>${escapeHtml(enabled ? 'Manual confirmation required' : humanReason(reason, 'Command not ready'))}</small></div>${this.componentDetailsBlock(`metering-remediation-details-${escapeHtml(id)}`, 'Remediation details', `${this.kv('Problem id', remediation.problem_id || problem.problem_id || id)}${this.kv('Selected period', this.periodLabel(period))}${this.kv('Affected counters', affected.length ? affected.join(', ') : 'Not published')}${this.kv('Reset scope', human(scope))}${this.kv('Source totals', 'Not changed')}${this.kv('Statistics', 'Not changed')}${this.kv('Command key', command?.command_id || remediation.command_ref || 'Not published')}${this.kv('Command state', command ? (enabled ? 'Ready' : humanReason(reason, 'Not ready')) : 'Not published')}`)}</div>`;
+      }).join('');
+      return `<section class="panel wide meteringRemediationPanel"><div class="meteringCardHead"><div><h2>Metering attention</h2><p>Resolve the selected period before relying on its totals.</p></div></div>${items}</section>`;
+    }
+    meteringRowFromRuntime(rt, label, key, group = '', fallbackUnit = 'kWh', metricKey = '') {
+      const row = rt.row(key);
+      const value = row?.missing ? null : asNumber(rowValue(row, null));
+      return {
+        label, key, metric_key:metricKey, group, value, unit:row.unit || fallbackUnit,
+        status:String(firstDefined(row.measurement_state,row.status,row.health,row.quality,rt.statusForKeys(key),'UNAVAILABLE')),
+        measurement_state:String(firstDefined(row.measurement_state,row.status,'UNAVAILABLE')),
+        attribution_state:String(firstDefined(row.attribution_state,'')),
+        trust_state:String(firstDefined(row.trust_state,'')),
+        availability:String(firstDefined(row.availability,'')),
+        status_label:String(firstDefined(row.status_label,'')),
+        user_action_required:asBool(row.user_action_required,false),
+        sub:row?.missing ? 'Not published' : ''
+      };
+    }
+    flexibleLoadMeteringRows(_rt, _periodId = 'today') {
+      return [];
+    }
+
+    meteringRowsFromRecords(_rt, periodId = 'today') {
+      const wanted=String(periodId || 'today').toLowerCase() === 'day' ? 'today' : String(periodId || 'today').toLowerCase();
+      return this.meteringRowsFromPeriod({
+        period_id:wanted,
+        measurement_state:'UNAVAILABLE',
+        summary:{ measured:{}, quality:{ period:'UNAVAILABLE' } }
+      });
+    }
+
+    meteringRowsFromPeriod(period) {
+      const measured = objectFrom(period?.summary?.measured || {});
+      const quality = objectFrom(period?.summary?.quality || {});
+      const status = String(firstDefined(quality.measurement_state,quality.health,quality.status,period?.measurement_state,period?.health,'UNAVAILABLE'));
+      const statusLabel = String(firstDefined(quality.status_label,period?.status_label,''));
+      const row = (label, metricKey) => ({ label, metric_key:metricKey, value:asNumber(valueAtPath(measured,metricKey)), unit:'kWh', status, measurement_state:status, status_label:statusLabel, user_action_required:asBool(firstDefined(quality.user_action_required,period?.user_action_required,false),false) });
+      return {
+        supply:[row('Solar production','solar_production_kwh'),row('Grid import','grid_import_kwh'),row('Home Battery discharge','battery_discharge_kwh')],
+        demand:[row('Site Consumption','site_consumption_kwh'),row('Home Consumption','home_consumption_kwh'),row('Flexible Loads','flexible_loads_energy_in_kwh'),row('Home Battery charge','battery_charge_kwh')],
+        grid:[row('Grid import','grid_import_kwh'),row('Grid export','grid_export_kwh')],
+        battery:[row('Home Battery charge','battery_charge_kwh'),row('Home Battery discharge','battery_discharge_kwh')]
+      };
+    }
+    meteringFallbackRows(rt, periodId = 'today') {
+      const period = String(periodId || 'today').toLowerCase() === 'day' ? 'today' : String(periodId || 'today').toLowerCase();
+      const exact = (label,key,group,metricKey) => this.meteringRowFromRuntime(rt,label,key,group,'kWh',metricKey);
+      return {
+        supply:[
+          exact('Solar production',`metering.solar_energy_${period}_kwh`,'supply','solar_production_kwh'),
+          exact('Grid import',`metering.grid_import_${period}_kwh`,'supply','grid_import_kwh'),
+          exact('Home Battery discharge',`metering.battery_discharge_${period}_kwh`,'supply','battery_discharge_kwh')
+        ],
+        demand:[
+          exact('Site Consumption',`metering.site_consumption_${period}_kwh`,'demand','site_consumption_kwh'),
+          exact('Home Consumption',`metering.home_consumption_${period}_kwh`,'demand','home_consumption_kwh'),
+          exact('Flexible Loads',`metering.flexible_loads_energy_in_${period}_kwh`,'demand','flexible_loads_energy_in_kwh'),
+          exact('Home Battery charge',`metering.battery_charge_${period}_kwh`,'demand','battery_charge_kwh')
+        ],
+        grid:[
+          exact('Grid import',`metering.grid_import_${period}_kwh`,'grid','grid_import_kwh'),
+          exact('Grid export',`metering.grid_export_${period}_kwh`,'grid','grid_export_kwh')
+        ],
+        battery:[
+          exact('Home Battery charge',`metering.battery_charge_${period}_kwh`,'battery','battery_charge_kwh'),
+          exact('Home Battery discharge',`metering.battery_discharge_${period}_kwh`,'battery','battery_discharge_kwh')
+        ]
+      };
+    }
+    meteringPeriodRowsAvailable(rows) {
+      return Object.values(rows || {}).flat().some(row => row && row.value !== null && row.value !== undefined);
+    }
+    meteringQualityFromRows(rows = {}) {
+      const all = Object.values(rows).flat().filter(Boolean);
+      const states = all.map(row => String(row.status || '').toUpperCase());
+      if (states.some(state => /UNAVAILABLE|FAIL|ERROR/.test(state))) return { health:'unavailable' };
+      if (states.some(state => /CONFIGURATION_REQUIRED/.test(state))) return { health:'configuration_required' };
+      if (states.some(state => /RESET_REQUIRED|UNTRUSTED|BASELINE/.test(state))) return { health:'reset_required', baseline_reset_required:true };
+      if (states.some(state => /PENDING|VERIFY/.test(state))) return { health:'pending', pending_baseline:true };
+      if (states.some(state => /PARTIAL|ESTIMATED/.test(state))) return { health:'partial' };
+      return { health:'trusted' };
+    }
+    flexibleLoadMeteringTable(rt, rows = [], periodLabel = '') {
+      const visibleRows = rows.map(row => ({ row, ux:createMeteringStatusModel(row) })).filter(item => item.ux.visible);
+      const details = visibleRows.filter(item => !item.row.is_total);
+      const totals = visibleRows.filter(item => item.row.is_total);
+      const renderRow = ({ row, ux }, total = false) => {
+        const label = ux.unattributed ? 'Unassigned charging energy' : (total ? 'Total Flexible Loads' : row.label);
+        const displayValue = ux.measured ? this.meteringDisplayValue(row) : ux.label;
+        const statusText = row.status_label || ux.label;
+        const assetId = String(firstDefined(row.asset_id,row.flexible_asset_id,row.consumer_id,row.source_asset_id,'') || '');
+        const asset = !total && !ux.unattributed && assetId ? this.energyAssetContext(rt, rt.asset(assetId) || { ...row, asset_id:assetId }) : null;
+        const identity = asset ? `<span class="meteringAssetIdentity">${this.assetVisual(asset,{size:'xs',fallbackIcon:this.flexibleAssetIcon(asset)})}<span><b>${escapeHtml(label)}</b>${row.source_label ? `<small>${escapeHtml(row.source_label)}</small>` : ''}</span></span>` : `<span><b>${escapeHtml(label)}</b>${row.source_label && !ux.unattributed ? `<small>${escapeHtml(row.source_label)}</small>` : ''}</span>`;
+        return `<tr class="${total ? 'meteringTotalRow' : ''}"><td>${identity}</td><td class="numeric">${escapeHtml(displayValue)}</td><td>${this.componentQualityChip(statusText)}</td></tr>`;
+      };
+      const bodyRows = [...details.map(item => renderRow(item,false)), ...totals.map(item => renderRow(item,true))];
+      const body = bodyRows.length ? bodyRows.join('') : `<tr><td colspan="3"><div class="empty"><b>No Flexible Load measurements available</b><span>Measurements appear when Energy publishes a visible period record.</span></div></td></tr>`;
+      return `<section class="panel wide flexibleMeteringPanel"><div class="meteringCardHead"><div><h2>Flexible Loads</h2><p>Measured consumption per Flexible Load for ${escapeHtml(String(periodLabel || 'the selected period').toLowerCase())}. Home Battery is reported separately as Flexible Storage.</p></div></div><div class="tableWrap"><table class="flexibleMeteringTable"><thead><tr><th>Flexible Load</th><th class="numeric">Measured energy</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
+    }
+    meteringCleanPage(vm) {
+      const { label, rows, conclusion, command, flexibleLoadRows = [] } = vm;
+      const action = command ? this.componentActionButton(command, `Reset ${label.toLowerCase()} totals`, 'metering') : '';
+      const group = (title, values) => this.meteringClusterCard(title, values || [], title==='Supply'?'Energy received during this period.':title==='Demand'?'Energy used during this period.':title==='Grid'?'Energy exchanged with the grid.':'Home Battery energy during this period.');
+      return `<div id="metering-body" class="meteringPage productPortalPage">${this.productStoryCard({ eyebrow:`${label} measurements`, title:conclusion.title, why:conclusion.why, recommendation:conclusion.recommendation, actions:action, details:'', tone:conclusion.tone })}<div class="meteringGrid productMeteringGrid">${group('Supply',rows.supply)}${group('Demand',rows.demand)}${group('Grid',rows.grid)}${group('Home Battery',rows.battery)}</div>${this.flexibleLoadMeteringTable(this.runtime(), flexibleLoadRows, label)}</div>`;
+    }
+    meteringNotPublishedPeriod(periods, remediation = null) {
+      const selected = this.selectedPeriod(periods, this.selectedMeteringPeriodId) || { period_id:this.selectedMeteringPeriodId || 'week', label:human(this.selectedMeteringPeriodId || 'Period') };
+      const label = this.periodLabel(selected);
+      const command = remediation?.command || this.runtime().meteringResetCommandFor({}, selected.period_id);
+      const action = command ? this.componentActionButton(command, `Reset ${label.toLowerCase()} totals`, 'metering') : '';
+      const title = remediation ? `${label} totals need a one-time reset` : `${label} totals are being prepared`;
+      const why = remediation ? `Home Intelligence found measurements for ${label.toLowerCase()}, but the starting point cannot yet be trusted.` : `Reliable ${label.toLowerCase()} totals are not available yet.`;
+      const recommendation = remediation ? `Reset once. Home Intelligence will confirm the new baseline while keeping the measured values visible.` : `${label} measurements are currently unavailable. They will appear when the contract publishes them.`;
+      return `<div class="meteringPage productPortalPage">${this.productStoryCard({ eyebrow:`${label} measurements`, title, why, recommendation, actions:action, tone:remediation?'orange':'blue' })}</div>`;
+    }
+    metering(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'metering');
+      const vm = this.buildMeteringPeriodViewModel(rt);
+      if (!vm.available && !vm.summaryHasData) return this.tabExperienceHeader(rt,'metering',pageVm) + this.meteringNotPublishedPeriod(vm.periods, vm.remediations[0] || null);
+      return this.tabExperienceHeader(rt,'metering',pageVm) + this.meteringCleanPage(vm);
+    }
+    retrospectiveState() {
+      // The current public contract does not publish a canonical retrospective product domain.
+      // Retrospective therefore fails closed instead of reading the retired V1
+      // entity. When canonical retrospective evidence is added to Public V2 it
+      // must enter through the typed selector boundary.
+      return null;
+    }
+    retrospectiveParsed(value, fallback) {
+      if (value === null || value === undefined || value === '') return fallback;
+      if (Array.isArray(value) || (typeof value === 'object' && value !== null)) return value;
+      try { return JSON.parse(value); } catch (_) { return fallback; }
+    }
+    retrospectiveRows(names = []) {
+      const st = this.retrospectiveState();
+      if (!st) return [];
+      const attrs = st.attributes || {};
+      for (const name of [...names,'rows','items','entries','data','results']) {
+        const parsed = this.retrospectiveParsed(attrs[name], null);
+        if (Array.isArray(parsed)) return parsed.filter(x=>x && typeof x==='object');
+        if (parsed && typeof parsed==='object') return Object.values(parsed).filter(x=>x && typeof x==='object');
+      }
+      return [];
+    }
+    retrospectivePrerequisites(attrs = {}, productStatus = {}) {
+      const raw = firstDefined(
+        attrs.prerequisites_json,
+        attrs.evidence_prerequisites_json,
+        attrs.pending_prerequisites_json,
+        productStatus.prerequisites_json,
+        productStatus.prerequisites,
+        []
+      );
+      const parsed = this.retrospectiveParsed(raw, raw);
+      const rows = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? Object.values(parsed) : []);
+      const normalize = (row, index) => {
+        const value = row && typeof row === 'object' ? row : { prerequisite_id:String(row || `step_${index+1}`) };
+        const id = String(firstDefined(value.prerequisite_id,value.id,value.key,`step_${index+1}`));
+        const state = String(firstDefined(value.state,value.status,value.health,'PENDING')).toUpperCase();
+        const labels = {
+          planning_outcome:'Planning outcomes', planning_results:'Planning outcomes',
+          execution_evidence:'Execution results', execution_results:'Execution results',
+          completed_metering:'Measured energy', metering_evidence:'Measured energy',
+          value_evidence:'Value evidence', accounting_evidence:'Value evidence',
+          closed_evaluation_period:'Closed evaluation period', evaluation_period:'Closed evaluation period'
+        };
+        return {
+          id,
+          label: firstDefined(value.label,value.display_name,labels[id],human(id)),
+          state,
+          reason: humanReason(firstDefined(value.reason,value.reason_label,value.message,''),''),
+          ready: /READY|COMPLETE|OK|AVAILABLE/.test(state)
+        };
+      };
+      if (rows.length) return rows.map(normalize);
+      const reason = String(firstDefined(productStatus.reason_code,productStatus.reason,attrs.reason_code,attrs.health_reason,'')).toLowerCase();
+      const inferred = [];
+      if (/planning/.test(reason)) inferred.push({ prerequisite_id:'planning_outcome', state:'PENDING' });
+      if (/execution/.test(reason)) inferred.push({ prerequisite_id:'execution_evidence', state:'PENDING' });
+      if (/meter|measure/.test(reason)) inferred.push({ prerequisite_id:'completed_metering', state:'PENDING' });
+      if (/value|account/.test(reason)) inferred.push({ prerequisite_id:'value_evidence', state:'PENDING' });
+      return inferred.map(normalize);
+    }
+    retrospectiveModel() {
+      const overallState=this.retrospectiveState();
+      const attrs=overallState?.attributes || {};
+      const productStatus=this.retrospectiveParsed(firstDefined(attrs.product_status_json,attrs.product_status),{});
+      const evidenceSummary=this.retrospectiveParsed(firstDefined(attrs.evidence_summary_json,attrs.evidence_summary),{});
+      const score=asNumber(firstDefined(attrs.score,attrs.overall_score,attrs.score_pct,productStatus.score,overallState?.state));
+      const coverage=asNumber(firstDefined(attrs.evidence_coverage_pct,evidenceSummary.coverage_pct,attrs.coverage_pct));
+      const rating=human(firstDefined(productStatus.label,attrs.rating,attrs.performance_rating,score!==null?(score>=90?'Excellent':score>=80?'Very good':score>=65?'Good':score>=45?'Learning':'Needs attention'):'Waiting for evidence'));
+      const confidence=human(firstDefined(attrs.confidence,productStatus.confidence,'Not available'));
+      const explanation=humanReason(firstDefined(attrs.explanation,attrs.summary,attrs.health_reason,productStatus.reason),'Home Intelligence is waiting for the evidence required to complete this retrospective.');
+      const trendRaw=firstDefined(attrs.trend,attrs.trend_delta,attrs.score_delta);
+      const trend=asNumber(trendRaw);
+      const objectives=this.retrospectiveRows(['objectives_json','objectives']);
+      const strengths=this.retrospectiveRows(['strengths_json','strengths']);
+      const barriers=this.retrospectiveRows(['barriers_json','barriers']);
+      const opportunities=this.retrospectiveRows(['opportunities_json','opportunities']);
+      const recommendations=this.retrospectiveRows(['strategy_recommendations_json','recommendations_json','recommendations']);
+      const deviations=this.retrospectiveRows(['deviations_json','deviations']);
+      const deductions=[...barriers,...opportunities,...deviations];
+      const state=String(firstDefined(productStatus.state,overallState?.state,'')).toUpperCase();
+      const prerequisites=this.retrospectivePrerequisites(attrs, productStatus);
+      const collecting=/COLLECTING|WAITING|PENDING|PREREQUISITE/.test(state);
+      const hasEvidence=score!==null || objectives.length>0 || strengths.length>0 || deductions.length>0 || recommendations.length>0 || coverage!==null;
+      const available=hasEvidence;
+      const chainAssessment=objectFrom(this.retrospectiveParsed(firstDefined(attrs.chain_assessment_json,attrs.chain_assessment),{}));
+      const executionKpis=objectFrom(this.retrospectiveParsed(firstDefined(attrs.execution_kpis_json,attrs.execution_kpis),{}));
+      const tacticalKpis=objectFrom(this.retrospectiveParsed(firstDefined(attrs.tactical_planning_kpis_json,attrs.tactical_planning_kpis),{}));
+      const operationalKpis=objectFrom(this.retrospectiveParsed(firstDefined(attrs.operational_planning_kpis_json,attrs.operational_planning_kpis),{}));
+      return { available, collecting, hasEvidence, state, prerequisites, score, scoreText:score===null?'—':`${Math.round(score)}`, coverage, coverageText:coverage===null?'Not available':`${Math.round(coverage)}%`, rating, confidence, explanation, trend, trendText:trend===null?human(firstDefined(trendRaw,'Not available')):`${trend>=0?'▲ +':'▼ '}${Math.abs(trend).toFixed(0)}`, kpis:objectives, strengths, deductions, recommendations, chainAssessment, executionKpis, tacticalKpis, operationalKpis, attrs };
+    }
+    retrospective(rt) {
+      const review=this.retrospectiveModel();
+      const vm=this.buildPageViewModel(rt,'retrospective');
+      if (!review.available) {
+        const steps=(review.prerequisites.length ? review.prerequisites : [
+          {label:'Planning outcomes',state:'PENDING',ready:false},
+          {label:'Execution results',state:'PENDING',ready:false},
+          {label:'Measured energy',state:'PENDING',ready:false}
+        ]).map(step=>`<span><b>${escapeHtml(step.label)}</b><em>${escapeHtml(step.ready?'Ready':human(step.state || 'Pending'))}</em>${step.reason?`<small>${escapeHtml(step.reason)}</small>`:''}</span>`).join('');
+        return `${this.tabExperienceHeader(rt,'retrospective',vm)}<div class="retrospectivePage"><section class="panel retroCollectingState"><div class="retroCollectingIcon">↺</div><div><small>REVIEW PREREQUISITES</small><h2>${escapeHtml(review.rating || 'Waiting for evidence')}</h2><p>${escapeHtml(review.explanation)}</p><div class="retroEvidenceSteps">${steps}</div><div class="productNotice"><b>No action required</b><span>The review appears automatically when the published prerequisites are complete.</span></div></div></section></div>`;
+      }
+      const scoreOf=row=>asNumber(firstDefined(row.score,row.score_pct,row.value,row.achieved_score));
+      const weightOf=row=>asNumber(firstDefined(row.weight,row.weight_pct));
+      const statusOf=row=>human(firstDefined(row.status,row.rating,row.state,scoreOf(row)!==null?(scoreOf(row)>=90?'Excellent':scoreOf(row)>=75?'Good':'Improving'):'Collecting evidence'));
+      const titleOf=(row,fallback)=>human(firstDefined(row.label,row.title,row.name,row.kpi_name,row.objective,row.recommendation,row.recommendation_title,fallback));
+      const explanationOf=row=>humanReason(firstDefined(row.explanation,row.reason,row.summary,row.reasoning,row.description),'No additional explanation published.');
+      const kpis=review.kpis.map((row,i)=>{const score=scoreOf(row);const weight=weightOf(row);return `<article class="retroKpiCard"><div class="retroKpiHead"><span>${escapeHtml(firstDefined(row.icon,'◎'))}</span><div><h3>${escapeHtml(titleOf(row,`Objective ${i+1}`))}</h3><p>${escapeHtml(explanationOf(row))}</p></div><strong>${score===null?'—':Math.round(score)}</strong></div><div class="retroProgress"><i style="width:${Math.max(0,Math.min(100,score||0))}%"></i></div><footer><span>${escapeHtml(statusOf(row))}</span><span>${weight===null?'Measured objective':`${Math.round(weight)}% weight`}</span></footer></article>`;}).join('');
+      const deductions=review.deductions.slice(0,4).map((row,i)=>{const points=Math.abs(asNumber(firstDefined(row.points_lost,row.deduction_points,row.score_impact,row.points))||0);return `<article class="retroOpportunity"><span class="retroOpportunityIcon">${escapeHtml(firstDefined(row.icon,'↗'))}</span><div><h3>${escapeHtml(titleOf(row,`Opportunity ${i+1}`))}</h3><p>${escapeHtml(explanationOf(row))}</p></div><strong>${points?`+${Math.round(points)} potential`:'Review'}</strong></article>`;}).join('');
+      const rec=review.recommendations[0]||null;
+      const expected=rec?asNumber(firstDefined(rec.expected_score_gain,rec.score_gain,rec.expected_gain_points,rec.impact_points)):null;
+      const confidence=rec?human(firstDefined(rec.confidence,review.confidence)):'Not available';
+      const risk=rec?human(firstDefined(rec.risk,'Low')):'Not available';
+      const lessons=review.kpis.filter(r=>{const v=scoreOf(r);return v!==null&&v>=80;}).slice(0,3).map(r=>`<div class="retroLesson"><span>✓</span><div><b>${escapeHtml(titleOf(r,'Objective'))}</b><p>${escapeHtml(explanationOf(r))}</p></div></div>`).join('');
+      const empty=`<div class="empty"><b>Collecting evidence</b><span>This section appears when Energy Intelligence publishes enough measurable evidence.</span></div>`;
+      const chainRows = Object.entries(review.chainAssessment || {}).filter(([key])=>key!=='overall').map(([key,value])=>`<div class="goalRow"><span>${escapeHtml(human(key))}</span><b>${escapeHtml(human(value))}</b></div>`).join('');
+      const executionSummary = review.executionKpis && Object.keys(review.executionKpis).length ? `<div class="goalGrid"><div class="goalRow"><span>Execution results</span><b>${escapeHtml(String(firstDefined(review.executionKpis.result_count,'—')))}</b></div><div class="goalRow"><span>Confirmed successes</span><b>${escapeHtml(String(firstDefined(review.executionKpis.success_count,'—')))}</b></div><div class="goalRow"><span>Failures</span><b>${escapeHtml(String(firstDefined(review.executionKpis.failure_count,'—')))}</b></div><div class="goalRow"><span>Pending</span><b>${escapeHtml(String(firstDefined(review.executionKpis.pending_count,'—')))}</b></div></div>` : '';
+      const introText = review.collecting ? 'This period is still open. Available objective and execution evidence is shown now; the final score and trend remain unavailable until the period closes.' : review.explanation;
+      return `${this.tabExperienceHeader(rt,'retrospective',vm)}<div class="retrospectivePage"><section class="retroIntro"><div><small>${review.collecting?'Open period review':'Weekly review'}</small><h2>${escapeHtml(review.rating)}</h2><p>${escapeHtml(introText)}</p></div><div class="retroScoreRing"><strong>${escapeHtml(review.scoreText)}</strong><span>${review.score===null?'score pending':'out of 100'}</span></div></section><section class="panel" id="retrospective-details"><div class="portalSectionHeader"><div><small>Current evidence</small><h2>What the system can already conclude</h2><p>Published planning, execution and goal evidence is shown even while the period is still open.</p></div><strong>${escapeHtml(review.coverageText)} covered</strong></div>${chainRows?`<div class="goalGrid">${chainRows}</div>`:''}${executionSummary}</section><section class="panel" id="retrospective-objectives"><div class="portalSectionHeader"><div><small>Objectives</small><h2>How well did Energy Intelligence perform?</h2><p>Each objective shows its currently published evidence status.</p></div><strong>${escapeHtml(review.coverageText)} covered</strong></div><div class="retroKpiGrid">${kpis||empty}</div></section><section class="panel" id="retrospective-opportunities"><div class="portalSectionHeader"><div><small>Issues and opportunities</small><h2>What needs attention?</h2><p>Published deviations and opportunities explain where the chain did not deliver as intended.</p></div></div><div class="retroOpportunityList">${deductions||empty}</div></section><section class="panel retroLessons"><div class="portalSectionHeader"><div><small>What went well</small><h2>Strengths from this period</h2></div></div>${lessons||empty}</section><section class="panel retroBestNext"><small>Next best improvement</small><h2>${escapeHtml(rec?titleOf(rec,'Recommended improvement'):(review.collecting?'Waiting for closed evidence':'Still learning'))}</h2><p>${escapeHtml(rec?explanationOf(rec):(review.collecting?'A final recommendation is published when the review period closes and sufficient objective evidence is available.':'Home Intelligence will prioritise one improvement when sufficient evidence is available.'))}</p><div class="retroImpact"><div><span>Expected gain</span><strong>${expected===null?'—':`+${Math.round(expected)} points`}</strong></div><div><span>Confidence</span><strong>${escapeHtml(confidence)}</strong></div><div><span>Risk</span><strong>${escapeHtml(risk)}</strong></div></div></section></div>`;
+    }
+    intelligence(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'intelligence');
+      const d = rt.decision();
+      const planningRows = this.flexibleAssetDomain(rt).planningRows();
+      const policies = rt.effectiveStrategyRows();
+      const mode = this.automationModeValue(rt, firstDefined(d.mode, d.automation_mode, 'Automatic'));
+      const state = this.userStateText(firstDefined(d.product_state,d.status,d.state,rt.value('energy_intelligence.system_state','Monitoring')),'Monitoring');
+      const reasonObj = objectFrom(d.reason || {});
+      const why = humanReason(firstDefined(reasonObj.message,d.user_reason_label,d.reason_label,reasonObj.code,rt.rawText('energy_intelligence.reason',null)),'Home Intelligence is monitoring current energy conditions.');
+      const recommendation = human(firstDefined(d.advice,d.recommendation,rt.value('energy_intelligence.recommendation',null),rt.rawText('energy_intelligence.recommended_action','Keep monitoring')));
+      const actionId = firstDefined(d.recommended_action_id,rt.value('energy_intelligence.recommended_action_id',null),null);
+      const command = actionId ? rt.commands().find(c=>String(c.command_instance_id||c.command_id||'')===String(actionId)) : null;
+      const actions = command ? this.componentActionButton(command,human(rt.commandRole(command)||command.command_id),command.target_asset_id) : '';
+      const assetRows = planningRows.slice(0,8).map(row=>{ const id=row.asset_id; const s=this.userStateText(firstDefined(row.product_state,row.status,row.state,row.active?'active':row.waiting?'waiting':row.planned?'planned':'available')); const r=humanReason(firstDefined(row.user_reason_label,row.waiting_reason,row.reason,row.reason_code),'Home Intelligence is monitoring this asset.'); return `<div class="portalStatusRow"><div><b>${escapeHtml(rt.assetName(id)||human(id))}</b><span>${escapeHtml(r)}</span></div><strong>${escapeHtml(s)}</strong></div>`; }).join('');
+      const policySummary = policies.filter(p=>/active|waiting|constraining|enabled/i.test(String(firstDefined(p.influence_state,p.effective_state,'')))).slice(0,3).map(p=>`<span>${escapeHtml(human(firstDefined(p.label,p.policy_id,p.strategy_id,p.asset_id)))}</span>`).join('');
+      return `${this.tabExperienceHeader(rt,'intelligence',pageVm)}<div class="intelligencePage productPortalPage intelligenceControlCenter">${this.productStoryCard({ eyebrow:'Current situation', title:state, why, recommendation:recommendation||'', actions, tone:'purple' })}<section class="panel intelligenceManagedPanel"><div class="portalSectionHeader"><div><small>Managed energy</small><h2>Assets Home Intelligence is watching</h2><p>Only assets that currently participate in planning are shown.</p></div>${policySummary ? `<div class="policyInfluenceChips">${policySummary}</div>` : ''}</div><div class="portalStatusList">${assetRows || `<div class="empty"><b>No active planning</b><span>Home Intelligence is monitoring the home.</span></div>`}</div></section></div>`;
+    }
+    valueAssetIdentity(rt, item = {}) {
+      const row = objectFrom(item);
+      const candidateIds = [
+        row.asset_id, row.consumer_id, row.consumer, row.source_asset_id,
+        row.producer_asset_id, row.flexible_asset_id, row.target_asset_id
+      ].map(v=>String(v||'').trim()).filter(Boolean);
+      const flexible = this.flexibleAssetDomain(rt).all().map(vm=>vm.raw || {});
+      const mix = rt.consumerMixRows?.() || [];
+      const aliases = (asset)=>[
+        asset.asset_id, asset.consumer_id, asset.consumer, asset.source_asset_id,
+        asset.producer_asset_id, asset.flexible_asset_id, asset.target_asset_id
+      ].map(v=>String(v||'').trim()).filter(Boolean);
+      const match = [...flexible, ...mix].find(asset => {
+        const ids = aliases(asset);
+        return candidateIds.some(id => ids.includes(id));
+      }) || {};
+      const canonicalId = String(firstDefined(match.asset_id, match.flexible_asset_id, match.source_asset_id, row.asset_id, row.source_asset_id, row.consumer_id, row.consumer, '') || '');
+      const merged = { ...row, ...match, asset_id: canonicalId || row.asset_id || '' };
+      const name = firstDefined(match.display_name, row.display_name, canonicalId ? rt.assetName(canonicalId) : '', '');
+      return { asset:merged, id:canonicalId, name:String(name || (candidateIds.length ? human(candidateIds[0]) : 'Consumer')) };
+    }
+
+    value(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'value');
+      const v = this.valuePeriodContext(rt);
+      const money = (x) => this.valueMoney(x, v.currency, v.state, '—');
+      const hasFinancialValue = [v.net,v.importCost,v.exportRevenue,v.netEnergyCost].some(value => asNumber(value) !== null);
+      const configurationBlocked = !v.accountingReady && !hasFinancialValue;
+      const pricingEditing = this.strategyEditProfileId === 'pricing_settings';
+      const tariffRows = (v.tariffs || []).map(item => {
+        const unit = item.row?.unit || (item.id === 'vat' ? '%' : '€/kWh');
+        const valueText = item.configured ? `${fmtNumber(item.value, item.id === 'vat' ? 1 : 3, '—')} ${unit}` : '—';
+        const editor = pricingEditing && item.row && item.writable ? this.editableNumberControl({ ...item.row, profile_id: 'pricing_settings' }, item.label) : `<span class="strategyReadValue">${escapeHtml(valueText)}</span>`;
+        const guidance = item.configured ? (item.writable ? 'Configured value. Edit the set to change it.' : 'Supplied automatically by Pricing.') : 'This value still needs configuration.';
+        return `<div class="strategyTableRow pricingStrategyRow ${item.configured ? 'configured' : 'missing'}"><div class="strategyPrimaryRow"><div class="strategySetting">${escapeHtml(item.label)}</div><div class="strategyValue">${editor}</div><div class="strategyGuidance"><i>${escapeHtml(guidance)}</i></div></div></div>`;
+      }).join('');
+      const pricingChanged = Object.keys(this.editDrafts || {}).filter(key => String(key).startsWith('pricing.')).length;
+      const pricingActions = pricingEditing
+        ? `<span class="strategyChangeCount">${pricingChanged ? `${pricingChanged} changed` : 'No changes'}</span><button class="strategyTextAction" data-strategy-cancel="pricing_settings">Cancel</button><button class="strategySaveAction" data-strategy-save="pricing_settings"${pricingChanged ? '' : ' disabled'}>Save</button>`
+        : `<button class="strategyTextAction" data-strategy-edit="pricing_settings">Edit</button>`;
+      const missingRequired = (v.tariffs || []).filter(item => item.required && !item.configured);
+      const consumers = v.consumers.map(row => {
+        const item=objectFrom(row);
+        const identity=this.valueAssetIdentity(rt,item);
+        const meta=`${human(firstDefined(item.attribution_quality,'Not available'))} · ${fmtKwh(firstDefined(item.attributed_kwh,item.energy_kwh), 'Unavailable')}`;
+        return `<div class="propertyRow valueConsumerRow"><div class="valueAssetIdentity">${this.assetVisual(identity.asset,{size:'sm',fallbackIcon:'🚗'})}<span><b>${escapeHtml(identity.name)}</b><small>${escapeHtml(meta)}</small></span></div><strong>${escapeHtml(money(firstDefined(item.attributed_value,item.attributed_eur)))}</strong></div>`;
+      }).join('');
+      const optional = [['Savings',v.savings],['Avoided grid cost',v.avoided],['Self-consumption value',v.selfConsumption]].filter(([,value])=>asNumber(value)!==null).map(([label,value])=>this.kv(label,money(value))).join('');
+      const financialBody = configurationBlocked ? `<section class="panel wide valueConfigurationState"><h2>Financial result</h2><div class="valueStateHeadline"><b>${escapeHtml(v.stateLabel)}</b><span>${escapeHtml(v.attention)}</span></div><p>Complete the missing Pricing inputs to calculate financial values for ${escapeHtml(v.label.toLowerCase())}.</p><div class="valueConfigurationChecklist">${(v.tariffs || []).filter(item=>item.required).map(item=>`<div><span>${item.configured?'✓':'□'}</span><b>${escapeHtml(item.label)}</b><em>${escapeHtml(item.configured?'Configured':'Configuration required')}</em></div>`).join('')}</div></section>` : `<section class="panel wide"><h2>${escapeHtml(v.label)} financial result</h2><p>Accumulated measured value for the Metering-selected period. No future value is predicted.</p><div class="r3280Balance"><span>Net financial result</span><b>${escapeHtml(money(v.net))}</b><p>${escapeHtml(v.interpretation)}</p></div><div class="goalGrid"><div class="goalRow"><span>Import cost</span><b>${escapeHtml(money(v.importCost))}</b></div><div class="goalRow"><span>Export revenue</span><b>${escapeHtml(money(v.exportRevenue))}</b></div><div class="goalRow"><span>Net energy cost</span><b>${escapeHtml(money(v.netEnergyCost))}</b></div><div class="goalRow"><span>Result completeness</span><b>${escapeHtml(v.resultCompletenessLabel)}</b><small>${escapeHtml(v.resultScopeLabel)}</small></div></div>${optional ? `<div class="softBox">${optional}</div>` : ''}</section>`;
+      const allocationById = new Map(v.consumers.map(row => { const item=objectFrom(row); return [String(firstDefined(item.consumer_id,item.asset_id,item.consumer,'')), item]; }));
+      const flexibleRows = this.flexibleAssetDomain(rt).participating().map(vm => { const asset = vm.raw;
+        const id = String(firstDefined(asset.asset_id,asset.flexible_asset_id,asset.target_asset_id,''));
+        const allocation = allocationById.get(id) || {};
+        const power = firstDefined(asset.power_kw,asset.current_power_kw,asset.actual_power_kw);
+        const attributed = firstDefined(allocation.attributed_value,allocation.attributed_eur);
+        return `<div class="flexPricingRow"><div class="valueAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<span><b>${escapeHtml(rt.assetName(id) || asset.display_name || human(id) || 'Flexible load')}</b><small>${escapeHtml(fmtKw(power,'Inactive'))} now</small></span></div><strong>${asNumber(attributed)!==null ? escapeHtml(money(attributed)) : 'Attribution unavailable'}</strong></div>`;
+      }).join('');
+      return `${this.tabExperienceHeader(rt,'value',pageVm)}${this.bodyContextBar(rt,'value','value-body')}<div id="value-body" class="valuePage r363ValuePage">
+        <div class="valueGrid">${financialBody}
+        <section class="panel wide strategyTablePanel pricingStrategyPanel" id="value-pricing-settings"><div class="strategyTableHead"><div><h2>Pricing settings</h2><p>${missingRequired.length ? `${missingRequired.length} value${missingRequired.length===1?'':'s'} still need configuration.` : 'Tariff configuration is complete.'}</p></div><div class="strategySetActions">${pricingActions}</div></div><div class="strategyTable"><div class="strategyColumnHead"><span>Setting</span><span>Value</span></div>${tariffRows}</div></section>
+        <section class="panel" id="value-flexible-pricing"><h2>Pricing of flexible loads</h2><p>Financial attribution is shown only when Value publishes it. The UX does not estimate costs.</p><div class="flexPricingList">${flexibleRows || `<div class="empty"><b>No flexible loads published</b><span>No controllable Energy assets are currently available.</span></div>`}</div></section>
+        <section class="panel" id="value-consumers"><h2>Consumer allocation</h2><p>Financial attribution by consumer for ${escapeHtml(v.label.toLowerCase())}.</p>${consumers || `<div class="empty"><b>Consumer allocation is not yet available for the selected period.</b><span>No consumer value attribution is currently published.</span></div>`}</section>
+        </div>
+      </div>`;
+    }
+
+    productLanguage(html) {
+      let out = String(html || '');
+      const replacements = [
+        [/Data incomplete/gi,'Some details unavailable'],
+        [/Some guidance details unavailable/gi,'Some guidance is unavailable'],
+        [/Some forecast details unavailable/gi,'Some forecast information is unavailable'],
+        [/Some measurements unavailable/gi,'Some measurements are unavailable'],
+        [/Some consumer details unavailable/gi,'Some consumer information is unavailable'],
+        [/Configuration required/gi,'Setup needed'],
+        [/Published by Pricing/gi,'Configured'],
+        [/No reliable financial result is currently published\.?/gi,'A reliable financial result is not available yet.'],
+        [/No consumer value attribution is currently published\.?/gi,'Consumer value allocation is not available yet.'],
+        [/No flexible loads published/gi,'No controllable loads available'],
+        [/No consumers published/gi,'No consumers available'],
+        [/No charger connections published/gi,'No charger connections available'],
+        [/Source attribution not published/gi,'Energy source unavailable'],
+        [/Planning Value Published/gi,'Charging plan available'],
+        [/Horizon Summary Available/gi,'Outlook available'],
+        [/Calculation Not Trusted/gi,'Waiting for complete data'],
+        [/Calculation Trust Health Not Ok/gi,'Some planning inputs are incomplete'],
+        [/Runtime Error/gi,'Currently unavailable'],
+        [/\bUNKNOWN\b/gi,'Not measured'],
+        [/\bTRUST_STATE\b/gi,'Measurement quality'],
+        [/\bBASELINE_UNTRUSTED\b/gi,'Verification required'],
+        [/\bRESET_PENDING\b/gi,'Reset in progress'],
+        [/Approval required/gi,'Confirmation needed'],
+        [/Observed/gi,'Available'],
+        [/Flexible Asset/gi,'Controllable'],
+        [/Flexible assets/gi,'Controllable assets'],
+        [/public flow relations/gi,'connections'],
+        [/Topology evidence/gi,'Connection details'],
+        [/Physical topology/gi,'Energy connections'],
+        [/Published by Mobility as Energy connection assets\.?/gi,'Vehicle charging connections.'],
+        [/Aggregate storage state from public battery property index\.?/gi,'Combined state of your home batteries.'],
+        [/Rendered only from inline editable property metadata\.?/gi,'Settings available for this battery.'],
+        [/No editable battery settings published/gi,'No battery settings available'],
+        [/Editable metadata is inline on public property rows\.?/gi,'No adjustable battery settings are currently available.'],
+        [/Today and tomorrow horizon outlook from the canonical Outlook contract/gi,'Today and tomorrow energy outlook'],
+        [/Current-day horizon summary from the Outlook contract\.?/gi,'Today’s expected energy balance.'],
+        [/Some details are not published yet\. See quality details\.?/gi,'Planning detail is partial; open Quality for exact limitations.'],
+        [/Period summaries not published yet\.?/gi,'Week, month and year summaries are not available yet.'],
+        [/Showing clean today counters from the public metering index\. Week, month and year are not fabricated by UX\./gi,'Today’s measured totals remain available. Longer periods will appear when their summaries are ready.'],
+        [/Backend-published remediation advice for the selected period\.?/gi,'What needs attention for the selected period.'],
+        [/Reset Command Not Published/gi,'Reset is not available'],
+        [/Contract gap/gi,'Details'],
+        [/Mode is currently published read-only by the backend\.?/gi,'This mode is currently view-only.'],
+        [/Backend did not publish allowed values\.?/gi,'No selectable options are currently available.'],
+        [/Options not published/gi,'Options unavailable'],
+        [/No public write route published/gi,'Editing is unavailable'],
+        [/No public command published/gi,'Action unavailable'],
+        [/No command published/gi,'Action unavailable'],
+        [/No additional explanation is needed/gi,'No additional explanation available'],
+        [/Not published/gi,'Unavailable'],
+        [/Published/gi,'Available'],
+        [/Canonical/gi,'Main'],
+        [/property index/gi,'data source'],
+        [/contract/gi,'information'],
+        [/runtime/gi,'system'],
+        [/metadata/gi,'settings information'],
+        [/trust health/gi,'data quality'],
+        [/planner state/gi,'plan status'],
+        [/Energy Need Exists/gi,'Energy demand is waiting'],
+        [/Energy Need Blocked/gi,'Waiting for suitable energy'],
+        [/Automatic Blocker/gi,'Automatic start condition'],
+        [/Min(?:imum)? Power Above Surplus/gi,'Waiting for sufficient solar power'],
+        [/Checking Readiness/gi,'Preparing automatic control'],
+        [/Provider Remaining Forecast/gi,'Remaining forecast'],
+        [/Execution state/gi,'Status'],
+        [/Execution/gi,'Status'],
+        [/Candidate(?:s)?/gi,'Considered'],
+        [/Selected/gi,'Planned'],
+        [/Blocked/gi,'Waiting'],
+        [/Baseline reset required/gi,'Metering reset needed']
+      ];
+      for (const [pattern, value] of replacements) out = out.replace(pattern, value);
+      return out;
+    }
+
+    planningAssetIcon(asset = {}) {
+      const text = `${asset.asset_type || ''} ${asset.flexible_role || ''} ${asset.name || asset.display_name || ''}`.toLowerCase();
+      if (/battery|storage/.test(text)) return '🔋';
+      if (/car|vehicle|ev/.test(text)) return '🚘';
+      if (/charger|wallbox|sideway/.test(text)) return '⚡';
+      return '◆';
+    }
+    planningAssetTone(asset = {}) {
+      const text = `${asset.asset_type || ''} ${asset.flexible_role || ''} ${asset.name || asset.display_name || ''}`.toLowerCase();
+      if (/battery|storage/.test(text)) return 'green';
+      if (/charger|wallbox|sideway/.test(text)) return 'orange';
+      if (/car|vehicle|ev/.test(text)) return 'purple';
+      return 'blue';
+    }
+    planningIconBadge(icon, tone = 'blue', extra = '') {
+      return `<span class="planningIconBadge ${escapeHtml(tone)} ${escapeHtml(extra)}" aria-hidden="true">${escapeHtml(icon)}</span>`;
+    }
+    planningAssetName(asset = {}) {
+      return firstDefined(asset.display_name, asset.name, asset.friendly_name, asset.label, asset.asset_id, 'Flexible asset');
+    }
+    assetVisual(asset = {}, { size = 'md', fallbackIcon = '◆', decorative = true } = {}) {
+      const visualRef = String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
+      const resolved = typeof resolveEnergyAssetVisual === 'function'
+        ? resolveEnergyAssetVisual(asset)
+        : (visualRef && typeof resolveEnergyVisualRef === 'function' ? resolveEnergyVisualRef(visualRef) : null);
+      const label = this.planningAssetName(asset);
+      const assetId = String(firstDefined(asset.asset_id, asset.id, '') || '').trim();
+      const assetType = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
+      const pickerChoices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(assetType) : [];
+      const canPick = !!assetId && !visualRef.startsWith('mobility.') && pickerChoices.length > 0;
+      const pickerAttrs = canPick
+        ? ` data-energy-visual-open="${escapeHtml(assetId)}" role="button" tabindex="0" title="Choose representative image"`
+        : '';
+      if (resolved?.url) {
+        const alt = decorative ? '' : label;
+        return `<span class="assetVisual assetVisual-${escapeHtml(size)}"${pickerAttrs}><img src="${escapeHtml(resolved.url)}" alt="${escapeHtml(alt)}" style="filter:${escapeHtml(resolved.filter || 'none')}"></span>`;
+      }
+      return `<span class="assetVisual assetVisual-${escapeHtml(size)} assetVisualFallback"${pickerAttrs} aria-hidden="${canPick ? 'false' : 'true'}">${escapeHtml(fallbackIcon)}</span>`;
+    }
+    energyVisualPickerOverlay(rt) {
+      const assetId = String(this.energyVisualPickerAssetId || '').trim();
+      if (!assetId) return '';
+      const asset = typeof rt.asset === 'function'
+        ? rt.asset(assetId)
+        : (typeof rt.assets === 'function' ? rt.assets().find(row => String(row?.asset_id || '') === assetId) : null);
+      if (!asset) return '';
+      const type = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
+      const choices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(type) : [];
+      if (!choices.length) return '';
+      const selected = typeof rhiEnergySelectedVisualRef === 'function' ? rhiEnergySelectedVisualRef(assetId) : '';
+      const fallbackEntry = typeof rhiEnergyDefaultVisualEntry === 'function' ? rhiEnergyDefaultVisualEntry(asset) : null;
+      const current = selected || (fallbackEntry && typeof rhiEnergyVisualRef === 'function' ? rhiEnergyVisualRef(fallbackEntry) : '');
+      const picker = new HomeBrainEnergyVisualPicker();
+      return picker.render(asset, current);
+    }
+    assetIdentityChip(asset = {}, meta = '') {
+      return `<span class="assetIdentityChip">${this.assetVisual(asset,{size:'xs',fallbackIcon:this.planningAssetIcon(asset)})}<span><b>${escapeHtml(this.planningAssetName(asset))}</b>${meta ? `<small>${escapeHtml(meta)}</small>` : ''}</span></span>`;
+    }
+    planningEnergyNeed(asset = {}) {
+      return asNumber(firstDefined(asset.energy_to_target_kwh, asset.energy_needed_kwh, asset.remaining_energy_kwh, asset.energy_need_kwh));
+    }
+    planningBucketHour(bucket = {}) {
+      const raw = firstDefined(bucket.start, bucket.start_time, bucket.bucket_start, bucket.local_start, bucket.hour, bucket.label, '');
+      if (typeof raw === 'number') return Math.max(0, Math.min(23, Math.floor(raw)));
+      const text = String(raw || '');
+      const iso = text.match(/T(\d{2}):/); if (iso) return Number(iso[1]);
+      const hm = text.match(/(?:^|\s)(\d{1,2})(?::\d{2})?/); return hm ? Math.max(0, Math.min(23, Number(hm[1]))) : null;
+    }
+    planningAllocations(bucket = {}) {
+      let rows = parseMaybeJson(bucket.asset_allocations_json, null)
+        || parseMaybeJson(bucket.asset_allocations, null)
+        || parseMaybeJson(bucket.allocations_json, null)
+        || parseMaybeJson(bucket.allocations, null)
+        || parseMaybeJson(bucket.asset_allocation, null)
+        || [];
+      if (!Array.isArray(rows) && rows && typeof rows === 'object') rows = Object.entries(rows).map(([asset_id, value]) => ({ asset_id, ...objectFrom(value) }));
+      return Array.isArray(rows) ? rows : [];
+    }
+    buildPlanningViewModel(rt) {
+      const horizonId = this.selectedPlanningHorizonId || 'D0';
+      const domainAssets = this.flexibleAssetDomain(rt).all();
+      const assets = domainAssets.filter(vm => !vm.isDisabled && !vm.isStorage).map(vm => vm.raw);
+      const storage = domainAssets.find(vm => vm.isStorage && !vm.isDisabled)?.raw || null;
+      return createPlanningViewModel({ gateway: rt.contractGateway(), horizonId, flexibleAssets: assets, storage });
+    }
+
+    planningParticipant(row, lane, participantId) {
+      return (row?.[lane] || []).find(item => String(item.participantId) === String(participantId)) || null;
+    }
+    planningTimeLabel(value) {
+      const text = String(value || '');
+      const match = text.match(/T(\d{2}:\d{2})/);
+      return match ? match[1] : (text || '—');
+    }
+    planningLaneCell(participant, { advisory = false, signed = false } = {}) {
+      if (!participant || participant.energyKwh === null) return `<span class="planningUnavailable">—</span>`;
+      const value = participant.energyKwh;
+      return `<span class="planningPowerValue ${signed ? 'planningImport' : ''} ${value <= 0.001 ? 'planningIdle' : ''}">${value.toFixed(1)}</span>`;
+    }
+    planning(rt) {
+      const vm = this.buildPlanningViewModel(rt);
+      const horizonLabel = vm.horizonId === 'D1' ? 'Tomorrow' : 'Today';
+      const assetKey = asset => String(asset.asset_id || asset.id || '');
+      const totals = vm.laneTotals;
+      const canonicalAssetsById = vm.planningAssetsById || {};
+      const assetTotalsById = totals.flexibleAssetsById;
+      const plannedForAsset = assetId => {
+        const raw = assetTotalsById[assetId];
+        if (raw === undefined || raw === null) return null;
+        if (typeof raw === 'number') return asNumber(raw);
+        const row = objectFrom(raw);
+        return asNumber(firstDefined(row.energy_kwh, row.planned_energy_kwh, row.total_kwh, row.value));
+      };
+      const allAssetTotals = vm.assets.map(asset => {
+        const canonical = objectFrom(canonicalAssetsById[assetKey(asset)] || vm.planningAssets.find(row => String(row.asset_id || '') === assetKey(asset)) || {});
+        const published = objectFrom(assetTotalsById[assetKey(asset)]);
+        return {
+          asset,
+          canonical,
+          need: asNumber(firstDefined(canonical.need_kwh,published.energy_need_kwh,published.need_kwh,published.remaining_need_kwh)),
+          plannedEnergy: vm.horizonId === 'D1' ? asNumber(canonical.planned_tomorrow_kwh) : asNumber(canonical.planned_today_kwh),
+          remainingNeed: asNumber(firstDefined(canonical.unresolved_horizon_kwh,published.remaining_need_kwh,published.unresolved_need_kwh))
+        };
+      });
+      const hourlyAssetEnergy = assetId => vm.rows.reduce((sum,row) => {
+        const value = this.planningParticipant(row,'consumers',assetId)?.energyKwh;
+        return sum + (value === null || value === undefined ? 0 : Math.max(0,Number(value) || 0));
+      }, 0);
+      const assetTotals = allAssetTotals.filter(item => {
+        const values = [item.need,item.plannedEnergy,item.remainingNeed,hourlyAssetEnergy(assetKey(item.asset))];
+        return values.some(value => value !== null && value > 0.001);
+      });
+
+      const solarTotal = totals.solarKwh;
+      const batteryOutTotal = totals.homeBatteryOutKwh;
+      const gridInTotal = totals.gridInKwh;
+      const homeTotal = totals.homeKwh;
+      const flexibleLoadsTotal = totals.flexibleLoadsKwh;
+      const batteryInTotal = totals.homeBatteryInKwh;
+      const gridOutTotal = totals.gridOutKwh;
+      const sourceTotal = totals.sourceTotalKwh;
+      const useTotal = totals.useTotalKwh;
+      const balanceDelta = totals.balanceDeltaKwh;
+      const batteryNeed = totals.homeBatteryNeedKwh;
+      const showLane = value => value === null || Math.abs(value) > 0.001;
+      const systemLanes = [
+        {id:'solar',group:'sources',label:'Solar',icon:'☀',tone:'orange',total:solarTotal,participantLane:'sources',participantId:'solar'},
+        {id:'batteryOut',group:'sources',label:'Home Battery out',icon:'▣',tone:'green',total:batteryOutTotal,participantLane:'sources',participantId:'battery'},
+        {id:'gridIn',group:'sources',label:'Grid in',icon:'↘',tone:'slate',total:gridInTotal,participantLane:'sources',participantId:'grid',signed:true},
+        {id:'home',group:'consumers',label:'Home',icon:'⌂',tone:'blue',total:homeTotal,participantLane:'consumers',participantId:'home'},
+        {id:'batteryIn',group:'consumers',label:'Home Battery in',icon:'▣',tone:'green',total:batteryInTotal,participantLane:'consumers',participantId:'battery',advisory:true},
+        // Grid out is the fixed boundary lane and must remain the final column.
+        // Flexible Loads is not a system lane: individual flexible assets are rendered as columns.
+        {id:'gridOut',group:'boundary',label:'Grid out',icon:'↗',tone:'slate',total:gridOutTotal,boundary:true,alwaysVisible:true}
+      ].filter(lane => lane.alwaysVisible || showLane(lane.total));
+
+      const sourceLaneCount = systemLanes.filter(l => l.group === 'sources').length;
+      const consumerLaneCount = systemLanes.filter(l => l.group === 'consumers').length + assetTotals.length;
+      const boundaryLaneCount = systemLanes.filter(l => l.group === 'boundary').length;
+      const systemHeaders = systemLanes.filter(l => l.group !== 'boundary').map(lane => `<th><span class="planningColumnHead">${this.planningIconBadge(lane.icon,lane.tone,'system')}<b>${escapeHtml(lane.label)}</b><small>kWh</small></span></th>`).join('');
+      const assetHeaders = assetTotals.map(item => `<th><span class="planningAssetHead">${this.assetVisual(item.asset,{size:'xs',fallbackIcon:this.planningAssetIcon(item.asset)})}<span><b>${escapeHtml(this.planningAssetName(item.asset))}</b><small class="planningHeaderNeed">${item.need===null?'Need —':`Need ${item.need.toFixed(1)} kWh`}</small></span></span><small class="planningUnit">kWh</small></th>`).join('');
+      const boundaryHeaders = systemLanes.filter(l => l.group === 'boundary').map(lane => `<th><span class="planningColumnHead">${this.planningIconBadge(lane.icon,lane.tone,'system')}<b>${escapeHtml(lane.label)}</b><small>kWh</small></span></th>`).join('');
+      const laneCell = (row,lane) => {
+        if (lane.aggregateOnly) {
+          const value = row.consumers.filter(item => assetTotals.some(a => assetKey(a.asset) === String(item.participantId))).reduce((sum,item) => sum + (item.energyKwh || 0),0);
+          return value <= 0.001 ? '' : value.toFixed(1);
+        }
+        if (lane.boundary) {
+          const value = row.boundary.gridExportKwh;
+          return value === null ? '<span class="planningUnavailable">—</span>' : (value <= 0.001 ? '' : `<span class="planningExport">${value.toFixed(1)}</span>`);
+        }
+        const participant = this.planningParticipant(row,lane.participantLane,lane.participantId);
+        if (!participant || participant.energyKwh === null) return '<span class="planningUnavailable">—</span>';
+        return participant.energyKwh <= 0.001 ? '' : `<span class="planningPowerValue ${lane.signed?'planningImport':''}">${participant.energyKwh.toFixed(1)}</span>`;
+      };
+      const rows = vm.rows.map(row => {
+        const current = vm.horizonId === 'D0' && row.id === vm.currentBucketId;
+        const fixedCells = systemLanes.filter(l => l.group !== 'boundary').map(lane => `<td>${laneCell(row,lane)}</td>`).join('');
+        const assetCells = assetTotals.map(item => `<td>${laneCell(row,{participantLane:'consumers',participantId:assetKey(item.asset)})}</td>`).join('');
+        const boundaryCells = systemLanes.filter(l => l.group === 'boundary').map(lane => `<td>${laneCell(row,lane)}</td>`).join('');
+        return `<tr class="${current?'planningCurrent':''}"><td><span class="planningTime">${current?'<em>NOW</em>':''}${escapeHtml(this.planningTimeLabel(row.startTime))}</span></td>${fixedCells}${assetCells}${boundaryCells}</tr>`;
+      }).join('');
+      const totalCell = (value,small='Planning total',{showZero=false}={}) => `<td><b>${value===null?'—':(Math.abs(value) <= 0.001 ? (showZero?'0.0 kWh':'') : value.toFixed(1)+' kWh')}</b><small>${value!==null && Math.abs(value) <= 0.001 && !showZero ? '' : escapeHtml(small)}</small></td>`;
+      const fixedTotalCells = systemLanes.filter(l => l.group !== 'boundary').map(lane => totalCell(lane.total,lane.id==='batteryIn'&&batteryNeed!==null?`${batteryNeed.toFixed(1)} kWh target need`:'Planning total')).join('');
+      const assetTotalCells = assetTotals.map(item => `<td class="planningTotalAsset"><b>${item.plannedEnergy===null?'—':item.plannedEnergy.toFixed(1)+' kWh'}</b><small>${item.need===null?'Need unavailable':`of ${item.need.toFixed(1)} kWh needed`}</small></td>`).join('');
+      const boundaryTotalCells = systemLanes.filter(l => l.group === 'boundary').map(lane => totalCell(lane.total,'Planning total',{showZero:true})).join('');
+
+      const canonicalTotals = vm.horizonId === 'D0'
+        ? objectFrom(vm.todayTotals)
+        : objectFrom(vm.tomorrowTotals);
+      const totalNeed = asNumber(canonicalTotals.flexible_total_need_kwh);
+      const totalPlanned = asNumber(firstDefined(
+        canonicalTotals.planned_flexible_energy_kwh,
+        vm.horizonId === 'D1' ? canonicalTotals.planned_tomorrow_kwh : canonicalTotals.planned_today_kwh
+      ));
+      const remainingNeed = asNumber(firstDefined(canonicalTotals.still_unresolved_kwh, canonicalTotals.unresolved_horizon_kwh));
+      const planStatus = String(firstDefined(vm.currentActionIntent.action_state, vm.currentActionIntent.state, vm.summary.plan_status, vm.horizon.status, vm.horizon.state, vm.complete?'available':'unavailable'));
+      const confidence = firstDefined(vm.quality.confidence, vm.horizon.confidence, 'Limited');
+      const statusLabel = /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
+      const plannedTotals = assetTotals.map(item => `<span class="planningFooterAsset">${this.assetVisual(item.asset,{size:'xs',fallbackIcon:this.planningAssetIcon(item.asset)})}<b>${escapeHtml(this.planningAssetName(item.asset))}</b> ${item.plannedEnergy===null?'—':item.plannedEnergy.toFixed(1)+' kWh'}</span>`).join('');
+      const summaryItems = vm.horizonId === 'D1'
+        ? [['Need entering tomorrow',totalNeed],['Planned tomorrow',totalPlanned],['Still after tomorrow',remainingNeed]]
+        : [['Need entering today',totalNeed],['Planned today',totalPlanned],['Still after today',remainingNeed]];
+      const summaryTotals = `<div class="planningAggregateTotals">${summaryItems.map(([label,value])=>`<span><small>${label}</small><b>${value===null?'—':value.toFixed(1)+' kWh'}</b></span>`).join('')}</div>`;
+      const disclosure = firstDefined(vm.rows.find(row=>row.disclosure)?.disclosure, vm.quality.basis ? `Planning basis: ${human(vm.quality.basis)}. Actual execution follows the current operational intent.` : 'Future buckets are advisory. Actual execution follows the current operational intent.');
+      const balanceLabel = sourceTotal===null || useTotal===null ? 'Planning balance unavailable' : `${sourceTotal.toFixed(1)} kWh source · ${useTotal.toFixed(1)} kWh use${balanceDelta===null?'':` · Δ ${balanceDelta.toFixed(3)} kWh`}`;
+      const heroValue = totalPlanned===null ? '—' : totalPlanned.toFixed(1)+' kWh';
+      const planningHeader = {
+        image:hbEnergyHeroAsset('solar-generation'),
+        icon:'▣',
+        eyebrow:'Tactical planning',
+        title:`${horizonLabel} plan`,
+        value:heroValue,
+        unit:totalNeed===null?'planned flexible energy':`of ${totalNeed.toFixed(1)} kWh flexible need`,
+        explanation:remainingNeed===null?'Remaining need is unavailable.':`${remainingNeed.toFixed(1)} kWh still needs a suitable opportunity.`,
+        tone:'purple',
+        badgeText:vm.contractSupported ? statusLabel : 'Unavailable',
+        badgeTone:vm.contractSupported && vm.complete ? 'ok' : 'attention',
+        metrics:[
+          ['◎',vm.horizonId === 'D1' ? 'Need entering tomorrow' : 'Need entering today',fmtKwh(totalNeed,'—'),horizonLabel],
+          ['▣',vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today',fmtKwh(totalPlanned,'—'),horizonLabel],
+          ['◷',vm.horizonId === 'D1' ? 'Still after tomorrow' : 'Still after today',fmtKwh(remainingNeed,'—'),'Horizon-local residual'],
+          ['✓','Confidence',this.productStateLabel(confidence,'Limited'),'Planning confidence']
+        ]
+      };
+      if (!vm.contractSupported) return `${this.tabExperienceHeader(rt,'planning',planningHeader)}${this.contractGap('Tactical planning unavailable','The backend did not publish canonical Planning energy lanes.')}`;
+      const participatingCount = assetTotals.length;
+      const nextLines = assetTotals.map(item => this.assetIdentityChip(item.asset,fmtKw(firstDefined(item.asset.requested_power_kw,item.asset.requested_charge_power_kw,item.asset.requested_power_kw_effective),'—'))).join('');
+      const planningLoadRows = assetTotals.map(item => {
+        const canonical=item.canonical||{};
+        const priority=human(firstDefined(item.asset.energy_control_priority,item.asset.priority_label,'Normal'));
+        const next=String(firstDefined(canonical.what_text,canonical.next_action_label,canonical.next_action,canonical.today_label,'Wait'));
+        const why=String(firstDefined(canonical.why_text,canonical.reason_label,'No explanation published.'));
+        return `<article class="planningLoadRow"><div class="planningLoadIdentity">${this.assetVisual(item.asset,{size:'sm',fallbackIcon:this.planningAssetIcon(item.asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(item.asset))}</b><span class="priorityBadge">${escapeHtml(priority)}</span></div><small><i class="dot ${/connected/i.test(String(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'')))?'green':'gray'}"></i>${escapeHtml(human(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'Connection unavailable')))}</small></div></div><div><small>Next action</small><b class="nextActionBadge">${escapeHtml(next)}</b></div><div><small>Requested power</small><b>${fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')}</b></div><div><small>Planned today</small><b>${fmtKwh(item.plannedEnergy,'—')}</b></div><div><small>Why / reason</small><b>${escapeHtml(why)}</b></div><div><small>Plan status</small><b class="planStatusBadge ${/at.?risk|blocked|failed/i.test(String(firstDefined(canonical.exception_state,canonical.risk_state,canonical.today_status,'')))?'exception':'unknown'}">${escapeHtml(firstDefined(canonical.plan_conformance_label,canonical.exception_label,canonical.risk_label,'Status unavailable'))}</b></div></article>`;
+      }).join('');
+      const planningReason = human(firstDefined(vm.summary.reason, vm.horizon.reason, vm.currentActionIntent.reason, vm.quality.reason, vm.complete ? 'Planning data is available.' : 'No complete hourly allocation is currently published.'));
+      const planningContext = `<section class="panel planningContextPanel"><div class="planningContextGrid"><span><small>Horizon</small><b>${escapeHtml(horizonLabel)}</b></span><span><small>Plan state</small><b>${escapeHtml(statusLabel)}</b></span><span><small>Hourly buckets</small><b>${vm.rows.length}</b></span><span><small>Participating loads</small><b>${allAssetTotals.length}</b></span><span><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></span><span><small>Planning source</small><b>Energy public planning contract</b></span></div><p>${escapeHtml(planningReason)}</p>${vm.rows.length ? '' : '<div class="empty"><b>No hourly allocation published for this horizon</b><span>The UX keeps unavailable hours empty and does not estimate a schedule.</span></div>'}</section>`;
+      return `${this.tabExperienceHeader(rt,'planning',planningHeader)}
+      ${planningContext}
+      <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>${vm.buckets.length} published bucket${vm.buckets.length===1?'':'s'} · backend timestamps preserved · no interpolation · zero values hidden · Grid out fixed at table end</p></div><span>All primary values are kWh per bucket</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>published by Planning</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Canonical Tactical plan projected without frontend recalculation.</p></div></div><div class="planningLoadList">${planningLoadRows||'<div class="empty"><b>No planned flexible loads</b></div>'}</div></section>`;
+    }
+
+    navigationPlaceholder(rt, view) {
+      if (view === 'solar-generation') {
+        const p = this.buildPageViewModel(rt, 'solar');
+        const model = { ...p, title:'Solar generation', badgeText:'Structure ready', badgeTone:'neutral' };
+        return `${this.tabExperienceHeader(rt,'solar-generation',model)}<section class="panel navigationPlaceholder"><small>ENERGY DOMAIN</small><h2>Solar generation content follows in the next screen pass</h2><p>The navigation and premium header are now in their final structural location. Inverter, panel and storage-link content is intentionally not moved into this release.</p></section>`;
+      }
+      const p = this.buildPageViewModel(rt, 'intelligence');
+      const model = { ...p, image:hbEnergyHeroAsset('intelligence'), icon:'◇', title:'Strategic planning', value:'—', unit:'longer-term horizon', explanation:'Longer-term goals, constraints and optimisation', badgeText:'Structure ready', badgeTone:'neutral', metrics:[['◎','Horizon','—','Longer-term'],['◇','Goals','—','Not migrated yet'],['◫','Constraints','—','Not migrated yet'],['↗','Optimisation','—','Not migrated yet']] };
+      return `${this.tabExperienceHeader(rt,'strategic-planning',model)}<section class="panel navigationPlaceholder"><small>INTELLIGENCE</small><h2>Strategic planning content follows in the next screen pass</h2><p>The navigation position is established without inventing or relocating strategic planning semantics in this release.</p></section>`;
+    }
+    placeholder(rt) {
+      return `<section class="panel cleanPlaceholder"><h2>${escapeHtml(this.title())}</h2><p>This screen is outside the current clean rewrite scope. All V1 screens are active on the R1.56 public contract runtime.</p><div class="softBox"><b>Migration scope</b><span>Metering, Intelligence and Value are now clean active screens. Style cleanup stays for the final polish round.</span></div></section>`;
+    }
+    renderMainWarning(footer) {
+      // R3.45.5: backend trust is a footer concern only.
+      // Hard-gate failures must stay visible, but not as a main screen banner.
+      return '';
+    }
+    diagnosticSpec(tab) {
+      const label=human(tab || 'overview');
+      return [
+        [UX_INTERFACES.publicV2,'Energy Public V2',`${label} product truth through the single canonical Energy contract`]
+      ];
+    }
+
+    diagnosticEntity(rt, entityId, label, purpose) {
+      const raw = rt.rawState(entityId);
+      const allowed = rt.isAllowed(entityId);
+      const attrs = raw?.attributes || {};
+      const state = String(raw?.state ?? '').trim();
+      const normalized = state.toLowerCase();
+      const unavailable = !raw || ['unknown','unavailable',''].includes(normalized);
+      const working = !!raw && allowed && !unavailable;
+      const reason = firstDefined(attrs.product_reason, attrs.reason, attrs.availability_reason, attrs.message, attrs.last_error, unavailable ? (raw ? `State is ${state || 'empty'}` : 'Entity is not available') : (!allowed ? 'Not listed in public_ux_entities_json' : ''));
+      return { entityId, label, purpose, raw, allowed, state, working, reason: human(reason,'') };
+    }
+    releaseIssueModel(rt, tab, footer) {
+      const rows = this.diagnosticSpec(tab).map(([entityId,label,purpose]) => this.diagnosticEntity(rt,entityId,label,purpose));
+      const unavailable = rows.filter(row => !row.working);
+      const issues = [];
+      unavailable.forEach(row => issues.push(`${row.label}: ${row.reason || row.state || 'Unavailable'}`));
+      if (!footer.runtimeTrusted && !unavailable.length) issues.unshift('Canonical Energy contract is unavailable or incompatible.');
+      if (!issues.length) return null;
+      return {
+        severity: footer.runtimeTrusted ? 'warning' : 'error',
+        label: footer.runtimeTrusted ? `${issues.length} issue${issues.length === 1 ? '' : 's'}` : 'Runtime issue',
+        tooltip: issues.join('\n')
+      };
+    }
+    diagnosticsPanel() {
+      // Release/diagnostic details stay silent while healthy and live in the compact footer tooltip on issues.
+      return '';
+    }
+    renderFooter(rt, tab, footer) {
+      const backend = footer.backendVersion || 'Unknown';
+      const contract = footer.contractVersion || 'Unknown';
+      const issue = this.releaseIssueModel(rt, tab, footer);
+      const issueLines = issue
+        ? String(issue.tooltip || issue.label || 'Runtime issue').split('\n').map(line => line.trim()).filter(Boolean)
+        : [];
+      const issueDetails = issue ? `
+        <details class="rhiUxFooterDetails">
+          <summary class="hiReleaseIssue rhiUxFooterIssue ${issue.severity}">${escapeHtml(issue.label)} · details</summary>
+          <div class="rhiUxFooterPanel" role="status">
+            <div class="rhiUxFooterPanelMeta">Backend ${escapeHtml(backend)} · Contract ${escapeHtml(contract)}</div>
+            ${issueLines.map(line => `<div class="rhiUxFooterProblem"><span class="rhiUxFooterProblemDot" aria-hidden="true"></span><span>${escapeHtml(line)}</span></div>`).join('')}
+            <div class="rhiUxFooterAction">Resolve the listed runtime/backend condition, then reload this view to verify recovery.</div>
+          </div>
+        </details>` : '';
+      return `<footer class="hiRuntimeFooter rhiUxFooter" aria-label="RHI Energy release information"><span>RHI Energy UX ${escapeHtml(footer.uxVersion || UX_VERSION)}</span><span>Backend ${escapeHtml(backend)}</span>${issueDetails}</footer>`;
+    }
+    renderError(view, error) {
+      const message = error && error.message ? error.message : String(error || 'Unknown render error');
+      const stack = error && error.stack ? String(error.stack).split('\n').slice(0, 4).join('\n') : '';
+      return `<section class="panel"><h2>${escapeHtml(human(view))} unavailable</h2><p>The screen failed to render. This is a frontend defect guard; other Energy tabs remain available.</p><div class="softBox"><b>Error</b><span>${escapeHtml(message)}</span></div>${stack ? `<pre class="decisionDump">${escapeHtml(stack)}</pre>` : ''}</section>`;
+    }
+    viewContent(rt) {
+      const body = this.view === 'overview' ? this.overview(rt) : this.view === 'outlook' ? this.outlook(rt) : this.view === 'flow' ? this.flow(rt) : this.view === 'solar' ? this.solar(rt) : this.view === 'operational-planning' ? this.operationalPlanning(rt) : this.view === 'battery' ? this.battery(rt) : this.view === 'consumers' ? this.consumers(rt) : this.view === 'gas' ? this.gas(rt) : this.view === 'strategies' ? this.strategies(rt) : this.view === 'metering' ? this.metering(rt) : this.view === 'intelligence' ? this.intelligence(rt) : this.view === 'retrospective' ? this.retrospective(rt) : this.view === 'value' ? this.value(rt) : this.view === 'planning' ? this.planning(rt) : this.view === 'strategic-planning' ? this.navigationPlaceholder(rt, 'strategic-planning') : this.placeholder(rt);
+      const marker = '</section>';
+      const headerEnd = body.indexOf(marker);
+      if (headerEnd < 0) return body;
+      const split = headerEnd + marker.length;
+      return `${body.slice(0, split)}<div id="hi-body-${escapeHtml(this.view)}">${body.slice(split)}</div>${this.understandingFooter(rt, this.view)}`;
+    }
+    patchDomNode(current, next) {
+      if (!current || !next) return;
+      if (current.nodeType !== next.nodeType || current.nodeName !== next.nodeName) {
+        current.replaceWith(next.cloneNode(true));
+        return;
+      }
+      if (current.nodeType === Node.TEXT_NODE || current.nodeType === Node.COMMENT_NODE) {
+        if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
+        return;
+      }
+      const currentAttributes = [...current.attributes];
+      currentAttributes.forEach(attribute => {
+        if (!next.hasAttribute(attribute.name)) current.removeAttribute(attribute.name);
+      });
+      [...next.attributes].forEach(attribute => {
+        if (current.getAttribute(attribute.name) !== attribute.value) current.setAttribute(attribute.name, attribute.value);
+      });
+      if (current.nodeName === 'STYLE' && current.textContent === next.textContent) return;
+      const currentChildren = [...current.childNodes];
+      const nextChildren = [...next.childNodes];
+      const shared = Math.min(currentChildren.length, nextChildren.length);
+      for (let index = 0; index < shared; index += 1) this.patchDomNode(currentChildren[index], nextChildren[index]);
+      for (let index = currentChildren.length - 1; index >= nextChildren.length; index -= 1) currentChildren[index].remove();
+      for (let index = shared; index < nextChildren.length; index += 1) current.appendChild(nextChildren[index].cloneNode(true));
+    }
+    patchMarkup(markup) {
+      const template = document.createElement('template');
+      template.innerHTML = markup;
+      const currentNodes = [...this.shadowRoot.childNodes];
+      const nextNodes = [...template.content.childNodes];
+      const shared = Math.min(currentNodes.length, nextNodes.length);
+      for (let index = 0; index < shared; index += 1) this.patchDomNode(currentNodes[index], nextNodes[index]);
+      for (let index = currentNodes.length - 1; index >= nextNodes.length; index -= 1) currentNodes[index].remove();
+      for (let index = shared; index < nextNodes.length; index += 1) this.shadowRoot.appendChild(nextNodes[index].cloneNode(true));
+    }
+    render() {
+      if (!this._hass) return;
+      const preserveViewport = this._preserveViewportOnRender === true && this._renderedView === this.view;
+      const viewport = preserveViewport ? { x: window.scrollX || 0, y: window.scrollY || 0 } : null;
+      this._preserveViewportOnRender = false;
+      const signature = this.runtimeSignature();
+      if (!this._forceRender && signature === this._lastRuntimeSignature) return;
+      this._lastRuntimeSignature = signature;
+      this._forceRender = false;
+      const previousPlanningWrap = this.shadowRoot?.querySelector('.planningTableWrap');
+      if (previousPlanningWrap) {
+        this.planningScrollLeft = previousPlanningWrap.scrollLeft;
+        this.planningScrollTop = previousPlanningWrap.scrollTop;
+      }
+      if (this.editSession) { this.pendingRuntimeRender = true; return; }
+      const rt = this.runtime();
+      const footer = rt.footerModel();
+      let content = '';
+      try {
+        content = this.viewContent(rt);
+      } catch (error) {
+        console.error(`[HomeBrain Energy ${UX_VERSION}] ${this.view} render failed`, error);
+        content = this.renderError(this.view, error);
+      }
+      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${this.energyHardwareStyles()}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
+
+      /* R3.62.0 canonical component framework and adaptive convergence */
+      :host{--hi-space-1:4px;--hi-space-2:8px;--hi-space-3:12px;--hi-space-4:16px;--hi-radius-sm:8px;--hi-radius-md:12px;--hi-break-tablet:980px;--hi-break-phone:700px}
+
+
+
+
+
+
+
+
+
+
+
+      .scopeSelector{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}.scopeSelectorTitle{display:none}.scopeButtons{display:flex;gap:4px;flex-wrap:wrap}.scopeSelector>select{display:none}
+      .hiConclusionFooter{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:linear-gradient(135deg,rgba(255,255,255,.98),rgba(247,250,252,.96))}
+      .hiConclusionMain{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;align-items:start}.hiConclusionIcon{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:rgba(3,169,244,.08)}.hiConclusionFooter small{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}.hiConclusionFooter h2{font-size:13px;line-height:1.2;margin:1px 0 2px}.hiConclusionFooter p{font-size:10px;line-height:1.3;margin:0;color:var(--muted)}.hiConclusionFooter details{margin:0;min-width:128px}
+      .hiTechnicalFooter{margin:8px 0 0;border-top:1px solid rgba(148,163,184,.24);padding-top:6px;color:#94a3b8;font-size:9px}.hiTechnicalFooter>summary{display:flex;justify-content:space-between;gap:10px;align-items:center;cursor:pointer;list-style:none;padding:4px 2px}.hiTechnicalFooter>summary::-webkit-details-marker{display:none}.hiTechnicalFooter>summary span{font-weight:600}.hiTechnicalFooter>summary b{font-weight:500;color:#94a3b8}.hiTechnicalInterfaceList{display:grid;gap:2px;padding:5px 2px 2px}.hiTechnicalInterfaceRow{display:grid;grid-template-columns:8px minmax(150px,.8fr) minmax(220px,1.2fr) auto;gap:7px;align-items:center;padding:3px 0;border-top:1px solid rgba(148,163,184,.12)}.hiTechnicalInterfaceRow div{display:grid}.hiTechnicalInterfaceRow b{font-size:9px;color:#64748b}.hiTechnicalInterfaceRow small{font-size:8px;color:#94a3b8}.hiTechnicalInterfaceRow code{font-size:8px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hiTechnicalInterfaceRow em{font-size:8px;font-style:normal;color:#94a3b8}.hiTechnicalDot{width:5px;height:5px;border-radius:50%;background:#cbd5e1}.hiTechnicalDot.ok{background:#86b99a}.hiTechnicalDot.warn{background:#d6a75c}.hiRuntimeFooter{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 9px;margin:3px 0 0;padding:3px 2px 0;border:0;background:transparent;color:#94a3b8;font-size:8.5px;line-height:1.2;opacity:.82}.hiRuntimeFooter span+span:before{content:"·";margin-right:9px;color:#cbd5e1}.hiRuntimeFooter .hiReleaseIssue{font-weight:650}.hiRuntimeFooter .hiReleaseIssue.warning{color:#b7791f}.hiRuntimeFooter .hiReleaseIssue.error{color:#b42318}
+      #hi-body-overview>.summaryRow:first-child,#hi-body-consumers .consumerMixKpis,#hi-body-intelligence>.intelligencePage>.summaryRow:first-child{display:none}
+      .r362ValuePage .valueGrid{align-items:start}
+      @media(max-width:980px){.hiConclusionFooter{grid-template-columns:1fr}.hiConclusionFooter details{min-width:0}}
+      @media(max-width:700px){.scopeSelector{display:contents}.scopeButtons{display:contents}.hiConclusionFooter{padding:9px 10px}.hiConclusionMain{grid-template-columns:24px minmax(0,1fr)}.hiConclusionIcon{width:24px;height:24px}}
+
+      /* R3.45.8: accumulated Solar interaction and full-width details fixes. */
+      .solarV3457 .loadEditCommandRow{grid-template-columns:1.25fr 1fr auto;align-items:end}
+      .solarV3457 .loadDetailsFull{padding:0 12px 10px;border-top:0}
+      .solarV3457 .loadDetailsFull .hiDetails{margin:0;width:100%}
+      .solarV3457 .loadDetailsFull .hiDetails summary{width:100%;box-sizing:border-box;text-align:left;background:#fff}
+      .solarV3457 .loadDetailsFull .hiDetails[open] .softBox{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px}
+      .solarV3457 .loadDetailsFull .softBox .kv{background:#fff;border:1px solid #e5ebf3;border-radius:8px;padding:7px 8px;min-height:36px}
+      .solarV3457 .loadActions .hiAction{min-width:52px}
+      .solarV3457 .loadActions .hiAction.enabled{pointer-events:auto}
+      .solarV3457 .sliderField input[type=range]:not(:disabled),.solarV3457 .selectField select:not(:disabled){cursor:pointer;background:#fff;color:#0f172a}
+      .solarV3457 .sliderField input[type=range]:disabled,.solarV3457 .selectField select:disabled{opacity:.65;cursor:not-allowed}
+
+
+      /* R3.46.10 Metering clean period fallback, clustering and sortable rows */
+      .meteringPage{max-width:1500px;margin:0 auto;display:grid;gap:var(--hi-gap)}.meteringHeader{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,.75fr);gap:12px;align-items:start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}.meteringHeader h2{margin:0 0 4px;font-size:20px}.meteringHeader p{margin:0;color:var(--muted)}.meteringSelectorStack{display:grid;gap:8px}.meteringContractNote{padding:12px 14px;display:block;border-color:#f2d79b;background:#fffdf7}.meteringContractNote b{display:block;font-size:13px}.meteringContractNote span{display:block;color:var(--muted);font-size:12px;margin-top:2px}.meteringGrid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.meteringGrid .meteringQualityCard{grid-column:1/-1}.meteringCleanCard h2,.meteringQualityCard h2{font-size:18px;margin-bottom:4px}.meteringCleanCard p{font-size:12px;margin-bottom:10px}.meteringCleanRows{display:grid;gap:7px}.meteringCleanRow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;border:1px solid #e5ebf3;background:#fff;border-radius:12px;padding:10px 12px}.meteringCleanRow b{font-size:13px}.meteringCleanRow span{display:block;color:var(--muted);font-size:11px;margin-top:2px}.meteringCleanRow strong{font-size:14px;text-align:right}.meteringCleanRow.raw{background:#f8fafc}.meteringSortSelector .scopeButtons{justify-content:flex-start}.meteringSortSelector select{display:none;width:100%;min-height:40px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:8px 10px;font:inherit}.meteringKpis{margin-bottom:0}
+      @media(max-width:1180px){.meteringHeader{grid-template-columns:1fr}.meteringGrid{grid-template-columns:1fr 1fr}.meteringGrid .meteringQualityCard{grid-column:1/-1}}
+      @media(max-width:700px){.meteringHeader,.meteringGrid,.meteringKpis{grid-template-columns:1fr}.meteringSortSelector .scopeButtons{display:none}.meteringSortSelector select{display:block}.meteringCleanRow{grid-template-columns:1fr auto}.meteringCleanRow .qs{grid-column:1/-1;justify-self:start}.meteringContractNote{padding:12px}}
+
+
+
+
+
+      .flowPage>.summaryRow.four:first-child{display:none}
+      @media(max-width:900px){}
+      @media(max-width:420px){}
+      .hiUnderstandingFooter{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.75fr) auto;gap:12px;align-items:start;margin:10px 0 4px;padding:14px 16px;background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid var(--line);border-radius:14px}
+      .hiUnderstandingFooter small{display:block;font-size:9px;font-weight:750;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}.hiUnderstandingFooter h2{font-size:16px;margin:0 0 4px}.hiUnderstandingFooter p{font-size:11.5px;line-height:1.4;color:var(--muted);margin:0}.hiUnderstandingConclusion{border-left:1px solid var(--line);padding-left:12px}.hiUnderstandingConclusion b{font-size:11.5px;line-height:1.4;font-weight:600}.hiUnderstandingFooter details{min-width:150px;margin:0}
+      [id^="hi-body-"]{scroll-margin-top:12px}
+      @media(min-width:1101px){}
+      @media(min-width:701px) and (max-width:1100px){.hiUnderstandingFooter{grid-template-columns:1fr 1fr}.hiUnderstandingFooter details{grid-column:1/-1}}
+      @media(max-width:700px){.hiUnderstandingFooter{grid-template-columns:1fr;padding:12px;margin-top:8px}.hiUnderstandingConclusion{border-left:0;border-top:1px solid var(--line);padding:10px 0 0}.hiUnderstandingFooter details{min-width:0}}
+
+    
+      /* R3.62.0 — actual density, action-fit and duplicate-removal closure */
+      :host{--hi-status-desktop-h:48px;--hi-status-phone-h:42px}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      /* Header owns summary/status/actions. Remove old duplicated summary/action surfaces in bodies. */
+      #hi-body-overview>.summaryRow,#hi-body-outlook>.summaryRow,#hi-body-flow>.summaryRow,#hi-body-solar .summaryRow:first-child,#hi-body-battery>.summaryRow,#hi-body-consumers .consumerMixKpis,#hi-body-strategies>.summaryRow,#hi-body-metering>.summaryRow,#hi-body-intelligence .summaryRow:first-child,#hi-body-value>.summaryRow{display:none}
+      #hi-body-outlook .outlookHeader,#hi-body-metering .meteringHeader{display:none}
+      .hiUnderstandingFooter{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(220px,.9fr) auto;align-items:center;gap:14px;margin:10px 0 4px;padding:10px 12px;min-height:66px;border-radius:12px;background:linear-gradient(135deg,#fff 0%,#f7fafc 100%)}
+      .hiFooterLead{display:flex;align-items:center;gap:10px;min-width:0}.hiFooterIcon{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:#f3efff;color:#6d28d9;font-size:14px;flex:0 0 auto}.hiFooterLead>div{min-width:0}
+      .hiUnderstandingFooter small{font-size:8px;letter-spacing:.1em;margin:0 0 2px}.hiUnderstandingFooter h2{font-size:14px;line-height:1.2;margin:0;white-space:normal}.hiFooterAttention{min-width:0;border-left:1px solid var(--line);padding-left:14px}.hiFooterAttention p{font-size:10.5px;line-height:1.3;margin:0;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.hiUnderstandingFooter>details{min-width:92px;margin:0}.hiUnderstandingFooter>details>summary{height:34px;min-height:34px;padding:6px 10px;border-radius:9px;font-size:10px;white-space:nowrap}
+      @media(min-width:701px) and (max-width:1100px){.hiUnderstandingFooter{grid-template-columns:minmax(0,1.15fr) minmax(200px,.85fr) auto}}
+      @media(max-width:700px){.hiUnderstandingFooter{grid-template-columns:1fr auto;gap:8px;padding:9px 10px;min-height:60px}.hiFooterAttention{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);padding:6px 0 0}.hiFooterIcon{width:26px;height:26px}.hiUnderstandingFooter h2{font-size:12.5px}.hiFooterAttention p{font-size:9.5px;-webkit-line-clamp:1}.hiUnderstandingFooter>details{grid-column:2;grid-row:1}.hiUnderstandingFooter>details[open]{grid-column:1/-1;grid-row:auto}}
+
+      /* R3.64.0 public intent, authoritative readback and mobile draft-save transition */
+      [data-property-key].dirty{border-color:#f59e0b;background:#fffdf7}.propertyDraftBar{position:sticky;bottom:max(8px,env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;margin:12px auto 4px;padding:10px 12px;max-width:720px;border:1px solid #cbd5e1;border-radius:14px;background:rgba(255,255,255,.96);box-shadow:0 12px 34px rgba(15,23,42,.16);backdrop-filter:blur(14px)}.propertyDraftBar>div:first-child{display:grid;gap:2px}.propertyDraftBar b{font-size:12px}.propertyDraftBar span{font-size:10px;color:var(--muted)}.propertyDraftBar>div:last-child{display:flex;gap:8px}.propertyDraftBar button{min-height:38px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:7px 14px;font:inherit;font-size:11px;font-weight:650}.propertyDraftBar button.primary{background:#0f172a;color:#fff;border-color:#0f172a}.writeState.pending,.writeState.verifying{color:#b45309}.writeState.accepted{color:#15803d}.writeState.rejected,.writeState.timed_out{color:#b91c1c}@media(max-width:700px){.propertyDraftBar{position:fixed;left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));margin:0;max-width:none;padding:9px 10px}.propertyDraftBar span{display:none}.propertyDraftBar button{min-width:84px;min-height:44px}.energy{padding-bottom:92px}}
+
+      /* R3.63.2 explicit persistence, correct requirement count and stable pricing facts */
+      main.editing{scroll-behavior:auto}.pricingSettingsList{display:grid;border:1px solid var(--line);border-radius:14px;overflow:hidden}.pricingSettingRow{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(280px,1.2fr);gap:16px;align-items:center;padding:10px 12px;background:#fff;border-bottom:1px solid var(--line)}.pricingSettingRow:last-child{border-bottom:0}.pricingSettingIdentity{display:flex;align-items:center;gap:10px;min-width:0}.pricingSettingIdentity>div{display:grid;gap:2px}.pricingSettingIdentity small{color:var(--muted);font-size:11px}.pricingSettingEditor{min-width:0}.pricingSettingEditor>.editField{margin:0}.pricingSettingEditor>span{display:block;text-align:right;color:var(--muted);font-size:11px}.pricingSettingsHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.pricingSettingsHeader>b{border-radius:999px;padding:6px 10px;background:#fff7ed;color:#9a3412;font-size:11px;white-space:nowrap}.flexPricingList{display:grid;gap:7px}.flexPricingRow{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;background:#fff}.flexPricingRow>div{min-width:0}.flexPricingRow b,.flexPricingRow span{display:block}.flexPricingRow span{font-size:11px;color:var(--muted);margin-top:2px}.flexPricingRow strong{font-size:12px;text-align:right}.editing input,.editing select,.editing textarea{user-select:text;-webkit-user-select:text}.editing [data-property-key]:focus{outline:2px solid rgba(37,99,235,.35);outline-offset:2px}@media(max-width:700px){.pricingSettingRow{grid-template-columns:1fr;gap:8px}.pricingSettingEditor>span{text-align:left}.pricingSettingsHeader{display:grid}.flexPricingRow{align-items:flex-start}.flexPricingRow strong{max-width:45%}}
+      .valueTariffList{display:grid;gap:10px;margin-top:14px}.valueTariffRow{border:1px solid var(--line,#e3e7ec);border-radius:14px;padding:12px;display:grid;gap:10px}.valueTariffEvidence{display:flex;align-items:center;gap:10px}.valueTariffEvidence>div{display:grid;gap:2px}.valueTariffEvidence span{font-size:12px;color:var(--muted,#697386)}.valueTariffMark{font-size:18px;font-weight:800;color:var(--green,#21875b)}.valueTariffRow.missing .valueTariffMark{color:var(--orange,#a86300)}.valueTariffRow .editField{margin:0}.valueConfigurationState{display:grid;gap:14px}.valueStateHeadline{display:grid;gap:5px;padding:16px;border-radius:16px;background:var(--soft,#f4f6f8)}.valueStateHeadline b{font-size:24px}.valueStateHeadline span{color:var(--muted,#697386)}.valueConfigurationChecklist{display:grid;gap:8px}.valueConfigurationChecklist>div{display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line,#e3e7ec)}.valueConfigurationChecklist em{font-style:normal;color:var(--muted,#697386);font-size:12px}@media(max-width:700px){.valueConfigurationChecklist>div{grid-template-columns:24px 1fr}.valueConfigurationChecklist em{grid-column:2}.valueTariffRow{padding:10px}}
+
+      /* R3.68.0 Solar mobile-first responsive redesign */
+      .solarOperationalExecutionPanel{display:grid;gap:12px}.solarExecutionSummary{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.solarExecutionSummary span{border:1px solid var(--line);background:#f8fafc;border-radius:999px;padding:4px 8px;font-size:9.5px;color:#475569}.solarExecutionList{display:grid;gap:7px}.solarExecutionRow{display:grid;grid-template-columns:1.2fr .9fr .82fr .72fr .9fr 1.35fr;gap:10px;align-items:center;border:1px solid #e3eaf2;border-radius:12px;padding:10px 12px;background:#fff}.solarExecutionConsumer{display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px;align-items:center;min-width:0}.solarExecutionIcon{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#eef6ff}.solarExecutionConsumer b,.solarExecutionCell b,.solarExecutionWhy b{display:block;font-size:11px;line-height:1.25}.solarExecutionConsumer small,.solarExecutionCell small,.solarExecutionWhy small{display:block;font-size:8.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:3px}.solarExecutionConsumer small{margin:2px 0 0;text-transform:none;letter-spacing:0}.solarExecutionCell span{display:block;font-size:9.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.solarExecutionWhy{min-width:0}.solarExecutionWhy b{font-weight:620;color:#334155}.solarExecutionState{display:inline-flex;width:max-content;border-radius:999px;padding:3px 7px;background:#f1f5f9;color:#475569}.solarExecutionState.active{background:#dcfce7;color:#15803d}.solarExecutionState.waiting{background:#fff7ed;color:#c2410c}.solarExecutionState.blocked{background:#fee2e2;color:#b91c1c}
+      @media(max-width:1100px){.solarExecutionRow{grid-template-columns:1.25fr 1fr 1fr}.solarExecutionWhy{grid-column:1/-1;padding-top:7px;border-top:1px solid #edf2f7}}
+      @media(max-width:700px){.solarOperationalExecutionPanel .energySectionHead{display:grid;gap:8px}.solarExecutionSummary{justify-content:flex-start}.solarExecutionRow{grid-template-columns:1fr 1fr;padding:9px}.solarExecutionConsumer,.solarExecutionWhy{grid-column:1/-1}.solarExecutionWhy{padding-top:7px}.solarExecutionCell span{white-space:normal}.solarExecutionCell b{font-size:10.5px}}
+      .solarOperationalCompact{display:grid;gap:8px;padding:10px 12px}.solarOperationalCompactHead{display:flex;align-items:center;justify-content:space-between;gap:12px}.solarOperationalCompactHead h2{margin:0;font-size:15px;line-height:1.2}.solarOperationalCompactHead p{margin:2px 0 0;font-size:9.5px;color:var(--muted)}.solarOperationalCounts{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.solarOperationalCounts span{padding:3px 7px;border:1px solid var(--line);border-radius:999px;background:#f8fafc;font-size:9px;font-weight:650;color:#475569}.solarCompactConsumerList{display:grid;gap:6px}.solarCompactConsumer{display:grid;grid-template-columns:minmax(150px,.95fr) minmax(100px,.55fr) minmax(0,3.2fr);align-items:center;gap:10px;border:1px solid #e3eaf2;border-radius:10px;background:#fff;padding:8px 10px}.solarCompactIdentity{display:grid;grid-template-columns:30px minmax(0,1fr);align-items:center;gap:8px;min-width:0}.solarCompactIcon{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#eef6ff}.solarCompactIdentity b{display:block;font-size:11.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.solarCompactIdentity small{display:block;margin-top:2px;font-size:9px;color:var(--muted)}.solarCompactPlan{display:grid;gap:3px;align-content:center}.solarCompactPlan>span:last-child{font-size:9px;color:var(--muted)}.solarCompactFacts{display:grid;grid-template-columns:.72fr .72fr .82fr .82fr 1.15fr minmax(150px,1.55fr);align-items:center;min-width:0}.solarCompactItem{min-width:0;padding:0 9px;border-left:1px solid #edf1f5}.solarCompactItem:first-child{border-left:0}.solarCompactItem small{display:block;margin-bottom:2px;font-size:7.8px;font-weight:700;letter-spacing:.055em;text-transform:uppercase;color:#64748b}.solarCompactItem b{display:block;font-size:10.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.solarCompactItem span:not(.solarCompactStatus){display:block;margin-top:2px;font-size:8.5px;line-height:1.2;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.solarCompactItem.wide b{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.solarCompactStatus{display:inline-flex;align-items:center;width:max-content;max-width:100%;padding:3px 6px;border:1px solid;border-radius:999px;font-size:8.8px;font-weight:700;line-height:1.05;white-space:nowrap}.solarCompactStatus.active{background:#dcfce7;color:#166534;border-color:#bbf7d0}.solarCompactStatus.waiting{background:#fff7ed;color:#9a3412;border-color:#fed7aa}.solarCompactStatus.blocked{background:#fef2f2;color:#b91c1c;border-color:#fecaca}.solarCompactStatus.planned{background:#eef2ff;color:#4338ca;border-color:#c7d2fe}.solarCompactStatus.neutral{background:#f8fafc;color:#475569;border-color:#e2e8f0}
+      @media(max-width:1050px){.solarCompactConsumer{grid-template-columns:minmax(150px,.8fr) minmax(100px,.5fr) minmax(0,2.7fr)}.solarCompactFacts{grid-template-columns:repeat(5,minmax(70px,1fr))}.solarCompactItem.wide{grid-column:1/-1;border-left:0;border-top:1px solid #edf1f5;padding-top:5px;margin-top:4px}.solarCompactItem.wide b{-webkit-line-clamp:1}}
+      @media(max-width:700px){.solarOperationalCompactHead{align-items:flex-start}.solarOperationalCounts{justify-content:flex-start}.solarCompactConsumer{grid-template-columns:minmax(0,1fr) auto;gap:7px;padding:8px}.solarCompactFacts{grid-column:1/-1;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid #edf1f5;padding-top:7px}.solarCompactItem{padding:0 6px}.solarCompactItem:nth-child(4){border-left:0}.solarCompactItem.wide{grid-column:1/-1}.solarCompactPlan{justify-items:end}}
+      .solarPlanResponsive{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(330px,.85fr);gap:14px;align-items:stretch}.solarPlanStatus,.solarPlanAutomation{min-width:0;display:grid;align-content:start;gap:10px}.solarPlanAutomation{border-left:1px solid var(--line);padding-left:14px}.solarPlanHeading{display:flex;align-items:center;justify-content:space-between;gap:10px}.solarPlanHeading h2{margin:0;font-size:18px}.solarPlanHeading>span{font-size:10.5px;color:var(--muted)}.solarPlanState{display:inline-flex;align-items:center;gap:6px}.solarPlanMessage{border:1px solid #e3ecf5;background:#f8fbfe;border-radius:12px;padding:12px}.solarPlanMessage small{display:block;text-transform:uppercase;letter-spacing:.08em;font-size:9px;color:var(--muted);font-weight:700}.solarPlanMessage h3{font-size:15px;line-height:1.3;margin:5px 0 3px}.solarPlanMessage p{margin:0;font-size:11px;color:var(--muted);line-height:1.35}.solarPlanStats{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.solarPlanStats span{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 8px;font-size:9.5px;color:#475569}.solarPlanAutomation .modeControl,.solarPlanAutomation .segmented{width:100%;max-width:none}.automationCompactInfo{display:grid;grid-template-columns:1fr;gap:2px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fafbfd}.automationCompactInfo b{font-size:11px}.automationCompactInfo span{font-size:10px;color:var(--muted)}.compactFlexibleLoads{width:100%}.compactFlexibleLoads .flexLoadList{display:grid;grid-template-columns:1fr;gap:7px}.compactFlexibleLoads .decisionLoadCard{margin:0}.compactFlexibleLoads .decisionMainRow{min-height:0;padding:9px 11px;gap:8px}.compactFlexibleLoads .r164GoalContext{padding:0 11px 6px}.compactFlexibleLoads .decisionControlRow{padding:8px 11px;gap:8px}.compactFlexibleLoads .loadDetailsFull{padding:0 11px 8px}.solarCompactSummaryRow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.solarCompactFact{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid var(--line);border-radius:11px;padding:9px 11px}.solarCompactFact span{font-size:10px;color:var(--muted)}.solarCompactFact b{font-size:12px;white-space:nowrap}
+      @media(max-width:900px){.solarPlanResponsive{grid-template-columns:1fr 1fr}.solarPlanAutomation{padding-left:12px}.solarCompactSummaryRow{grid-template-columns:1fr 1fr}}
+      @media(max-width:700px){.solarPlanResponsive{grid-template-columns:1fr 1fr;gap:8px;padding:10px}.solarPlanStatus,.solarPlanAutomation{gap:7px}.solarPlanAutomation{padding-left:8px}.solarPlanHeading{display:grid;gap:2px}.solarPlanHeading h2{font-size:14px}.solarPlanHeading>span{font-size:9px}.solarPlanMessage{padding:8px;border-radius:9px}.solarPlanMessage h3{font-size:12px;line-height:1.25;margin:3px 0}.solarPlanMessage p{font-size:9.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.solarPlanStats{gap:4px;margin-top:6px}.solarPlanStats span{font-size:8.5px;padding:3px 6px}.solarPlanAutomation .segmented button{min-width:0;padding:8px 5px;font-size:9px}.automationCompactInfo{padding:6px 7px}.automationCompactInfo b{font-size:9.5px}.automationCompactInfo span{font-size:9px}.solarPlanAutomation .hiDetails summary{padding:6px 0;font-size:9px}.compactFlexibleLoads{padding:10px}.compactFlexibleLoads .energySectionHead{display:grid;grid-template-columns:1fr;gap:7px}.compactFlexibleLoads .energySectionHead h2{font-size:16px}.compactFlexibleLoads .energySectionHead p{font-size:10px;margin:2px 0 0}.compactFlexibleLoads .sortControl{display:grid;grid-template-columns:auto 1fr;gap:6px}.compactFlexibleLoads .sortControl .segmented{overflow-x:auto}.compactFlexibleLoads .sortControl button{padding:6px 8px;font-size:9px}.compactFlexibleLoads .decisionMainRow{grid-template-columns:minmax(0,1.4fr) minmax(80px,.6fr);padding:8px;gap:6px}.compactFlexibleLoads .decisionIdentity{grid-column:1}.compactFlexibleLoads .decisionPlan{grid-column:2}.compactFlexibleLoads .decisionMetric,.compactFlexibleLoads .decisionExpected,.compactFlexibleLoads .r164GoalContext{display:none}.compactFlexibleLoads .decisionControlRow{grid-template-columns:1fr;padding:7px 8px}.compactFlexibleLoads .decisionActions{grid-template-columns:repeat(3,1fr)}.compactFlexibleLoads .decisionActions .hiAction{min-height:34px;font-size:10px;padding:5px}.compactFlexibleLoads .automationMini{display:none}.solarCompactSummaryRow{grid-template-columns:1fr 1fr;gap:6px}.solarCompactFact{padding:7px 8px}.solarCompactFact span{font-size:9px}.solarCompactFact b{font-size:10.5px}}
+
+      /* R3.67.0 product cleanup and central tab diagnostics */
+      
+      .hiConclusionFooter>details{display:none}
+      .hiTabDiagnostics{margin:8px 0 16px;border:1px solid var(--line);border-radius:14px;background:#fff;overflow:hidden}
+      .hiTabDiagnostics>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;min-height:48px;background:#f8fafc}
+      .hiTabDiagnostics>summary::-webkit-details-marker{display:none}.hiTabDiagnostics>summary span{display:grid;gap:2px}.hiTabDiagnostics>summary b{font-size:12px}.hiTabDiagnostics>summary small{font-size:10px;color:var(--muted)}.hiTabDiagnostics>summary>strong{font-size:10px;border-radius:999px;padding:5px 9px;background:#e8f5ec;color:#166534}.hiTabDiagnostics[open]>summary>strong{background:#eef2ff;color:#3730a3}
+      .hiDiagnosticsBody{display:grid;gap:12px;padding:12px 14px 14px}.hiDiagnosticImpact,.hiDiagnosticSection{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff}.hiDiagnosticImpact{background:#f8fafc}.hiDiagnosticImpact h3,.hiDiagnosticSection h4{margin:0 0 7px;font-size:12px}.hiDiagnosticImpact p,.hiDiagnosticSection>p{margin:0;color:var(--muted);font-size:11px;line-height:1.45}
+      .hiDiagnosticRow{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:start;padding:9px 0;border-top:1px solid var(--line)}.hiDiagnosticRow:first-of-type{border-top:0}.hiDiagnosticState{width:20px;height:20px;border-radius:999px;display:grid;place-items:center;background:#e8f5ec;color:#166534;font-weight:800}.hiDiagnosticRow.issue .hiDiagnosticState{background:#fff1df;color:#9a3412}.hiDiagnosticRow>div{display:grid;gap:2px;min-width:0}.hiDiagnosticRow b{font-size:11px}.hiDiagnosticRow small{font-size:10px;color:var(--muted)}.hiDiagnosticRow code,.hiDiagnosticIssue code,.hiEngineeringRow code{font-size:9px;overflow-wrap:anywhere;color:#475569}.hiDiagnosticRow>strong{font-size:10px}.hiDiagnosticRow>p{grid-column:2/-1;margin:2px 0 0;font-size:10px;color:#9a3412}
+      .hiDiagnosticIssue{display:grid;gap:4px;padding:9px 0;border-top:1px solid var(--line)}.hiDiagnosticIssue:first-of-type{border-top:0}.hiDiagnosticIssue b{font-size:11px}.hiDiagnosticIssue span{font-size:10px;color:var(--muted)}.hiDiagnosticEmpty{font-size:10px;color:var(--muted);padding:6px 0}.hiEngineeringRow{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid var(--line)}.hiEngineeringRow:first-of-type{border-top:0}.hiEngineeringRow b{font-size:10px}.hiDiagnosticMeta{font-size:9px;color:var(--muted);text-align:right}
+      @media(max-width:700px){.hiTabDiagnostics>summary{padding:11px 12px}.hiDiagnosticsBody{padding:10px}.hiDiagnosticRow{grid-template-columns:22px minmax(0,1fr)}.hiDiagnosticRow>strong{grid-column:2}.hiDiagnosticRow>p{grid-column:2}.hiDiagnosticMeta{text-align:left}}
+
+
+      /* R3.71.0 Solar phone convergence and user-controlled tab navigation */
+      @media(max-width:700px){
+        /* The user owns horizontal navigation position. No grid conversion, snapping or automatic centering. */
+        .tabs{display:flex;grid-template-columns:none;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;white-space:nowrap;gap:4px;padding:4px;scroll-snap-type:none;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain;touch-action:pan-x}
+        .tab{flex:0 0 auto;width:auto;min-width:104px;min-height:44px;padding:8px 14px;font-size:12px;line-height:1.1;white-space:nowrap;text-align:center;scroll-snap-align:none}
+
+        /* Solar is genuinely phone-first: status first, automation second, never squeezed side by side. */
+        .solarPlanResponsive{grid-template-columns:1fr;gap:10px;padding:11px}
+        .solarPlanStatus,.solarPlanAutomation{width:100%;min-width:0;gap:7px}
+        .solarPlanAutomation{border-left:0;border-top:1px solid var(--line);padding:10px 0 0}
+        .solarPlanHeading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+        .solarPlanHeading h2{font-size:16px}
+        .solarPlanHeading>span{font-size:10px;text-align:right}
+        .solarPlanMessage{padding:9px 10px}
+        .solarPlanMessage small{font-size:8.5px}
+        .solarPlanMessage h3{font-size:13px;line-height:1.28;margin:4px 0 2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .solarPlanMessage p{font-size:10px;line-height:1.3;-webkit-line-clamp:1}
+        .solarPlanStats{display:none}
+        .solarPlanAutomation .modeControl,.solarPlanAutomation .segmented{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;overflow:hidden}
+        .solarPlanAutomation .segmented button{width:100%;min-width:0;padding:9px 4px;font-size:10px;white-space:nowrap}
+        .automationCompactInfo{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px}
+        .automationCompactInfo b{font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .automationCompactInfo span{font-size:9.5px;white-space:nowrap}
+        .solarPlanAutomation .hiDetails summary{min-height:38px;padding:7px 8px;font-size:10px}
+
+        /* Flexible loads remain the primary full-width content and are compact rather than paired with duplicated solar facts. */
+        .compactFlexibleLoads{width:100%;padding:10px}
+        .compactFlexibleLoads .flexLoadList{grid-template-columns:1fr;gap:7px}
+        .compactFlexibleLoads .decisionLoadCard{width:100%;overflow:hidden}
+        .compactFlexibleLoads .decisionMainRow{grid-template-columns:minmax(0,1fr) auto;padding:8px 9px}
+        .compactFlexibleLoads .decisionControlRow{padding:7px 9px;gap:7px}
+        .compactFlexibleLoads .decisionActions{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+        .compactFlexibleLoads .decisionActions .hiAction{min-width:0;min-height:38px;padding:6px 4px;font-size:10px}
+        .compactFlexibleLoads .sortControl .segmented{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));overflow:hidden;width:100%}
+        .compactFlexibleLoads .sortControl button{min-width:0;width:100%;padding:7px 4px;font-size:9.5px}
+      }
+
+      /* R3.73.0 lean strategy set editing */
+      .strategyTablePanel{padding:14px}.strategyTableHead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:7px}.strategyTableHead h2{margin:0;font-size:16px;font-weight:600}.strategyTableHead p{margin:2px 0 0;font-size:10.5px;line-height:1.25}.strategySetActions{display:flex;align-items:center;gap:7px;flex:0 0 auto}.strategyTextAction,.strategySaveAction{min-height:30px;padding:5px 9px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer}.strategyTextAction{border:0;background:transparent;color:#526178}.strategySaveAction{border:1px solid #d7e5fb;background:#eef5ff;color:#1d4ed8}.strategyTextAction:disabled,.strategySaveAction:disabled{opacity:.4;cursor:default}.strategyChangeCount{font-size:9.5px;color:var(--muted)}.strategyTable{border-top:1px solid #edf1f6}.strategyColumnHead,.strategyPrimaryRow{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,42%);gap:12px;align-items:center}.strategyColumnHead{padding:5px 2px 4px;color:#8a96a8;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}.strategyColumnHead span:last-child{text-align:right}.strategyTableRow{border-top:1px solid #f0f3f7;padding:7px 2px 6px;transition:background .15s ease,border-color .15s ease}.strategyTableRow.changed{background:rgba(37,99,235,.035);border-left:2px solid rgba(37,99,235,.35);padding-left:7px}.strategySetting{font-size:11.5px;color:#526178}.strategyValue{text-align:right;min-width:0}.strategyReadValue{font-size:11.5px;font-weight:560;color:#172033}.strategyGuidance{grid-column:1/-1;margin-top:2px;padding-right:2px;color:#8a96a8;font-size:9.5px;line-height:1.2}.strategyGuidance i{font-style:italic}.strategyValue .editField,.strategyValue .selectField,.strategyValue .sliderField,.strategyValue .toggleField{margin:0;padding:0;background:transparent;border:0;display:block}.strategyValue .editField>span,.strategyValue .selectField>span,.strategyValue .sliderField>div>span,.strategyValue .toggleField>span{display:none}.strategyValue input,.strategyValue select{width:min(220px,100%);min-height:34px;padding:5px 7px;font-size:11px;margin-left:auto}.strategyValue .sliderField input[type=range]{width:100%}.strategyValue .toggleField{justify-content:flex-end}.strategiesPage .strategyProfilePicker{margin-bottom:10px}.strategiesPage .effectivePolicyPreview{margin-top:10px}.batteryGrid .strategyTablePanel{grid-column:1/-1}.compactFlexibleLoads>.strategyTablePanel{margin-top:10px}
+      @media(max-width:700px){.strategyTablePanel{padding:11px}.strategyTableHead{align-items:center}.strategyTableHead p{display:none}.strategyColumnHead,.strategyPrimaryRow{grid-template-columns:minmax(0,1fr) minmax(112px,44%);gap:8px}.strategyColumnHead{font-size:8.5px}.strategySetting,.strategyReadValue{font-size:11px}.strategyGuidance{font-size:9px;white-space:normal}.strategySetActions{gap:4px}.strategyTextAction,.strategySaveAction{padding:5px 7px}.strategyChangeCount{display:none}.strategyValue input,.strategyValue select{min-height:36px}}
+
+      /* R3.74.0 product clarity and mobile compaction */
+      .r3280OutlookSummary{display:none}
+      .outlookHeroFacts small{display:block;margin-top:2px;color:var(--muted);font-size:10px;font-weight:500}
+      .consumerExplorerCard.compact{padding:9px 11px}.consumerExplorerCard.compact .consumerExplorerHead{align-items:center}.consumerExplorerCard.compact .consumerExplorerPrimary span{font-size:10px}.consumerExplorerCard.compact .consumerReason{display:block;margin-top:3px;color:var(--muted);font-size:9.5px;font-style:italic}.consumerExplorerCard.compact>.hiDetails{margin-top:6px}.consumerExplorerCard.compact>.hiDetails summary{min-height:30px;padding:5px 7px}
+      .consumerQuickFilters{display:none}.consumerToolbar{grid-template-columns:1fr 1fr}.consumerExplorerHeader{grid-template-columns:minmax(0,1fr) minmax(260px,.55fr)}
+      .effectivePolicyList{display:grid;border-top:1px solid #edf1f6}.effectivePolicyRow.compact{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 2px;border:0;border-bottom:1px solid #f0f3f7;border-radius:0;background:transparent}.effectivePolicyRow.compact b,.effectivePolicyRow.compact span,.effectivePolicyRow.compact strong{font-size:11px}.effectivePolicyRow.compact span{color:var(--muted)}.effectivePolicyRow.compact strong{text-align:right}.effectivePolicyRow.compact small{grid-column:1/-1;color:var(--muted);font-size:9px;font-style:italic}
+      .pricingStrategyPanel .strategyGuidance{padding-top:1px}.pricingStrategyPanel .editField{margin:0}.pricingStrategyPanel input{min-height:34px}
+      .meteringRemediationPanel{padding:11px}.meteringRemediationItem{grid-template-columns:minmax(0,1fr) auto;padding:9px;margin-top:7px}.remediationImpact{display:none}
+      .hiTabDiagnostics{margin-top:10px;margin-bottom:5px}.hiRuntimeFooter{font-size:9px;color:#8a96a8;padding:3px 2px;margin:0;display:block;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      @media(max-width:700px){.consumerExplorerHeader{grid-template-columns:1fr}.consumerToolbar{grid-template-columns:1fr 1fr}.effectivePolicyRow.compact{grid-template-columns:minmax(0,1fr) minmax(0,.9fr) auto}.outlookGrid{gap:8px}.meteringRemediationItem{grid-template-columns:1fr}.meteringRemediationAction{align-items:flex-start}.pricingStrategyPanel{padding:11px}.hiRuntimeFooter{font-size:8.5px}}
+
+      .periodUnavailableCard{max-width:760px;margin:0 auto;text-align:left}.periodAvailabilityHint{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:10px;background:#f7f9fc;border:1px solid var(--line)}.periodAvailabilityHint span{color:var(--muted)}.productNotice{display:flex;align-items:center;gap:10px;padding:10px 12px}.productNotice b{white-space:nowrap}.productNotice span{color:var(--muted)}.disabledAssetsSection .consumerExplorerCard{min-height:0}.disabledAssetsSection .consumerExplorerHead{min-height:38px}.disabledAssetsSection .consumerExplorerCard>.hiDetails{display:none}
+
+      /* R3.82.3 end-user portal communication standard */
+      .productPortalPage{display:grid;gap:12px}
+      .productStory{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:18px;border-left:4px solid #3b82f6}
+      .productStory.orange{border-left-color:#f59e0b}.productStory.green{border-left-color:#22c55e}.productStory.purple{border-left-color:#8b5cf6}
+      .productStoryCopy small{display:block;text-transform:uppercase;letter-spacing:.12em;font-size:9px;color:var(--muted);margin-bottom:6px}
+      .productStoryCopy h2{font-size:20px;line-height:1.2;margin:0 0 6px;letter-spacing:-.02em}
+      .productStoryCopy>p{font-size:12px;line-height:1.45;margin:0;max-width:760px}
+      .productStoryRecommendation{margin-top:12px;padding:10px 12px;border-radius:10px;background:#f8fafc;display:grid;gap:3px}
+      .productStoryRecommendation span{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}.productStoryRecommendation b{font-size:12px;line-height:1.35}
+      .productStoryActions{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}.productStory>.hiDetails{grid-column:1/-1}
+      .managedAssetCard{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff;display:grid;gap:10px}
+      .managedAssetHeader{display:flex;justify-content:space-between;gap:12px;align-items:start}.managedAssetHeader h3{margin:0 0 3px;font-size:14px}.managedAssetHeader span{font-size:11px;color:var(--muted)}.managedAssetHeader>b{font-size:14px}
+      .managedAssetStory{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px}.managedAssetStory>p,.managedAssetStory>div{margin:0;padding:10px 12px;background:#f8fafc;border-radius:9px;font-size:11px;line-height:1.4}.managedAssetStory small{display:block;text-transform:uppercase;letter-spacing:.08em;font-size:8.5px;color:var(--muted);margin-bottom:3px}.managedAssetStory b{font-size:11px}
+      .managedAssetFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.managedAssetFacts span{min-width:0;padding:7px 8px;border-radius:8px;background:#f8fafc}.managedAssetFacts small,.managedAssetFacts b{display:block}.managedAssetFacts small{font-size:8px;color:var(--muted)}.managedAssetFacts b{font-size:10.5px;line-height:1.3;overflow-wrap:anywhere}.managedAssetActions{display:flex;gap:8px;flex-wrap:wrap}.managedAssetCard>.hiDetails{margin:0}
+      .compactDisclosure{padding:0;overflow:hidden}.compactDisclosure>summary{padding:12px 14px;font-weight:640;cursor:pointer}.compactDisclosure>p{padding:0 14px}.disabledAssetList{display:grid;gap:4px;padding:8px 12px 12px}.disabledAssetCompact{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fbfcfd}.disabledAssetCompact b{display:block;font-size:11px}.disabledAssetCompact span{font-size:9.5px;color:var(--muted)}.disabledAssetCompact>.hiDetails{margin:0}.disabledAssetCompact>.hiDetails summary{padding:6px 8px}
+      .portalStatusList{display:grid;gap:5px;margin-top:8px}.portalStatusRow{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.portalStatusRow:last-child{border-bottom:0}.portalStatusRow b{display:block;font-size:12px}.portalStatusRow span{font-size:10px;color:var(--muted)}.portalStatusRow strong{font-size:11px;white-space:nowrap}
+      .productMeteringGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      @media(max-width:700px){.productStory{grid-template-columns:1fr;padding:13px}.productStoryActions{justify-content:flex-start}.managedAssetStory{grid-template-columns:1fr}.managedAssetFacts{grid-template-columns:1fr 1fr}.productMeteringGrid{grid-template-columns:1fr}}
+
+
+      .sliderField.commandEditable{background:linear-gradient(120deg,#f8fbff,#fff);border:1px solid #dbeafe;border-radius:10px;padding:8px 10px}.sliderField.commandEditable input[type=range]:not(:disabled){cursor:pointer;accent-color:#2563eb}.sliderField.commandEditable .commandReadback{display:block;margin-top:3px;font-size:9px;color:#64748b;font-weight:560}.automationQuickAction .hiSegmented{width:100%}.automationQuickAction .hiSegment{min-height:34px}.solarPlanAutomation .automationQuickAction{width:100%}
+      /* R3.85.4 end-user Planning presentation */
+      .planningMatrixPanel{padding:16px}.planningMatrixHead{margin-bottom:12px}.planningMatrixHead h2{font-size:19px}.planningMatrixHead p,.planningMatrixHead>span{display:none}.planningTable{table-layout:fixed;min-width:900px}.planningTable th,.planningTable td{width:auto;min-width:0;height:48px;padding:10px 8px;font-size:12px}.planningTable th:first-child,.planningTable td:first-child{width:92px;min-width:92px}.planningTable thead th{height:66px}.planningTable .planningLaneGroups th{height:38px;font-size:11px;color:#64748b}.planningTable td{font-weight:400}.planningTable td b{font-size:13px}.planningTable td small{display:none}.planningHeaderNeed{display:block;color:#6d28d9;font-size:10px;font-weight:600;margin-top:4px}.planningPowerValue{font-size:13px;font-weight:450}.planningIdle{font-size:15px;font-weight:400;color:#cbd5e1}.planningTotalRow th,.planningTotalRow td{height:58px;font-weight:650}.planningTotalRow small{display:none}.planningFooter{grid-template-columns:1fr;margin-top:12px}.planningFooter>div{border:0}.planningFooter>div:nth-child(2),.planningFooter>div:nth-child(3){display:none}.planningFooter>div:first-child>small{font-size:11px}.planningFooterAsset{font-size:12px}.planningAggregateTotals b{font-size:14px}.planningAggregateTotals small{display:block;font-size:10px}
+      /* Planning visual language convergence */
+      .planningHero{position:relative;min-height:150px;border:1px solid var(--line);border-radius:15px;padding:20px 26px;margin-bottom:8px;overflow:hidden;background:linear-gradient(90deg,rgba(255,255,255,.98),rgba(255,255,255,.78)),url('/hacsfiles/rhi-energy-ux/assets/heroes/solar-hero.webp') center/cover;display:flex;justify-content:space-between;gap:20px}.planningHero small{font-size:9px;letter-spacing:.14em;color:#526178;font-weight:700}.planningHero h2{font-size:24px;margin:5px 0 2px}.planningHeroValue{font-size:38px;font-weight:650;letter-spacing:-.03em}.planningHeroValue span{font-size:11px;font-weight:500;color:var(--muted);margin-left:8px}.planningHero p{font-size:11px;color:var(--muted);margin:5px 0 0}.planningStatus{align-self:flex-start;padding:6px 10px;border-radius:999px;font-size:10px;font-weight:650;background:#f4f6f8}.planningStatus.ok{background:#eef8f2;color:#2f6d4b}.planningStatus.warn{background:#fff7e6;color:#946200}.planningPage{max-width:1500px;margin:0 auto}.planningMatrixPanel{padding:10px}.planningMatrixHead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:7px}.planningMatrixHead h2{margin:0;font-size:16px}.planningMatrixHead p,.planningMatrixHead>span{font-size:9.5px;color:var(--muted);margin:2px 0 0}.planningTableWrap{max-height:430px;overflow:auto;border:1px solid var(--line);border-radius:11px;scroll-padding-top:76px;scroll-padding-bottom:52px;isolation:isolate}.planningTable{border-collapse:separate;border-spacing:0;width:100%;min-width:980px;background:#fff}.planningTable th,.planningTable td{border-right:1px solid #edf1f6;border-bottom:1px solid #edf1f6;padding:7px 9px;text-align:center;font-size:10.5px;line-height:1.15;height:38px;box-sizing:border-box}.planningTable th:first-child,.planningTable td:first-child{position:sticky;left:0;background:#fff;z-index:3;text-align:left;min-width:88px}.planningTable thead th{position:sticky;background:#f8fafc;font-weight:650}.planningTable thead .planningLaneGroups th{top:0;z-index:6;height:28px}.planningTable thead tr:nth-child(2) th{top:28px;z-index:5;height:48px}.planningTable thead th[rowspan="2"]{top:0;z-index:8;height:76px;background:#f8fafc}.planningTable thead th:first-child{left:0;background:#f8fafc}.planningTable th small{display:block;color:var(--muted);font-weight:450;margin-top:2px}.planningAssetHead{display:flex;align-items:center;justify-content:center;gap:7px}.planningAssetHead>span:last-child{display:flex;flex-direction:column;align-items:flex-start;min-width:0}.planningAssetHead b{max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.planningSystemHead{display:flex;align-items:center;justify-content:center;gap:6px}.planningColumnHead{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;text-align:center}.planningColumnHead b,.planningColumnHead small{display:block;text-align:center;margin:0}.planningIconBadge{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border-radius:9px;width:29px;height:29px;font-size:16px;line-height:1;background:#eef5ff;color:#2563eb;box-shadow:inset 0 0 0 1px rgba(37,99,235,.10)}.planningIconBadge.purple{background:#f2edff;color:#7137d8;box-shadow:inset 0 0 0 1px rgba(113,55,216,.12)}.planningIconBadge.green{background:#eaf8ef;color:#239551;box-shadow:inset 0 0 0 1px rgba(35,149,81,.12)}.planningIconBadge.orange{background:#fff5df;color:#e59a00;box-shadow:inset 0 0 0 1px rgba(229,154,0,.14)}.planningIconBadge.slate{background:#f1f4f8;color:#64748b;box-shadow:inset 0 0 0 1px rgba(100,116,139,.12)}.planningIconBadge.system{width:25px;height:25px;font-size:14px;border-radius:8px}.planningIconBadge.mini{width:22px;height:22px;font-size:12px;border-radius:7px;margin-right:5px}.planningIconBadge.hero{width:45px;height:45px;font-size:23px;border-radius:13px}.planningHeroLead{display:flex;align-items:flex-start;gap:13px}.planningFooterAsset{display:inline-flex;align-items:center}.planningUnit{margin-top:3px}.planningTime{display:flex;align-items:center;gap:5px;font-weight:600}.planningTime em{font-style:normal;font-size:7px;padding:2px 4px;border-radius:5px;background:#ede9fe;color:#7c3aed}.planningCurrent td{background:#fcfbff}.planningCurrent td:first-child{background:#fcfbff}.planningTable td small{display:block;color:var(--muted);font-size:8.5px;margin-top:2px;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.planningWait{display:inline-flex;align-items:center;justify-content:center;gap:5px;color:#b7791f;font-weight:650}.planningCellState{display:flex;align-items:center;justify-content:center;gap:4px}.planningStateDot{display:inline-block;width:6px;height:6px;border-radius:50%}.planningStateDot.active{background:#f59e0b}.planningStateDot.wait{background:#cbd5e1}.planningPowerValue{font-size:11px}.planningIdle,.planningUnavailable{color:#94a3b8}.planningExport{color:#15803d}.planningImport{color:#dc2626}.planningFooter{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(120px,.45fr) minmax(0,1fr);gap:0;margin-top:8px;border:1px solid var(--line);border-radius:10px;overflow:hidden}.planningFooter>div{padding:9px 12px;border-right:1px solid var(--line)}.planningFooter>div:last-child{border-right:0}.planningFooter small{display:block;color:var(--muted);font-size:9px;margin-bottom:5px}.planningFooter>div>div{display:flex;gap:14px;flex-wrap:wrap}.planningFooter span{font-size:10.5px}.planningFooter span i{margin-right:4px}.planningFooter b{font-size:11px}.planningHeaderNeed{color:#6d28d9;font-weight:600;font-size:9px;margin-top:3px}.planningTotalSpacer td{height:52px;padding:0;border:0;background:#fff}.planningTotalSpacer td:first-child{position:static}.planningTotalRow th,.planningTotalRow td{position:sticky;bottom:0;background:#fbfcfe;z-index:7;height:52px;border-top:1px solid #dfe5ed;font-weight:600;box-shadow:0 -1px 0 #dfe5ed}.planningTotalRow th:first-child{left:0;z-index:9;background:#fbfcfe}.planningTotalRow td small,.planningTotalRow th small{display:block;margin-top:3px;color:var(--muted);font-weight:450}.planningTotalAsset b{color:#6d28d9}.planningAggregateTotals{display:grid;grid-template-columns:repeat(3,minmax(110px,1fr));gap:0;margin-top:8px;border-top:1px solid var(--line)}.planningAggregateTotals>span{padding:8px 12px 0;border-right:1px solid var(--line)}.planningAggregateTotals>span:last-child{border-right:0}.planningAggregateTotals small{margin-bottom:3px}.planningAggregateTotals b{font-size:11px}.planningAggregateTotals>span:last-child b{color:#6d28d9}@media(max-width:700px){.planningHero{min-height:120px;padding:15px}.planningHero h2{font-size:20px}.planningHeroValue{font-size:30px}.planningMatrixPanel{padding:7px}.planningTableWrap{max-height:390px}.planningFooter{grid-template-columns:1fr}.planningFooter>div{border-right:0;border-bottom:1px solid var(--line)}.planningFooter>div:last-child{border-bottom:0}}
+
+.retroCollectingState{display:grid;grid-template-columns:64px minmax(0,1fr);gap:18px;align-items:start;padding:28px}.retroCollectingIcon{width:56px;height:56px;border-radius:18px;display:grid;place-items:center;background:#f5f3ff;color:#6d28d9;font-size:28px}.retroCollectingState small{display:block;color:#7c3aed;font-weight:800;letter-spacing:.12em}.retroCollectingState h2{margin:5px 0 8px;font-size:24px}.retroEvidenceSteps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0}.retroEvidenceSteps span{display:grid;gap:4px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;background:#fafafa}.retroEvidenceSteps b{font-size:12px}.retroEvidenceSteps em{font-size:11px;color:#64748b;font-style:normal}@media(max-width:700px){.retroCollectingState{grid-template-columns:1fr}.retroEvidenceSteps{grid-template-columns:1fr}}
+      .flexibleMeteringPanel{margin-top:12px}.flexibleMeteringPanel .tableWrap{overflow:auto;border:1px solid var(--divider-color,#e5e7eb);border-radius:12px}.flexibleMeteringTable{width:100%;border-collapse:collapse;min-width:560px}.flexibleMeteringTable th,.flexibleMeteringTable td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--divider-color,#e5e7eb);vertical-align:middle}.flexibleMeteringTable th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--secondary-text-color)}.flexibleMeteringTable tr:last-child td{border-bottom:0}.flexibleMeteringTable td.numeric,.flexibleMeteringTable th.numeric{text-align:right}.flexibleMeteringTable td small{display:block;color:var(--secondary-text-color);font-weight:400;margin-top:3px}.quickAutomation{display:inline-flex;align-items:center;gap:10px;padding:6px 10px;border:1px solid #dbe6f3;border-radius:11px;background:#fff}.quickAutomationLabel{font-size:12px;font-weight:700;color:#111827;white-space:nowrap}.quickAutomation .hiSegmented{margin:0;width:auto}.quickAutomation .hiSegment{min-height:34px;min-width:90px;padding:7px 11px;font-size:12px;font-weight:650}
+      .operationalOverview,.planningOverview{padding:12px 14px}.operationalOverviewHead h2,.planningOverview h2{margin:0;font-size:16px}.operationalOverviewHead p{margin:3px 0 10px;font-size:11px;color:#64748b;line-height:1.4}.operationalSummaryGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.operationalSummaryCard{display:grid;grid-template-columns:42px 1fr;align-items:center;gap:10px;min-height:72px;padding:11px 13px;border:1px solid #e4eaf2;border-radius:12px;background:#fff}.operationalSummaryCard.charging{background:#f7fcf8;border-color:#d8efdf}.operationalSummaryCard.next{background:#f7faff;border-color:#d8e6fb}.operationalSummaryCard.planned{background:#fbf9ff;border-color:#eadffc}.operationalSummaryCard.exceptional{background:#fffaf7;border-color:#f8dfcf}.summaryIcon{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#fff;font-size:20px}.operationalSummaryCard small{display:block;font-size:10px;font-weight:700;letter-spacing:.02em}.operationalSummaryCard b{display:block;font-size:19px;line-height:1.1;margin-top:2px}.operationalSummaryCard p{margin:4px 0 0;font-size:11px;line-height:1.4;color:#64748b}
+      .solarLoadRow{padding:0;overflow:hidden;border:1px solid #e3eaf2;border-radius:13px;background:#fff}.solarLoadSummary{display:grid;grid-template-columns:1.45fr .85fr .9fr .8fr .85fr 1.25fr .9fr;align-items:center;gap:12px;padding:12px 14px}.solarLoadIdentity{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:center;gap:9px}.solarLoadIcon{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#f5f3ff}.solarLoadName{display:flex;align-items:center;gap:7px}.solarLoadName h3{margin:0;font-size:13px;line-height:1.3}.priorityBadge{display:inline-flex;padding:3px 7px;border-radius:999px;background:#eef5ff;color:#475569;font-size:9.5px;font-weight:700;white-space:nowrap}.solarLoadIdentity small,.planningLoadIdentity small{display:flex;align-items:center;gap:4px;margin-top:3px;font-size:10.5px;color:#64748b}.solarLoadFact{min-width:0}.solarLoadFact small,.planningLoadRow>div>small{display:block;margin-bottom:4px;font-size:9px;font-weight:750;letter-spacing:.05em;text-transform:uppercase;color:#64748b}.solarLoadFact b,.planningLoadRow>div>b{display:block;font-size:12px;line-height:1.3}.solarLoadFact span{display:block;margin-top:2px;font-size:10.5px;color:#64748b}.nextActionBadge{display:inline-flex;width:max-content;max-width:100%;padding:4px 7px;border-radius:7px;background:#eef5ff;color:#2563eb;font-size:11px;font-weight:700}.planStatusBadge{display:inline-flex;width:max-content;padding:5px 8px;border-radius:8px;font-size:10px;font-weight:700}.planStatusBadge.ok{background:#eafaf0;color:#15803d}.planStatusBadge.exception{background:#fff1f2;color:#be123c}.solarLoadControls{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(260px,.9fr);gap:18px;align-items:center;padding:10px 14px;border-top:1px solid #edf1f5;background:#fbfdff}.solarLoadControls .requestedSlot{display:grid;grid-template-columns:150px minmax(0,1fr);align-items:center;gap:12px}.controlTitle{font-size:10px;font-weight:700;color:#475569}.solarLoadControls .loadActions{display:flex;align-items:center;justify-content:flex-start;gap:9px;border-left:1px solid #e5eaf0;padding-left:18px}.solarLoadControls .loadActions>span{margin-right:8px;font-size:10px;color:#64748b}.solarLoadRow .loadDetailsFull{display:none}
+      .valueAssetIdentity{display:flex;align-items:center;gap:10px;min-width:0}.valueAssetIdentity>span{min-width:0}.valueAssetIdentity b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.valueAssetIdentity small{display:block;margin-top:3px;font-size:10px;color:#64748b}.valueConsumerRow{align-items:center;min-height:72px}.flexPricingRow>div.valueAssetIdentity{display:flex}
+      .assetVisual{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border-radius:10px;background:#f5f7fa;overflow:hidden;border:1px solid #e8edf3}.assetVisual img{display:block;width:100%;height:100%;object-fit:contain}.assetVisual-xs{width:38px;height:30px;padding:2px}.assetVisual-sm{width:54px;height:42px;padding:3px}.assetVisual-md{width:72px;height:54px;padding:4px}.assetVisualFallback{font-size:18px;color:#52657f}.assetIdentityChip{display:inline-flex;align-items:center;gap:7px;margin:2px 8px 2px 0;vertical-align:middle}.assetIdentityChip>span:last-child{min-width:0}.assetIdentityChip b{display:block;font-size:11px;line-height:1.2}.assetIdentityChip small{display:block;margin-top:2px;font-size:9.5px;color:#64748b}.operationalSummaryCard p{display:flex;align-items:center;flex-wrap:wrap;gap:2px}.solarLoadIdentity{grid-template-columns:54px minmax(0,1fr)}.planningLoadIdentity{grid-template-columns:54px minmax(0,1fr)}.planningAssetHead{display:flex;align-items:center;gap:7px}.planningFooterAsset{display:inline-flex;align-items:center;gap:6px}.outlookChildRow{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:8px}
+      .planningKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:8px 0;border:1px solid #e3eaf2;border-radius:13px;background:#fff;overflow:hidden}.planningKpiStrip article{padding:14px 18px;border-left:1px solid #edf1f5}.planningKpiStrip article:first-child{border-left:0}.planningKpiStrip small{display:block;font-size:10px;color:#64748b}.planningKpiStrip b{display:block;margin-top:3px;font-size:17px}.planningOverview{margin:8px 0}.plannedFlexibleLoads{margin-top:8px}.planningLoadList{display:grid;gap:0;border:1px solid #e4eaf2;border-radius:11px;overflow:hidden}.planningLoadRow{display:grid;grid-template-columns:1.45fr 1fr .8fr .85fr 1.2fr .9fr;align-items:center;gap:12px;padding:11px 13px;border-top:1px solid #edf1f5}.planningLoadRow:first-child{border-top:0}.planningLoadIdentity{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center;gap:8px}.planningLoadName{display:flex;align-items:center;gap:7px}.planningLoadName b{font-size:12px;line-height:1.3}
+      @media(max-width:900px){.operationalSummaryGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.solarLoadSummary{grid-template-columns:1.4fr repeat(3,minmax(0,1fr))}.solarLoadWhy{grid-column:2/4}.solarLoadControls{grid-template-columns:1fr}.solarLoadControls .loadActions{border-left:0;padding-left:0}.planningLoadRow{grid-template-columns:1.4fr repeat(2,minmax(0,1fr))}.planningLoadRow>div:nth-child(n+5){margin-top:6px}}
+      @media(max-width:650px){.quickAutomation{width:100%;justify-content:space-between;flex-wrap:wrap}.quickAutomationLabel{font-size:11px}.quickAutomation .hiSegmented{width:100%}.quickAutomation .hiSegment{min-width:0;flex:1 1 0;padding:7px 8px;font-size:11px}.operationalSummaryGrid,.planningKpiStrip{grid-template-columns:1fr 1fr}.solarLoadSummary{grid-template-columns:1fr 1fr}.solarLoadIdentity,.solarLoadWhy{grid-column:1/-1}.solarLoadControls .requestedSlot{grid-template-columns:1fr}.planningLoadRow{grid-template-columns:1fr 1fr}.planningLoadIdentity{grid-column:1/-1}}
+
+.flexibleMeteringTable .meteringTotalRow td{border-top:2px solid var(--line);background:#f8fafc;font-weight:700}.flexibleMeteringTable .meteringTotalRow td:first-child b{font-size:12px}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      @media(max-width:1024px){
+
+
+
+
+      }
+      @media(max-width:760px){
+
+
+
+
+
+
+
+
+      }
+      @media(max-width:430px){
+
+
+
+
+
+
+
+      }
+</style><style>
+.navigationShell{--nav-active-bg:#edf5ff;--nav-active-border:#cfdef1;--nav-active-text:#0f4ca4;--rhi-company-area-min:250px;--rhi-company-area-max:320px;--rhi-company-logo-max-width:286px;--rhi-company-logo-max-height:116px;--rhi-company-logo-padding:10px 16px;--rhi-company-divider:rgba(226,232,240,.82);position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(var(--rhi-company-area-min),var(--rhi-company-area-max));gap:0;margin:0 0 12px;background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.91));border:1px solid rgba(207,217,230,.86);border-radius:22px;box-shadow:0 12px 30px rgba(15,23,42,.045);overflow:hidden;backdrop-filter:blur(16px)}.navigationShell.nav-intelligence{--nav-active-bg:#f1edff;--nav-active-border:#dfd5fb;--nav-active-text:#5a38b3}.navigationShell.nav-insights{--nav-active-bg:#e7f7f4;--nav-active-border:#cdebe6;--nav-active-text:#176e67}
+.navProductArea{min-width:0}.navPrimaryRow{min-height:78px;display:grid;grid-template-columns:minmax(270px,.72fr) minmax(430px,1.28fr);align-items:center;gap:24px;padding:10px 22px 9px}.navBrand{display:flex;align-items:center;min-width:0;min-height:56px;padding:2px 0 0 4px}.navBrandCopy{display:grid;align-content:center;gap:2px;min-width:0}.navBrandCopy b{font-size:15px;line-height:1.1;font-weight:520;letter-spacing:-.01em;color:#58708f;white-space:nowrap}.navBrandCopy small{font-size:24px;line-height:1.02;letter-spacing:.055em;font-weight:790;color:#0b467f;white-space:nowrap}
+.navSections,.navItems{display:flex;align-items:center;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}.navSections::-webkit-scrollbar,.navItems::-webkit-scrollbar{display:none}
+.navSections{justify-content:flex-start;gap:14px;padding:0;background:transparent;border:0;border-radius:0;max-width:100%}.navSectionTab{min-height:50px;border:0;border-radius:15px;background:transparent;padding:10px 20px;font:inherit;font-size:13px;font-weight:660;color:#53647d;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:10px;transition:background .15s ease,color .15s ease,box-shadow .15s ease}.navSectionTab:hover{background:#f8fafc;color:#2f3f56}.navSectionTab.active{background:var(--nav-active-bg);color:var(--nav-active-text);box-shadow:inset 0 0 0 1px var(--nav-active-border),0 6px 16px rgba(15,23,42,.035)}.navSectionIcon{width:22px;height:22px;display:grid;place-items:center;flex:0 0 22px}.navSectionIcon svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.navSectionTab[data-nav-section="energy"] .navSectionIcon svg path{fill:none}
+.navItems.tabs{margin:0;padding:7px 22px 9px;gap:10px;border:0;border-top:1px solid rgba(226,232,240,.82);border-radius:0;background:rgba(255,255,255,.52);box-shadow:none;backdrop-filter:none;min-height:52px}.navItemTab{flex:0 0 auto;min-height:34px;border:0;border-radius:11px;background:transparent;padding:7px 12px;font:inherit;font-size:11px;font-weight:600;color:#5f6d80;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:background .15s ease,color .15s ease,box-shadow .15s ease}.navItemIcon{width:13px;height:13px;display:grid;place-items:center;flex:0 0 13px;color:#7a8798}.navItemIcon svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.navItemTab:hover{background:#f8fafc;color:#425269}.navItemTab:hover .navItemIcon{color:#66758a}.navItemTab.active{background:var(--nav-active-bg);color:var(--nav-active-text);box-shadow:inset 0 0 0 1px var(--nav-active-border)}.navItemTab.active .navItemIcon{color:#718096}
+.navCompany{min-width:0;border-left:1px solid var(--rhi-company-divider);display:grid;place-items:center;padding:var(--rhi-company-logo-padding);background:linear-gradient(180deg,rgba(252,254,255,.78),rgba(247,250,253,.58))}.navCompanyLogo{display:block;width:min(100%,var(--rhi-company-logo-max-width));height:auto;max-height:var(--rhi-company-logo-max-height);object-fit:contain;object-position:center;}
+.hiTabExperienceHeader{margin-top:0}.hiTabPurpose{font-size:11.5px;line-height:1.35;color:#64748b;margin:0 0 12px;max-width:620px}.hiTabLiveLine{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.hiTabLiveLine strong{font-size:11px;color:#334155}.hiTabLiveLine>span{font-size:10px;color:#64748b}.navigationPlaceholder{max-width:780px;margin:0 auto}.navigationPlaceholder>small{display:block;font-size:9px;letter-spacing:.13em;font-weight:750;color:#64748b;margin-bottom:6px}
+@media(max-width:1180px){.navigationShell{--rhi-company-area-min:220px;--rhi-company-area-max:250px;--rhi-company-logo-max-width:220px;--rhi-company-logo-max-height:94px;--rhi-company-logo-padding:8px 12px}.navPrimaryRow{grid-template-columns:minmax(225px,.62fr) minmax(0,1.38fr);gap:14px;padding-inline:16px}.navSections{gap:6px}.navSectionTab{padding:9px 14px;font-size:11.5px}.navBrandCopy b{font-size:13.5px}.navBrandCopy small{font-size:21px}.navItems.tabs{gap:7px;padding-inline:16px}.navItemTab{padding:7px 13px;font-size:11px}.navCompany{padding-inline:12px}}
+@media(max-width:820px){.navigationShell{--rhi-company-logo-max-width:126px;--rhi-company-logo-max-height:48px;display:block;border-radius:18px}.navProductArea{min-width:0}.navCompany{position:absolute;top:8px;right:10px;width:126px;height:48px;padding:0;border:0;background:transparent;pointer-events:none}.navCompanyLogo{max-height:var(--rhi-company-logo-max-height)}.navPrimaryRow{display:grid;grid-template-columns:1fr;gap:7px;min-height:0;padding:10px 8px 7px}.navBrand{min-height:48px;padding:1px 138px 0 6px}.navBrandCopy b{font-size:12.5px}.navBrandCopy small{font-size:19px}.navSections{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.navSectionTab{min-width:0;min-height:41px;justify-content:center;padding:7px 5px;font-size:10.5px;gap:6px}.navSectionIcon{width:17px;height:17px;flex-basis:17px}.navItems.tabs{display:flex;overflow-x:auto;white-space:nowrap;padding:5px 8px 7px;gap:4px;min-height:48px}.navItemTab{min-height:35px;padding:6px 11px;font-size:10.5px}.hiTabPurpose{font-size:10px;margin-bottom:8px;display:block;-webkit-line-clamp:unset}.hiTabLiveLine strong{font-size:9.5px}}
+@media(max-width:430px){.navigationShell{--rhi-company-logo-max-width:102px;--rhi-company-logo-max-height:42px}.navCompany{width:102px;right:8px}.navBrand{padding-right:112px}.navBrandCopy small{font-size:17px}.navSectionTab{font-size:10px}.navItemTab{padding:6px 9px;font-size:10px}.hiTabPurpose{max-width:48ch}}}
+
+/* R3.95.3 TERMINAL top-level visual contract — MUST remain last in cascade. */
+.hiTabExperienceHeader{display:grid;grid-template-columns:minmax(0,1fr);grid-auto-flow:row;align-items:stretch;width:100%;gap:8px;margin:0}
+
+
+
+
+
+.hiTabPurpose{display:block;max-width:510px;margin:0;font-size:clamp(12px,1.15vw,16px);line-height:1.42;color:#536A91;font-weight:500;-webkit-line-clamp:unset;overflow:visible}
+
+
+
+
+
+.hiTabStatusItem{min-width:0;min-height:94px;height:auto;display:grid;grid-template-columns:52px minmax(0,1fr);gap:11px;align-items:center;padding:12px 14px;border:1px solid #DBE6F3;border-radius:15px;background:rgba(255,255,255,.97);box-shadow:0 8px 22px rgba(21,61,115,.045)}
+.hiTabStatusIcon{width:46px;height:46px;min-width:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:#EEF5FF;border:0;font-size:24px}
+.hiTabStatusCopy{min-width:0;display:block}
+.hiTabStatusCopy small{display:block;margin:0 0 3px;color:#31558E;font-size:10px;font-weight:650}
+.hiTabStatusCopy b{display:block;margin:0 0 3px;color:#0B173D;font-size:clamp(14px,1.25vw,18px);font-weight:720;line-height:1.08;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hiTabStatusCopy em{display:block;margin-top:2px;color:#55709B;font-size:10px;font-style:normal;font-weight:500;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+
+.hiQuickActionItems{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;overflow:visible}
+.hiQuickAction{height:40px;min-height:40px;border:1px solid #D8E4F1;border-radius:10px;background:#fff;color:#075FD8;box-shadow:none;font-size:11px;font-weight:660;padding:0 13px;display:inline-flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap}
+.hiQuickAction:first-child{background:#0B66F6;border-color:#0B66F6;color:#fff}
+@media(max-width:1024px){.hiTabStatusItem{grid-template-columns:42px minmax(0,1fr);padding:10px;min-height:88px}.hiTabStatusIcon{width:40px;height:40px;min-width:40px}}
+@media(max-width:760px){.hiTabPurpose{font-size:12px}.hiQuickActionItems{flex-wrap:nowrap}.hiQuickAction{flex:0 0 auto}}
+@media(max-width:430px){.hiTabPurpose{font-size:10px;line-height:1.3}.hiTabStatusItem{grid-template-columns:34px minmax(0,1fr);min-height:76px;padding:8px;gap:7px}.hiTabStatusIcon{width:32px;height:32px;min-width:32px;border-radius:10px;font-size:18px}}
+</style><main class="energy rhiUxDomainBody rhi-ux-root">${this.nav()}${this.renderMainWarning(footer)}<section>${this.productLanguage(content)}</section>${this.propertyDraftBar()}${this.energyVisualPickerOverlay(rt)}${this.productLanguage(this.renderFooter(rt,this.view,footer))}</main>`;
+      if (markup === this._lastMarkup) { this.persistInteractionContext(); return; }
+      this._lastMarkup = markup;
+      this.persistInteractionContext();
+      const canPatch = this._renderedView === this.view && this._renderedNavSection === this.navSection && this._renderedNavItem === this.navItem && !!this.shadowRoot.querySelector('main');
+      if (canPatch) {
+        this.patchMarkup(markup);
+        this.restoreInteractionState();
+        this.mountGasStatisticsGraph();
+        if (viewport) queueMicrotask(() => window.scrollTo(viewport.x, viewport.y));
+        return;
+      }
+      this.shadowRoot.innerHTML = markup;
+      this._renderedView = this.view;
+      this._renderedNavSection = this.navSection;
+      this._renderedNavItem = this.navItem;
+      this.restoreInteractionState();
+      this.mountGasStatisticsGraph();
+      const tabs = this.shadowRoot.querySelector('.navItems');
+      if (tabs) {
+        tabs.scrollLeft = this.navScrollLeft || 0;
+        tabs.addEventListener('scroll', () => { this.navScrollLeft = tabs.scrollLeft; this.persistInteractionContext(); }, { passive: true });
+      }
+      const main = this.shadowRoot.querySelector('main');
+      main?.addEventListener('click', this.onClick.bind(this));
+      const planningWrap = this.shadowRoot.querySelector('.planningTableWrap');
+      if (planningWrap) {
+        planningWrap.scrollLeft = this.planningScrollLeft || 0;
+        planningWrap.scrollTop = this.planningScrollTop || 0;
+        planningWrap.addEventListener('scroll', () => {
+          this.planningScrollLeft = planningWrap.scrollLeft;
+          this.planningScrollTop = planningWrap.scrollTop;
+          this.persistInteractionContext();
+        }, { passive: true });
+      }
+      main?.addEventListener('input', this.onInput.bind(this));
+      main?.addEventListener('change', this.onChange.bind(this));
+      main?.addEventListener('keydown', this.onKeyDown.bind(this));
+      main?.addEventListener('focusin', this.onFocusIn.bind(this));
+      main?.addEventListener('focusout', this.onFocusOut.bind(this));
+      main?.addEventListener('toggle', this.onToggle.bind(this), true);
+    }
+    styles() { return `:host{display:block;color:#0f172a;--bg:#f7f9fc;--card:#fff;--line:#e5ebf3;--muted:#66758d;--green:#16a34a;--orange:#f59e0b;--purple:#7c3aed;--blue:#2563eb;user-select:text;-webkit-user-select:text}.energy{background:radial-gradient(circle at 50% 0%,#ffffff 0,#fbfcff 42%,#f4f7fb 100%);padding:24px 32px 38px;border-radius:30px;min-height:calc(100vh - 70px)}.top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px}.eyebrow{font-size:12px;letter-spacing:.16em;font-weight:800;color:#64748b}.top h1{font-size:42px;line-height:1.05;letter-spacing:-.04em;margin:8px 0 6px}.top p{margin:0;color:#6a7488;font-size:17px}.topRight{text-align:right}.releaseLine,.uxLine{font-size:11px;color:#8795ad;font-weight:700}.topPills{display:flex;gap:12px;align-items:center;justify-content:flex-end;margin:10px 0}.pill{background:#fff;border:1px solid var(--line);border-radius:999px;padding:12px 18px;font-weight:800;box-shadow:0 10px 25px rgba(15,23,42,.04)}.live{color:#0f7a3a}.quick{border:0;background:#101827;color:#fff;border-radius:16px;padding:14px 22px;font-weight:900;box-shadow:0 14px 30px rgba(15,23,42,.15)}.tabs{display:flex;gap:8px;background:rgba(255,255,255,.82);backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:20px;padding:8px;margin:8px 0 22px;box-shadow:0 18px 40px rgba(15,23,42,.04)}.tab{border:0;background:transparent;border-radius:13px;padding:11px 22px;font-size:14px;font-weight:900;color:#43516a;cursor:pointer}.tab.active{background:#eef5ff;color:#0f172a;box-shadow:inset 0 0 0 1px #d6e6ff,0 8px 18px rgba(37,99,235,.05)}.summaryRow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:18px;margin-bottom:20px}.summaryRow.four{grid-template-columns:repeat(4,minmax(0,1fr))}.metric,.panel,.heroPanel{background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(255,255,255,.84));border:1px solid #e6edf7;border-radius:30px;box-shadow:0 24px 55px rgba(15,23,42,.065)}.metric{min-height:112px;padding:22px 24px;display:flex;gap:18px;align-items:center}.metric .mi{width:56px;height:56px;border-radius:50%;background:#f8fafc;display:grid;place-items:center;font-size:28px}.metric.orange .mi{background:#fff7ed;color:#ea580c}.metric.green .mi{background:#ecfdf5;color:#16a34a}.metric.purple .mi{background:#f5f3ff;color:#7c3aed}.metric.blue .mi{background:#eff6ff;color:#2563eb}.ml{font-size:13px;text-transform:none;color:#6b7890}.mv{font-size:28px;font-weight:950;letter-spacing:-.035em;margin:4px 0}.ms{font-size:13px;color:var(--muted);line-height:1.35;max-width:360px}.landing{display:grid;grid-template-columns:.96fr 1.92fr .96fr;gap:20px}.panel{padding:28px}.panel h2,.heroPanel h2{margin:0 0 8px;font-size:25px;letter-spacing:-.03em}.panel p,.heroPanel p{margin:0 0 18px;color:var(--muted);font-size:15px}.assetRow{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:16px;margin:12px 0}.round{width:48px;height:48px;border-radius:16px;background:#ecfdf5;display:grid;place-items:center;font-size:23px}.grow{flex:1;min-width:0}.grow b{display:block;font-size:16px}.grow span{display:block;color:var(--muted);font-size:13px;margin-top:2px}.assetRow strong{font-size:17px}.bar{height:5px;background:#e8eef6;border-radius:10px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,#10b981,#22c55e)}.total{border-top:1px solid var(--line);margin-top:18px;padding-top:18px}.total span{color:var(--muted);display:block}.total b{font-size:30px}.heroPanel{padding:30px;text-align:center;position:relative;overflow:hidden;min-height:560px}.rec{max-width:560px;margin:20px auto -54px;background:#f0fdf4;border:1px solid #b7e4c7;border-radius:24px;text-align:left;padding:22px;display:grid;grid-template-columns:40px 1fr 42px;gap:16px;align-items:start;position:relative;z-index:3;box-shadow:0 20px 50px rgba(22,163,74,.13);backdrop-filter:blur(10px)}.rec small{font-weight:900;letter-spacing:.12em;color:#64748b}.rec h2{font-size:24px;color:#15803d;margin:5px 0}.rec p{margin:0;color:#516175}.recIcon{font-size:26px;color:#16a34a}.check{width:42px;height:42px;border-radius:50%;border:2px solid #86d39a;color:#16a34a;display:grid;place-items:center;font-weight:900}.recMeta{display:flex;gap:30px;margin-top:18px;border-top:1px solid #d7eedb;padding-top:14px}.recMeta span{font-size:13px;color:#6b7890}.energyScene{position:relative;height:360px;margin:0 auto;border-radius:30px;max-width:840px;background:linear-gradient(135deg,#fff7ed,#eef7ff 50%,#ecfdf5);box-shadow:0 24px 60px rgba(15,23,42,.10);overflow:hidden}.sceneTitle{position:absolute;top:34px;left:70px;text-align:left}.sceneTitle b{display:block;font-size:31px;letter-spacing:-.04em}.sceneTitle span{display:block;color:#64748b}.house{position:absolute;left:50%;top:48%;width:170px;height:105px;transform:translate(-50%,-10%);background:#f3eadb;border:10px solid #0f172a;border-radius:8px}.roof{position:absolute;left:-24px;right:-24px;top:-58px;height:72px;background:#0f172a;clip-path:polygon(50% 0,100% 100%,0 100%)}.wall i{display:inline-block;width:22px;height:25px;background:#fde68a;border-radius:3px;margin:38px 5px 0}.panels{position:absolute;top:-45px;left:32px}.panels i{display:inline-block;width:17px;height:18px;background:#1d4ed8;border:1px solid rgba(255,255,255,.4)}.car{position:absolute;right:245px;bottom:74px;width:76px;height:42px;background:#fff;border-radius:12px}.car:before,.car:after{content:"";position:absolute;bottom:-11px;width:14px;height:14px;border-radius:50%;background:#0f172a}.car:before{left:10px}.car:after{right:10px}.solarPath,.batteryPath,.gridPath{position:absolute;height:6px;border-radius:999px}.solarPath{left:205px;top:172px;width:210px;background:#f59e0b;transform:rotate(16deg)}.batteryPath{left:210px;bottom:142px;width:220px;background:#16a34a;transform:rotate(-13deg)}.gridPath{right:170px;top:203px;width:210px;background:#7c3aed}.float{position:absolute;background:rgba(255,255,255,.94);border:1px solid #e5ebf3;border-radius:18px;padding:12px 16px;text-align:left;box-shadow:0 18px 38px rgba(15,23,42,.13);z-index:2}.float span,.float small{display:block;color:#64748b;font-size:11px}.float b{display:block;font-size:20px}.float.solar{left:80px;top:110px}.float.battery{left:86px;bottom:82px}.float.grid{right:70px;top:175px}.float.export{left:105px;top:74px;border-radius:999px;color:#ea580c;font-weight:900}.chips{display:flex;gap:10px;justify-content:center;margin-top:16px}.chips span{background:#fff;border:1px solid var(--line);border-radius:999px;padding:9px 14px;font-weight:800}.bottomInsights{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:18px}.insight{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px;text-align:left}.insight span{display:block;color:#64748b}.insight b{font-size:24px;display:block;margin:4px 0}.insight small{color:var(--muted)}.empty{border:1px dashed #cbd5e1;border-radius:18px;padding:16px;margin-top:14px;background:#fff;text-align:center}.empty b{display:block}.empty span{display:block;color:var(--muted);font-size:13px;margin-top:4px}.sectionLabel{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#64748b;font-weight:900;margin:16px 0 6px}.solarOperationsPage{max-width:1600px;margin:0 auto}.solarKpis{margin-bottom:20px}.solarHomeIntelligence{display:grid;grid-template-columns:.8fr 1fr 1fr 1fr;gap:28px;align-items:center;margin-bottom:22px}.solarIntelligenceIntro{text-align:left}.r3230Illustration{height:120px;border-radius:50%;background:#eaf6ff;display:flex;align-items:center;justify-content:center;gap:26px;font-size:28px;margin-top:16px}.solarPolicySegment small,.solarDecisionArea small,.solarNextArea small{display:block;text-transform:uppercase;letter-spacing:.14em;font-size:11px;color:#64748b;font-weight:900;margin-bottom:8px}.energySegmentButtons{display:flex;flex-wrap:wrap;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden;background:#f8fafc}.energySegment{border:0;background:transparent;padding:12px 18px;font-weight:900}.energySegment.selected{background:#fff}.solarDecisionArea{border-left:1px solid #e5ebf3;padding-left:24px}.solarDecisionArea h3{margin:0 0 8px}.dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:8px}.green{background:#22c55e}.solarNextArea{border-left:4px solid #f59e0b;padding-left:20px}.solarNextArea b,.solarDecisionArea b{font-size:20px;display:block}.solarMainGrid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:22px}.energySectionHead{display:flex;justify-content:space-between;gap:14px;align-items:start;border-bottom:1px solid #e5ebf3;padding-bottom:14px;margin-bottom:14px}.solarLegend{display:flex;gap:14px;color:#64748b}.solarLegend i{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px}.solarLegend .blue{background:#2563eb}.solarLegend .green{background:#22c55e}.solarLegend .orange{background:#f59e0b}.solarLegend .gray{background:#cbd5e1}.solarLoadCard{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:12px;align-items:center;border:1px solid #e5ebf3;background:#fff;border-radius:18px;padding:14px;margin:10px 0}.solarLoadCard b{display:block}.solarLoadCard span{display:block;color:#64748b;font-size:12px}.solarSideCard{margin-bottom:22px}.solarTodayPrimary{font-size:28px;font-weight:950;color:#16a34a;margin:10px 0}.solarTodayRows>div{display:flex;justify-content:space-between;border-bottom:1px solid #e5ebf3;padding:10px 0}.advanced summary{border:1px solid #e5ebf3;border-radius:12px;padding:8px 10px;font-weight:900;cursor:pointer}.miniChart{margin-top:22px}.miniChart svg{width:100%;height:120px}.r3230ChartLabels{display:flex;justify-content:space-between;color:#64748b;font-size:12px}.r3280OutlookGrid{display:grid;grid-template-columns:1.2fr .9fr .9fr .9fr;gap:18px;align-items:start}.r3280Balance{border:1px solid #dbeafe;border-radius:20px;background:#eff6ff;padding:28px;margin:20px 0}.r3280Balance b{font-size:30px;display:block}.goalGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.goalRow{background:#f8fafc;border:1px solid #e7eef7;border-radius:14px;padding:12px}.goalRow span{display:block;color:#64748b;font-size:12px}.goalRow b{display:block;margin-top:4px}.kv{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:14px 0;gap:20px}.kv span{color:var(--muted)}.kv b{text-align:right}.softBox{margin-top:18px;background:#f5f3ff;border-radius:18px;padding:18px}.softBox b,.softBox span{display:block}.flowPage{max-width:1660px;margin:0 auto}.physicalFlowHero{margin-bottom:22px}.flowHeader{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px}.flowBadge{background:#eef5ff;border:1px solid #d6e6ff;border-radius:999px;padding:10px 14px;font-weight:900;color:#1d4ed8}.flowCanvas{display:grid;grid-template-columns:310px minmax(360px,1fr) 340px;gap:28px;align-items:stretch}.flowColumn{background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid #e6edf7;border-radius:26px;padding:20px}.flowColumn h3{margin:0 0 16px;font-size:18px}.flowNode{border:1px solid #e5ebf3;background:#fff;border-radius:20px;padding:16px;margin:12px 0;display:grid;grid-template-columns:50px 1fr;gap:14px;align-items:center;box-shadow:0 14px 30px rgba(15,23,42,.04)}.flowIcon{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;background:#f8fafc;font-size:24px}.flowNode span,.flowNode small{display:block;color:#64748b}.flowNode b{display:block;font-size:22px;letter-spacing:-.03em}.solarNode .flowIcon{background:#fff7ed}.batteryNode .flowIcon{background:#ecfdf5}.gridNode .flowIcon{background:#f5f3ff}.homeNode .flowIcon,.consumerNode .flowIcon,.chargerNode .flowIcon{background:#eff6ff}.flowCenter{position:relative;background:radial-gradient(circle at 50% 38%,#fff 0,#eef7ff 45%,#ecfdf5 100%);border:1px solid #e5ebf3;border-radius:30px;padding:26px;display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:center;min-height:410px}.busStack{display:grid;gap:18px}.switchboardNode,.homeBusNode{background:#fff;border:1px solid #dbe5f0;border-radius:24px;padding:22px;text-align:center;box-shadow:0 20px 45px rgba(15,23,42,.08)}.switchboardNode span,.homeBusNode span,.homeBusNode small{display:block;color:#64748b}.switchboardNode b,.homeBusNode b{display:block;font-size:25px;letter-spacing:-.035em;margin:6px 0}.homeBusNode{border-color:#bfdbfe;background:linear-gradient(180deg,#fff,#eff6ff)}.flowLines{display:grid;gap:14px}.flowLine{background:rgba(255,255,255,.9);border:1px solid #e5ebf3;border-radius:999px;padding:12px 14px;display:grid;grid-template-columns:46px 1fr auto;gap:12px;align-items:center}.flowLine i{display:block;height:7px;border-radius:999px;background:#94a3b8}.flowLine.solar i{background:#f59e0b}.flowLine.battery i{background:#16a34a}.flowLine.grid i{background:#7c3aed}.flowLine.export i{background:#ef4444}.flowLine span{color:#64748b}.flowLine b{font-size:16px}.flowDetailsGrid{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:18px}.topologyList{max-height:430px;overflow:auto;padding-right:4px}.batteryGrid,.consumerGrid,.strategyGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.batteryGrid .wide,.consumerGrid .wide,.strategyGrid .wide{grid-column:1/-1}.batteryGauge{background:linear-gradient(180deg,#ecfdf5,#fff);border:1px solid #bbf7d0;border-radius:24px;padding:22px;margin:16px 0}.batteryGauge b{display:block;font-size:48px;letter-spacing:-.06em;color:#15803d}.batteryGauge span{display:block;color:#64748b;margin-bottom:14px}.batteryChild,.propertyRow,.commandRow,.intentCard,.consumerFullCard{border:1px solid #e5ebf3;background:#fff;border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 10px 24px rgba(15,23,42,.035)}.batteryChild{display:grid;grid-template-columns:1fr auto;gap:8px}.batteryChild strong{font-size:24px}.batteryChild small,.propertyRow span,.commandRow span,.consumerFullCard span,.intentCard small{display:block;color:#64748b;font-size:12px}.batteryChild .bar{grid-column:1/-1}.propertyRow,.commandRow{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}.propertyRow small,.commandRow small{grid-column:1/-1;color:#64748b}.commandRow.disabled strong{color:#f59e0b}.commandRow.enabled strong{color:#16a34a}.commandRow.hidden{display:none}.consumerFullCard{display:block}.consumerHead{display:flex;justify-content:space-between;gap:14px;align-items:start}.consumerHead strong{font-size:22px}.consumerFlags{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.consumerFlags span{border-radius:999px;padding:7px 10px;font-size:12px;font-weight:900;border:1px solid #e5ebf3;background:#f8fafc}.consumerFlags span.on{background:#ecfdf5;color:#15803d;border-color:#bbf7d0}.consumerFlags span.off{background:#f8fafc;color:#64748b}.intentCard{display:grid;grid-template-columns:1fr minmax(190px,.8fr);gap:16px}.intentCard h3{margin:4px 0 8px;font-size:21px}.intentCard p{margin:0;color:#64748b}.intentFacts .kv{padding:8px 0}.meteringGrid,.intelligenceGrid,.valueGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.meteringGrid .wide,.intelligenceGrid .wide,.valueGrid .wide{grid-column:1/-1}.meteringPage,.intelligencePage,.valuePage{max-width:1660px;margin:0 auto}.meteringRow,.activityRow{border:1px solid #e5ebf3;background:#fff;border-radius:18px;padding:16px;margin:12px 0;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;box-shadow:0 10px 24px rgba(15,23,42,.035)}.meteringRow span,.meteringRow small,.activityRow span{display:block;color:#64748b;font-size:12px}.meteringRow small{grid-column:1/-1}.decisionDump{white-space:pre-wrap;background:#0f172a;color:#e2e8f0;border-radius:18px;padding:18px;overflow:auto;max-height:420px;font-size:12px;line-height:1.5}.strategiesPage,.batteryPage,.consumersPage{max-width:1660px;margin:0 auto}.cleanPlaceholder{max-width:720px}.backendWarning{margin:0 0 10px;padding:10px 12px;border:1px solid #f4c7b3;background:#fff7f2;border-radius:10px;color:#5f2d1f;display:grid;gap:3px}.backendWarning b{font-size:12px;font-weight:650}.backendWarning span{font-size:11px}.hiRuntimeFooter{display:flex;flex-wrap:wrap;gap:7px;align-items:center;border-top:1px solid #dbe5f0;margin:18px 6px 0;padding:10px 0 0;color:#5f6f86;font-size:11.5px;font-weight:650;line-height:1.35}.hiRuntimeFooter b{color:#0f172a}:host{color:var(--primary-text-color,#1f2937);--bg:var(--lovelace-background,#f5f7fa);--card:var(--ha-card-background,#fff);--line:var(--divider-color,#dfe6ef);--muted:var(--secondary-text-color,#64748b);--green:#5f9f7a;--orange:#d8a15d;--purple:#8b7bb8;--blue:#6f91bd}.energy{background:var(--bg);padding:14px 16px 22px;border-radius:0;min-height:calc(100vh - 64px)}.top{margin-bottom:12px}.eyebrow{font-size:10px;letter-spacing:.14em;font-weight:600;color:var(--muted)}.top h1{font-size:26px;line-height:1.15;letter-spacing:-.015em;font-weight:600;margin:5px 0 3px}.top p{font-size:14px;color:var(--muted)}.topRight,.topPills,.releaseLine,.uxLine,.quick,.pill{display:none}.tabs{gap:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px;margin:8px 0 14px;box-shadow:none}.tab{border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;color:var(--primary-text-color,#334155)}.tab.active{background:rgba(3,169,244,.08);box-shadow:inset 0 0 0 1px rgba(3,169,244,.18);font-weight:650}.summaryRow{gap:10px;margin-bottom:10px}.metric,.panel,.heroPanel{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:none}.metric{min-height:74px;padding:12px 14px;gap:10px}.metric .mi{width:36px;height:36px;font-size:18px;border-radius:10px;background:#f3f6fa}.metric.orange .mi{background:#fff4e4;color:#b77935}.metric.green .mi{background:#eef7f1;color:#4f8d69}.metric.purple .mi{background:#f3f0fb;color:#7965a9}.metric.blue .mi{background:#eef5fb;color:#5b7fae}.ml{font-size:11px;color:var(--muted)}.mv{font-size:20px;font-weight:650;letter-spacing:-.015em;margin:2px 0}.ms{font-size:11.5px;line-height:1.3;color:var(--muted)}.landing{gap:10px}.panel{padding:14px}.panel h2,.heroPanel h2{font-size:18px;font-weight:600;letter-spacing:-.01em;margin:0 0 6px}.panel p,.heroPanel p{font-size:12.5px;margin:0 0 10px}.round{width:34px;height:34px;border-radius:9px;font-size:16px}.grow b{font-size:13px;font-weight:600}.grow span,.assetRow span,.propertyRow span,.commandRow span,.consumerFullCard span,.intentCard small,.meteringRow span,.meteringRow small,.activityRow span{font-size:11px}.bar{height:4px}.total{margin-top:10px;padding-top:10px}.total b{font-size:21px;font-weight:650}.heroPanel{padding:16px;min-height:0}.rec{max-width:480px;margin:12px auto -36px;padding:14px;border-radius:12px;grid-template-columns:28px 1fr 30px;gap:10px;box-shadow:none;background:#f4fbf6;border-color:#c9e7d1}.rec small{font-weight:600;font-size:9px}.rec h2{font-size:16px;font-weight:650;margin:3px 0;color:#3f7f5a}.rec p{font-size:11.5px}.recIcon{font-size:17px}.check{width:28px;height:28px}.recMeta{gap:14px;margin-top:10px;padding-top:8px}.recMeta span{font-size:10.5px}.energyScene{height:245px;border-radius:14px;box-shadow:none}.sceneTitle{top:22px;left:40px}.sceneTitle b{font-size:20px;font-weight:600}.sceneTitle span{font-size:11px}.house{width:126px;height:78px;border-width:7px}.roof{top:-43px;height:54px}.wall i{width:15px;height:17px;margin:29px 3px 0}.panels{top:-33px;left:24px}.panels i{width:12px;height:13px}.car{right:170px;bottom:52px;transform:scale(.72);transform-origin:right bottom}.solarPath,.batteryPath,.gridPath{height:4px}.float{border-radius:10px;padding:8px 10px;box-shadow:none}.float b{font-size:14px;font-weight:650}.float span,.float small{font-size:9px}.chips span{padding:6px 9px;font-weight:600;font-size:11px}.bottomInsights{gap:8px;margin-top:8px}.insight{border-radius:10px;padding:10px}.insight b{font-size:17px;font-weight:650}.sectionLabel{font-size:10px;font-weight:650;margin:10px 0 4px}.solarOperationsPage,.flowPage,.meteringPage,.intelligencePage,.valuePage,.strategiesPage,.batteryPage,.consumersPage{max-width:1180px}.solarKpis{margin-bottom:10px}.solarHomeIntelligence{gap:12px;margin-bottom:12px}.r3230Illustration{height:82px;margin-top:8px;font-size:20px}.solarPolicySegment small,.solarDecisionArea small,.solarNextArea small{font-weight:650;font-size:9px;margin-bottom:4px}.energySegmentButtons{border-radius:9px}.energySegment{padding:8px 11px;font-weight:600;font-size:11.5px}.solarDecisionArea{padding-left:12px}.solarNextArea{padding-left:12px;border-left-width:2px}.solarNextArea b,.solarDecisionArea b{font-size:14px;font-weight:650}.solarMainGrid{grid-template-columns:minmax(0,1fr) 280px;gap:10px}.energySectionHead{padding-bottom:8px;margin-bottom:8px}.solarLegend{gap:8px;font-size:11px}.solarLoadCard{border-radius:9px;padding:9px;margin:6px 0}.solarTodayPrimary{font-size:20px;font-weight:650;margin:5px 0}.solarTodayRows>div{padding:7px 0}.advanced summary{border-radius:8px;font-weight:600}.miniChart{margin-top:12px}.r3280OutlookGrid{gap:10px}.r3280Balance{border-radius:10px;padding:18px;margin:10px 0}.r3280Balance b{font-size:22px;font-weight:650}.goalGrid{gap:6px}.goalRow{border-radius:8px;padding:8px}.kv{padding:8px 0}.kv b{font-weight:600}.softBox{margin-top:10px;border-radius:10px;padding:10px}.flowHeader{margin-bottom:10px}.flowBadge{border-radius:999px;padding:6px 9px;font-weight:600;font-size:11px}.flowCanvas{grid-template-columns:220px minmax(320px,1fr) 240px;gap:10px}.flowColumn{border-radius:12px;padding:12px}.flowColumn h3{font-size:14px;font-weight:600;margin:0 0 8px}.flowIcon{width:34px;height:34px;border-radius:9px;font-size:17px}.flowNode{grid-template-columns:34px 1fr;gap:9px}.flowNode b{font-size:15px;font-weight:650}.flowCenter{border-radius:14px;padding:14px;gap:12px;min-height:285px}.switchboardNode,.homeBusNode{border-radius:12px;padding:14px;box-shadow:none}.switchboardNode b,.homeBusNode b{font-size:16px;font-weight:650}.flowLine{padding:8px 9px;grid-template-columns:30px 1fr auto;gap:8px}.flowLine i{height:4px}.flowLine b{font-size:12.5px}.flowDetailsGrid{gap:10px}.topologyList{max-height:310px}.batteryGrid,.consumerGrid,.strategyGrid,.meteringGrid,.intelligenceGrid,.valueGrid{gap:10px}.batteryGauge{border-radius:12px;padding:12px;margin:8px 0}.batteryGauge b{font-size:32px;font-weight:650}.batteryChild strong{font-size:17px}.consumerHead strong{font-size:16px;font-weight:650}.consumerFlags{gap:5px;margin:8px 0}.consumerFlags span{padding:4px 7px;font-size:10.5px;font-weight:600}.intentCard h3{font-size:16px;font-weight:650}.decisionDump{border-radius:10px;padding:12px;font-size:11px}.hiRuntimeFooter{margin:10px 4px 0;padding:8px 0 0;font-size:10px;font-weight:500;color:var(--muted)}.energy{padding:10px 12px 18px;min-height:calc(100vh - 54px)}.top{margin-bottom:8px}.eyebrow{font-size:9px;letter-spacing:.12em;font-weight:600}.top h1{font-size:23px;line-height:1.1;font-weight:560;letter-spacing:-.012em;margin:3px 0 2px}.top p{font-size:12.5px;margin:0}.tabs{border-radius:8px;padding:3px;margin:7px 0 10px;gap:3px}.tab{border-radius:6px;padding:6px 11px;font-size:11.5px;font-weight:560}.tab.active{font-weight:600;background:rgba(3,169,244,.065);box-shadow:inset 0 0 0 1px rgba(3,169,244,.14)}.summaryRow{gap:8px;margin-bottom:8px}.metric,.panel,.heroPanel{border-radius:10px}.metric{min-height:54px;padding:8px 10px;gap:8px}.metric.green{background:var(--card)}.metric .mi{width:30px;height:30px;font-size:15px;border-radius:8px}.ml{font-size:10.5px}.mv{font-size:17px;font-weight:590;letter-spacing:-.01em;margin:1px 0}.ms{font-size:10.5px;line-height:1.22}.panel{padding:10px}.panel h2,.heroPanel h2{font-size:16px;font-weight:580;margin:0 0 4px;letter-spacing:-.005em}.panel p,.heroPanel p{font-size:11.5px;line-height:1.28;margin:0 0 7px}.round{width:28px;height:28px;border-radius:8px;font-size:14px}.grow b{font-size:12.5px;font-weight:560}.grow span,.assetRow span,.propertyRow span,.commandRow span,.consumerFullCard span,.intentCard small,.meteringRow span,.meteringRow small,.activityRow span{font-size:10.5px}.bar{height:3px;margin-top:6px}.total{margin-top:7px;padding-top:7px}.total b{font-size:18px;font-weight:590}.landing{gap:8px}.heroPanel{padding:11px}.rec{max-width:420px;margin:8px auto -28px;padding:10px;border-radius:10px;grid-template-columns:22px 1fr 24px;gap:8px}.rec small{font-size:8.5px;font-weight:560}.rec h2{font-size:14px;font-weight:590;margin:2px 0;color:#356f4f}.rec p{font-size:10.5px;line-height:1.25}.recIcon{font-size:14px}.check{width:24px;height:24px;border-width:1px}.recMeta{gap:10px;margin-top:7px;padding-top:6px}.recMeta span{font-size:9.5px}.energyScene{height:205px;border-radius:10px;max-width:700px}.sceneTitle{top:15px;left:28px}.sceneTitle b{font-size:17px;font-weight:560}.sceneTitle span{font-size:10px}.house{width:104px;height:64px;border-width:6px}.roof{top:-35px;height:45px}.wall i{width:12px;height:14px;margin:24px 2px 0}.panels{top:-27px;left:20px}.panels i{width:10px;height:11px}.car{right:138px;bottom:42px;transform:scale(.62);transform-origin:right bottom}.solarPath,.batteryPath,.gridPath{height:3px}.float{border-radius:8px;padding:6px 8px}.float b{font-size:12.5px;font-weight:590}.float span,.float small{font-size:8.5px}.chips{gap:6px;margin-top:8px}.chips span{padding:4px 7px;font-weight:560;font-size:10px}.bottomInsights{gap:6px;margin-top:6px}.insight{border-radius:8px;padding:8px}.insight b{font-size:15px;font-weight:590}.sectionLabel{font-size:9px;font-weight:560;margin:6px 0 3px}.solarOperationsPage,.flowPage,.meteringPage,.intelligencePage,.valuePage,.strategiesPage,.batteryPage,.consumersPage{max-width:1560px;margin:0 auto}.solarKpis{margin-bottom:8px}.solarHomeIntelligence{gap:8px;margin-bottom:8px}.r3230Illustration{height:64px;margin-top:6px;font-size:16px}.solarPolicySegment small,.solarDecisionArea small,.solarNextArea small{font-size:8.5px;font-weight:560;margin-bottom:3px}.energySegment{padding:6px 9px;font-weight:560;font-size:10.5px}.solarDecisionArea{padding-left:8px}.solarNextArea{padding-left:8px}.solarNextArea b,.solarDecisionArea b{font-size:12.5px;font-weight:590}.solarMainGrid{grid-template-columns:minmax(0,1fr) 245px;gap:8px}.energySectionHead{padding-bottom:6px;margin-bottom:6px}.solarLegend{gap:6px;font-size:10px}.solarLoadCard{border-radius:8px;padding:7px;margin:5px 0}.solarTodayPrimary{font-size:17px;font-weight:590;margin:3px 0}.solarTodayRows>div{padding:5px 0}.advanced summary{font-weight:560}.r3280OutlookGrid{gap:8px}.r3280Balance{border-radius:8px;padding:12px;margin:7px 0}.r3280Balance b{font-size:18px;font-weight:590}.goalGrid{gap:5px}.goalRow{border-radius:8px;padding:7px}.kv{padding:6px 0}.kv b{font-weight:560}.softBox{margin-top:7px;border-radius:8px;padding:8px}.flowHeader{margin-bottom:7px}.flowBadge{padding:5px 8px;font-weight:560;font-size:10px}.flowCanvas{grid-template-columns:200px minmax(300px,1fr) 220px;gap:8px}.flowColumn{border-radius:10px;padding:9px}.flowColumn h3{font-size:12.5px;font-weight:560;margin:0 0 6px}.flowIcon{width:28px;height:28px;border-radius:8px;font-size:14px}.flowNode{grid-template-columns:28px 1fr;gap:7px}.flowNode b{font-size:13px;font-weight:580}.flowCenter{border-radius:10px;padding:10px;gap:8px;min-height:230px}.switchboardNode,.homeBusNode{border-radius:9px;padding:10px}.switchboardNode b,.homeBusNode b{font-size:14px;font-weight:580}.flowLine{padding:6px 7px;grid-template-columns:26px 1fr auto;gap:6px}.flowLine i{height:3px}.flowLine b{font-size:11px;font-weight:560}.flowDetailsGrid{gap:8px}.topologyList{max-height:260px}.batteryGrid,.consumerGrid,.strategyGrid,.meteringGrid,.intelligenceGrid,.valueGrid{gap:8px}.batteryGauge{border-radius:10px;padding:10px;margin:6px 0}.batteryGauge b{font-size:26px;font-weight:590}.batteryChild strong{font-size:15px}.consumerHead strong{font-size:14px;font-weight:580}.consumerFlags{gap:4px;margin:6px 0}.consumerFlags span{padding:3px 6px;font-size:9.5px;font-weight:560}.intentCard{grid-template-columns:1fr minmax(160px,.75fr);gap:10px}.intentCard h3{font-size:14px;font-weight:590;margin:2px 0 5px}.decisionDump{border-radius:8px;padding:9px;font-size:10px;line-height:1.35;max-height:330px}.hiRuntimeFooter{margin:7px 3px 0;padding:6px 0 0;font-size:9.5px;font-weight:450}.dot.green,.solarLegend .green{background:#5f9f7a}:host{
+        --hi-space-page-x:14px;
+        --hi-space-page-y:10px;
+        --hi-gap:8px;
+        --hi-radius:10px;
+        --hi-radius-sm:8px;
+        --hi-card-pad:10px;
+        --hi-kpi-h:62px;
+        --hi-icon:30px;
+        --hi-title:24px;
+        --hi-section-title:16px;
+        --hi-kpi:18px;
+        --hi-body:12px;
+        --hi-meta:10.5px;
+        --hi-w-strong:560;
+        --hi-w-title:570;
+        --hi-accent-ok:#eaf6ef;
+        --hi-accent-ok-text:#256a42;
+      }.energy{padding:var(--hi-space-page-y) var(--hi-space-page-x) 16px;background:var(--bg);border-radius:0}.top{margin:0 0 8px}.eyebrow{font-size:9px;line-height:1.2;font-weight:600;letter-spacing:.13em;color:var(--muted)}.top h1{font-size:var(--hi-title);line-height:1.08;font-weight:var(--hi-w-title);letter-spacing:-.015em;margin:4px 0 2px}.top p{font-size:12.5px;line-height:1.25;margin:0;color:var(--muted)}.tabs{height:42px;min-height:42px;box-sizing:border-box;align-items:center;padding:3px;margin:8px 0 10px;border-radius:var(--hi-radius);gap:3px;box-shadow:none}.tab{height:32px;min-height:32px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;border-radius:var(--hi-radius-sm);font-size:11.5px;line-height:1;font-weight:560;letter-spacing:0}.tab.active{font-weight:590;background:rgba(3,169,244,.065);box-shadow:inset 0 0 0 1px rgba(3,169,244,.14)}.summaryRow,.summaryRow.four{display:grid;gap:var(--hi-gap);margin:0 0 10px;align-items:start}.summaryRow{grid-template-columns:repeat(5,minmax(0,1fr))}.summaryRow.four{grid-template-columns:repeat(4,minmax(0,1fr))}.metric{height:var(--hi-kpi-h);min-height:var(--hi-kpi-h);max-height:var(--hi-kpi-h);box-sizing:border-box;padding:8px 10px;gap:8px;align-items:center;overflow:hidden;border-radius:var(--hi-radius);background:var(--card);box-shadow:none}.metric.green,.metric.orange,.metric.purple,.metric.blue{background:var(--card)}.green:not(.dot):not(i):not(.solarLegend *){background:var(--card)}.metric .mi{width:var(--hi-icon);height:var(--hi-icon);min-width:var(--hi-icon);border-radius:8px;font-size:14px}.metric.green .mi{background:var(--hi-accent-ok);color:var(--hi-accent-ok-text)}.metric.orange .mi{background:#fff7ed;color:#b77935}.metric.purple .mi{background:#f5f3ff;color:#6f5aa7}.metric.blue .mi{background:#eef5fb;color:#5b7fae}.metric>div:not(.mi){min-width:0}.ml{font-size:var(--hi-meta);line-height:1.15;font-weight:450;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mv{font-size:var(--hi-kpi);line-height:1.08;font-weight:570;letter-spacing:-.01em;margin:1px 0;color:var(--primary-text-color,#111827);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ms{font-size:var(--hi-meta);line-height:1.18;font-weight:400;color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.panel,.heroPanel{border-radius:var(--hi-radius);padding:var(--hi-card-pad);box-shadow:none}.panel h2,.heroPanel h2{font-size:var(--hi-section-title);line-height:1.15;font-weight:var(--hi-w-title);letter-spacing:-.005em;margin:0 0 5px}.panel p,.heroPanel p{font-size:var(--hi-body);line-height:1.28;margin:0 0 8px;color:var(--muted)}.landing,.batteryGrid,.consumerGrid,.strategyGrid,.meteringGrid,.intelligenceGrid,.valueGrid,.flowDetailsGrid,.r3280OutlookGrid{gap:var(--hi-gap)}.solarKpis{margin-bottom:10px}.solarMainGrid,.solarHomeIntelligence{gap:var(--hi-gap);margin-bottom:10px}.solarOperationsPage,.flowPage,.meteringPage,.intelligencePage,.valuePage,.strategiesPage,.batteryPage,.consumersPage{max-width:1500px;margin:0 auto}.heroPanel{min-height:0}.rec{margin:8px auto -24px;max-width:430px;padding:10px;border-radius:var(--hi-radius);grid-template-columns:22px 1fr 24px;gap:8px;box-shadow:none;background:#f3faf5;border-color:#cbe8d4}.rec h2{font-size:14px;line-height:1.15;font-weight:570;margin:2px 0;color:var(--hi-accent-ok-text);white-space:normal}.rec p{font-size:10.5px;line-height:1.22;margin:0}.rec small{font-size:8.5px;font-weight:560;letter-spacing:.11em}.check{width:24px;height:24px}.energyScene{height:190px;max-width:660px;border-radius:var(--hi-radius);box-shadow:none}.bottomInsights{gap:var(--hi-gap);margin-top:8px}.insight{padding:8px;border-radius:var(--hi-radius-sm)}.insight b{font-size:15px;font-weight:560}.round,.flowIcon{width:28px;height:28px;min-width:28px;border-radius:8px;font-size:13px}.grow b,.flowNode b,.consumerHead strong,.intentCard h3{font-size:12.5px;line-height:1.2;font-weight:560}.total{margin-top:7px;padding-top:7px}.total b{font-size:17px;font-weight:560}.kv{padding:5px 0}.sectionLabel{font-size:9px;line-height:1.15;font-weight:560;margin:6px 0 3px;letter-spacing:.11em}.flowCanvas{gap:var(--hi-gap)}.flowColumn{padding:8px;border-radius:var(--hi-radius)}.flowCenter{min-height:220px;padding:10px;border-radius:var(--hi-radius);gap:var(--hi-gap)}.switchboardNode,.homeBusNode{padding:10px;border-radius:var(--hi-radius-sm)}.switchboardNode b,.homeBusNode b{font-size:13px;font-weight:560}.flowLine{padding:6px 7px}.batteryGauge{padding:10px;margin:6px 0;border-radius:var(--hi-radius)}.batteryGauge b{font-size:24px;font-weight:560}.consumerFlags span{padding:3px 6px;font-size:9.5px;font-weight:520}.r3280Balance{padding:10px;border-radius:var(--hi-radius)}.r3280Balance b{font-size:17px;font-weight:560}.decisionDump{padding:9px;border-radius:var(--hi-radius-sm);font-size:10px;line-height:1.32}.hiRuntimeFooter{margin:7px 3px 0;padding:6px 0 0;font-size:9.5px;font-weight:420;color:var(--muted)}.hiRuntimeFooter b{font-weight:560}.backendWarning{display:none}.hiRuntimeFooter.runtimeTrusted .runtimeStatus{color:#15803d;font-weight:650}.hiRuntimeFooter.runtimeNotTrusted .runtimeStatus{color:#b45309;font-weight:700}.hiRuntimeFooter.runtimeNotTrusted{border-top:1px solid rgba(180,83,9,.18);color:var(--muted)}.qs{display:inline-flex;align-items:center;justify-content:center;min-width:34px;max-width:88px;height:16px;padding:0 6px;border-radius:999px;font-size:8.5px;line-height:1;font-weight:560;letter-spacing:.015em;white-space:nowrap;text-transform:uppercase;box-sizing:border-box;background:#eef2f7;color:#667085;border:1px solid rgba(15,23,42,.06)}.qs.ok{background:#eef8f2;color:#2f6d4b;border-color:#d7eadf}.qs.warn{background:#fff7e6;color:#946200;border-color:#f2d79b}.qs.fail{background:#fff1f1;color:#9b1c1c;border-color:#f3c2c2}.qs.missing,.qs.not-measured,.qs.unknown{background:#f4f6f8;color:#7a8493;border-color:#e6e9ee}.metric{position:relative}.metric>.qs{position:absolute;right:7px;top:6px;opacity:.72}.propertyRow{grid-template-columns:minmax(0,1fr) auto auto;align-items:center}.propertyRow strong{min-width:78px;text-align:right}.propertyControl{min-width:130px;max-width:190px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:5px 7px;font:inherit;font-size:11px}.propertyControl:disabled{background:#f8fafc;color:#94a3b8}.propertyRow>.qs{margin-left:6px}.propertyRow.warn,.meteringRow.warn{border-color:#f2d79b}.propertyRow.fail,.meteringRow.fail{border-color:#f3c2c2}.propertyRow.missing,.propertyRow.not-measured{opacity:.82}.empty b{font-weight:560}.empty span{font-size:10.5px;color:var(--muted)}.solarIntelligencePanel{display:grid;grid-template-columns:1.1fr 1.2fr 1.2fr 1.3fr;gap:var(--hi-gap);align-items:center}.solarIntro h2,.flexibleLoadsPanel h2{margin-bottom:6px}.solarIntro p{max-width:260px}.solarControls{display:grid;gap:8px}.controlBlock small,.solarStatus small,.solarRecommendation small{display:block;text-transform:uppercase;letter-spacing:.12em;font-size:9px;color:var(--muted);font-weight:650;margin-bottom:4px}.controlBlock>span,.solarStatus>span,.solarRecommendation>span{display:block;font-size:11px;line-height:1.3;color:var(--muted)}.hiSegmented{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#f8fafc;min-height:30px}.hiSegment{appearance:none;border:0;border-right:1px solid var(--line);background:transparent;padding:7px 13px;font:inherit;font-size:11px;font-weight:590;color:#334155;cursor:pointer;line-height:1}.hiSegment:last-child{border-right:0}.hiSegment.active{background:#eef6ff;color:#0f172a;box-shadow:inset 0 0 0 1px rgba(37,99,235,.08)}.hiSegment:disabled{cursor:not-allowed;color:#94a3b8}.execState{border:1px solid var(--line);background:#f8fafc;border-radius:10px;padding:8px 12px;font-size:11.5px;font-weight:590;color:#64748b}.solarStatus{border-left:1px solid var(--line);padding-left:16px}.solarStatus h3{font-size:13px;line-height:1.25;font-weight:600;margin:0 0 5px}.solarStatus b{display:block;font-size:13px;font-weight:600;margin-bottom:3px}.solarRecommendation{border-left:3px solid #f59e0b;padding-left:16px}.solarRecommendation h3{font-size:15px;line-height:1.25;font-weight:610;margin:0 0 5px;max-width:300px}.sortControl{display:flex;align-items:center;gap:8px}.sortControl>span{font-size:10.5px;color:var(--muted);font-weight:560}.flexLoadList{display:grid;gap:8px}.flexLoadCard{border:1px solid var(--line);border-radius:var(--hi-radius-sm);background:#fff;padding:10px 12px}.flexLoadCard.recommended{border-color:#c8d6ea;background:#fcfdff}.loadMain{display:grid;grid-template-columns:1.4fr .85fr .85fr 1.1fr;gap:10px;align-items:center}.loadMain h3{font-size:12px;line-height:1.2;margin:0 0 2px;font-weight:620}.loadMain p,.loadMain span{font-size:10.5px;line-height:1.25;color:var(--muted);margin:0}.loadMain b{font-size:12px;line-height:1.2;font-weight:610}.loadRecommendation b{display:block}.loadEnergy{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}.loadEnergy>div{background:#f8fafc;border:1px solid #edf2f7;border-radius:9px;padding:7px 9px}.loadEnergy span{display:block;font-size:10px;line-height:1.2;color:var(--muted);margin-bottom:3px}.loadEnergy b{font-size:11.5px;font-weight:610;line-height:1.2}.priorityChip{display:inline-flex;align-items:center;border:1px solid #cfe7d6;background:#f0fbf4;color:#166534;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:650;line-height:1}.loadReason{margin-top:7px;color:#64748b;font-size:10.5px;line-height:1.3}.loadReason span{display:inline-block;background:#fff7ed;border:1px solid #fed7aa;border-radius:999px;padding:4px 8px;color:#9a3412}.editGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}.editField{display:grid;grid-template-columns:1fr 80px auto;gap:6px;align-items:center;background:#f8fafc;border:1px solid #edf2f7;border-radius:9px;padding:6px 8px}.editField span,.editField em{font-size:10px;color:var(--muted);font-style:normal}.editField input{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;background:#fff;padding:5px 6px;font:inherit;font-size:11px}.editField input:disabled{background:#f1f5f9;color:#94a3b8}.loadActions{display:flex;align-items:center;gap:7px;margin-top:8px}.loadActions>span{font-size:10px;color:var(--muted);margin-right:4px}.hiAction{appearance:none;border:1px solid var(--line);background:#fff;color:#0f172a;border-radius:9px;padding:6px 13px;font:inherit;font-size:11px;font-weight:590;line-height:1}.hiAction.enabled{border-color:#b7d6c2;background:#f0fbf4;color:#166534;cursor:pointer}.hiAction.disabled{background:#f8fafc;color:#94a3b8;cursor:not-allowed}.hiDetails{margin-top:8px}.hiDetails summary{list-style:none;border:1px solid var(--line);border-radius:9px;padding:7px 10px;font-size:11px;font-weight:610;cursor:pointer;background:#fff}.hiDetails summary::-webkit-details-marker{display:none}.hiDetails summary:before{content:"▸";display:inline-block;margin-right:6px;font-size:10px}.hiDetails[open] summary:before{content:"▾"}.hiDetails .softBox{margin-top:8px}.softBox .kv{display:flex;justify-content:space-between;gap:12px}.softBox .kv span{font-size:10.5px;color:var(--muted)}.softBox .kv b{font-size:10.5px;font-weight:600;text-align:right}.rec{width:100%;max-width:none;box-sizing:border-box;margin:10px 0 14px;position:relative;z-index:1;box-shadow:none;align-self:stretch}.heroPanel>.rec,.panel>.rec,.wide>.rec{margin:10px 0 14px}.recMeta{flex-wrap:wrap}.heroPanel .energyScene{margin-top:8px}.strategyGrid .wide .rec,.intelligenceGrid .wide .rec{margin:10px 0 16px}.solarV3445 .solarIntelligencePanel{display:grid;grid-template-columns:minmax(250px,.9fr) minmax(250px,1fr) minmax(280px,1.05fr) minmax(300px,1.15fr);gap:10px;align-items:center}.solarV3445 .hiSegmented,.solarV3445 .hiAction,.solarV3445 .editField input,.solarV3445 .hiDetails summary{}.solarV3445 .loadMain{display:grid;grid-template-columns:minmax(220px,1.3fr) minmax(150px,.75fr) minmax(170px,.75fr) minmax(260px,1.15fr);gap:14px;align-items:center}.solarV3445 .loadMain>div{display:flex;flex-direction:column;gap:3px;min-width:0}.solarV3445 .loadMain b{display:block;white-space:normal}.solarV3445 .loadMain span,.solarV3445 .loadMain p{display:block;white-space:normal}.solarV3445 .editGrid{grid-template-columns:repeat(3,minmax(170px,1fr))}.solarV3445 .loadEnergy{grid-template-columns:repeat(4,minmax(120px,1fr))}.solarV3445 .solarMainGrid{align-items:start}.solarV3445 .solarSideCard{margin-bottom:10px}@media(max-width:1100px){.solarV3445 .solarIntelligencePanel,.solarV3445 .loadMain{grid-template-columns:1fr}.solarV3445 .editGrid,.solarV3445 .loadEnergy{grid-template-columns:1fr}}.solarV3457 .solarIntelligencePanel{grid-template-columns:1.15fr 1.55fr 1.2fr;align-items:stretch}.solarV3457 .solarControls{align-self:center}.solarV3457 .solarControls .controlBlock{display:grid;grid-template-columns:92px minmax(220px,1fr);align-items:center;gap:8px 12px;margin:0 0 8px}.solarV3457 .solarControls .controlBlock small{grid-column:1;margin:0}.solarV3457 .solarControls .controlBlock .hiSegmented,.solarV3457 .solarControls .controlBlock .execState{grid-column:2}.solarV3457 .solarControls .controlBlock span{grid-column:2}.solarV3457 .solarStatus{border-left:0;padding-left:0;display:grid;grid-template-columns:92px minmax(220px,1fr);align-items:start;gap:4px 12px;margin-top:0}.solarV3457 .solarStatus small{grid-column:1;margin-top:2px}.solarV3457 .solarStatus h3,.solarV3457 .solarStatus b,.solarV3457 .solarStatus span{grid-column:2}.solarV3457 .solarRecommendation{border-left:3px solid #f59e0b;padding-left:16px;align-self:stretch}.solarV3457 .flexLoadCard{padding:0;overflow:hidden}.solarV3457 .loadSummaryGrid{display:grid;grid-template-columns:1.45fr .85fr 1fr .9fr .9fr .95fr;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}.solarV3457 .loadIdentity{display:flex;align-items:center;gap:10px;min-width:0}.solarV3457 .loadIcon{width:32px;height:32px;border-radius:10px;background:#ecfdf5;display:grid;place-items:center;font-size:15px}.solarV3457 .loadIdentity h3{font-size:12px;font-weight:620;margin:0 0 2px;line-height:1.2}.solarV3457 .loadIdentity p{font-size:10.5px;color:var(--muted);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.solarV3457 .loadFact span{display:block;font-size:10px;color:var(--muted);line-height:1.2;margin-bottom:3px}.solarV3457 .loadFact b{font-size:12px;font-weight:620;line-height:1.2}.stateChip{display:inline-flex;align-items:center;border-radius:999px;background:#eef6ff;color:#1d4ed8;padding:4px 9px;font-size:10.5px;font-weight:650}.solarV3457 .loadEditCommandRow{display:grid;grid-template-columns:1.35fr auto;gap:14px;align-items:end;padding:10px 12px}.sliderField{display:block}.sliderField>div{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.sliderField span,.selectField span{display:block;font-size:10.5px;color:var(--muted);font-weight:560}.sliderField b{font-size:12px;font-weight:620}.sliderField input[type=range]{width:100%;accent-color:#2563eb}.selectField select{min-width:190px;width:100%;border:1px solid var(--line);border-radius:9px;background:#fff;padding:7px 10px;font:inherit;font-size:11px;color:#0f172a}.detailsButtonSlot{min-width:120px}.detailsButtonSlot .hiDetails{margin-top:0}.detailsButtonSlot .hiDetails summary{padding:8px 12px;text-align:center}.solarV3457 .hiDetails[open]{grid-column:1 / -1;margin-top:8px}.solarV3457 .hiDetails[open] .softBox{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;background:#f8fafc}.strategySettingsRow{margin-top:10px;border:1px solid var(--line);border-radius:var(--hi-radius-sm);background:#fff;padding:10px 12px;display:grid;grid-template-columns:1.25fr 3fr;gap:14px;align-items:center}.strategySettingsIntro b{display:block;font-size:12px;font-weight:620;margin-bottom:3px}.strategySettingsIntro span,.noStrategySettings{font-size:10.5px;color:var(--muted)}.strategySettingsControls{display:grid;grid-template-columns:repeat(6,minmax(90px,1fr));gap:8px;align-items:end}.strategySettingsControls .editField{grid-template-columns:1fr;background:#f8fafc}.strategySettingsControls .selectField select{min-width:0}.strategySettingsControls .editField em{display:none}.solarV3457 .solarIntelligencePanel{
+        grid-template-columns:minmax(280px,1.05fr) minmax(340px,1.4fr) minmax(320px,1.05fr);
+        grid-template-areas:"intro controls rec" "intro status rec";
+        gap:12px 18px;
+        align-items:stretch;
+        padding:14px 16px;
+      }.solarV3457 .solarIntro{grid-area:intro;align-self:stretch;display:grid;grid-template-rows:auto auto 1fr;align-content:start;gap:6px;border-right:1px solid var(--line);padding-right:16px}.solarV3457 .solarIntro h2{font-size:15px;margin:0;font-weight:640;line-height:1.2}.solarV3457 .solarIntro p{font-size:11.5px;line-height:1.35;max-width:260px;margin:0;color:var(--muted)}.solarV3457 .solarIntro .r3230Illustration{height:92px;margin-top:6px;max-width:320px;align-self:end}.solarV3457 .solarControls{grid-area:controls;align-self:start;display:grid;gap:8px;padding-top:2px}.solarV3457 .solarControls .controlBlock{grid-template-columns:82px minmax(220px,1fr);gap:6px 10px;margin:0;align-items:center}.solarV3457 .solarControls .controlBlock small{font-size:9px;letter-spacing:.13em}.solarV3457 .solarControls .controlBlock>span{font-size:10.5px;line-height:1.25}.solarV3457 .solarControls .hiSegmented{min-height:28px;border-radius:9px}.solarV3457 .solarControls .hiSegment{padding:6px 14px;font-size:10.5px}.solarV3457 .solarControls .execState{padding:7px 11px;border-radius:9px;font-size:11px}.solarV3457 .solarStatus{grid-area:status;border-left:0;padding-left:0;display:grid;grid-template-columns:82px minmax(220px,1fr);gap:4px 10px;align-self:start;margin-top:0}.solarV3457 .solarStatus small{grid-column:1;font-size:9px;letter-spacing:.13em;margin:2px 0 0;color:var(--muted)}.solarV3457 .solarStatus h3{grid-column:2;font-size:12px;line-height:1.25;margin:0 0 3px;font-weight:620}.solarV3457 .solarStatus b{grid-column:2;font-size:12px;line-height:1.2;margin:0 0 2px;font-weight:620}.solarV3457 .solarStatus span:not(.dot){grid-column:2;font-size:10.5px;line-height:1.32;color:var(--muted);max-width:330px}.solarV3457 .solarRecommendation{grid-area:rec;align-self:stretch;border-left:3px solid #f59e0b;border-top:1px solid #fde6bd;border-right:1px solid #fde6bd;border-bottom:1px solid #fde6bd;border-radius:0 10px 10px 0;padding:12px 14px;background:#fffdf8;display:grid;align-content:start;gap:5px;min-height:0}.solarV3457 .solarRecommendation small{font-size:9px;letter-spacing:.13em;margin:0;color:var(--muted)}.solarV3457 .solarRecommendation h3{font-size:15px;margin:0 0 2px;line-height:1.22;font-weight:640;max-width:none}.solarV3457 .solarRecommendation span{font-size:10.5px;line-height:1.25;color:#475569}.solarV3457 .solarRecommendation .hiDetails{margin-top:5px}.solarV3457 .flexibleLoadsPanel{padding:14px}.solarV3457 .energySectionHead{margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line)}.solarV3457 .flexLoadList{gap:8px}.solarV3457 .flexLoadCard{border-radius:11px;background:#fff;border-color:#dbe3ee;box-shadow:0 1px 0 rgba(15,23,42,.02)}.solarV3457 .loadSummaryGrid{grid-template-columns:1.55fr .78fr 1.05fr .95fr .98fr;gap:10px;padding:9px 11px;min-height:44px}.solarV3457 .loadIdentity{gap:9px}.solarV3457 .loadIcon{width:30px;height:30px;border-radius:9px}.solarV3457 .loadIdentity h3{font-size:11.5px;font-weight:640}.solarV3457 .loadIdentity p{font-size:10px}.solarV3457 .loadFact span{font-size:9.5px;margin-bottom:2px}.solarV3457 .loadFact b{display:inline-flex;align-items:center;width:auto;max-width:max-content;font-size:11.5px}.solarV3457 .priorityChip{padding:3px 10px;min-width:24px;justify-content:center;font-size:10.5px;background:#eefcf3;border-color:#cdebd7;color:#15803d}.solarV3457 .stateChip{display:inline-flex;width:auto;max-width:max-content;padding:3px 10px;font-size:10px;background:#eef6ff;color:#1d4ed8;border:1px solid #dbeafe}.solarV3457 .loadEditCommandRow{grid-template-columns:minmax(270px,1.25fr) minmax(230px,.85fr) minmax(180px,auto) minmax(118px,auto);gap:12px;padding:9px 11px;align-items:end}.solarV3457 .sliderField>div{margin-bottom:4px}.solarV3457 .sliderField span,.solarV3457 .selectField span{font-size:10px}.solarV3457 .sliderField b{font-size:11.5px}.solarV3457 .sliderField input[type=range]{height:18px}.solarV3457 .selectField select{min-height:30px;padding:6px 9px;border-radius:9px;font-size:11px}.solarV3457 .loadActions{margin:0;gap:7px;align-items:center}.solarV3457 .loadActions>span{font-size:10px;color:var(--muted)}.solarV3457 .loadActions .hiAction{padding:7px 13px;border-radius:9px;min-width:54px;text-align:center}.solarV3457 .detailsButtonSlot{min-width:110px}.solarV3457 .detailsButtonSlot .hiDetails summary{padding:8px 11px;border-radius:9px;background:#fff}.solarV3457 .loadEditCommandRow>.hiDetails[open],.solarV3457 .detailsButtonSlot .hiDetails[open]{grid-column:1 / -1;width:100%}.solarV3457 .detailsButtonSlot .hiDetails[open] .softBox{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;background:#f8fafc;border-color:#e2e8f0}.solarV3457 .strategySettingsRow{margin-top:10px;border-radius:11px;padding:10px 12px;background:#fff;grid-template-columns:1.15fr 3fr;gap:12px}.solarV3457 .strategySettingsIntro b{font-size:12px}.solarV3457 .strategySettingsIntro span,.solarV3457 .noStrategySettings{font-size:10.5px;line-height:1.3}.solarV3457 .noStrategySettings{display:inline-flex;align-items:center;min-height:30px;background:#f8fafc;border:1px solid var(--line);border-radius:9px;padding:0 10px;color:var(--muted)}.solarV3457 .strategySettingsControls{grid-template-columns:repeat(4,minmax(120px,1fr)) auto;gap:8px}@media(max-width:1100px){.solarV3457 .solarIntelligencePanel{grid-template-columns:1fr}.solarV3457 .loadSummaryGrid,.solarV3457 .loadEditCommandRow,.strategySettingsRow,.strategySettingsControls{grid-template-columns:1fr}}.solarDecisionUx .summaryRow.four{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.solarDecisionUx .metric{min-height:76px;border-radius:12px;padding:13px 16px;gap:12px;box-shadow:0 6px 18px rgba(15,23,42,.035)}.solarDecisionUx .metric .mi{width:44px;height:44px;border-radius:15px;font-size:22px}.solarDecisionUx .metric .mv{font-size:20px}.solarDecisionUx .metric .ml,.solarDecisionUx .metric .ms{font-size:11px}.solarDecisionUx .panel{border-radius:13px;box-shadow:0 8px 22px rgba(15,23,42,.035)}.solarDecisionUx .solarMainGrid{grid-template-columns:minmax(0,1fr) 260px;gap:14px}.solarDecisionUx .solarIntelligencePanel{grid-template-columns:1.1fr 1.1fr .9fr 1.45fr;gap:16px;padding:16px;border-radius:13px}.solarDecisionUx .solarIntro{border-right:1px solid var(--line)}.solarDecisionUx .solarIntro .r3230Illustration{height:116px;max-width:300px;background:radial-gradient(ellipse at center,#eaf7ff 0,#edf8ff 58%,transparent 60%)}.solarDecisionUx .solarRecommendation{background:linear-gradient(180deg,#f8fbff,#fff);border:1px solid #dbeafe;border-left:0;border-radius:12px;padding:14px 16px}.solarDecisionUx .solarRecommendation h3{text-transform:none;font-size:14px}.solarDecisionUx .solarRecommendation .recSplit{display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid #e5ebf3;margin-top:8px;padding-top:9px}.solarDecisionUx .solarRecommendation .recSplit b{display:block;font-size:15px}.solarDecisionUx .solarRecommendation .recSplit span{font-size:10.5px;color:var(--muted)}.solarDecisionUx .decisionLoadsPanel{padding:16px}.solarDecisionUx .energySectionHead{border-bottom:0;margin-bottom:8px;padding-bottom:0}.solarDecisionUx .energySectionHead h2{font-size:16px}.solarDecisionUx .energySectionHead p{font-size:11.5px;margin-top:2px}.solarDecisionUx .sortControl{gap:8px}.solarDecisionUx .insightButton,.solarDecisionUx .sideLink{border:1px solid #dbeafe;background:#fff;color:#2563eb;border-radius:9px;padding:8px 12px;font-weight:700;font-size:11px}.solarDecisionUx .flexLoadList{gap:9px}.solarDecisionUx .decisionLoadCard{border:1px solid #e1e8f2;border-radius:13px;background:#fff;overflow:hidden;box-shadow:0 2px 8px rgba(15,23,42,.025)}.solarDecisionUx .decisionMainRow{display:grid;grid-template-columns:1.55fr .95fr .76fr .76fr .72fr 1fr .95fr;gap:12px;align-items:start;padding:12px 14px;border-bottom:1px solid #edf2f7}.solarDecisionUx .decisionIdentity{display:grid;grid-template-columns:42px minmax(0,1fr);gap:11px;align-items:center}.solarDecisionUx .decisionIdentity .loadIcon{width:42px;height:42px;border-radius:50%;background:#ecfdf5;color:#15803d}.solarDecisionUx .decisionLoadCard.wait .loadIcon{background:#fff7ed;color:#ea580c}.solarDecisionUx .decisionLoadCard.warn .loadIcon{background:#f5f3ff;color:#7c3aed}.solarDecisionUx .decisionLoadCard.info .loadIcon{background:#eef6ff;color:#2563eb}.solarDecisionUx .decisionIdentity h3{font-size:13px;font-weight:760;margin:0}.solarDecisionUx .decisionIdentity p{font-size:11px;color:#475569;margin:2px 0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.solarDecisionUx .connectionPill{display:inline-flex;border-radius:999px;padding:3px 8px;font-size:10px;font-weight:750;background:#eef2f7;color:#475569}.solarDecisionUx .connectionPill.ok{background:#dcfce7;color:#15803d}.solarDecisionUx .connectionPill.warn{background:#fff7ed;color:#c2410c}.solarDecisionUx .connectionPill.off{background:#f1f5f9;color:#64748b}.solarDecisionUx .decisionPlan small,.solarDecisionUx .decisionMetric small,.solarDecisionUx .decisionExpected small{display:block;text-transform:none;font-size:10px;color:#64748b;margin-bottom:4px;font-weight:720}.solarDecisionUx .decisionPlan b,.solarDecisionUx .decisionMetric b,.solarDecisionUx .decisionExpected b{font-size:13px;line-height:1.2;color:#0f172a}.solarDecisionUx .decisionPlan span,.solarDecisionUx .decisionMetric span,.solarDecisionUx .decisionExpected span{display:block;font-size:10.5px;color:#334155;line-height:1.25;margin-top:4px}.solarDecisionUx .planningBadge,.solarDecisionUx .expectedBadge{display:inline-flex;border-radius:7px;padding:4px 8px;font-size:11px;font-weight:800}.solarDecisionUx .planningBadge.ok,.solarDecisionUx .expectedBadge.ok{background:#dcfce7;color:#15803d}.solarDecisionUx .planningBadge.wait,.solarDecisionUx .expectedBadge.wait{background:#ffedd5;color:#c2410c}.solarDecisionUx .planningBadge.warn,.solarDecisionUx .expectedBadge.warn{background:#f1f5f9;color:#475569}.solarDecisionUx .planningBadge.off,.solarDecisionUx .expectedBadge.off{background:#f1f5f9;color:#64748b}.solarDecisionUx .planningBadge.info,.solarDecisionUx .expectedBadge.info{background:#dbeafe;color:#1d4ed8}.solarDecisionUx .whyCell b{font-size:12px}.solarDecisionUx .decisionExpected b{white-space:nowrap}.solarDecisionUx .decisionControlRow{display:grid;grid-template-columns:110px minmax(260px,1fr) 140px minmax(260px,auto);gap:14px;align-items:end;padding:10px 14px 9px}.solarDecisionUx .readOnlyPriority{display:grid;gap:4px}.solarDecisionUx .readOnlyPriority span,.solarDecisionUx .automationMini span{font-size:10px;color:#64748b;font-weight:720}.solarDecisionUx .readOnlyPriority b{border:1px solid #dbeafe;background:#eff6ff;border-radius:8px;min-height:30px;display:inline-flex;align-items:center;justify-content:center;padding:0 12px;font-size:11px}.solarDecisionUx .requestedSlot{position:relative;display:grid;grid-template-columns:1fr auto;align-items:end;gap:8px}.solarDecisionUx .requestedSlot .sliderField{grid-column:1}.solarDecisionUx .requestedSlot .sliderField>div{grid-template-columns:auto auto;justify-content:start;gap:10px;margin-bottom:4px}.solarDecisionUx .requestedSlot .sliderField span{font-size:10.5px;font-weight:720;color:#475569}.solarDecisionUx .requestedSlot .sliderField b{font-size:11.5px}.solarDecisionUx .requestedSlot input[type=range]{height:22px}.solarDecisionUx .maxPowerHint{grid-column:2;font-size:10.5px;color:#0f172a;font-style:normal;padding-bottom:1px}.solarDecisionUx .automationMini{display:grid;gap:3px;border-left:1px solid #e5ebf3;padding-left:12px}.solarDecisionUx .automationMini b{width:max-content;border-radius:999px;padding:3px 8px;font-size:10.5px;background:#dcfce7;color:#15803d}.solarDecisionUx .automationMini b.off{background:#f1f5f9;color:#64748b}.solarDecisionUx .automationMini em{font-size:10px;color:#64748b;font-style:normal}.solarDecisionUx .decisionActions{display:grid;grid-template-columns:1fr 90px 78px;gap:8px;align-items:center;margin:0}.solarDecisionUx .decisionActions>span{font-size:10.5px;color:#64748b;white-space:nowrap}.solarDecisionUx .decisionActions .hiAction{min-width:0;border-radius:8px;padding:8px 11px;font-size:11px;font-weight:760}.solarDecisionUx .decisionActions .hiAction.enabled:first-of-type{background:#ecfdf5;border-color:#bbf7d0;color:#15803d}.solarDecisionUx .decisionActions .hiAction.enabled:nth-of-type(2){background:#fff1f2;border-color:#fecdd3;color:#dc2626}.solarDecisionUx .decisionLoadCard{border-radius:12px;margin:0}.solarDecisionUx .decisionMainRow{grid-template-columns:1.42fr .9fr .7fr .7fr .68fr .92fr .88fr;gap:9px;padding:9px 12px;align-items:center}.solarDecisionUx .decisionIdentity{grid-template-columns:34px minmax(0,1fr);gap:9px}.solarDecisionUx .decisionIdentity .loadIcon{width:34px;height:34px;font-size:14px}.solarDecisionUx .decisionIdentity h3{font-size:12.5px;line-height:1.1}.solarDecisionUx .decisionIdentity p{font-size:10px;margin:1px 0 3px}.solarDecisionUx .connectionPill{padding:2px 7px;font-size:9.5px}.solarDecisionUx .decisionPlan small,.solarDecisionUx .decisionMetric small,.solarDecisionUx .decisionExpected small{font-size:9.5px;margin-bottom:2px}.solarDecisionUx .decisionPlan b,.solarDecisionUx .decisionMetric b,.solarDecisionUx .decisionExpected b{font-size:12.2px}.solarDecisionUx .decisionPlan span,.solarDecisionUx .decisionMetric span,.solarDecisionUx .decisionExpected span{font-size:9.6px;margin-top:2px;line-height:1.15}.solarDecisionUx .planningBadge,.solarDecisionUx .expectedBadge{padding:3px 7px;font-size:10px;border-radius:7px}.solarDecisionUx .decisionControlRow{grid-template-columns:86px minmax(240px,1fr) 112px minmax(300px,auto);gap:10px;padding:7px 12px;align-items:center}.solarDecisionUx .readOnlyPriority span,.solarDecisionUx .automationMini span{font-size:9.5px}.solarDecisionUx .readOnlyPriority b{min-height:26px;padding:0 10px;font-size:10px}.solarDecisionUx .requestedSlot .sliderField>div{margin-bottom:2px}.solarDecisionUx .requestedSlot input[type=range]{height:18px}.solarDecisionUx .automationMini{gap:2px;padding-left:9px}.solarDecisionUx .automationMini b{font-size:9.5px;padding:2px 7px}.solarDecisionUx .automationMini em{font-size:9px;line-height:1.1}.solarDecisionUx .decisionActions{grid-template-columns:auto 82px 72px 72px;gap:7px}.solarDecisionUx .decisionActions>span{font-size:9.5px;max-width:92px;overflow:hidden;text-overflow:ellipsis}.solarDecisionUx .decisionActions .hiAction{padding:7px 9px;font-size:10.5px}.solarDecisionUx .decisionActions .hiAction.enabled:nth-of-type(3){background:#fefce8;border-color:#fde68a;color:#a16207}.solarDecisionUx .loadNotice{margin:0 12px 6px;padding:6px 8px;font-size:10px;border-radius:8px}.solarDecisionUx .loadNotice em{font-size:10px}.solarDecisionUx .loadDetailsFull{padding:0 12px 8px}.solarDecisionUx .loadDetailsFull .hiDetails summary{padding:7px 9px;font-size:11px}.solarDecisionUx .loadDetailsFull .softBox{padding:8px}.solarDecisionUx .flexLoadList{gap:7px}.solarDecisionUx .decisionLoadsPanel{padding:13px}.solarDecisionUx .energySectionHead{margin-bottom:6px}.solarDecisionUx .solarMainGrid{gap:12px}.solarDecisionUx .loadNotice{display:grid;grid-template-columns:auto auto 1fr;gap:8px;align-items:center;margin:0 14px 8px;background:#f8fafc;border:1px solid #e5ebf3;border-radius:8px;padding:7px 10px;color:#475569}.solarDecisionUx .loadNotice b{font-size:11px}.solarDecisionUx .loadNotice em{font-size:11px;font-style:normal;color:#64748b}.solarDecisionUx .loadDetailsFull{padding:0 14px 10px}.solarDecisionUx .loadDetailsFull .hiDetails summary{border:0;background:#fff;padding:8px 0;font-size:11.5px;font-weight:720}.solarDecisionUx .loadDetailsFull .hiDetails[open] .softBox{grid-template-columns:repeat(4,minmax(0,1fr));background:#f8fafc;border:1px solid #e5ebf3;border-radius:10px;margin-top:4px;padding:10px}.solarDecisionUx .strategySettingsRow{display:none}.solarDecisionUx .solarSideCard{padding:18px}.solarDecisionUx .solarSideCard h2{font-size:16px}.solarDecisionUx .solarTodayPrimary{font-size:20px}.solarDecisionUx .solarStateDecision .sideLink,.solarDecisionUx .planningCheck .sideLink{width:100%;margin-top:12px}.solarDecisionUx .planningCheckIcon{width:28px;height:28px;border-radius:50%;border:1px solid #bbf7d0;color:#16a34a;display:grid;place-items:center;font-weight:900;margin:10px 0}.solarDecisionUx .planningCheck>b{display:block;font-size:13px;line-height:1.35;margin-bottom:8px}.solarDecisionUx .planningMiniStats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}.solarDecisionUx .planningMiniStats span{font-size:10px;background:#f8fafc;border:1px solid #e5ebf3;border-radius:7px;padding:5px 6px;color:#475569}.r164GoalContext{display:grid;grid-template-columns:1.05fr 1.35fr .9fr 1.1fr .9fr;gap:8px;padding:7px 12px;border-top:1px solid #eef2f7;background:#fbfdff}.r164GoalContext>div{min-width:0;border:1px solid #e5ebf3;background:#fff;border-radius:8px;padding:6px 8px}.r164GoalContext small{display:block;font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.02em;margin-bottom:2px}.r164GoalContext b{display:block;font-size:10.5px;line-height:1.2;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.r164GoalContext span{display:block;font-size:9.5px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.effectiveStrategyGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.effectiveStrategyCard{border:1px solid #e5ebf3;background:#fff;border-radius:12px;padding:12px}.effectiveStrategyCard>div:first-child{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}.effectiveStrategyCard b{font-size:13px}.effectiveStrategyCard span{font-size:10px;color:#64748b}.effectiveStrategyFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}@media(max-width:1180px){.solarDecisionUx .decisionMainRow{grid-template-columns:1fr 1fr}.solarDecisionUx .decisionControlRow{grid-template-columns:1fr 1fr}.r164GoalContext{grid-template-columns:1fr 1fr}.effectiveStrategyGrid{grid-template-columns:1fr}.effectiveStrategyFacts{grid-template-columns:1fr 1fr}}.solarDecisionUx .compactSolarPlan{display:grid;grid-template-columns:1.1fr 1fr 1.4fr 1fr;gap:16px;align-items:start}.solarDecisionUx .compactSolarPlan .r3230Illustration,.solarDecisionUx .compactSolarPlan .recSplit{display:none}.solarDecisionUx .compactSolarPlan .solarRecommendation{min-height:0}.solarDecisionUx .compactSolarPlan .hiDetails summary{padding:7px 0;border:0;background:#fff}.solarDecisionUx .decisionLoadCard.noWhy .decisionMainRow{grid-template-columns:1.42fr .9fr .7fr .7fr .68fr}.solarDecisionUx .decisionLoadCard.noEta.noWhy .decisionMainRow{grid-template-columns:1.42fr .9fr .7fr .7fr}.solarDecisionUx .decisionLoadCard.noExpected.noEta.noWhy .decisionMainRow{grid-template-columns:1.42fr .9fr .7fr .7fr}.solarDecisionUx .decisionLoadCard.noExpected .decisionExpected,.solarDecisionUx .decisionLoadCard.noEta .readyCell,.solarDecisionUx .decisionLoadCard.noWhy .whyCell{display:none}.solarDecisionUx .r164GoalContext{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.solarDecisionUx .r164GoalContext:empty{display:none}.solarDecisionUx .mergedPlanningSummary .hiDetails summary{padding:8px 0;border:0;background:#fff}.solarDecisionUx .sortControl .insightButton{display:none}@media(max-width:1180px){.solarDecisionUx .compactSolarPlan{grid-template-columns:1fr 1fr}.solarDecisionUx .decisionLoadCard.noWhy .decisionMainRow,.solarDecisionUx .decisionLoadCard.noEta.noWhy .decisionMainRow,.solarDecisionUx .decisionLoadCard.noExpected.noEta.noWhy .decisionMainRow{grid-template-columns:1fr 1fr}}.strategyProfileUx .strategyProfilePicker{display:grid;grid-template-columns:minmax(260px,.9fr) minmax(220px,280px);gap:12px;align-items:start}.strategyProfileUx .strategyProfilePicker select{width:100%;min-height:38px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:8px 10px;font:inherit}.strategyProfileUx .profilePickCards{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}.strategyProfileUx .profilePickCard{border:1px solid var(--line);border-radius:12px;background:#fff;text-align:left;padding:10px 12px;cursor:pointer;color:#0f172a}.strategyProfileUx .profilePickCard.active{border-color:#bae6fd;background:#f0f9ff;box-shadow:inset 0 0 0 1px #bae6fd}.strategyProfileUx .profilePickCard b{display:block;font-size:12px;font-weight:650;margin-bottom:3px}.strategyProfileUx .profilePickCard span{display:block;font-size:10.5px;color:#64748b;line-height:1.3}.strategyProfileUx .strategyProfileWorkspace{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:10px;align-items:start}.strategyProfileUx .strategyProfileCard.selectedOnly{padding:12px}.strategyProfileUx .profileSettingGroup{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px;margin-top:9px}.strategyProfileUx .profileSettingGroup h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:800;margin:0 0 8px}.strategyProfileUx .profileSettingGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.strategyProfileUx .profileSettingGrid .profilePolicyLine{background:#f8fafc;border:1px solid #edf2f7;border-radius:9px;padding:8px 10px}.strategyProfileUx .profileNoControls{margin-top:9px}.writeState{display:block;grid-column:1/-1;font-size:9.5px;color:#64748b;margin-top:3px}.writeState.pending{color:#92400e}.writeState.sent{color:#166534}.writeState.failed,.writeState.blocked{color:#991b1b}.selectField.noOptions em{display:block;font-size:9.5px;color:#94a3b8;font-style:normal;margin-top:3px}.strategyProfilesPage{display:grid;gap:var(--hi-gap)}.strategyProfileSummary{margin-bottom:0}.strategyBoundaryCard{display:grid;grid-template-columns:minmax(280px,1fr) 2fr;gap:14px;align-items:center}.strategyBoundaryGrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.strategyBoundaryGrid span{display:block;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:9px 10px;font-size:10.5px;color:var(--muted)}.strategyBoundaryGrid b{display:block;margin-top:3px;font-size:12px;color:#0f172a}.strategyProfilesLayout{display:grid;grid-template-columns:minmax(190px,.7fr) minmax(0,2.35fr) minmax(220px,.85fr);gap:var(--hi-gap);align-items:start}.profileNav,.profileExplain{position:sticky;top:10px}.profileChips{display:grid;gap:7px}.profileChips span,.profileBadge{display:inline-flex;align-items:center;border:1px solid #dce8f6;background:#f8fbff;border-radius:999px;padding:7px 10px;font-size:10.5px;font-weight:650;color:#334155}.profileEditorColumn{display:grid;gap:var(--hi-gap)}.strategyProfileCard{display:grid;gap:10px}.profileCardHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.profileCardHead small{display:block;text-transform:uppercase;letter-spacing:.12em;font-size:9px;font-weight:700;color:var(--muted);margin-bottom:3px}.profileCardHead h2{margin:0 0 4px}.profileCardHead p{margin:0}.profileGroups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.profileGroup{background:#f8fafc;border:1px solid #e7edf6;border-radius:12px;padding:10px}.profileGroup h3,.profileControls h3{font-size:11px;line-height:1.2;text-transform:uppercase;letter-spacing:.1em;color:#64748b;margin:0 0 7px}.profilePolicyLine{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #edf2f7;padding:6px 0}.profilePolicyLine:first-of-type{border-top:0;padding-top:0}.profilePolicyLine span{font-size:10.5px;color:var(--muted)}.profilePolicyLine b{font-size:11px;font-weight:620;text-align:right}.profileControls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px}.profileControls h3{grid-column:1/-1}.profileNoControls{font-size:10.5px;color:#64748b;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:8px 10px}.effectivePolicyPreview{display:grid;gap:8px}.effectivePolicyList{display:grid;gap:8px}.effectivePolicyRow{display:grid;grid-template-columns:1.5fr 1fr .8fr 1fr 1fr;gap:10px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px}.effectivePolicyRow span{display:block;font-size:10px;color:var(--muted)}.effectivePolicyRow b{font-size:11.5px;font-weight:620}.strategyDiagnosticsPanel .hiDetails .softBox{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.empty.compact{margin-top:0;padding:10px;border-radius:10px}.empty.compact b{font-size:11px}.empty.compact span{font-size:10px}.profileControls .toggleField{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;background:#f8fafc;border:1px solid #edf2f7;border-radius:9px;padding:8px 10px}.profileControls .toggleField span{font-size:10.5px;color:var(--muted)}.profileControls .toggleField b{font-size:11px;color:#334155}.profileControls .toggleField input{width:18px;height:18px}.profileControls .editField,.profileControls .selectField,.profileControls .sliderField,.profileControls .toggleField{min-width:0}.profileControls .sliderField{background:#f8fafc;border:1px solid #edf2f7;border-radius:9px;padding:8px 10px}.profileControls .sliderField div{display:flex;justify-content:space-between;gap:8px}.profileControls .sliderField span{font-size:10.5px;color:var(--muted)}.profileControls .sliderField b{font-size:11px;color:#0f172a}.profileControls .sliderField input[type=range]{width:100%;margin-top:8px}.profileControls .selectField{display:grid;gap:5px;background:#f8fafc;border:1px solid #edf2f7;border-radius:9px;padding:8px 10px}.profileControls .selectField span{font-size:10.5px;color:var(--muted)}.profileControls .selectField select{width:100%;border:1px solid var(--line);border-radius:7px;background:#fff;padding:6px;font:inherit;font-size:11px}.profileControls input:disabled,.profileControls select:disabled{background:#f1f5f9;color:#94a3b8;cursor:not-allowed}@media(max-width:1180px){.strategyBoundaryCard,.strategyProfilesLayout{grid-template-columns:1fr}.profileNav,.profileExplain{position:static}.profileChips{display:flex;overflow-x:auto;gap:8px;padding-bottom:2px}.profileGroups{grid-template-columns:1fr 1fr}.effectivePolicyRow{grid-template-columns:1fr 1fr}.effectivePolicyRow>div:first-child{grid-column:1/-1}.profileControls{grid-template-columns:1fr 1fr}}@media(max-width:700px){.strategyProfilesPage .summaryRow.four.strategyProfileSummary{grid-template-columns:1fr 1fr}.strategyBoundaryCard{padding:14px}.strategyBoundaryGrid{grid-template-columns:1fr}.strategyProfilesLayout{gap:12px}.profileCardHead{display:grid;grid-template-columns:1fr}.profileBadge{justify-self:start}.profileGroups,.profileControls,.effectivePolicyRow,.strategyDiagnosticsPanel .hiDetails .softBox{grid-template-columns:1fr}.strategyProfileCard,.profileNav,.profileExplain,.effectivePolicyPreview,.strategyDiagnosticsPanel{padding:14px}.profilePolicyLine{align-items:flex-start}.profilePolicyLine b{text-align:left}.effectivePolicyRow{padding:10px}.profileControls .editField,.profileControls .selectField{width:100%}.profileControls input,.profileControls select{min-height:40px}.profileChips span{white-space:nowrap}}:host{--hi-intelligence:#7c3aed;--hi-metering:#4f46e5;--hi-solar:#f59e0b;--hi-battery:#059669;--hi-consumers:#2563eb;--hi-value:#0f766e}.hiTabExperienceHeader.orange{--tab-accent:var(--hi-solar)}.hiTabExperienceHeader.green{--tab-accent:var(--hi-battery)}.hiTabExperienceHeader.blue{--tab-accent:var(--hi-consumers)}.hiTabExperienceHeader.purple{--tab-accent:var(--hi-intelligence)}.hiTabExperienceHeader .hiTabStatusIcon{color:var(--tab-accent,#2563eb);background:color-mix(in srgb,var(--tab-accent,#2563eb) 8%,white)}.productStory{border-left:4px solid var(--tab-accent,#2563eb);background:linear-gradient(110deg,color-mix(in srgb,var(--tab-accent,#2563eb) 5%,white),#fff 55%)}.productStory.orange{--tab-accent:#f59e0b}.productStory.green{--tab-accent:#059669}.productStory.blue{--tab-accent:#2563eb}.productStory.purple{--tab-accent:#7c3aed}.productStoryRecommendation{background:color-mix(in srgb,var(--tab-accent,#2563eb) 6%,white);border:1px solid color-mix(in srgb,var(--tab-accent,#2563eb) 14%,white)}.editableProperty{display:grid;grid-template-columns:minmax(150px,.75fr) minmax(220px,1.25fr);gap:12px;align-items:center;width:100%;min-width:0}.editablePropertyCopy{display:grid;gap:3px}.editablePropertyCopy>span{font-weight:750;color:var(--ink)}.editablePropertyCopy>small,.editablePropertyDisabled,.editablePropertyReadback{font-size:10px;color:#64748b;font-style:normal}.editablePropertyEditor{display:grid;gap:4px;min-width:0}.editableProperty.readonly{opacity:.78}.editableProperty .sliderField,.editableProperty .selectField,.editableProperty .toggleField,.editableProperty .editField{margin:0}.automationQuickAction .editableProperty{grid-template-columns:1fr}.automationQuickAction .editablePropertyCopy{display:none}@media(max-width:760px){.editableProperty{grid-template-columns:1fr}}.automationQuickAction{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(360px,1.2fr);align-items:center;gap:18px;border:1px solid #eadfff;border-left:4px solid var(--hi-intelligence);border-radius:14px;background:linear-gradient(120deg,#faf7ff,#fff 62%);padding:12px 14px;box-shadow:none}.automationQuickAction.solar,.automationQuickAction.intelligence{margin:0}.automationQuickAction.solar{grid-template-columns:minmax(180px,.75fr) minmax(260px,1.25fr)}.automationQuickCopy small,.portalSectionHeader small{text-transform:uppercase;letter-spacing:.12em;font-size:9px;font-weight:750;color:#7c3aed}.automationQuickCopy h2,.portalSectionHeader h2{margin:3px 0 4px}.automationQuickCopy p,.portalSectionHeader p{margin:0;color:var(--muted)}.automationQuickControl{display:grid;gap:6px;min-width:0}.automationQuickControl .segmented{justify-self:start}.automationQuickControl>span{font-size:10.5px;color:#64748b}.automationWriteState{font-weight:700;color:#6d28d9}.automationWriteState.rejected{color:#b91c1c}.automationModeSummary{display:grid;grid-template-columns:auto auto;gap:2px 10px;align-items:center;padding:11px 12px;border:1px solid #ece6f8;border-radius:13px;background:#faf8ff}.automationModeSummary span{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#7c3aed;font-weight:750}.automationModeSummary b{justify-self:end;font-size:12px}.automationModeSummary em{grid-column:1/-1;font-style:normal;font-size:10.5px;color:#64748b}@media(max-width:760px){.automationQuickAction{grid-template-columns:1fr}.automationQuickControl .segmented{width:100%}}.intelligenceControlCenter{display:grid;gap:12px}.portalSectionHeader{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.policyInfluenceChips{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}.policyInfluenceChips span{border-radius:999px;padding:5px 8px;background:#f5f3ff;color:#6d28d9;font-size:9.5px;font-weight:650}.intelligenceManagedPanel{border-top:3px solid #ede9fe}.managedAssetCard{border-left:3px solid #dbeafe;background:linear-gradient(110deg,#f8fbff,#fff 48%)}.managedAssetCard .hiDetails,.productPortalPage .hiDetails,.productStory>.hiDetails{display:none}.hiTabSimpleBadge.ok{opacity:.72}.hiTabSimpleBadge.ok:before{background:var(--tab-accent,#22c55e)}@media(max-width:700px){.automationControlHeader,.portalSectionHeader{display:grid}.automationModePill{justify-self:start}.policyInfluenceChips{justify-content:flex-start}}.decisionTransparencyPage{max-width:1500px;margin:0 auto;display:grid;grid-template-columns:1.2fr 1fr;gap:12px}.decisionReferenceCard{grid-column:1/-1}.decisionReferenceHead{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.decisionReferenceHead small{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700}.decisionReferenceHead h2{margin:4px 0 4px}.decisionReferenceHead p{margin:0;color:var(--muted)}.decisionStateBadge{border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700;white-space:nowrap}.decisionReferenceGrid,.decisionMiniGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:12px}.decisionReferenceGrid>div,.decisionMiniGrid>div{border:1px solid #e7edf3;border-radius:10px;padding:8px 9px;background:#fafcfe}.decisionReferenceGrid span,.decisionMiniGrid span{display:block;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}.decisionReferenceGrid b,.decisionMiniGrid b{display:block;font-size:12px;line-height:1.25;margin-top:3px}.policyStatusRow{display:grid;grid-template-columns:minmax(220px,1fr) repeat(3,minmax(90px,.35fr));gap:8px;align-items:center;padding:9px 0;border-top:1px solid #edf1f5}.policyStatusRow:first-of-type{border-top:0}.policyStatusRow>div:first-child span{display:block;color:var(--muted);font-size:10.5px;margin-top:2px}.policyStatusRow small{display:block;font-size:9px;color:var(--muted)}.policyStatusRow strong{display:block;font-size:11px;margin-top:2px}.planningTransparencyRow{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:9px 0;border-top:1px solid #edf1f5}.planningTransparencyRow:first-of-type{border-top:0}.planningTransparencyRow span,.planningTransparencyRow small{display:block;color:var(--muted);font-size:10.5px;margin-top:2px}.planningTransparencyRow strong{font-size:11px;white-space:nowrap}.outlookAssetPlans{grid-column:span 2}.batteryPolicyInfluence{min-height:0}@media(max-width:700px){.decisionTransparencyPage{grid-template-columns:1fr}.decisionReferenceGrid,.decisionMiniGrid{grid-template-columns:1fr 1fr}.policyStatusRow{grid-template-columns:1fr 1fr}.policyStatusRow>div:first-child{grid-column:1/-1}.outlookAssetPlans{grid-column:auto}.decisionReferenceHead{flex-direction:column}.decisionStateBadge{align-self:flex-start}}.horizonPage{max-width:1500px;margin:0 auto;display:grid;gap:var(--hi-gap)}.horizonSelector{display:grid;grid-template-columns:minmax(160px,220px) 1fr;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}.horizonSelector>div:first-child span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700}.horizonSelector>div:first-child b{display:block;font-size:14px;font-weight:650}.horizonSelector select{display:none;width:100%;min-height:40px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:8px 10px;font:inherit}.horizonButtons{justify-content:flex-start}.horizonGrid{align-items:start}.warningChips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.warningChips span{border:1px solid #f2d79b;background:#fff7e6;color:#946200;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:650}.meteringHorizon .heroPanel{text-align:left;min-height:0}.meteringHorizon .meteringGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.meteringHorizon .meteringGrid .heroPanel,.meteringHorizon .meteringGrid section:last-child{grid-column:1/-1}@media(max-width:1180px){.strategyProfileUx .strategyProfileWorkspace,.strategyProfileUx .strategyProfilePicker{grid-template-columns:1fr}.strategyProfileUx .profileExplain{position:static}.strategyProfileUx .profileSettingGrid{grid-template-columns:1fr 1fr}}@media(max-width:700px){.strategyProfileUx .profilePickCards{display:none}.strategyProfileUx .strategyProfilePicker{grid-template-columns:1fr}.strategyProfileUx .strategyProfilePicker select{display:block}.strategyProfileUx .strategyProfileWorkspace{grid-template-columns:1fr}.strategyProfileUx .profileSettingGrid{grid-template-columns:1fr}.strategyProfileUx .profileCardHead{grid-template-columns:1fr}.strategyProfileUx .profileBadge{justify-self:start}.strategyProfileUx .profileSettingGroup{padding:9px}.strategyProfileUx input,.strategyProfileUx select{min-height:42px}.strategyProfileUx .profileExplain{display:block}}.outlookPageV2{gap:12px}.outlookHeader{display:grid;grid-template-columns:minmax(220px,360px) 1fr;gap:12px;align-items:center}.outlookHeader h2{font-size:18px;line-height:1.15;margin:0 0 3px;font-weight:650}.outlookHeader p{font-size:12px;line-height:1.25;color:var(--muted);margin:0}.outlookHeader .horizonSelector{padding:8px;grid-template-columns:0 1fr;gap:0}.outlookHeader .horizonSelector>div:first-child{display:none}.outlookKpis{margin-bottom:2px}.outlookGrid{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:10px;align-items:start}.outlookHero{grid-column:1/-1;display:grid;grid-template-columns:1.2fr 1fr 1.15fr;gap:10px;align-items:stretch;min-height:0;text-align:left}.outlookHero h2{font-size:18px;margin:0 0 4px}.outlookHero p{margin:0}.outlookHeroBalance{border:1px solid #d9e8fb;background:#f3f8ff;border-radius:12px;padding:12px;display:grid;align-content:center;gap:5px}.outlookHeroBalance b{font-size:16px;font-weight:650}.outlookHeroBalance span{font-size:12px;color:var(--muted)}.outlookHeroFacts{display:grid;grid-template-columns:1fr 1fr;gap:8px}.outlookHeroFacts>div{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px}.outlookHeroFacts span{display:block;font-size:11px;color:var(--muted);margin-bottom:5px}.outlookHeroFacts b{display:block;font-size:13px;font-weight:650}.outlookLimitNotice{grid-column:1/-1;border:1px solid #f2d79b;background:#fff8e8;color:#7a5200;border-radius:10px;padding:8px 10px;font-size:11px;font-weight:600}.outlookCard,.outlookQualityCard{min-height:0}.outlookCard .empty,.outlookQualityCard .empty{margin-top:8px;border:1px dashed var(--line);background:#fbfdff;border-radius:12px;padding:12px}.outlookQualityCard .hiDetails{margin-top:8px}.outlookQualityCard .warningChips{margin:0 0 8px}.outlookQualityCard{grid-column:auto}.r3470ConsumersPage{max-width:1500px;margin:0 auto;display:grid;gap:var(--hi-gap)}.consumerMixKpis{margin-bottom:0}.consumerMixSecondary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:10px 12px}.consumerMixSecondary>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:10px;background:#fff}.consumerMixSecondary span{font-size:10.5px;color:var(--muted)}.consumerMixSecondary b{font-size:13px}.consumerMixGap{display:block;background:#fffdf7;border-color:#f2d79b;padding:10px 12px}.consumerMixGap b,.consumerMixGap span{display:block}.consumerMixGap span{font-size:11px;color:var(--muted);margin-top:3px}.consumerExplorerHeader{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,.9fr);gap:12px;align-items:start}.consumerToolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px}.consumerToolbar label{font-size:10px;color:var(--muted);display:grid;gap:4px}.consumerToolbar select{min-height:38px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:7px 9px;font:inherit}.consumerQuickFilters{grid-column:1/-1;display:flex;gap:5px;flex-wrap:wrap}.consumerQuickFilters button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 9px;font-size:10px}.consumerQuickFilters button.active{background:#eef7fd;border-color:#b8def4;color:#175f88}.consumerExplorerList{display:grid;gap:8px;margin-top:10px}.consumerExplorerCard{border:1px solid var(--line);border-radius:13px;background:#fff;padding:11px 12px}.consumerExplorerHead{display:flex;justify-content:space-between;gap:12px;align-items:start}.consumerExplorerHead h3{margin:0;font-size:15px}.consumerExplorerHead p{margin:3px 0 0;font-size:10.5px}.consumerExplorerPrimary{text-align:right}.consumerExplorerPrimary b,.consumerExplorerPrimary span{display:block}.consumerExplorerPrimary b{font-size:16px}.consumerExplorerPrimary span{font-size:10.5px;color:var(--muted);margin-top:2px}.consumerExplorerMetrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:9px 0}.consumerExplorerMetrics>div{border:1px solid #e8edf3;border-radius:9px;padding:7px 8px;background:#f9fbfd}.consumerExplorerMetrics span,.consumerExplorerStatus span{display:block;font-size:9.5px;color:var(--muted)}.consumerExplorerMetrics b,.consumerExplorerStatus b{display:block;font-size:12px;margin-top:2px}.consumerMixBar{height:8px;border-radius:999px;overflow:hidden;display:flex;background:#eef2f6;margin:8px 0 5px}.consumerMixBar .solar{background:#f2b84b}.consumerMixBar .battery{background:#65a982}.consumerMixBar .lowGrid{background:#7aa9d8}.consumerMixBar .grid{background:#b8c2cc}.consumerMixLegend{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:9.5px}.consumerMixUnavailable{border:1px dashed #d9e1ea;border-radius:9px;padding:7px 9px;color:var(--muted);font-size:10px;margin:8px 0}.consumerExplorerStatus{display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px;margin-top:9px}.consumerExplorerStatus>div{padding:7px 8px;border-top:1px solid #edf1f5}.consumerExplorerStatus small{display:block;color:var(--muted);font-size:9.5px;margin-top:2px}@media(max-width:1180px){.consumerExplorerHeader{grid-template-columns:1fr}.consumerExplorerMetrics{grid-template-columns:repeat(3,minmax(0,1fr))}.consumerMixSecondary{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.consumerMixSecondary,.consumerExplorerMetrics,.consumerExplorerStatus{grid-template-columns:1fr}.consumerExplorerHead{align-items:start}.consumerToolbar{grid-template-columns:1fr}.consumerQuickFilters{display:none}.consumerExplorerPrimary b{font-size:14px}.consumerExplorerCard{padding:10px}.consumerMixLegend{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px}.summaryRow.four.solarKpis{grid-template-columns:1fr 1fr}.summaryRow.four.solarKpis .metric{min-width:0;padding:12px}.solarDecisionUx .compactSolarPlan{grid-template-columns:1fr;padding:14px}.solarDecisionUx .compactSolarPlan .solarIntro p{margin-bottom:0}.solarDecisionUx .solarControls{grid-template-columns:1fr}.solarDecisionUx .decisionLoadsPanel{padding:12px}.solarDecisionUx .energySectionHead{gap:10px}.solarDecisionUx .sortControl{width:100%;justify-content:space-between}.solarDecisionUx .sortControl .segmented{max-width:100%;overflow-x:auto}.solarDecisionUx .decisionMainRow,.solarDecisionUx .decisionLoadCard.noWhy .decisionMainRow,.solarDecisionUx .decisionLoadCard.noEta.noWhy .decisionMainRow,.solarDecisionUx .decisionLoadCard.noExpected.noEta.noWhy .decisionMainRow{grid-template-columns:1fr 1fr;padding:12px;gap:10px}.solarDecisionUx .decisionIdentity{grid-column:1/-1}.solarDecisionUx .decisionPlan{grid-column:1/-1}.solarDecisionUx .decisionMetric,.solarDecisionUx .decisionExpected{min-width:0}.solarDecisionUx .r164GoalContext{grid-template-columns:1fr;padding:0 12px 8px;background:#fff;border-top:0}.solarDecisionUx .r164GoalContext>div{padding:7px 9px}.solarDecisionUx .decisionControlRow{grid-template-columns:1fr;padding:10px 12px;gap:12px}.solarDecisionUx .requestedSlot input[type=range]{width:100%;height:28px}.solarDecisionUx .requestedSlot .sliderField{width:100%}.solarDecisionUx .automationMini{padding-left:0;border-left:0;display:grid;grid-template-columns:1fr auto;align-items:center}.solarDecisionUx .automationMini em{grid-column:1/-1}.solarDecisionUx .decisionActions{grid-template-columns:1fr 1fr}.solarDecisionUx .decisionActions>span{display:none}.solarDecisionUx .decisionActions .hiAction{min-height:40px;font-size:12px}.solarDecisionUx .loadDetailsFull{padding:0 12px 10px}.solarDecisionUx aside{display:grid;grid-template-columns:1fr;gap:12px}.solarDecisionUx .solarSideCard{padding:14px}.solarDecisionUx .planningMiniStats{grid-template-columns:1fr 1fr}.solarDecisionUx .solarStateDecision{display:none}.panel{border-radius:12px}}@media(max-width:700px){.summaryRow,.summaryRow.four,.landing,.solarHomeIntelligence,.solarMainGrid,.r3280OutlookGrid,.bottomInsights,.batteryGrid,.consumerGrid,.strategyGrid,.flowDetailsGrid{grid-template-columns:1fr}.tabs{overflow-x:auto}.solarDecisionUx .decisionMainRow,.solarDecisionUx .decisionControlRow,.r164GoalContext{grid-template-columns:1fr}.solarDecisionUx .decisionActions{grid-template-columns:1fr 1fr}.solarDecisionUx .decisionActions>span{grid-column:1/-1}.requestedSlot{grid-template-columns:1fr}.effectiveStrategyFacts{grid-template-columns:1fr}.top{gap:10px}.panel{padding:14px}.horizonSelector{grid-template-columns:1fr}.horizonSelector .horizonButtons{display:none}.horizonSelector select{display:block}.horizonGrid,.meteringHorizon .meteringGrid{grid-template-columns:1fr}.horizonPage .heroPanel{text-align:left}.warningChips span{font-size:9.5px}.horizonPage .goalGrid{grid-template-columns:1fr}}@media(max-width:1300px){.summaryRow,.summaryRow.four,.landing,.solarHomeIntelligence,.solarMainGrid,.r3280OutlookGrid,.bottomInsights{grid-template-columns:1fr}.top{flex-direction:column}.topRight{text-align:left}.topPills{justify-content:flex-start}.tabs{overflow:auto}.heroPanel{min-height:auto}.energyScene{height:340px}.solarLoadCard{grid-template-columns:1fr}.energySectionHead{flex-direction:column}}@media(max-width:700px){.outlookHeader{grid-template-columns:1fr}.outlookHeader .horizonSelector{grid-template-columns:1fr}.outlookGrid{grid-template-columns:1fr}.outlookHero{grid-template-columns:1fr}.outlookHeroFacts{grid-template-columns:1fr}.outlookKpis{grid-template-columns:1fr}.outlookHeader .horizonSelector .horizonButtons{display:none}.outlookHeader .horizonSelector select{display:block}.outlookPageV2 .panel,.outlookPageV2 .heroPanel{padding:12px}}@media(min-width:701px) and (max-width:1180px){.outlookHeader{grid-template-columns:1fr}.outlookGrid{grid-template-columns:1fr 1fr}.outlookHero{grid-template-columns:1fr}.outlookQualityCard{grid-column:1/-1}}.scopeSelector{display:grid;grid-template-columns:minmax(140px,220px) 1fr;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 10px;min-height:44px}.scopeSelectorTitle span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700}.scopeSelectorTitle b{display:block;font-size:14px;font-weight:650}.scopeButtons{display:inline-flex;align-items:center;justify-content:flex-start;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#f8fafc;min-height:30px;width:max-content;max-width:100%}.scopeOption{appearance:none;border:0;border-right:1px solid var(--line);background:transparent;padding:8px 14px;font:inherit;font-size:11px;font-weight:600;color:#334155;cursor:pointer;line-height:1;white-space:nowrap}.scopeOption:last-child{border-right:0}.scopeOption.active{background:#eef6ff;color:#0f172a;box-shadow:inset 0 0 0 1px rgba(37,99,235,.10)}.scopeSelector select{display:none;width:100%;min-height:42px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:8px 10px;font:inherit}.outlookHeader .scopeSelector{grid-template-columns:1fr}.outlookHeader .scopeSelectorTitle{display:none}.periodMeteringHeader{display:grid;grid-template-columns:minmax(220px,360px) 1fr;gap:12px;align-items:center}.periodMeteringHeader h2{font-size:18px;line-height:1.15;margin:0 0 3px;font-weight:650}.periodMeteringHeader p{font-size:12px;line-height:1.25;color:var(--muted);margin:0}.periodMeteringHeader .scopeSelector{grid-template-columns:1fr}.periodMeteringHeader .scopeSelectorTitle{display:none}.periodMeteringPage{max-width:1500px;margin:0 auto;display:grid;gap:12px}.periodMeteringGrid{display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:10px;align-items:start}.periodMeteringHero{grid-column:1/-1;min-height:0;text-align:left}.periodWarningNotice{margin-top:8px;border:1px solid #f2d79b;background:#fff8e8;color:#7a5200;border-radius:10px;padding:8px 10px;font-size:11px;font-weight:600}.periodQualityCard .hiDetails{margin-top:8px}@media(max-width:700px){.scopeSelector{grid-template-columns:1fr}.scopeButtons{display:none}.scopeSelector select{display:block}.outlookHeader .scopeSelectorTitle,.periodMeteringHeader .scopeSelectorTitle{display:block}.periodMeteringHeader{grid-template-columns:1fr}.periodMeteringGrid{grid-template-columns:1fr}.periodMeteringKpis{grid-template-columns:1fr}.periodMeteringPage .panel,.periodMeteringPage .heroPanel{padding:12px}}@media(min-width:701px) and (max-width:1180px){.periodMeteringHeader{grid-template-columns:1fr}.periodMeteringGrid{grid-template-columns:1fr 1fr}.periodMeteringHero,.periodQualityCard{grid-column:1/-1}}.horizonPage{max-width:1500px;margin:0 auto;display:grid;gap:var(--hi-gap)}.horizonSelector{display:grid;grid-template-columns:minmax(160px,220px) 1fr;gap:10px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}.horizonSelector>div:first-child span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700}.horizonSelector>div:first-child b{display:block;font-size:14px;font-weight:650}.horizonSelector select{display:none;width:100%;min-height:40px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:8px 10px;font:inherit}.horizonButtons{justify-content:flex-start}.horizonGrid{align-items:start}.warningChips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.warningChips span{border:1px solid #f2d79b;background:#fff7e6;color:#946200;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:650}.meteringHorizon .heroPanel{text-align:left;min-height:0}.meteringHorizon .meteringGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.meteringHorizon .meteringGrid .heroPanel,.meteringHorizon .meteringGrid section:last-child{grid-column:1/-1}@media(max-width:1180px){.strategyProfileUx .strategyProfileWorkspace,.strategyProfileUx .strategyProfilePicker{grid-template-columns:1fr}.strategyProfileUx .profileExplain{position:static}.strategyProfileUx .profileSettingGrid{grid-template-columns:1fr 1fr}}@media(max-width:700px){.strategyProfileUx .profilePickCards{display:none}.strategyProfileUx .strategyProfilePicker{grid-template-columns:1fr}.strategyProfileUx .strategyProfilePicker select{display:block}.strategyProfileUx .strategyProfileWorkspace{grid-template-columns:1fr}.strategyProfileUx .profileSettingGrid{grid-template-columns:1fr}.strategyProfileUx .profileCardHead{grid-template-columns:1fr}.strategyProfileUx .profileBadge{justify-self:start}.strategyProfileUx .profileSettingGroup{padding:9px}.strategyProfileUx input,.strategyProfileUx select{min-height:42px}.strategyProfileUx .profileExplain{display:block}}.disabledAssetsSection{background:#fafbfd}.disabledAssetCard{padding:10px 12px;background:#fafbfd;border-style:solid}.disabledAssetMain{display:flex;align-items:center;justify-content:space-between;gap:14px}.disabledAssetState{text-align:right}.disabledAssetState b,.disabledAssetState span{display:block}.disabledAssetState b{font-size:12px;color:#475569}.disabledAssetState span,.disabledAssetReason{font-size:10.5px;color:var(--muted)}.disabledAssetReason{margin:7px 0 0;padding-top:7px;border-top:1px solid var(--line)}.controlAvailability{display:flex;flex-wrap:wrap;gap:5px 12px;padding:0 12px 9px;color:#9a3412;font-size:10px}.controlAvailability span{display:inline-block}.storageConsumersSection .decisionMiniGrid{display:none}@media(max-width:700px){.summaryRow.four.solarKpis{grid-template-columns:1fr 1fr}.solarDecisionUx .decisionMainRow,.solarDecisionUx .decisionLoadCard.noWhy .decisionMainRow,.solarDecisionUx .decisionLoadCard.noEta.noWhy .decisionMainRow,.solarDecisionUx .decisionLoadCard.noExpected.noEta.noWhy .decisionMainRow{grid-template-columns:1fr 1fr}.solarDecisionUx .decisionControlRow{grid-template-columns:1fr}.solarDecisionUx .r164GoalContext{grid-template-columns:1fr}.solarDecisionUx .compactSolarPlan{grid-template-columns:1fr}.solarDecisionUx .decisionActions>span{display:none}.solarDecisionUx .decisionActions .hiAction{min-height:40px}.solarDecisionUx .requestedSlot input[type=range]{width:100%}.solarDecisionUx aside{grid-template-columns:1fr}}.meteringRemediationPanel{border-color:#fed7aa;background:#fffaf5}.meteringRemediationItem{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,240px);gap:14px;align-items:start;border:1px solid #fde6c8;background:#fff;border-radius:12px;padding:12px;margin-top:10px}.meteringRemediationText h3{margin:0 0 6px;font-size:14px;font-weight:700;color:#7c2d12}.meteringRemediationText p{margin:0 0 8px;font-size:12px;color:#475569;line-height:1.35}.remediationImpact{display:grid;grid-template-columns:70px minmax(0,1fr);gap:8px;background:#fff7ed;border:1px solid #ffedd5;border-radius:9px;padding:8px;font-size:11px}.remediationImpact b{color:#9a3412}.meteringRemediationAction{display:flex;flex-direction:column;gap:6px;align-items:stretch}.meteringRemediationAction .hiAction{min-height:38px}.meteringRemediationAction small{font-size:10.5px;color:#64748b;text-align:center}.writeFeedback{margin-top:8px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;padding:6px 8px;font-size:11px;font-weight:650;color:#334155}.writeFeedback.pending,.writeFeedback.pending_verification{border-color:#fde68a;background:#fffbeb;color:#92400e}.writeFeedback.failed,.writeFeedback.blocked{border-color:#fecaca;background:#fff1f2;color:#991b1b}@media(max-width:700px){.meteringRemediationItem{grid-template-columns:1fr}.meteringRemediationAction small{text-align:left}.remediationImpact{grid-template-columns:1fr}}.tabs{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;scrollbar-width:thin;-webkit-overflow-scrolling:touch}.tab{flex:0 0 auto;min-height:44px}.consumerToolbar select,.scopeSelector select,.horizonSelector select,.meteringSortSelector select{min-height:44px}.hiAction,button,select,input{touch-action:manipulation}.consumerExplorerMetrics{grid-template-columns:repeat(3,minmax(0,1fr))}.consumerExplorerCard{overflow:hidden}.consumerExplorerHead,.consumerExplorerStatus{min-width:0}.consumerExplorerHead>*,.consumerExplorerStatus>*{min-width:0}.consumerExplorerHead h3,.consumerExplorerHead p,.consumerExplorerStatus small{overflow-wrap:anywhere}.energy{overflow-x:hidden}.panel,.heroPanel,.metric{min-width:0}@media(max-width:700px){.energy{padding:8px 8px 16px;border-radius:0}.top{margin-bottom:6px}.top h1{font-size:22px}.top p{font-size:12px}.tabs{margin:6px 0 8px;padding:3px;border-radius:9px}.tab{padding:10px 13px;font-size:12px}.summaryRow,.summaryRow.four,.summaryRow.five,.consumerMixKpis{grid-template-columns:1fr 1fr}.metric{min-height:72px}.consumerExplorerHeader{display:grid;grid-template-columns:1fr}.consumerToolbar{display:grid;grid-template-columns:1fr 1fr;width:100%}.consumerQuickFilters{grid-column:1/-1;display:flex;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.consumerQuickFilters button{flex:0 0 auto;min-height:44px}.consumerExplorerHead{grid-template-columns:minmax(0,1fr) auto;gap:8px}.consumerExplorerMetrics{grid-template-columns:1fr 1fr}.consumerExplorerStatus{grid-template-columns:1fr}.consumerMixLegend{display:grid;grid-template-columns:1fr 1fr}.consumerExplorerCard .hiDetails summary{min-height:44px;display:flex;align-items:center}.batteryGrid,.consumerGrid,.strategyGrid,.meteringGrid,.intelligenceGrid,.valueGrid,.flowCanvas,.solarMainGrid{grid-template-columns:1fr}.flowColumn,.flowCenter{min-width:0}.hiRuntimeFooter{display:flex;flex-wrap:wrap;gap:4px 6px}.kv{grid-template-columns:minmax(0,1fr) auto}.propertyRow,.commandRow,.assetRow{min-width:0}}@media(max-width:420px){.summaryRow,.summaryRow.four,.summaryRow.five,.consumerMixKpis{grid-template-columns:1fr}.consumerExplorerMetrics{grid-template-columns:1fr}.consumerToolbar{grid-template-columns:1fr}.consumerQuickFilters{grid-column:1}.consumerExplorerHead{grid-template-columns:1fr}.consumerExplorerPrimary{text-align:left}.consumerMixLegend{grid-template-columns:1fr}}.hiTabExperienceHeader{display:grid;grid-template-columns:minmax(300px,.9fr) minmax(420px,1.35fr);gap:14px;margin:0 0 18px;align-items:stretch}.hiTabStatusItem{min-width:0;padding:13px 14px;border-radius:16px;background:#f8fafc;border:1px solid #edf1f6;display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:center}.hiTabStatusIcon{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:#fff;border:1px solid #e6edf7;font-size:17px;line-height:1;color:#2563eb}.hiTabExperienceHeader.orange .hiTabStatusIcon{color:#ea580c;background:#fffaf3}.hiTabExperienceHeader.green .hiTabStatusIcon{color:#15803d;background:#f2fbf5}.hiTabExperienceHeader.purple .hiTabStatusIcon{color:#6d28d9;background:#faf7ff}.hiTabStatusItem small{font-size:11px;color:#64748b;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hiTabStatusItem b{font-size:18px;line-height:1.15;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hiTabExperienceHeader+.summaryRow{margin-top:0}@media(max-width:900px){.hiTabExperienceHeader{grid-template-columns:1fr}}@media(max-width:700px){.hiTabExperienceHeader{gap:8px;margin-bottom:10px}.hiTabStatusItem{padding:10px 11px;min-height:60px;grid-template-columns:30px minmax(0,1fr);gap:8px}.hiTabStatusIcon{width:30px;height:30px;border-radius:10px;font-size:15px}.hiTabStatusItem small{font-size:10px}.hiTabStatusItem b{font-size:16px}.hiTabExperienceHeader+.summaryRow{display:none}}@media(max-width:340px){}.hiTabExperienceHeader{display:block;margin:0 0 18px}.hiTabStatusItem{background:rgba(248,250,252,.9);min-height:70px}.hiTabExperienceHeader+.summaryRow,.solarOperationsPage>.summaryRow:first-child,.batteryPage>.summaryRow:first-child,.consumersPage>.summaryRow:first-child,.strategiesPage>.summaryRow:first-child,.intelligencePage>.summaryRow:first-child,.valuePage>.summaryRow:first-child{display:none}@media(max-width:900px){}@media(max-width:700px){.hiTabExperienceHeader{margin-bottom:10px}.hiTabStatusItem{min-height:64px}}@media(max-width:420px){}.hiTabSimpleBadge{display:inline-flex;align-items:center;gap:6px;width:max-content;max-width:220px;border-radius:999px;padding:6px 10px;background:rgba(255,255,255,.9);border:1px solid rgba(203,213,225,.9);box-shadow:0 5px 16px rgba(15,23,42,.06);font-size:11px;font-weight:700;white-space:nowrap}.hiTabSimpleBadge:before{content:"";width:7px;height:7px;border-radius:50%;background:#94a3b8;flex:0 0 auto}.hiTabSimpleBadge.ok:before{background:#22c55e}.hiTabSimpleBadge.attention:before{background:#f59e0b}.hiTabSimpleBadge.attention{color:#8a5700}.hiTabStatusItem{min-height:58px;padding:9px 11px;grid-template-columns:30px minmax(0,1fr);gap:8px}.hiTabStatusIcon{width:30px;height:30px;border-radius:9px;font-size:15px}.hiTabStatusItem small{font-size:10px}.hiTabStatusItem b{font-size:16px;margin-top:2px}.outlookSummaryStrip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 10px}.outlookSummaryStrip>div{background:#fff;border:1px solid var(--line);border-radius:11px;padding:10px 12px}.outlookSummaryStrip small{display:block;color:var(--muted);font-size:9px}.outlookSummaryStrip b{display:block;font-size:12px;margin-top:3px}.outlookThreeGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}.outlookBalanceCard{min-height:0}.outlookAggregateRow{display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line)}.outlookChildren{margin:0 0 5px 12px}.outlookChildRow{display:grid;grid-template-columns:25px minmax(0,1fr) auto;gap:7px;align-items:center;padding:6px 8px;border-left:2px solid #dbe7f3;background:#f8fbff;margin:3px 0}.outlookChildRow b{font-size:10.5px}.outlookChildRow strong{font-size:10.5px}.outlookTotalRow{display:flex;align-items:center;justify-content:space-between;border-top:2px solid #d9e2ee;margin-top:8px;padding-top:9px;font-weight:700}.outlookBalanceMeaning{display:block;margin-top:5px;color:var(--muted)}.flowProductCanvas{grid-template-columns:minmax(180px,.8fr) minmax(260px,1.1fr) minmax(220px,1fr)}.flowHomeCenter{display:flex;flex-direction:column;justify-content:center}.flowGroupNode{border:1px solid var(--line);background:#fff;border-radius:12px;padding:9px;margin-top:7px}.flowGroupHead{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:8px;align-items:center}.flowGroupHead small{display:block;color:var(--muted);font-size:9px}.flowChildRow{display:grid;grid-template-columns:25px minmax(0,1fr) auto;gap:7px;align-items:center;margin:5px 0 0 20px;padding:6px 7px;border-left:2px solid #dce8f5;background:#f8fbff}.flowChildRow b,.flowChildRow strong{font-size:10.5px}.flowChildRow small{display:block;color:var(--muted);font-size:9px}.flowConnectionsPanel{margin-top:10px}.flowConnectionsPanel .flowChildRow{margin-left:0}@media(max-width:1050px){.outlookThreeGrid{grid-template-columns:1fr 1fr}.outlookThreeGrid>section:last-child{grid-column:1/-1}.flowProductCanvas{grid-template-columns:1fr 1fr}.flowHomeCenter{grid-column:1/-1;grid-row:1}}.flowDetailsGridTwoUp{grid-template-columns:repeat(2,minmax(0,1fr))}.batteryGridTwoUp{grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr)}.disabledAssetLead{display:flex;align-items:center;gap:10px}.disabledAssetLead .solarLoadIcon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:#f4f6f8;flex:0 0 auto}.disabledAssetLead .solarLoadIcon.disabled{background:#f1f5f9;color:#64748b}.disabledAssetLead small{display:block;color:var(--muted);font-size:9.5px;margin-top:2px}@media(max-width:700px){.flowDetailsGridTwoUp,.batteryGridTwoUp{grid-template-columns:1fr}}.empty.compact{padding:10px;margin-top:6px}@media(max-width:700px){.hiTabSimpleBadge{font-size:9px;padding:4px 7px;max-width:128px}.hiTabStatusItem{min-height:54px;padding:8px 9px}}:host{--hi-page-max:1500px;--hi-hero-h-desktop:184px;--hi-hero-h-tablet:170px;--hi-hero-h-phone:148px;--hi-status-h:58px;--hi-touch:44px}@media(max-width:700px){.tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));overflow:visible;white-space:normal;gap:4px;padding:5px;scroll-snap-type:none;-webkit-overflow-scrolling:auto;overscroll-behavior:auto}.tab{width:100%;min-width:0;min-height:38px;padding:6px 3px;font-size:10px;line-height:1.05;white-space:normal;text-align:center;scroll-snap-align:none}}.energy{max-width:var(--hi-page-max);margin:0 auto;box-sizing:border-box}.tabs{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain;scroll-snap-type:none;white-space:nowrap}.tabs::-webkit-scrollbar{display:none}.tab{flex:0 0 auto;min-height:var(--hi-touch);scroll-snap-align:none}.hiTabStatusItem{min-height:var(--hi-status-h);height:var(--hi-status-h);box-sizing:border-box}.hiTabStatusItem b,.hiTabStatusItem small{min-width:0}.panel>h2+.goalGrid,.panel>p+.goalGrid{margin-top:6px}details.advanced>summary,.advanced summary{min-height:var(--hi-touch);display:flex;align-items:center;box-sizing:border-box}.hiRuntimeFooter{display:flex;flex-wrap:wrap;gap:4px 6px;line-height:1.35}/* Overview retains the agreed source → intelligence → demand model on normal tablet landscape and desktop. *//* Tablet: compact header, deliberate two-column content, no desktop overflow. */@media(min-width:701px) and (max-width:1100px){.energy{padding:16px 18px 28px}.top{margin-bottom:10px}.tabs{margin-bottom:12px}.hiTabStatusItem{padding:8px 9px}.hiTabStatusItem b{font-size:15px}.hiTabStatusItem small{font-size:9.5px}.panel{padding:13px}.flowCanvas{grid-template-columns:minmax(150px,.85fr) minmax(260px,1.2fr) minmax(150px,.85fr)}.solarMainGrid{grid-template-columns:minmax(0,1fr) minmax(250px,34%)}.valueGrid,.intelligenceGrid,.batteryGrid,.consumerGrid,.strategyGrid,.meteringGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}/* Phone: one coherent page rhythm, compact 2×2 signals and safe controls. */@media(max-width:700px){.energy{padding:10px 10px 22px;border-radius:0}.top{margin-bottom:8px}.top h1{font-size:25px}.top p{font-size:12px}.tabs{gap:2px;padding:4px;margin:5px 0 10px;border-radius:14px}.tab{padding:9px 12px;font-size:12px}.hiTabStatusItem{height:56px;min-height:56px;padding:7px 8px}.hiTabStatusItem b{font-size:15px}.hiTabStatusItem small{font-size:9px}.panel{padding:11px}.panel h2{font-size:16px}.flowCanvas{grid-template-columns:1fr}.flowCenter{order:-1;min-height:180px}.flowColumn{min-width:0}.solarMainGrid,.valueGrid,.intelligenceGrid,.batteryGrid,.consumerGrid,.strategyGrid,.meteringGrid,.flowDetailsGrid{grid-template-columns:1fr}.goalGrid{grid-template-columns:1fr}.solarLoadCard{grid-template-columns:minmax(0,1fr) auto}.solarLoadCard>*:nth-child(n/**/+3){grid-column:1/-1}.editField input,.editField select,select,button{min-height:var(--hi-touch)}.hiRuntimeFooter .runtimeStatus{flex-basis:100%}}@media(max-width:390px){.hiTabStatusItem{grid-template-columns:27px minmax(0,1fr)}.hiTabStatusIcon{width:27px;height:27px}}:host{--hi-status-h:44px}.hiTabStatusItem{height:44px;min-height:44px;padding:5px 7px;grid-template-columns:24px minmax(0,1fr);gap:6px;border-radius:10px}.hiTabStatusIcon{width:24px;height:24px;border-radius:7px;font-size:12px}.hiTabStatusItem small{font-size:8.5px;line-height:1.05;margin:0}.hiTabStatusItem b{font-size:14px;line-height:1.05;margin:1px 0 0}.hiTabStatusItem span:not(.hiTabStatusIcon){font-size:8.5px;line-height:1.05;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hiTabStatusItem .statusBadge,.hiTabStatusItem .qualityChip{font-size:7px;padding:2px 4px}.hiQuickActionItems{gap:6px}.hiQuickAction,.hiQuickSelect select,.hiQuickActionItems button{min-height:36px;height:36px;padding:6px 12px;border-radius:10px;font-size:11px}.hiUnderstandingFooter{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin-top:10px;padding:12px 14px;border-radius:14px;min-height:0}.hiUnderstandingCopy{min-width:0}.hiUnderstandingFooter small{display:block;font-size:8.5px;letter-spacing:.1em;margin:0 0 3px}.hiUnderstandingFooter h2{font-size:15px;line-height:1.25;margin:0}.hiUnderstandingFooter p{font-size:10.5px;line-height:1.3;margin:3px 0 0;color:var(--muted)}.hiUnderstandingFooter>details{margin:0;min-width:150px}.hiUnderstandingFooter>details>summary{min-height:36px;padding:7px 10px;border-radius:10px;font-size:10.5px;white-space:nowrap}.hiUnderstandingFooter>details[open]{grid-column:1/-1;width:100%;margin-top:2px}@media(max-width:700px){:host{--hi-status-h:42px}.hiTabStatusItem{height:42px;min-height:42px;padding:4px 6px;grid-template-columns:22px minmax(0,1fr);gap:5px}.hiTabStatusIcon{width:22px;height:22px;font-size:11px}.hiTabStatusItem small,.hiTabStatusItem span:not(.hiTabStatusIcon){font-size:8px}.hiTabStatusItem b{font-size:13px}.hiQuickAction,.hiQuickSelect select,.hiQuickActionItems button{height:34px;min-height:34px;padding:5px 10px}.hiUnderstandingFooter{grid-template-columns:1fr auto;padding:10px 11px;gap:8px}.hiUnderstandingFooter h2{font-size:13.5px}.hiUnderstandingFooter p{font-size:9.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.hiUnderstandingFooter>details{min-width:0}.hiUnderstandingFooter>details>summary{height:34px;min-height:34px;padding:6px 8px;font-size:0}.hiUnderstandingFooter>details>summary:after{content:"Details ›";font-size:10px}.hiUnderstandingFooter>details[open]{grid-column:1/-1}}:host{
+        --hi-type-display:clamp(26px,3vw,38px);
+        --hi-type-hero:clamp(20px,2.1vw,29px);
+        --hi-type-section:16px;
+        --hi-type-card:13px;
+        --hi-type-body:11.5px;
+        --hi-type-caption:9.5px;
+        --hi-type-footer:9px;
+        --hi-leading-tight:1.18;
+        --hi-leading-body:1.42;
+        --hi-space-xs:4px;
+        --hi-space-sm:8px;
+        --hi-space-md:12px;
+        --hi-space-lg:16px;
+      }.panel>h2,.panel>div>h2,.consumerExplorerHeader h2,.strategyTableHead h2{font-size:var(--hi-type-section);line-height:1.22;font-weight:640;letter-spacing:-.01em}.panel p,.panel>div>p{font-size:var(--hi-type-body);line-height:var(--hi-leading-body)}.panel small,.panel em{font-size:var(--hi-type-caption);line-height:1.3}.hiRuntimeFooter{margin-top:7px;padding:4px 2px;border:0;background:transparent;justify-content:center;color:#94a3b8;font-size:var(--hi-type-footer);line-height:1.2;opacity:.82}.rhiUxFooter{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:5px 10px;margin:10px 3px 0;padding:7px 4px;border:0;background:transparent;color:#64748b;font-size:11px;font-weight:520;line-height:1.35;opacity:1;white-space:normal;overflow:visible;text-overflow:clip}.rhiUxFooter>span+span:before{content:"·";margin-right:10px;color:#cbd5e1}.rhiUxFooterDetails{position:relative;margin:0}.rhiUxFooterDetails>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}.rhiUxFooterDetails>summary::-webkit-details-marker{display:none}.rhiUxFooterDetails>summary:after{content:"▾";font-size:9px;color:currentColor}.rhiUxFooterDetails[open]>summary:after{content:"▴"}.rhiUxFooterIssue{font-weight:700}.rhiUxFooterIssue.warning{color:#9a6700}.rhiUxFooterIssue.error{color:#b42318}.rhiUxFooterPanel{flex-basis:100%;width:min(720px,calc(100vw - 48px));box-sizing:border-box;margin:7px auto 2px;padding:10px 12px;border:1px solid #dbe5f0;border-radius:10px;background:#fff;color:#334155;font-size:11px;line-height:1.4;box-shadow:0 8px 20px rgba(15,23,42,.06)}.rhiUxFooterPanelMeta{font-size:10px;font-weight:650;color:#64748b;margin-bottom:6px}.rhiUxFooterProblem{display:grid;grid-template-columns:8px minmax(0,1fr);gap:7px;align-items:start;padding:3px 0}.rhiUxFooterProblemDot{width:6px;height:6px;margin-top:5px;border-radius:50%;background:#d97706}.rhiUxFooterAction{margin-top:7px;padding-top:7px;border-top:1px solid #eef2f7;color:#475569;font-weight:600}@media(max-width:700px){.rhiUxFooter{font-size:10.5px;gap:4px 8px;padding:6px 3px}.rhiUxFooter>span+span:before{margin-right:8px}.rhiUxFooterPanel{width:min(100%,calc(100vw - 28px));font-size:10.5px}}
+/* Consumers: one filter surface, compact rows, details on demand */.consumerExplorer{padding:10px}.consumerExplorerHeader{margin-bottom:6px}.consumerExplorerHeader p{margin:2px 0 0}.consumerExplorerList{display:grid;gap:5px}.consumerExplorerCard.compact{padding:0;border-radius:10px;overflow:hidden}.consumerExplorerHead{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:8px 10px;min-height:44px}.consumerExplorerHead h3{font-size:12px;line-height:1.2;margin:0 0 2px;font-weight:630}.consumerExplorerHead p{font-size:9.5px;line-height:1.25;margin:0;color:var(--muted)}.consumerReason{display:block;margin-top:3px;font-size:9px;color:#8a5b12;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.consumerExplorerPrimary{display:flex;align-items:baseline;gap:8px;text-align:right}.consumerExplorerPrimary b{font-size:13px;line-height:1}.consumerExplorerPrimary span{font-size:9.5px;color:var(--muted)}.consumerExplorerCard>.hiDetails{margin:0;border-top:1px solid var(--line)}.consumerExplorerCard>.hiDetails summary{border:0;border-radius:0;background:#fbfcfd;padding:6px 10px;font-size:9.5px}.consumerMixSecondary{padding:8px 10px;gap:8px}.consumerMixSecondary>div{padding:5px 7px}/* Strategies and Pricing: one compact set-level editor language */.strategyProfilePicker.compact{display:grid;grid-template-columns:minmax(0,1fr) minmax(190px,280px);gap:10px 16px;align-items:center;padding:11px 13px}.strategyProfilePicker.compact>small{grid-column:1/-1;margin-top:-5px;color:var(--muted);font-style:italic}.strategyProfileSelect{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:center}.strategyProfileSelect>span{font-size:9.5px;color:var(--muted)}.strategyProfileSelect select{width:100%;min-height:36px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:6px 9px;font:inherit;font-size:11px}.profilePickCards{display:none}.effectivePolicyList{display:grid;gap:5px}.effectivePolicyPreview{padding:10px}.effectivePolicyPreview>p{margin:2px 0 7px}.effectivePolicyList .propertyRow,.effectivePolicyList>article,.effectivePolicyList>div{min-height:0;padding:7px 9px;margin:0}.strategyTablePanel,.pricingStrategyPanel{padding:11px}.strategyTableRow{padding:0}.strategyPrimaryRow{grid-template-columns:minmax(130px,1fr) minmax(130px,.8fr);gap:8px 14px;padding:8px 4px}.strategyGuidance{grid-column:1/-1;color:#94a3b8;font-style:italic}/* Intelligence: fixed Risk → Recommendation → Opportunity → Readiness hierarchy */.intelligenceProductGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.intelligenceSignal{padding:14px;min-height:126px;display:flex;flex-direction:column;justify-content:flex-start}.intelligenceSignal>small{font-size:9px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);font-style:normal;margin-bottom:7px}.intelligenceSignal h2{font-size:17px;line-height:1.22;margin:0 0 6px;font-weight:650;letter-spacing:-.015em}.intelligenceSignal p{font-size:11px;line-height:1.42;margin:0;color:var(--muted)}.intelligenceSignal.recommendation{border-left:3px solid #22c55e}.intelligenceSignal.risk{border-left:3px solid #f59e0b}.intelligenceSignal.opportunity{border-left:3px solid #3b82f6}.intelligenceSignal.readiness{border-left:3px solid #8b5cf6}.intelligenceAssets{grid-column:1/-1;padding:11px}.intelligenceAssetList{display:grid;gap:5px;margin-top:7px}/* Outlook and Solar wording/content density */.outlookHeroFacts>div{padding:8px 10px}.solarPlanStats span{font-size:9.5px}.solarPlanMessage h3{font-size:15px;line-height:1.25}@media(max-width:700px){.intelligenceProductGrid{grid-template-columns:1fr;gap:7px}.intelligenceSignal{min-height:0;padding:11px}.intelligenceSignal h2{font-size:15px}.strategyProfilePicker.compact{grid-template-columns:1fr;padding:10px}.strategyProfilePicker.compact>small{grid-column:1;margin-top:0}.consumerExplorerHead{padding:7px 8px;min-height:40px}.consumerExplorerPrimary{display:grid;gap:2px}.strategyPrimaryRow{grid-template-columns:1fr}.strategyGuidance{grid-column:1}}.retrospectivePage{display:grid;gap:12px}.retroIntro{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;padding:24px;border-radius:16px;background:linear-gradient(135deg,#172554,#312e81 58%,#6d28d9);color:#fff;box-shadow:0 16px 38px rgba(49,46,129,.22)}.retroIntro small,.retroBestNext small{text-transform:uppercase;letter-spacing:.14em;font-size:10px;font-weight:800;opacity:.74}.retroIntro h2{font-size:28px;margin:5px 0 6px}.retroIntro p{max-width:680px;margin:0;color:rgba(255,255,255,.82);line-height:1.5}.retroScoreRing{width:118px;height:118px;border-radius:50%;display:grid;place-content:center;text-align:center;border:9px solid rgba(255,255,255,.22);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);background:rgba(255,255,255,.08)}.retroScoreRing strong{font-size:38px;line-height:1}.retroScoreRing span{font-size:10px;margin-top:5px;opacity:.72}.retroKpiGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.retroKpiCard{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff}.retroKpiHead{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:10px;align-items:start}.retroKpiHead>span{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:#eef2ff}.retroKpiHead h3{font-size:13px;margin:0 0 3px}.retroKpiHead p{font-size:10px;line-height:1.35;margin:0;color:var(--muted)}.retroKpiHead>strong{font-size:25px;color:#312e81}.retroProgress{height:6px;border-radius:999px;background:#eef2f7;overflow:hidden;margin:12px 0 8px}.retroProgress i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#6366f1,#8b5cf6)}.retroKpiCard footer{display:flex;justify-content:space-between;gap:8px;font-size:9px;color:var(--muted)}.retroOpportunityList{display:grid;gap:8px}.retroOpportunity{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:11px;padding:11px 12px;background:#fff}.retroOpportunityIcon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#fff7ed}.retroOpportunity h3{font-size:12px;margin:0 0 2px}.retroOpportunity p{font-size:10px;margin:0;color:var(--muted)}.retroOpportunity>strong{font-size:11px;color:#7c3aed}.retroLesson{display:grid;grid-template-columns:28px minmax(0,1fr);gap:9px;padding:10px 0;border-bottom:1px solid var(--line)}.retroLesson:last-child{border-bottom:0}.retroLesson>span{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#ecfdf5;color:#047857}.retroLesson b{font-size:12px}.retroLesson p{font-size:10px;margin:2px 0 0;color:var(--muted)}.retroBestNext{padding:22px;background:linear-gradient(135deg,#faf5ff,#eef2ff);border-color:#ddd6fe}.retroBestNext h2{font-size:22px;margin:5px 0}.retroBestNext>p{max-width:760px;color:var(--muted);line-height:1.45}.retroImpact{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:16px}.retroImpact>div{padding:10px;border-radius:10px;background:rgba(255,255,255,.72);border:1px solid rgba(124,58,237,.12)}.retroImpact span{display:block;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.retroImpact strong{display:block;font-size:14px;margin-top:3px}.retrospectivePage .portalSectionHeader>strong{font-size:12px;color:#5b21b6}@media(max-width:700px){.retroIntro{grid-template-columns:1fr;padding:18px}.retroScoreRing{width:94px;height:94px}.retroKpiGrid,.retroImpact{grid-template-columns:1fr}.retroOpportunity{grid-template-columns:32px minmax(0,1fr)}.retroOpportunity>strong{grid-column:2}.retroIntro h2{font-size:22px}}.outlookSummaryStrip{display:flex;gap:8px;flex-wrap:wrap;background:transparent;border:0;padding:0}.outlookSummaryStrip>div{flex:1 1 180px;min-height:0;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}.physicalFlowCanvas{grid-template-columns:minmax(190px,.8fr) minmax(330px,1.35fr) minmax(240px,1fr)}.physicalFlowCenter{background:linear-gradient(135deg,#eefbf6,#edf7ff);border:1px solid #d9e8e2;border-radius:14px;padding:14px}.flowArrow{text-align:center;color:#64748b;font-size:18px;line-height:1}.batteryHero{min-height:0}@media(max-width:1050px){.physicalFlowCanvas{grid-template-columns:1fr 1fr}.physicalFlowCenter{grid-column:1/-1;grid-row:1}}@media(max-width:700px){.physicalFlowCenter{grid-column:auto;grid-row:auto}}.batteryGrid.batteryGridTwoUp{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}.batteryPremium .x{}.batteryPage .summaryRow.four{margin-top:8px}.batteryGrid.batteryGridTwoUp{align-items:start}.batteryGrid.batteryGridTwoUp>.panel{min-height:0}.batteryHero{padding:18px}.batteryHero h2{font-size:18px}.batteryHero p{font-size:11px}.batteryGauge{padding:16px;border-radius:14px}.batteryGauge b{font-size:27px}.batteryGrid .kv{min-height:38px}.batteryGrid .kv span,.batteryGrid .kv b{font-size:12px}.batteryGrid .strategyTablePanel{margin-top:2px}.batteryGrid .strategyTablePanel .strategyTableRow{padding:6px 2px 5px}.batteryGrid .strategyTablePanel .strategySetting,.batteryGrid .strategyTablePanel .strategyReadValue{font-size:11px}@media(max-width:700px){}.flowProductCanvas.flowCanvas{grid-template-columns:minmax(180px,.8fr) minmax(260px,1.1fr) minmax(220px,1fr)}@media(min-width:701px) and (max-width:1050px){.outlookThreeGrid{grid-template-columns:1fr 1fr}.outlookThreeGrid>section:last-child{grid-column:1/-1}.flowProductCanvas.flowCanvas{grid-template-columns:1fr 1fr}.flowProductCanvas .flowHomeCenter{grid-column:1/-1;grid-row:1}}/* Overview Production / Consumption uniformity */
+
+/* R3.94.7 canonical core-tab stylesheet. One selector owner per component. */
+.overviewCoreGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.92fr) minmax(0,1fr);gap:10px;align-items:start}
+.overviewCorePanel{padding:14px;min-height:0}
+.overviewSectionTitle{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.overviewSectionTitle h2{margin:0;font-size:16px;line-height:1.15;font-weight:570}
+.overviewSectionTitle p{margin:2px 0 0;font-size:10.5px;line-height:1.25;color:var(--muted)}
+.overviewSectionIcon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:17px;flex:0 0 auto;background:#eff6ff;color:#2563eb}
+.overviewSectionIcon.orange{background:#fff7ed;color:#ea580c}.overviewSectionIcon.blue{background:#eff6ff;color:#2563eb}
+.overviewHouseHero{position:relative;overflow:hidden;height:250px;min-height:250px;padding:0}
+.overviewHouseHeroImage{position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,22,37,.08),rgba(10,22,37,.72)),url('/hacsfiles/rhi-energy-ux/assets/heroes/overview-hero.webp') center/cover no-repeat}
+.overviewDecisionOverlay{position:absolute;inset:auto 0 0;padding:16px;color:#fff}
+.overviewDecisionLabel{font-size:9px;font-weight:750;letter-spacing:.14em}.overviewDecisionOverlay h2{font-size:17px;line-height:1.2;margin:7px 0;color:#fff}.overviewDecisionOverlay p{font-size:10.5px;line-height:1.3;color:rgba(255,255,255,.88);margin:0 0 10px;max-width:42ch}
+.overviewDecisionFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.overviewDecisionFacts>div{background:rgba(255,255,255,.92);color:#172033;border-radius:9px;padding:7px}.overviewDecisionFacts small{display:block;color:#64748b;font-size:9px}.overviewDecisionFacts b{display:block;margin-top:2px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.overviewEnergyRow{display:grid;grid-template-columns:30px minmax(0,1fr) 82px;gap:9px;align-items:center;min-height:48px;padding:8px 9px;margin:5px 0;border:1px solid var(--line);border-radius:10px;background:#fff}
+.overviewEnergyIcon{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:#eef6ff;font-size:13px}.overviewEnergyCopy{min-width:0}.overviewEnergyCopy b{display:block;font-size:11.5px;line-height:1.2;font-weight:650}.overviewEnergyCopy small{display:block;margin-top:2px;font-size:9.5px;line-height:1.2;color:var(--muted)}.overviewEnergyRow>strong{justify-self:end;min-width:82px;text-align:right;white-space:nowrap;font-size:12px;font-weight:650;font-variant-numeric:tabular-nums}
+.overviewEnergyRow.child{margin-left:18px;border-left:2px solid #d9e7f5;background:#f8fbff}.overviewEnergyRow.aggregate{background:#fbfdff}.overviewEnergyRow.total,.overviewEnergyRow.boundary{border-width:0;border-radius:0;background:transparent}.overviewEnergyRow.total{border-top:2px solid #dbe4ef;padding-top:10px;margin-top:9px}.overviewEnergyRow.boundary{border-top:1px solid var(--line);margin-top:8px}.overviewEnergyRow.total .overviewEnergyIcon,.overviewEnergyRow.boundary .overviewEnergyIcon{visibility:hidden}.overviewEnergyRow.total .overviewEnergyCopy b,.overviewEnergyRow.total>strong{font-size:13px}.overviewEnergyRow.boundary .overviewEnergyCopy small{text-transform:uppercase;letter-spacing:.08em}
+.overviewSupportFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+.chargingConnectionGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.chargingConnectionGrid>.empty{grid-column:1/-1}
+.flowDetailsGrid.flowDetailsGridTwoUp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}.flowDetailsGrid.flowDetailsGridTwoUp>.panel{min-width:0;height:100%}
+.flowConnectionCard,.flowPhysicalConsumerCard{display:grid;grid-template-columns:auto minmax(0,1fr) 76px;align-items:center;gap:10px;min-height:64px;padding:9px 10px;margin:6px 0;border:1px solid var(--line);border-radius:10px;background:#fff;box-sizing:border-box}.flowAssetVisual{width:54px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#f5f7fa;overflow:hidden}.flowAssetVisual img{display:block;max-width:50px;max-height:42px;object-fit:contain}.flowConnectionCard>div,.flowPhysicalConsumerCard>div{min-width:0}.flowConnectionCard b,.flowPhysicalConsumerCard b{display:block;font-size:12.5px;line-height:1.2;font-weight:600}.flowConnectionCard span,.flowPhysicalConsumerCard span{display:block;margin-top:3px;font-size:10.5px;line-height:1.25;color:var(--muted);white-space:normal}.flowConnectionCard strong,.flowPhysicalConsumerCard strong{min-width:76px;text-align:right;font-size:12.5px;line-height:1.2;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.flowConnectionCard small{display:block;margin-top:4px;font-size:9.5px;color:var(--muted)}
+.batteryContributorList{display:grid;gap:10px}.batteryContributorCard{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:stretch;min-height:148px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#fff,#fbfcfe);overflow:hidden}.batteryContributorVisual{display:flex;align-items:center;justify-content:center;padding:10px;background:linear-gradient(180deg,#f7f9fb,#eef2f5);overflow:hidden}.batteryContributorVisual .assetVisual{width:88px;height:108px;max-width:88px;max-height:108px;padding:5px;box-sizing:border-box;border:0;background:transparent;overflow:hidden}.batteryContributorVisual .assetVisual img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center center}.batteryContributorBody{min-width:0;padding:13px 14px;display:flex;flex-direction:column;justify-content:center;gap:7px}.batteryContributorHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.batteryContributorHeader>div{min-width:0}.batteryContributorHeader b{display:block;font-size:14px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}.batteryContributorHeader strong{flex:0 0 auto;font-size:22px;line-height:1;font-variant-numeric:tabular-nums}.batteryHealth{display:inline-flex;margin-top:5px;padding:3px 7px;border-radius:999px;background:#eef8f2;color:#2f6d4b;font-size:10px;font-weight:700}.batteryContributorMeta{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#526178}.batteryContributorMeta b{font-size:12px;color:#172033;font-variant-numeric:tabular-nums}.batteryContributorFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.batteryContributorFacts span{min-width:0;padding:6px 7px;border-radius:8px;background:#f8fafc}.batteryContributorFacts small,.batteryContributorFacts b{display:block}.batteryContributorFacts small{font-size:8px;color:#64748b}.batteryContributorFacts b{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.batteryContributorState{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;min-width:0}.batteryContributorState span{font-size:10.5px;font-weight:700;color:#265c3b;white-space:nowrap}.batteryContributorState small{min-width:0;font-size:10px;line-height:1.25;color:var(--muted);white-space:normal}.batteryContributorCard .bar{margin-top:2px}
+@media(max-width:1050px){.overviewCoreGrid{grid-template-columns:1fr 1fr}.overviewDecisionPanel{grid-column:1/-1;grid-row:1}.chargingConnectionGrid{grid-template-columns:1fr}.batteryContributorCard{grid-template-columns:104px minmax(0,1fr)}.batteryContributorVisual .assetVisual{width:80px;height:102px;max-width:80px;max-height:102px}.batteryContributorFacts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.overviewCoreGrid,.overviewSupportFacts{grid-template-columns:1fr}.overviewDecisionPanel{grid-column:auto;grid-row:auto}.overviewHouseHero{height:220px;min-height:220px}.overviewEnergyRow{grid-template-columns:28px minmax(0,1fr) 76px}.overviewEnergyRow>strong{min-width:76px}.overviewEnergyRow.child{margin-left:12px}.batteryContributorCard{grid-template-columns:88px minmax(0,1fr);min-height:126px}.batteryContributorVisual{padding:7px}.batteryContributorVisual .assetVisual{width:68px;height:88px;max-width:68px;max-height:88px;padding:3px}.batteryContributorBody{padding:11px 12px}.batteryContributorHeader b{font-size:13px}.batteryContributorHeader strong{font-size:20px}.batteryContributorState{grid-template-columns:1fr}.batteryContributorState small{font-size:9.5px}.batteryContributorFacts{grid-template-columns:repeat(2,minmax(0,1fr))}.batteryContributorFacts span:last-child:nth-child(odd){grid-column:1/-1}}
+
+      @media(max-width:700px){.flowDetailsGrid.flowDetailsGridTwoUp,.chargingConnectionGrid{grid-template-columns:1fr}}
+
+
+`;
+    }
+  }
+
+  function installCleanEnergyCard(tag) {
+    const Existing = customElements.get(tag);
+    if (!Existing) {
+      customElements.define(tag, HomeBrainEnergyCard);
+      return true;
+    }
+    const cleanProto = HomeBrainEnergyCard.prototype;
+    for (const name of Object.getOwnPropertyNames(cleanProto)) {
+      if (name === 'constructor') continue;
+      const descriptor = Object.getOwnPropertyDescriptor(cleanProto, name);
+      Object.defineProperty(Existing.prototype, name, descriptor);
+    }
+    Existing.prototype.__cleanEnergyR3410Installed = true;
+    return true;
+  }
+
+  installCleanEnergyCard('homebrain-energy-card');
+  installCleanEnergyCard('homebrain-energy-domain-card');
+})();
