@@ -53,6 +53,13 @@ function rhiEnergyVisualCatalogForType(assetType = "") {
   return rhiEnergyVisualCatalog().filter(row => row.asset_type === type && row.selectable !== false);
 }
 
+function rhiEnergyVisualBrandsForType(assetType = "") {
+  return [...new Set(rhiEnergyVisualCatalogForType(assetType)
+    .map(row => String(row.brand || "").trim())
+    .filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+}
+
 function rhiEnergyVisualRef(entryOrId = "") {
   const id = typeof entryOrId === "object" ? String(entryOrId?.id || "") : String(entryOrId || "");
   return id ? `energy.logical.${id}` : "";
