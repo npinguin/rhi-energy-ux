@@ -3136,108 +3136,6 @@
         if (facts.length >= limit) break;
       }
       return facts;
-    }, limit = 4) {
-      const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
-      if (!id) return [];
-      const type = this.energyAssetType(asset);
-      const byType = {
-        battery:[
-          ['battery.soc_pct','State of charge'],
-          ['battery.power_kw','Power now'],
-          ['battery.available_kwh','Available energy'],
-          ['battery.capacity_kwh','Capacity'],
-          ['battery.state','State'],
-          ['battery.temperature_c','Temperature']
-        ],
-        battery_system:[
-          ['battery.soc_pct','State of charge'],
-          ['battery.power_kw','Power now'],
-          ['battery.available_kwh','Available energy'],
-          ['battery.capacity_kwh','Capacity'],
-          ['battery.reserve_target_pct','Reserve'],
-          ['battery.state','State']
-        ],
-        home_battery_system:[
-          ['battery.soc_pct','State of charge'],
-          ['battery.power_kw','Power now'],
-          ['battery.available_kwh','Available energy'],
-          ['battery.capacity_kwh','Capacity'],
-          ['battery.reserve_target_pct','Reserve'],
-          ['battery.state','State']
-        ],
-        solar_production:[
-          ['solar.power_kw','Production now'],
-          ['solar.energy_today_kwh','Produced today'],
-          ['solar.capacity_kwp','Installed capacity'],
-          ['solar.state','State']
-        ],
-        solar_array:[
-          ['solar.power_kw','Production now'],
-          ['solar.energy_today_kwh','Produced today'],
-          ['solar.capacity_kwp','Installed capacity'],
-          ['solar.state','State']
-        ],
-        solar_panel:[
-          ['solar.power_kw','Production now'],
-          ['solar.energy_today_kwh','Produced today'],
-          ['solar.state','State']
-        ],
-        solar_inverter:[
-          ['inverter.power_kw','Power now'],
-          ['solar.power_kw','Solar power'],
-          ['inverter.efficiency_pct','Efficiency'],
-          ['inverter.state','State']
-        ],
-        inverter:[
-          ['inverter.power_kw','Power now'],
-          ['solar.power_kw','Solar power'],
-          ['inverter.efficiency_pct','Efficiency'],
-          ['inverter.state','State']
-        ],
-        grid_connection:[
-          ['grid.net_power_kw','Grid power'],
-          ['grid_import.power_kw','Import'],
-          ['grid_export.power_kw','Export'],
-          ['grid.flow_direction','Direction']
-        ],
-        gas_meter:[
-          ['gas.flow_m3_h','Flow now'],
-          ['gas.total_m3','Meter total'],
-          ['gas.state','State']
-        ],
-        flexible_load:[
-          ['flexible_load.power_kw','Power now'],
-          ['flexible_load.energy_to_target_kwh','Energy needed'],
-          ['flexible_load.state','State'],
-          ['flexible_load.automation_mode','Automation']
-        ],
-        flexible_asset:[
-          ['flexible_load.power_kw','Power now'],
-          ['flexible_load.energy_to_target_kwh','Energy needed'],
-          ['flexible_load.state','State'],
-          ['flexible_load.automation_mode','Automation']
-        ],
-        consumer:[
-          ['consumer.power_kw','Power now'],
-          ['consumer.energy_today_kwh','Energy today'],
-          ['consumer.state','State']
-        ]
-      };
-      const candidates = byType[type] || [];
-      const facts = [];
-      const seen = new Set();
-      for (const [key,label] of candidates) {
-        if (seen.has(key)) continue;
-        const field = rt.assetField(id, key);
-        if (!field?.resolved) continue;
-        seen.add(key);
-        const value = field.display && field.display !== '—'
-          ? field.display
-          : (field.value === null || field.value === undefined ? '—' : `${field.value}${field.unit ? ` ${field.unit}` : ''}`);
-        facts.push({ label, value, status:field.status || field.quality || 'AVAILABLE', key });
-        if (facts.length >= limit) break;
-      }
-      return facts;
     }
 
     energyAssetAreaLabel(asset = {}) {
@@ -3304,28 +3202,6 @@
         <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
         <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div><span class="energyDeviceState">${escapeHtml(statusLabel)}</span></div>
         <div class="energyDeviceFacts">${details}${relation}</div>${actions}${this.energyAssetDetailDisclosure(rt,enriched)}</div>
-      </article>`;
-    }, roleLabel = '') {
-      const enriched = this.energyAssetContext(rt, asset);
-      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
-      const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
-      const type = String(firstDefined(enriched.asset_type,enriched.object_class,'device') || 'device');
-      const facts = this.energyAssetFacts(rt,enriched,4);
-      const projection = id ? rt.assetProjection(id) : null;
-      const lifecycle = String(firstDefined(projection?.lifecycle?.state, enriched.health, enriched.status, '') || '');
-      const availability = String(firstDefined(enriched.availability_state,enriched.connection_state,'') || '');
-      const unavailable = /unavailable|offline|disconnected|failed/i.test(`${availability} ${lifecycle}`);
-      const degraded = /degraded|warning|attention|incomplete/i.test(lifecycle);
-      const statusLabel = unavailable ? 'Unavailable' : degraded ? 'Needs attention' : lifecycle && !/unknown/i.test(lifecycle) ? human(lifecycle) : 'Available';
-      const area = this.energyAssetAreaLabel(enriched);
-      const actions = this.assetQuickActions(rt,id,3);
-      const details = facts.length
-        ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
-        : `<span><small>Status</small><b>${escapeHtml(statusLabel)}</b></span>`;
-      return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
-        <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
-        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div><span class="energyDeviceState">${escapeHtml(statusLabel)}</span></div>
-        <div class="energyDeviceFacts">${details}</div>${actions}${this.energyAssetDetailDisclosure(rt,enriched)}</div>
       </article>`;
     }
 
