@@ -67,9 +67,9 @@ const planning = method("planning");
 assert.match(planning, /this\.assetVisual\(item\.asset/);
 
 const connector = method("connectorCard");
-assert.match(connector, /resolveEnergyVisualRef\(charger\.visual_ref\)/);
+assert.match(connector, /rt\.resolveVisualRef\(charger\.visual_ref, 'card'\)/);
 const flowConsumer = method("consumerCard");
-assert.match(flowConsumer, /resolveEnergyVisualRef\(consumer\.visual_ref\)/);
+assert.match(flowConsumer, /rt\.resolveVisualRef\(consumer\.visual_ref, 'card'\)/);
 
 const battery = method("batteryChildCard");
 assert.match(battery, /this\.assetVisual\(asset/);
