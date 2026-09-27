@@ -1,13 +1,16 @@
-# v4.2.7 — Gas hero binary integrity TEST CANDIDATE
+# v4.2.8 — Frontend convergence and Gas hero identity TEST CANDIDATE
 
-This hotfix preserves the 4.2.6 UX-detail closure and fixes the remaining Gas hero rendering failure.
+This candidate closes the remaining structural frontend cleanup before runtime qualification.
 
-- replaces the corrupt file that carried a `.webp` extension without valid WebP bytes;
-- packages the approved Gas hero as a real RIFF/WEBP image;
-- adds a release-blocking magic-byte check so an invalid WebP cannot pass validation again;
-- preserves the 4.2.6 single page-controls surface, Hero → Status → Page Controls → Body order and richer physical-device detail context;
-- keeps runtime truth backend-owned and does not invent missing telemetry.
+- binds the Gas page to a new immutable `gas-page-hero-v2.svg` asset carrying the approved photographic Gas hero, separate from gas-meter device visuals;
+- removes legacy `hiTab*` and `hiQuickAction*` shared presentation authority from Energy;
+- replaces historical r326/r346 release-era class names with semantic domain names;
+- removes all remaining `!important` declarations from `src/app/energy-card.js`;
+- closes the UX debt ratchet at zero so these presentation layers cannot return;
+- keeps Hero → Status → Page Controls → Body owned by RHI UX Core 1.4.1;
+- clarifies RHI UX Core as the sole company-branding authority;
+- keeps Energy meaning, totals, planning and command truth backend-owned.
 
-Rollback: v4.2.6.
+Rollback: v4.2.7.
 
-Target Home Assistant render, iPad/desktop proof, functional journey, refresh/restart, upgrade and rollback proof remain separate runtime qualification gates.
+Target Home Assistant HACS install, desktop/iPad rendering, live contracts, write/readback, refresh, upgrade and rollback remain mandatory runtime qualification gates before stable promotion.

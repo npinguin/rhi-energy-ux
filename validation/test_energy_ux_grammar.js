@@ -23,6 +23,9 @@ for (const token of [
   'id:"retrospective", label:"Retrospective"'
 ]) assert.ok(presentation.includes(token), "missing existing tab "+token);
 
+assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v2.svg"'), "Gas page must use immutable photographic hero v2");
+assert.ok(!presentation.includes('gas: "heroes/gas-hero.webp"'), "legacy Gas page hero mapping must not return");
+
 assert.match(header,/metrics = \[\],[\s\S]*contextControls = "",[\s\S]*commandActions = ""/);
 assert.match(header,/rhiUxQuickActionBar/);
 assert.ok(app.includes("contextControls:this.pageContextControls(rt, tab)"));

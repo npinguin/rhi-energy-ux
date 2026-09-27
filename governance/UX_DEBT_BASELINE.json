@@ -2,13 +2,13 @@
   "schema_version": 1,
   "owner": "rhi-energy-ux",
   "scope": "src/app/energy-card.js",
-  "rationale": "Temporary ratchet while legacy Energy presentation layers are removed. Counts may decrease but must not increase.",
+  "rationale": "Closed baseline after Core convergence. Legacy shared Hero/Status/Quick Action authority, release-era r326/r346 class names and !important declarations are forbidden.",
   "maximums": {
-    "important_declarations": 5059,
-    "legacy_hiTabHero_mentions": 112,
-    "legacy_hiTabStatusGrid_mentions": 32,
-    "legacy_hiQuickActionBar_mentions": 28,
-    "historical_r326_mentions": 105,
-    "historical_r346_mentions": 154
+    "important_declarations": 0,
+    "legacy_hiTabHero_mentions": 0,
+    "legacy_hiTabStatusGrid_mentions": 0,
+    "legacy_hiQuickActionBar_mentions": 0,
+    "historical_r326_mentions": 0,
+    "historical_r346_mentions": 0
   }
 }

@@ -37,8 +37,7 @@ for forbidden in (
     if forbidden in APP:
         errors.append(f"legacy mixed page-control authority remains: {forbidden}")
 
-# Legacy presentation selectors may remain temporarily as CSS debt, but no
-# renderer may create new legacy structural markup.
+# Legacy presentation authority is closed. Neither rendering nor stylesheet debt may reappear.
 for legacy_class in ("hiTabHero", "hiTabStatusGrid", "hiQuickActionBar"):
     if re.search(r'class=[\"\'][^\"\']*' + re.escape(legacy_class), APP):
         errors.append(f"legacy structural markup rendered: {legacy_class}")
@@ -64,8 +63,7 @@ for selector in (".rhiUxPageHero{", ".rhiUxStatusGrid{", ".rhiUxQuickActionBar{"
     if selector in PRESENTATION:
         errors.append(f"Energy redefines Core-owned selector: {selector}")
 
-# Ratchet historical CSS/release-evolution debt. This is intentionally a
-# maximum-only baseline: cleanup may reduce counts without governance edits.
+# Closed presentation debt baseline. All historical/shared-authority counters are zero and must stay zero.
 maxima = BASELINE["maximums"]
 counts = {
     "important_declarations": APP.count("!important"),
@@ -77,8 +75,8 @@ counts = {
 }
 for key, actual in counts.items():
     maximum = int(maxima[key])
-    if actual > maximum:
-        errors.append(f"UX debt increased: {key} {actual} > baseline {maximum}")
+    if actual != maximum:
+        errors.append(f"UX debt baseline violated: {key} {actual} != required {maximum}")
 
 if errors:
     raise SystemExit("\n".join(errors))
