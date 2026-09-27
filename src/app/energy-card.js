@@ -3999,7 +3999,7 @@
     strategyTable(rt, profile = {}, options = {}) {
       const id = String(profile.profile_id || options.profileId || 'strategy_profile');
       const rows = this.profileEditableRows(rt, profile);
-      const editing = this.strategyEditProfileId === id;
+      const editing = options.alwaysEditable === true || this.strategyEditProfileId === id;
       const changed = rows.filter(row => Object.prototype.hasOwnProperty.call(this.editDrafts, String(row.key || row.property_key || row.field_key || '')));
       const title = options.title || this.profileUserLabel(profile);
       const description = options.description || this.profileUserDescription(profile);
@@ -4013,7 +4013,7 @@
         return `<div class="strategyTableRow${changedClass}"><div class="strategyPrimaryRow"><span class="strategySetting">${escapeHtml(label)}</span><div class="strategyValue">${value}</div></div>${guidance}</div>`;
       }).join('');
       const actions = editing
-        ? `<span class="strategyChangeCount">${changed.length ? `${changed.length} changed` : 'No changes'}</span><button class="strategyTextAction" data-strategy-cancel="${escapeHtml(id)}">Cancel</button><button class="strategySaveAction" data-strategy-save="${escapeHtml(id)}"${changed.length ? '' : ' disabled'}>Save</button>`
+        ? `<span class="strategyChangeCount">${changed.length ? `${changed.length} changed` : 'No changes'}</span><button class="strategyTextAction" data-strategy-cancel="${escapeHtml(id)}">Discard</button><button class="strategySaveAction" data-strategy-save="${escapeHtml(id)}"${changed.length ? '' : ' disabled'}>Save</button>`
         : `<button class="strategyTextAction" data-strategy-edit="${escapeHtml(id)}"${rows.length ? '' : ' disabled'}>Edit</button>`;
       return `<section class="panel strategyTablePanel"><div class="strategyTableHead"><div><h2>${escapeHtml(title)}</h2>${description ? `<p>${escapeHtml(description)}</p>` : ''}</div><div class="strategySetActions">${actions}</div></div><div class="strategyTable"><div class="strategyColumnHead"><span>Setting</span><span>Value</span></div>${rowHtml || `<div class="profileNoControls">No editable strategy settings are published.</div>`}</div>${options.details || ''}</section>`;
     }
@@ -4030,7 +4030,7 @@
     strategyProfileCard(rt, profile = {}) {
       const id = profile.profile_id || 'strategy_profile';
       const details = this.componentDetailsBlock(`strategy-profile-${id}-details`, 'Diagnostics', `${this.kv('Profile id', id)}${this.kv('Raw profile type', profile.profile_type || profile.asset_type || '—')}${this.kv('Editable fields published', String(this.profileEditableRows(rt, profile).length))}${this.kv('Contract role', profile.contract_role || 'editable_strategy_profile')}${this.kv('Planning outcome source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning')}${this.kv('Command source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.commands')}${this.kv('Engineer reason', human(profile.engineer_reason || '—'))}`);
-      return this.strategyTable(rt, profile, { details });
+      return this.strategyTable(rt, profile, { details, alwaysEditable:true });
     }
     effectivePolicyPreviewCard(rt, strategy = {}) {
       const assetId = strategy.asset_id || strategy.target_asset_id || '';
@@ -4325,7 +4325,16 @@
         : effectiveStrategies;
       const effectiveRows = (effectiveRowsForProfile.length ? effectiveRowsForProfile : effectiveStrategies).map(strategy => this.effectivePolicyPreviewCard(rt, strategy)).join('');
       const diagnostics = `${this.kv('Editable strategy source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy')}${this.kv('Effective context source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy.effective_properties')}${this.kv('Planning outcome source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning')}${this.kv('Explanation source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.intelligence')}${this.kv('Action source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.commands')}${this.kv('Selected profile', selectedId || 'None')}`;
+      const automationRow = rt.editableProperty('energy.automation_mode') || rt.row('energy.automation_mode');
+      const automationMode = rowValue(automationRow, this.energyAutomationMode(rt,d) || 'automatic');
+      const automationOptions = allowedValuesForRow(automationRow).length
+        ? allowedValuesForRow(automationRow).map(value => ({ value, label:this.productStateLabel(value,human(value)), attrs:{'data-mode-value':value,'data-property-key':'energy.automation_mode'} }))
+        : ['automatic','advice','disabled'].map(value => ({ value, label:this.productStateLabel(value,human(value)), attrs:{'data-mode-value':value,'data-property-key':'energy.automation_mode'} }));
+      const automationControl = this.isWritableRow(automationRow)
+        ? this.componentSegmentedControl(automationOptions, automationMode, 'automationModeControl')
+        : `<div class="profileNoControls">Automation mode is not writable in the current public contract.</div>`;
       return `${this.tabExperienceHeader(rt,'strategies',pageVm)}<div class="strategiesPage strategyProfilesPage strategyProfileUx">
+        <section class="panel strategyAutomationMode"><div><h2>Automation mode</h2><p>Choose how Home Intelligence may act. The configured value is written through the canonical Energy property interface and confirmed by readback.</p></div>${automationControl}${this.editablePropertyFeedback(automationRow)}</section>
         ${profilePicker || `<section class="panel"><h2>No strategy profiles published</h2><p>Waiting for canonical V2 strategy configuration.</p></section>`}
         <div class="profileEditorColumn">${selected ? this.strategyProfileCard(rt, selected) : ''}</div>
         <section class="panel effectivePolicyPreview"><h2>Current policy effect${selected ? ` · ${escapeHtml(this.profileUserLabel(selected))}` : ''}</h2><p>Configured, effective and influencing policy state.</p><div class="effectivePolicyList">${effectiveRows || `<div class="empty"><b>No effective strategy published</b><span>Waiting for canonical V2 effective strategy.</span></div>`}</div></section>
@@ -4524,7 +4533,8 @@
       const { label, rows, conclusion, command, flexibleLoadRows = [] } = vm;
       const action = command ? this.componentActionButton(command, `Reset ${label.toLowerCase()} totals`, 'metering') : '';
       const group = (title, values) => this.meteringClusterCard(title, values || [], title==='Supply'?'Energy received during this period.':title==='Demand'?'Energy used during this period.':title==='Grid'?'Energy exchanged with the grid.':'Home Battery energy during this period.');
-      return `<div id="metering-body" class="meteringPage productPortalPage">${this.productStoryCard({ eyebrow:`${label} measurements`, title:conclusion.title, why:conclusion.why, recommendation:conclusion.recommendation, actions:action, details:'', tone:conclusion.tone })}<div class="meteringGrid productMeteringGrid">${group('Supply',rows.supply)}${group('Demand',rows.demand)}${group('Grid',rows.grid)}${group('Home Battery',rows.battery)}</div>${this.flexibleLoadMeteringTable(this.runtime(), flexibleLoadRows, label)}</div>`;
+      const selector = this.componentPeriodSelector(vm.periods, vm.periodId, 'metering-period');
+      return `<div id="metering-body" class="meteringPage productPortalPage"><section class="panel compact meteringPeriodControl"><div><h2>Measurement period</h2><p>Select the period used for Metering and persist it as the Energy metering context.</p></div>${selector}${this.editablePropertyFeedback(this.runtime().row('metering.selected_period'))}</section>${this.productStoryCard({ eyebrow:`${label} measurements`, title:conclusion.title, why:conclusion.why, recommendation:conclusion.recommendation, actions:action, details:'', tone:conclusion.tone })}<div class="meteringGrid productMeteringGrid">${group('Supply',rows.supply)}${group('Demand',rows.demand)}${group('Grid',rows.grid)}${group('Home Battery',rows.battery)}</div>${this.flexibleLoadMeteringTable(this.runtime(), flexibleLoadRows, label)}</div>`;
     }
     meteringNotPublishedPeriod(periods, remediation = null) {
       const selected = this.selectedPeriod(periods, this.selectedMeteringPeriodId) || { period_id:this.selectedMeteringPeriodId || 'week', label:human(this.selectedMeteringPeriodId || 'Period') };
@@ -4534,7 +4544,8 @@
       const title = remediation ? `${label} totals need a one-time reset` : `${label} totals are being prepared`;
       const why = remediation ? `Home Intelligence found measurements for ${label.toLowerCase()}, but the starting point cannot yet be trusted.` : `Reliable ${label.toLowerCase()} totals are not available yet.`;
       const recommendation = remediation ? `Reset once. Home Intelligence will confirm the new baseline while keeping the measured values visible.` : `${label} measurements are currently unavailable. They will appear when the contract publishes them.`;
-      return `<div class="meteringPage productPortalPage">${this.productStoryCard({ eyebrow:`${label} measurements`, title, why, recommendation, actions:action, tone:remediation?'orange':'blue' })}</div>`;
+      const selector = this.componentPeriodSelector(periods, selected.period_id || this.selectedMeteringPeriodId || 'today', 'metering-period');
+      return `<div class="meteringPage productPortalPage"><section class="panel compact meteringPeriodControl"><div><h2>Measurement period</h2><p>Select the period even while totals are still being prepared.</p></div>${selector}${this.editablePropertyFeedback(this.runtime().row('metering.selected_period'))}</section>${this.productStoryCard({ eyebrow:`${label} measurements`, title, why, recommendation, actions:action, tone:remediation?'orange':'blue' })}</div>`;
     }
     metering(rt) {
       const pageVm = this.buildPageViewModel(rt, 'metering');
