@@ -38,17 +38,26 @@ function readEnergyPublicV2(gateway) {
     const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {value:raw};
     const resolution = source.resolution && typeof source.resolution === 'object' ? source.resolution : {};
     const value = source.value !== undefined ? source.value : null;
-    const status = String(source.status || source.availability || resolution.status || (value !== null ? 'AVAILABLE' : 'UNAVAILABLE')).toUpperCase();
-    const quality = String(source.quality || (status === 'AVAILABLE' ? 'CANONICAL' : 'UNKNOWN')).toUpperCase();
-    const resolved = status === 'AVAILABLE' && value !== null && !['INVALID','STALE'].includes(quality);
+    const sourceStatus = String(source.status || '').toUpperCase();
+    const resolutionStatus = String(resolution.status || '').toUpperCase();
+    const availability = String(
+      source.availability
+      || (['AVAILABLE','UNAVAILABLE'].includes(sourceStatus) ? sourceStatus : '')
+      || (resolutionStatus === 'RESOLVED' ? 'AVAILABLE' : resolutionStatus === 'UNAVAILABLE' ? 'UNAVAILABLE' : '')
+      || (value !== null ? 'AVAILABLE' : 'UNAVAILABLE')
+    ).toUpperCase();
+    const quality = String(source.quality || resolution.quality || (availability === 'AVAILABLE' ? 'CANONICAL' : 'UNKNOWN')).toUpperCase();
+    const resolved = availability === 'AVAILABLE' && value !== null && !['INVALID','STALE','NOT_ASSESSED'].includes(quality);
     return Object.freeze({
       resolved,
       value,
       display:String(source.display ?? source.display_value ?? (value ?? '—')),
       unit:String(source.unit || ''),
-      state:status.toLowerCase(),
-      status,
+      state:availability.toLowerCase(),
+      status:availability,
       quality,
+      normalization_status:sourceStatus && !['AVAILABLE','UNAVAILABLE'].includes(sourceStatus) ? sourceStatus : '',
+      resolution_status:resolutionStatus,
       reason:String(source.reason || resolution.reason_code || source.reason_code || source.reason_text || ''),
       source:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
       editable:source.write_supported === true || source.editable === true,
