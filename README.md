@@ -11,7 +11,7 @@ Public GPL-3.0-only Home Assistant dashboard package for **Robotix Home Intellig
 
 The backend owns Energy semantics. The UX renders backend-owned public contracts and never invents the backend version.
 
-Company branding is source-owned at `src/assets/branding/company-logo.svg`. Branding tests own artwork and cache-safe delivery; layout/navigation owns header-slot geometry. Footer tests do not assert logo transport. The build mirrors the canonical asset tree byte-for-byte to `dist/assets`; runtime code must not redraw, recolour, filter or synthesize the mark.
+Company branding is owned by RHI UX Core and bundled from the pinned Core snapshot; Energy does not maintain a second branding authority. Energy asset packaging is limited to domain-specific imagery. Runtime code must not redraw, recolour, filter or synthesize the company mark.
 
 ## Install with HACS
 
