@@ -25,10 +25,12 @@ for (const token of [
 
 assert.match(header,/metrics = \[\],[\s\S]*contextControls = "",[\s\S]*commandActions = ""/);
 assert.match(header,/rhiUxQuickActionBar/);
-assert.ok(app.includes("contextControls:this.pageContextControls(rt, tab)"));\nassert.ok(app.includes("commandActions:this.pageQuickActions(rt, tab)"));
+assert.ok(app.includes("contextControls:this.pageContextControls(rt, tab)"));
+assert.ok(app.includes("commandActions:this.pageQuickActions(rt, tab)"));
 assert.ok(app.includes("pageQuickActions(rt, tab)"));
 assert.ok(!app.includes("${this.quickActionBar(rt, this.view)}"));
-assert.match(app,/pageContextControls\(rt, tab\)/);\nassert.match(app,/return controls;/);
+assert.match(app,/pageContextControls\(rt, tab\)/);
+assert.match(app,/return controls;/);
 assert.match(app,/publishedById = new Map/);
 assert.match(app,/energyAssetDetailDisclosure/);
 assert.match(app,/planningContextPanel/);
