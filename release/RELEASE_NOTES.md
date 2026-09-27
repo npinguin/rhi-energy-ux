@@ -1,13 +1,16 @@
-# v4.2.7 — Gas hero binary integrity TEST CANDIDATE
+# v4.2.8 — Gas hero design authority and frontend governance TEST CANDIDATE
 
-This hotfix preserves the 4.2.6 UX-detail closure and fixes the remaining Gas hero rendering failure.
+This candidate uses the approved photographic Gas page hero supplied for Energy and tightens frontend ownership rules.
 
-- replaces the corrupt file that carried a `.webp` extension without valid WebP bytes;
-- packages the approved Gas hero as a real RIFF/WEBP image;
-- adds a release-blocking magic-byte check so an invalid WebP cannot pass validation again;
-- preserves the 4.2.6 single page-controls surface, Hero → Status → Page Controls → Body order and richer physical-device detail context;
-- keeps runtime truth backend-owned and does not invent missing telemetry.
+Changes:
+- adds the approved wide Gas hero as a new immutable `gas-page-hero-v2.webp` asset;
+- maps the Gas page explicitly to the new page-level hero and removes the legacy Gas page hero from page resolution;
+- keeps gas-meter/device visuals separate from page-hero presentation;
+- adds release-blocking checks for the canonical Gas hero mapping and packaged asset;
+- clarifies that Robotix branding is owned by RHI UX Core and must not become a second domain authority;
+- preserves the Core-owned Hero → Status → Page Controls → Body grammar and backend-owned Energy semantics;
+- keeps HACS delivery on the immutable tagged `dist/` tree with no publication rebuild.
 
-Rollback: v4.2.6.
+Rollback: v4.2.7.
 
-Target Home Assistant render, iPad/desktop proof, functional journey, refresh/restart, upgrade and rollback proof remain separate runtime qualification gates.
+Target Home Assistant desktop/iPad rendering, functional journeys, refresh/restart, upgrade and rollback proof remain separate runtime qualification gates.
