@@ -39,23 +39,25 @@ assert.match(solar,/solarEnergyStory/);
 assert.match(solar,/solarHardwareExperience/);
 assert.doesNotMatch(solar,/solarOperationalExecutionPanel/);
 
-for (const phrase of ["Solar zones","Inverter system","Battery system","Other published hardware"]) {
+for (const phrase of ["Solar production","Inverter system","Home Battery","Other published hardware"]) {
   assert.ok(app.includes(phrase), "missing Solar hierarchy section "+phrase);
 }
 assert.match(app,/energyAssetParentId/);
 assert.match(app,/energyAssetDetailDisclosure/);
 assert.match(app,/Missing publication fields/);
-assert.match(app,/Aggregate storage state with the physical batteries shown underneath/);
+assert.match(app,/Storage system with its physical batteries/);
 const hardwareStart = app.indexOf("\n    solarHardwareExperience(rt)");
 const hardwareEnd = app.indexOf("\n    solarEnergyStory(rt)", hardwareStart);
 const hardware = app.slice(hardwareStart, hardwareEnd);
 assert.ok(hardware.indexOf("solarInverterSystem") < hardware.indexOf("solarBatterySystem"), "inverters must precede battery system");
-assert.ok(hardware.indexOf("solarBatterySystem") < hardware.indexOf("'Solar zones'"), "battery system must precede solar zones");
+assert.match(hardware,/stringsForInverter/);
+assert.match(hardware,/unassignedArrays/);
+assert.doesNotMatch(hardware,/'Solar zones'/);
 assert.match(app,/solarModuleCard/);
 assert.match(app,/solarOptimizerPrimaryCard/);
 assert.match(app,/POWER OPTIMIZER/);
-assert.match(app,/Primary solar production and optimizer status for this zone/);
-assert.match(app,/optimizerByPanel/);
+assert.match(app,/SOLAR STRING/);
+assert.match(app,/Panels without optimizer publication/);
 assert.doesNotMatch(app,/No panels linked to this zone/);
 assert.doesNotMatch(app,/No modules linked/);
 assert.doesNotMatch(app,/Optimizers without panel relationship/);
