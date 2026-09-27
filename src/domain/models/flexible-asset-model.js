@@ -70,23 +70,30 @@
       const id = String(firstDefined(asset.asset_id, asset.flexible_asset_id, asset.target_asset_id, ''));
       const planning = this.planningFor(id);
       const context = this.assetContext(asset);
-      const participation = this.participationState(asset, planning);
+      // Materialize one UX asset from two canonical views of the same V2 object:
+      // core.flexible.assets owns participation/planning semantics, while objects[]
+      // carries richer producer identity such as visual_ref and charger linkage.
+      // No semantic inference or cross-domain lookup is performed here.
+      const materialized = context.asset
+        ? { ...context.asset, ...asset, asset_id:id }
+        : { ...asset, asset_id:id };
+      const participation = this.participationState(materialized, planning);
       return {
         id,
-        raw: asset,
+        raw: materialized,
         planning,
         profile: context.profile,
-        profileId: String(context.asset?.profile_id || context.profile?.profile_id || ''),
+        profileId: String(materialized.profile_id || context.profile?.profile_id || ''),
         publication: context.publication,
-        visualRef: String(firstDefined(context.asset?.visual_ref, asset.visual_ref, '') || ''),
+        visualRef: String(firstDefined(materialized.visual_ref, '') || ''),
         visual: typeof resolveEnergyVisualRef === 'function'
-          ? resolveEnergyVisualRef(firstDefined(context.asset?.visual_ref, asset.visual_ref, ''))
+          ? resolveEnergyVisualRef(firstDefined(materialized.visual_ref, ''))
           : null,
         publicationGap: typeof energyAssetPublicationGap === 'function'
           ? energyAssetPublicationGap(this.runtime.contractGateway(), id)
           : { status:'unavailable', missing:[] },
         participation,
-        operation: this.operationalState(asset, planning),
+        operation: this.operationalState(materialized, planning),
         isStorage: participation === 'storage',
         isDisabled: participation === 'disabled',
         isParticipating: participation === 'participating' || participation === 'temporarily_unavailable',
