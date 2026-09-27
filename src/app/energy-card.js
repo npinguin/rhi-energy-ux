@@ -873,22 +873,27 @@
     }
     meteringPeriods() {
       if (this._meteringPeriods) return this._meteringPeriods;
-      const periods=objectFrom(this.publicV2().valueAccounting?.periods || {});
-      const labels={today:'Today',day:'Today',week:'This week',month:'This month',year:'This year'};
-      const order={today:1,day:1,week:2,month:3,year:4};
-      this._meteringPeriods=Object.keys(periods).map(period_id=>{
+      const v2=this.publicV2();
+      const periods=objectFrom(v2.metering?.periods || {});
+      const labels={hour:'This hour',today:'Today',day:'Today',week:'This week',month:'This month',year:'This year'};
+      const order={hour:0,today:1,day:1,week:2,month:3,year:4};
+      this._meteringPeriods=Object.entries(periods).map(([period_id,raw])=>{
         const id=String(period_id).toLowerCase();
+        const row=objectFrom(raw);
         return {
-          entity_id:this.publicV2().envelope.entityId,
+          entity_id:v2.envelope.entityId,
           period_id:id,
           label:labels[id] || human(id),
-          selector_order:order[id] || 99,
+          selector_order:order[id] ?? 99,
           graph_support:false,
           bucket_support:false,
-          measurement_state:'UNAVAILABLE',
-          reason:'Canonical metering energy is not published by the current public contract.'
+          ...row,
+          summary:objectFrom(row.summary),
+          measurement_state:String(firstDefined(row.measurement_state,row.availability,'UNAVAILABLE')),
+          quality:String(firstDefined(row.quality,row.summary?.quality?.period,'UNKNOWN')),
+          user_action_required:asBool(firstDefined(row.user_action_required,row.baseline_reset_required,false),false)
         };
-      }).sort((a,b)=>(a.selector_order||99)-(b.selector_order||99));
+      }).sort((a,b)=>(a.selector_order??99)-(b.selector_order??99));
       return this._meteringPeriods;
     }
     valuePeriods() {
@@ -2105,7 +2110,11 @@
         const direct = directFacts[spec.id];
         const value = published !== undefined && published !== null ? published : (rowVal !== null ? rowVal : direct);
         const configured = asNumber(value) !== null || (value !== undefined && value !== null && value !== '');
-        return { ...spec, row, value, configured, writable: !!spec.input && row ? this.isWritableRow(row) : false, pricingMode:this.pricingMode(rt) };
+        const pricingConfig=objectFrom(rt.publicV2().configuration?.pricing || {});
+        const blockers=new Set(asArray(pricingConfig.blocking_property_ids).map(String));
+        const propertyId=String(firstDefined(row?.property_id,row?.property_key,row?.key,'') || '');
+        const required=propertyId ? blockers.has(propertyId) : false;
+        return { ...spec, required, row, value, configured, writable: !!spec.input && row ? this.isWritableRow(row) : false, pricingMode:this.pricingMode(rt), accountingMode:String(pricingConfig.accounting_mode || '') };
       });
     }
     valuePeriodContext(rt) {
@@ -2139,7 +2148,8 @@
         currency, net, importCost, exportRevenue, netEnergyCost,
         savings:null, avoided:null, selfConsumption:null, breakdown:{}, consumers:[],
         interpretation, attention, reason:String(summary.reason || ''),
-        tariffs:this.valueTariffRows(rt, {}), accountingReady, pricingComplete:true
+        tariffs:this.valueTariffRows(rt, {}), accountingReady,
+        pricingComplete:objectFrom(rt.publicV2().configuration?.pricing || {}).accounting_configuration_complete === true
       };
     }
 
@@ -2155,13 +2165,21 @@
       const requested = String(this.selectedMeteringPeriodId || rt.value('metering.selected_period','today') || 'today').toLowerCase();
       const periodId = requested === 'day' ? 'today' : requested;
       const period = byPeriodId.get(periodId) || { period_id:periodId, label:this.periodLabel({ period_id:periodId }), graph_support:false, bucket_support:false };
-      const rawPeriod={};
-      const effectivePeriod={ ...period, summary:{ ...(period.summary || {}), measured:{}, quality:{ period:'UNAVAILABLE' } } };
+      const rawPeriod=objectFrom(period);
+      const summary=objectFrom(rawPeriod.summary);
+      const measured=objectFrom(summary.measured);
+      const qualityPayload=objectFrom(summary.quality);
+      const effectivePeriod={ ...rawPeriod, summary:{ ...summary, measured, quality:qualityPayload } };
       const flexibleLoadRows = this.flexibleLoadMeteringRows(rt, periodId);
       const rows = this.meteringRowsFromPeriod(effectivePeriod);
       const recordsHaveValues = this.meteringPeriodRowsAvailable(rows);
-      const summaryHasData = recordsHaveValues || Object.keys(rawPeriod).length > 0;
-      const quality = { health:rawPeriod.quality || 'UNAVAILABLE', measurement_state:rawPeriod.quality || 'UNAVAILABLE', user_action_required:false };
+      const summaryHasData = recordsHaveValues || Object.keys(measured).some(key => measured[key] !== null && measured[key] !== undefined);
+      const quality = {
+        ...qualityPayload,
+        health:String(firstDefined(qualityPayload.health,rawPeriod.quality,rawPeriod.measurement_state,'UNAVAILABLE')),
+        measurement_state:String(firstDefined(qualityPayload.measurement_state,rawPeriod.measurement_state,rawPeriod.availability,'UNAVAILABLE')),
+        user_action_required:asBool(firstDefined(qualityPayload.user_action_required,rawPeriod.user_action_required,rawPeriod.baseline_reset_required,false),false)
+      };
       const normalizeMetricKey = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
       const allRows = Object.values(rows).flat().filter(Boolean);
       const metricValue = aliases => {
@@ -4550,15 +4568,21 @@
     metering(rt) {
       const pageVm = this.buildPageViewModel(rt, 'metering');
       const vm = this.buildMeteringPeriodViewModel(rt);
-      if (!vm.available && !vm.summaryHasData) return this.tabExperienceHeader(rt,'metering',pageVm) + this.meteringNotPublishedPeriod(vm.periods, vm.remediations[0] || null);
+      if (!vm.available && !vm.summaryHasData) {
+        const requiredRemediation = vm.quality?.user_action_required === true && vm.command
+          ? { command:vm.command }
+          : null;
+        return this.tabExperienceHeader(rt,'metering',pageVm) + this.meteringNotPublishedPeriod(vm.periods, requiredRemediation);
+      }
       return this.tabExperienceHeader(rt,'metering',pageVm) + this.meteringCleanPage(vm);
     }
     retrospectiveState() {
-      // The current public contract does not publish a canonical retrospective product domain.
-      // Retrospective therefore fails closed instead of reading the retired V1
-      // entity. When canonical retrospective evidence is added to Public V2 it
-      // must enter through the typed selector boundary.
-      return null;
+      const retrospective=objectFrom(this.runtime().publicV2().retrospective || {});
+      if (!Object.keys(retrospective).length) return null;
+      return {
+        state:String(firstDefined(retrospective.status,'COLLECTING_EVIDENCE')),
+        attributes:retrospective
+      };
     }
     retrospectiveParsed(value, fallback) {
       if (value === null || value === undefined || value === '') return fallback;
@@ -4579,6 +4603,7 @@
     retrospectivePrerequisites(attrs = {}, productStatus = {}) {
       const raw = firstDefined(
         attrs.prerequisites_json,
+        attrs.prerequisites,
         attrs.evidence_prerequisites_json,
         attrs.pending_prerequisites_json,
         productStatus.prerequisites_json,
@@ -4718,7 +4743,6 @@
       const v = this.valuePeriodContext(rt);
       const money = (x) => this.valueMoney(x, v.currency, v.state, '—');
       const hasFinancialValue = [v.net,v.importCost,v.exportRevenue,v.netEnergyCost].some(value => asNumber(value) !== null);
-      const configurationBlocked = !v.accountingReady && !hasFinancialValue;
       const pricingEditing = this.strategyEditProfileId === 'pricing_settings';
       const tariffRows = (v.tariffs || []).map(item => {
         const unit = item.row?.unit || (item.id === 'vat' ? '%' : '€/kWh');
@@ -4732,6 +4756,7 @@
         ? `<span class="strategyChangeCount">${pricingChanged ? `${pricingChanged} changed` : 'No changes'}</span><button class="strategyTextAction" data-strategy-cancel="pricing_settings">Cancel</button><button class="strategySaveAction" data-strategy-save="pricing_settings"${pricingChanged ? '' : ' disabled'}>Save</button>`
         : `<button class="strategyTextAction" data-strategy-edit="pricing_settings">Edit</button>`;
       const missingRequired = (v.tariffs || []).filter(item => item.required && !item.configured);
+      const configurationBlocked = missingRequired.length > 0;
       const consumers = v.consumers.map(row => {
         const item=objectFrom(row);
         const identity=this.valueAssetIdentity(rt,item);
@@ -4742,7 +4767,11 @@
         return `<div class="propertyRow valueConsumerRow"><div class="valueAssetIdentity">${this.assetVisual(identity.asset,{size:'sm',fallbackIcon:'🚗'})}<span><b>${escapeHtml(identity.name)}</b><small>${escapeHtml(meta)}</small></span></div><strong>${escapeHtml(money(firstDefined(item.attributed_value,item.attributed_eur)))}</strong></div>`;
       }).filter(Boolean).join('');
       const optional = [['Savings',v.savings],['Avoided grid cost',v.avoided],['Self-consumption value',v.selfConsumption]].filter(([,value])=>asNumber(value)!==null).map(([label,value])=>this.kv(label,money(value))).join('');
-      const financialBody = configurationBlocked ? `<section class="panel wide valueConfigurationState"><h2>Financial result</h2><div class="valueStateHeadline"><b>${escapeHtml(v.stateLabel)}</b><span>${escapeHtml(v.attention)}</span></div><p>Complete the missing Pricing inputs to calculate financial values for ${escapeHtml(v.label.toLowerCase())}.</p><div class="valueConfigurationChecklist">${(v.tariffs || []).filter(item=>item.required).map(item=>`<div><span>${item.configured?'✓':'□'}</span><b>${escapeHtml(item.label)}</b><em>${escapeHtml(item.configured?'Configured':'Configuration required')}</em></div>`).join('')}</div></section>` : `<section class="panel wide"><h2>${escapeHtml(v.label)} financial result</h2><p>Accumulated measured value for the Metering-selected period. No future value is predicted.</p><div class="r3280Balance"><span>Net financial result</span><b>${escapeHtml(money(v.net))}</b><p>${escapeHtml(v.interpretation)}</p></div><div class="goalGrid"><div class="goalRow"><span>Import cost</span><b>${escapeHtml(money(v.importCost))}</b></div><div class="goalRow"><span>Export revenue</span><b>${escapeHtml(money(v.exportRevenue))}</b></div><div class="goalRow"><span>Net energy cost</span><b>${escapeHtml(money(v.netEnergyCost))}</b></div><div class="goalRow"><span>Result completeness</span><b>${escapeHtml(v.resultCompletenessLabel)}</b><small>${escapeHtml(v.resultScopeLabel)}</small></div></div>${optional ? `<div class="softBox">${optional}</div>` : ''}</section>`;
+      const financialBody = configurationBlocked
+        ? `<section class="panel wide valueConfigurationState"><h2>Financial result</h2><div class="valueStateHeadline"><b>${escapeHtml(v.stateLabel)}</b><span>${escapeHtml(v.attention)}</span></div><p>Complete only the Pricing inputs the backend marks as blocking for ${escapeHtml(v.label.toLowerCase())}.</p><div class="valueConfigurationChecklist">${missingRequired.map(item=>`<div><span>${item.configured?'✓':'□'}</span><b>${escapeHtml(item.label)}</b><em>${escapeHtml(item.configured?'Configured':'Configuration required')}</em></div>`).join('')}</div></section>`
+        : !v.accountingReady && !hasFinancialValue
+          ? `<section class="panel wide valueEvidenceState"><h2>Financial result</h2><div class="valueStateHeadline"><b>Waiting for measured evidence</b><span>${escapeHtml(v.attention)}</span></div><p>Pricing is usable. The financial result will appear when the selected Metering period contains sufficient measured import/export evidence.</p></section>`
+          : `<section class="panel wide"><h2>${escapeHtml(v.label)} financial result</h2><p>Accumulated measured value for the Metering-selected period. No future value is predicted.</p><div class="r3280Balance"><span>Net financial result</span><b>${escapeHtml(money(v.net))}</b><p>${escapeHtml(v.interpretation)}</p></div><div class="goalGrid"><div class="goalRow"><span>Import cost</span><b>${escapeHtml(money(v.importCost))}</b></div><div class="goalRow"><span>Export revenue</span><b>${escapeHtml(money(v.exportRevenue))}</b></div><div class="goalRow"><span>Net energy cost</span><b>${escapeHtml(money(v.netEnergyCost))}</b></div><div class="goalRow"><span>Result completeness</span><b>${escapeHtml(v.resultCompletenessLabel)}</b><small>${escapeHtml(v.resultScopeLabel)}</small></div></div>${optional ? `<div class="softBox">${optional}</div>` : ''}</section>`;
       const allocationById = new Map(v.consumers.map(row => { const item=objectFrom(row); return [String(firstDefined(item.consumer_id,item.asset_id,item.consumer,'')), item]; }));
       const flexibleRows = this.flexibleAssetDomain(rt).participating().map(vm => { const asset = vm.raw;
         const id = String(firstDefined(asset.asset_id,asset.flexible_asset_id,asset.target_asset_id,''));
