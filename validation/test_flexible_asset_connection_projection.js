@@ -131,3 +131,8 @@ assert.ok(card.includes('domain.consumerFacing().map'), 'Consumers must use cons
 assert.ok(card.includes('planningParticipants().map'), 'Planning projections must use planning participants');
 assert.ok(card.includes('vm?.isInfrastructure'), 'Value/consumer escape hatches must reject infrastructure');
 console.log('PASS infrastructure-only charger fallback cannot leak into managed consumer/planning surfaces');
+
+
+assert.ok(card.includes('const assetTotals = allAssetTotals;'), 'Tactical Planning must keep zero/no-plan participants visible');
+assert.ok(!card.includes('const assetTotals = allAssetTotals.filter(item => {'), 'Tactical Planning must not hide valid participants based on non-zero energy');
+console.log('PASS Tactical Planning preserves valid zero/no-plan participants');
