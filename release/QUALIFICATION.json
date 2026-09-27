@@ -1,8 +1,8 @@
 {
-  "version": "4.3.13",
-  "candidate_tag": "v4.3.13",
+  "version": "4.3.14",
+  "candidate_tag": "v4.3.14",
   "candidate_sha": "pending",
-  "previous_release": "4.3.12",
+  "previous_release": "4.3.13",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -53,5 +53,11 @@
   "solar_empty_panel_noise_suppressed": "NOT_EXECUTED",
   "solar_compact_value_flow": "NOT_EXECUTED",
   "visual_editor_explicit_save": "NOT_EXECUTED",
-  "visual_editor_brand_filter": "NOT_EXECUTED"
+  "visual_editor_brand_filter": "NOT_EXECUTED",
+  "energy_visual_write_readback": "NOT_EXECUTED",
+  "energy_visual_restart_persistence": "NOT_EXECUTED",
+  "shared_visual_picker_grammar": "NOT_EXECUTED",
+  "mobility_visual_ownership_preserved": "NOT_EXECUTED",
+  "solar_primary_facts_visible": "NOT_EXECUTED",
+  "solar_compact_card_density": "NOT_EXECUTED"
 }
