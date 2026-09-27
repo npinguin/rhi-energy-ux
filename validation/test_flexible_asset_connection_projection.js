@@ -92,3 +92,10 @@ assert.ok(card.includes('consumer.effective_connection_id'));
 assert.ok(card.includes('consumer.assigned_connection_id'));
 assert.ok(card.includes('consumer.physical_connection_id'));
 console.log('PASS physical consumer rows are connection targets, never charger infrastructure');
+
+
+assert.ok(card.includes('rows.set(chargerKey, row)'), 'connection identity must be charger-only');
+assert.ok(card.includes('if (!chargerKey || rows.has(chargerKey)) return;'), 'duplicate charger materialization must fail closed');
+assert.ok(card.includes('relationship.visual_ref, charger.visual_ref'), 'producer visual_ref must outrank Energy-local visual');
+assert.ok(!card.includes('rows.set(`${chargerKey}::${consumerKey}`, row)'), 'consumer assignment must not create a second physical connection row');
+console.log('PASS one charger row per physical connection and producer visual ownership');
