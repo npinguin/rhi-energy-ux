@@ -1,22 +1,24 @@
-# RHI Energy UX v4.3.7 — TEST CANDIDATE
+# RHI Energy UX v4.3.8 — TEST CANDIDATE
 
-## Physical charging topology closure
+## Physical consumer chain closure
 
-- consumes the new canonical `RHI_ENERGY_PUBLIC_CONTRACT_V2.connections` projection from Energy E0.15.73;
-- keeps Mobility-owned charger and vehicle identity visible when charging power is exactly 0 kW;
-- recognizes Mobility's canonical `asset_connected`, `effective_connection_id`, `assigned_connection_id` and `physical_connection_id` semantics;
-- renders Charging connections and Physical consumers from producer-owned topology without name/device inference;
-- preserves cross-domain `visual_ref` rendering through the Foundation registry;
-- includes the pending Solar-zone visible-name ordering cleanup already staged for 4.3.7;
-- adds regression coverage for the exact idle charger/vehicle shape that previously disappeared from Flow.
+- defines Charging connections as charger/infrastructure rows and Physical consumers as the connected target assets;
+- projects `connection.asset_id -> connected_asset_id/connected_consumer_id` directionally instead of allowing the charger to reappear as its own consumer;
+- excludes charger object types and canonical charger ids from the Physical consumers list;
+- materializes assigned vehicles from the exact connection snapshot so idle 0 kW vehicles remain visible;
+- preserves non-charger flexible consumers such as thermal/outdoor loads;
+- preserves Mobility-owned vehicle and charger `visual_ref` and resolves both only through the Foundation visual registry;
+- treats Mobility `asset_connected` as a connected state;
+- fails closed to a neutral empty visual when a producer `visual_ref` is not registered; Energy-owned fallback artwork is not used for cross-domain assets.
 
 ## Required package set
 
 - RHI UX Core **1.5.1** at `bb275767d9e9672713c00b9e8bd9fde13b9b5962`;
 - Foundation **F1.8.25+**;
-- Energy backend **E0.15.73+**, tested with **E0.15.73**;
+- Energy backend **E0.15.73+**, tested with **E0.15.74**;
 - Mobility backend **M0.10.19+**.
 
-Rollback: **v4.3.6**.
+Rollback: **v4.3.7**.
 
-Target Home Assistant qualification remains mandatory. The Flow screen must show the idle charger/vehicle topology from the screenshot scenario before stable promotion.
+Target Home Assistant qualification must prove the full visible chain:
+**charger image/name -> assigned vehicle image/name -> vehicle as Physical consumer**, including idle 0.0 kW.
