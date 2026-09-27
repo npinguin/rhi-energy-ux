@@ -59,6 +59,12 @@ function resolveEnergyAssetVisual(asset = {}, registry = null, variant = "card")
     if (!sourceRef.startsWith("energy.logical.")) return null;
   }
 
+  const sourceDomain = String(asset.source_domain || asset.producer_domain || asset.raw?.source_domain || "").trim().toLowerCase();
+  const sourceKind = String(asset.source_asset_kind || asset.raw?.source_asset_kind || "").trim().toLowerCase();
+  // Cross-domain producer assets without an explicit registered ref fail closed.
+  // Never substitute an Energy-owned semantic/device image for Mobility identity.
+  if (sourceDomain === "mobility" || ["vehicle","charger"].includes(sourceKind)) return null;
+
   const assetId = String(asset.asset_id || asset.id || "").trim();
   const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
   const selectedRef = typeof rhiEnergySelectedVisualRef === "function"
