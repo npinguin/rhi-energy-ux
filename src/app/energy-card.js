@@ -181,6 +181,21 @@
     resolveVisualRef(visualRef, variant = 'card') {
       return resolveEnergyVisualRef(visualRef, this.visualRegistry(), variant);
     }
+    sourceAssetNavigation(asset = {}) {
+      if (typeof rhiUxResolveDomainAssetNavigation !== 'function') return '';
+      const assetId = String(firstDefined(asset.asset_id, asset.id, asset.raw?.asset_id, '') || '').trim();
+      const visualRef = String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
+      const registryOwner = visualRef ? String(this.visualRegistry()?.entry?.(visualRef)?.owner_domain || '').trim() : '';
+      const ownerDomain = String(firstDefined(
+        asset.producer_domain,
+        asset.source_domain,
+        asset.visual_owner_domain,
+        registryOwner,
+        ''
+      ) || '').trim();
+      if (!assetId || !ownerDomain || ['rhi_energy','rhi_energy_ux'].includes(ownerDomain)) return '';
+      return rhiUxResolveDomainAssetNavigation(ownerDomain, assetId);
+    }
     releaseState() { return this.rawState(RELEASE_ENTITY); }
     releaseAttrs() { return this.releaseState()?.attributes || {}; }
     publicUxEntities() {
@@ -1304,6 +1319,15 @@
       if (saveAll && !saveAll.disabled) { this.savePropertyDrafts(); return; }
       const discardAll = event.target.closest('[data-discard-property-drafts]');
       if (discardAll && !discardAll.disabled) { this.editDrafts = {}; this.render(); return; }
+      const sourceNav = event.target.closest('[data-source-asset-nav]');
+      if (sourceNav && !sourceNav.disabled) {
+        const path = String(sourceNav.dataset.sourceAssetNav || '').trim();
+        if (path && !/^https?:\/\//i.test(path)) {
+          history.pushState(null, '', path);
+          window.dispatchEvent(new Event('location-changed'));
+        }
+        return;
+      }
       const tabTarget = event.target.closest('[data-tab-target]');
       if (tabTarget) {
         event.preventDefault();
@@ -2902,7 +2926,11 @@
       const name = load.display_name || rt.assetName(id) || human(id);
       const explicitReason = firstDefined(load.disabled_reason, load.lifecycle_reason, load.participation_reason, planning.disabled_reason, planning.disabled_reason_code, '');
       const reason = explicitReason ? humanReason(explicitReason, '') : '';
-      return `<article class="disabledAssetCompact"><div class="disabledAssetLead">${this.assetVisual(load,{size:'sm',fallbackIcon:this.flexibleAssetIcon(load)})}<div><b>${escapeHtml(name)}</b><span>Not managed by Home Intelligence</span>${reason ? `<small>${escapeHtml(reason)}</small>` : ''}</div></div></article>`;
+      const sourceAssetPath = rt.sourceAssetNavigation(load);
+      const sourceAssetLink = sourceAssetPath
+        ? `<button type="button" class="action sourceAssetLink" data-source-asset-nav="${escapeHtml(sourceAssetPath)}">Open source asset</button>`
+        : '';
+      return `<article class="disabledAssetCompact"><div class="disabledAssetLead">${this.assetVisual(load,{size:'sm',fallbackIcon:this.flexibleAssetIcon(load)})}<div><b>${escapeHtml(name)}</b><span>Not managed by Home Intelligence</span>${reason ? `<small>${escapeHtml(reason)}</small>` : ''}${sourceAssetLink}</div></div></article>`;
     }
     operationalLoadCard(rt, load, recommendation, targetId) {
       const id = load.asset_id;
@@ -2952,10 +2980,14 @@
       const operationalStatus = this.canonicalOperationalStatus(rt, load, planning);
       const exceptional = operationalStatus.exceptional === true;
       const conformanceKnown = operationalStatus.exceptional !== null;
+      const sourceAssetPath = rt.sourceAssetNavigation(load);
+      const sourceAssetLink = sourceAssetPath
+        ? `<button type="button" class="action sourceAssetLink" data-source-asset-nav="${escapeHtml(sourceAssetPath)}">Open source asset</button>`
+        : '';
       return `<article class="flexLoadCard solarLoadRow ${exceptional?'exceptional':''}">
         <div class="solarLoadSummary"><div class="solarLoadIdentity">${this.assetVisual(load,{size:'sm',fallbackIcon:this.flexibleAssetIcon(load)})}<div><div class="solarLoadName"><h3>${escapeHtml(load.display_name || human(id))}</h3><span class="priorityBadge">${escapeHtml(priorityLabel)}</span></div><small><i class="dot green"></i>${escapeHtml(connection.label)}</small></div></div>
         <div class="solarLoadFact"><small>Now / live</small><b>${escapeHtml(liveState)}</b><span>${fmtKw(powerKw,'—')}</span></div><div class="solarLoadFact"><small>Next action</small><b class="nextActionBadge">${escapeHtml(nextAction)}</b></div><div class="solarLoadFact"><small>Power target</small><b>${fmtKw(requested,'—')}</b></div><div class="solarLoadFact"><small>Planned today</small><b>${fmtKwh(plannedTodayKwh,'—')}</b></div><div class="solarLoadFact solarLoadWhy"><small>Why / reason</small><b>${escapeHtml(canonicalWhy)}</b></div><div class="solarLoadFact"><small>Status</small><b class="planStatusBadge ${exceptional?'exception':(conformanceKnown?'ok':'unknown')}">${exceptional?'Exceptional !':(conformanceKnown?'No published exception':'Status unavailable')}</b></div></div>
-        <div class="solarLoadControls"><div class="requestedSlot"><small class="controlTitle">Requested charge power</small>${requestedControl || `<label class="sliderField unavailable"><div><span>Requested charge power</span><b>—</b></div><input type="range" disabled></label>`}${maxPowerText ? `<em class="maxPowerHint">${escapeHtml(maxPowerText)}</em>` : ''}</div>${actionButtons ? `<div class="loadActions decisionActions"><span>Manual intervention</span>${actionButtons}</div>` : ''}</div>${controlAvailability}${infoBanner}<div class="loadDetailsFull">${this.componentDetailsBlock(detailsId, 'Details', `${this.kv('Planning', human(planning.state || '—'))}${this.kv('Why', canonicalWhy)}${this.kv('Asset id', id)}`)}</div>
+        <div class="solarLoadControls"><div class="requestedSlot"><small class="controlTitle">Requested charge power</small>${requestedControl || `<label class="sliderField unavailable"><div><span>Requested charge power</span><b>—</b></div><input type="range" disabled></label>`}${maxPowerText ? `<em class="maxPowerHint">${escapeHtml(maxPowerText)}</em>` : ''}</div>${actionButtons ? `<div class="loadActions decisionActions"><span>Manual intervention</span>${actionButtons}</div>` : ''}</div>${controlAvailability}${infoBanner}<div class="loadDetailsFull">${this.componentDetailsBlock(detailsId, 'Details', `${this.kv('Planning', human(planning.state || '—'))}${this.kv('Why', canonicalWhy)}${this.kv('Asset id', id)}${sourceAssetLink}`)}</div>
       </article>`;
     }
     energyAssetContext(rt, asset = {}) {
