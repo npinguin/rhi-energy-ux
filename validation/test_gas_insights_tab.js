@@ -6,8 +6,8 @@ const presentation = fs.readFileSync("src/app/presentation.js","utf8");
 const catalog = fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
 
 assert.match(presentation,/id:"consumers", label:"Consumers"[\s\S]*id:"gas", label:"Gas", view:"gas"/);
-assert.ok(presentation.includes('gas: "heroes/gas-hero.webp"'),"Gas hero mapping must use WebP");
-assert.ok(fs.existsSync("src/assets/heroes/gas-hero.webp"),"missing Gas hero artwork");
+assert.ok(presentation.includes('gas: "heroes/gas-hero.svg"'),"Gas hero mapping must use packaged SVG");
+assert.ok(fs.existsSync("src/assets/heroes/gas-hero.svg"),"missing Gas hero SVG artwork");
 
 assert.match(app,/gas:\['consumer'\]/);
 assert.match(app,/gas:\['energy','gas'\]/);
@@ -29,6 +29,6 @@ assert.match(app,/The UX never estimates missing consumption/);
 
 assert.match(app,/energyDeviceStatusCard\(rt, gas\.asset, 'Gas meter'\)/);
 assert.match(app,/gas: \{ image:hbEnergyHeroAsset\('gas'\)/);
-assert.ok(catalog.includes('gas_meter.smart_meter') && catalog.includes('package_path:"heroes/gas-hero.webp"'),"Gas catalog must reference WebP hero");
+assert.ok(catalog.includes('gas_meter.smart_meter') && catalog.includes('package_path:"heroes/gas-hero.webp"'),"Gas meter catalog fallback may retain the logical-device WebP visual");
 
 console.log("PASS Gas is the final Energy tab with dedicated hero, canonical meter and HA-native statistics history");
