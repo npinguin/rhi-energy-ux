@@ -1532,7 +1532,7 @@ function readEnergyCommandContract(gateway) {
           flexible:true,
           source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.objects'],
           metering_state:'UNAVAILABLE',
-          metering_reason:'Canonical per-asset period energy is not published by E0.15.48.'
+          metering_reason:'Canonical per-asset period energy is not published by the current public contract.'
         };
       });
       return this._consumerMixRows;
@@ -1549,7 +1549,7 @@ function readEnergyCommandContract(gateway) {
         energy_kwh:null,
         energy_by_asset_kwh:{},
         health:'PARTIAL',
-        reason:'Canonical current flexible-asset truth is available; category/per-asset period energy is not published by E0.15.48.',
+        reason:'Canonical current flexible-asset truth is available; category/per-asset period energy is not published by the current public contract.',
         source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.objects']
       };
       return this._consumerMixSummary;
@@ -1899,7 +1899,7 @@ function readEnergyCommandContract(gateway) {
           graph_support:false,
           bucket_support:false,
           measurement_state:'UNAVAILABLE',
-          reason:'Canonical metering energy is not published by E0.15.48.'
+          reason:'Canonical metering energy is not published by the current public contract.'
         };
       }).sort((a,b)=>(a.selector_order||99)-(b.selector_order||99));
       return this._meteringPeriods;
@@ -5890,7 +5890,7 @@ function rhiEnergyVisualPickerStyles() {
       return this.tabExperienceHeader(rt,'metering',pageVm) + this.meteringCleanPage(vm);
     }
     retrospectiveState() {
-      // E0.15.48 does not publish a canonical retrospective product domain.
+      // The current public contract does not publish a canonical retrospective product domain.
       // Retrospective therefore fails closed instead of reading the retired V1
       // entity. When canonical retrospective evidence is added to Public V2 it
       // must enter through the typed selector boundary.
