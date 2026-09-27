@@ -1,6 +1,6 @@
 {
   "product": "rhi-energy-ux",
-  "version": "4.3.4",
+  "version": "4.3.5",
   "stage": "test_candidate",
   "publication_authority": "github_releases",
   "publication_status": "installable_candidate_until_qualified",
@@ -32,5 +32,11 @@
     "source_commit": "667b6f4274ffd0855d51444cb2eb27891a5ab398",
     "runtime_dependency": false,
     "branding_owner": "rhi-ux-core"
+  },
+  "visual_registry": {
+    "contract": "RHI_VISUAL_ASSET_REGISTRY_V1",
+    "minimum_contract_version": "1.1.0",
+    "minimum_foundation": "F1.8.23",
+    "producer_registration_required": true
   }
 }
