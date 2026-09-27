@@ -1937,12 +1937,16 @@
       return asNumber(firstDefined(effective.available_above_reserve_kwh, effective.usable_above_reserve_kwh));
     }
     flexibleNeedKwh(rt) {
-      const values = this.flexibleAssetDomain(rt).participating().map(vm => asNumber(firstDefined(vm.raw.energy_to_target_kwh, vm.raw.energy_needed_kwh, vm.raw.remaining_energy_kwh))).filter(value => value !== null);
+      const values = this.flexibleAssetDomain(rt).planningParticipants().map(vm => asNumber(firstDefined(vm.raw.energy_to_target_kwh, vm.raw.energy_needed_kwh, vm.raw.remaining_energy_kwh))).filter(value => value !== null);
       if (!values.length) return null;
       return values.reduce((sum, value) => sum + Math.max(0, value), 0);
     }
     flexiblePowerNowKw(rt) {
-      const values = this.flexibleAssetDomain(rt).participating().map(vm => asNumber(firstDefined(vm.raw.power_kw, vm.raw.current_power_kw, vm.raw.actual_power_kw))).filter(value => value !== null);
+      // Live Flexible Loads power is physical connection truth owned by Energy core.
+      // Do not re-sum planning participants: infrastructure may consume power without being a planning target.
+      const physical = rt.number('flexible_loads.power_kw');
+      if (physical !== null) return Math.abs(physical);
+      const values = this.flexibleAssetDomain(rt).planningParticipants().map(vm => asNumber(firstDefined(vm.raw.power_kw, vm.raw.current_power_kw, vm.raw.actual_power_kw))).filter(value => value !== null);
       if (!values.length) return null;
       return values.reduce((sum, value) => sum + Math.abs(value), 0);
     }
@@ -3504,7 +3508,7 @@
       const recommendation = firstDefined(d.recommendation, d.advice, rt.rawText('energy_intelligence.recommendation', null), 'Observe');
       const targetId = firstDefined(d.recommended_target_asset_id, rt.value('energy_intelligence.recommended_target_asset_id', null), '');
       const assetDomain = this.flexibleAssetDomain(rt);
-      const loads = assetDomain.all().filter(vm => !vm.isStorage).map(vm => vm.raw);
+      const loads = assetDomain.consumerFacing().map(vm => vm.raw);
       const participating = loads.filter(load => !assetDomain.byId(load.asset_id)?.isDisabled);
       const disabled = loads.filter(load => assetDomain.byId(load.asset_id)?.isDisabled);
       const cards = participating.map(load => this.operationalLoadCard(rt, load, recommendation, targetId)).join('');
@@ -3550,7 +3554,7 @@
       const gridBalance = gridImport !== null && gridExport !== null ? gridImport-gridExport : null;
       const confidence = human(firstDefined(quality.confidence,horizon.confidence,'Not available'));
       const basis = human(firstDefined(supply.solar_basis,supply.forecast_basis,isTomorrow?'Full day forecast':'Remaining forecast'));
-      const planningRows = this.flexibleAssetDomain(rt).all().filter(vm => !vm.isDisabled && !vm.isStorage).map(vm => {
+      const planningRows = this.flexibleAssetDomain(rt).planningParticipants().map(vm => {
         const load=vm.raw||{}; const id=load.asset_id||load.flexible_asset_id||''; const planning=load.energy_planning||rt.planningOutcomeFor(id)||{};
         const amount=asNumber(firstDefined(planning.planned_today_kwh,planning.scheduled_kwh,planning.known_need_kwh,planning.energy_to_target_kwh,load.energy_to_target_kwh,load.required_energy_kwh));
         return amount===null?null:`<div class="outlookChildRow">${this.assetVisual(load,{size:'xs',fallbackIcon:this.flexibleAssetIcon(load)})}<b>${escapeHtml(load.display_name||rt.assetName(id)||human(id))}</b><strong>${escapeHtml(fmtKwh(amount))}</strong></div>`;
@@ -4238,7 +4242,7 @@
       const summary = rt.consumerMixSummary();
       const domain = this.flexibleAssetDomain(rt);
       const publishedById = new Map(publishedRows.map(row => [String(row.asset_id||row.consumer_id||row.id||''), row]));
-      const canonicalRows = domain.all().filter(vm => !vm.isStorage).map(vm => {
+      const canonicalRows = domain.consumerFacing().map(vm => {
         const raw = vm.raw || {};
         const published = publishedById.get(vm.id) || {};
         return {
@@ -4675,7 +4679,7 @@
         row.asset_id, row.consumer_id, row.consumer, row.source_asset_id,
         row.producer_asset_id, row.flexible_asset_id, row.target_asset_id
       ].map(v=>String(v||'').trim()).filter(Boolean);
-      const flexible = this.flexibleAssetDomain(rt).all().map(vm=>vm.raw || {});
+      const flexible = this.flexibleAssetDomain(rt).consumerFacing().map(vm=>vm.raw || {});
       const mix = rt.consumerMixRows?.() || [];
       const aliases = (asset)=>[
         asset.asset_id, asset.consumer_id, asset.consumer, asset.source_asset_id,
@@ -4899,7 +4903,7 @@
     buildPlanningViewModel(rt) {
       const horizonId = this.selectedPlanningHorizonId || 'D0';
       const domainAssets = this.flexibleAssetDomain(rt).all();
-      const assets = domainAssets.filter(vm => !vm.isDisabled && !vm.isStorage).map(vm => vm.raw);
+      const assets = this.flexibleAssetDomain(rt).planningParticipants().map(vm => vm.raw);
       const storage = domainAssets.find(vm => vm.isStorage && !vm.isDisabled)?.raw || null;
       return createPlanningViewModel({ gateway: rt.contractGateway(), horizonId, flexibleAssets: assets, storage });
     }
