@@ -1,3 +1,10 @@
+## 4.3.18 — planning user closure
+
+- keeps incomplete charging demand visible in Tactical Planning;
+- exposes missing planning inputs as explicit blockers instead of empty planning success;
+- adopts UX Core 1.5.3 shared appearance primitives;
+- aligns cross-domain planning/visual dependency with Mobility M0.10.20.
+
 ## 4.3.17 — structural capability presence
 
 - consumes Energy E0.15.81 backend-owned structural experience presence;
