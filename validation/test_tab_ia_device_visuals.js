@@ -40,7 +40,7 @@ assert.match(viewContent, /this\.view === 'operational-planning' \? this\.operat
 const solar = method("solar");
 assert.match(solar, /solarEnergyStory\(rt\)/);
 assert.match(solar, /solarHardwareExperience\(rt\)/);
-assert.match(solar, /Solar energy facts/);
+assert.doesNotMatch(solar, /Solar energy facts/);
 assert.doesNotMatch(solar, /operationalLoadCard/);
 assert.doesNotMatch(solar, /Flexible Loads/);
 assert.doesNotMatch(solar, /requested_charge_power/);
