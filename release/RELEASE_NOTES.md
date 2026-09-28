@@ -1,15 +1,16 @@
-# RHI Energy UX 4.3.14 — SOLAR_HIERARCHY_PERSISTENT_APPEARANCE
+# RHI Energy UX 4.3.15 — SOLAR_RELEASE_CLOSURE
 
-- Move Home Battery ahead of Solar production/inverter hardware detail.
-- Keep Solar strings visible directly below the inverter system; optimizers and panels are primary body content, not hidden behind the string Details toggle.
-- Keep unresolved inverter↔string relationships visible without guessing ownership.
-- Persist Energy-owned appearance through backend Public V2 property writes instead of browser localStorage.
-- Use the shared UX Core 1.5.2 visual picker shell.
-- Preserve producer ownership: Mobility-owned vehicle/charger/flexible-load visuals remain authoritative and cannot be overridden by Energy.
-- Preserve E0.15.77 automation authority, planning, Metering, Value and Retrospective semantics.
+- Keep Home Battery first in the Solar hardware body.
+- Show Solar Production, then inverter cards, then each inverter's strings, then optimizer/panel combo cards.
+- Keep identity and key energy properties primary; full technical metadata remains foldable under Details.
+- Remove the bottom Solar energy facts/product-noise section from normal Solar UX.
+- Add an explicit visible Appearance action for writable Energy-owned assets while preserving image-click entry.
+- Persist appearance through Energy backend write/readback only.
+- Preserve Mobility producer visual ownership.
+- Pair with Energy E0.15.79 so Home Battery aggregate SoC is mathematically consistent with aggregate available/capacity energy.
 
-Minimum/tested backend: **E0.15.78**.
-UX Core baseline: **1.5.2 @ 16a217a33f6a7cc90d42ad83492e90ba1d364eee**.
+Minimum/tested backend: **E0.15.79**.
+UX Core baseline: **1.5.2**.
 Known accepted technical debt: **0**.
 Known accepted feature debt: **0**.
 

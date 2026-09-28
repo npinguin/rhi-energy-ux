@@ -39,7 +39,7 @@ assert.match(solar,/solarEnergyStory/);
 assert.match(solar,/solarHardwareExperience/);
 assert.doesNotMatch(solar,/solarOperationalExecutionPanel/);
 
-for (const phrase of ["Solar production","Inverter system","Home Battery","Other published hardware"]) {
+for (const phrase of ["Solar production","Inverter system","Home Battery"]) {
   assert.ok(app.includes(phrase), "missing Solar hierarchy section "+phrase);
 }
 assert.match(app,/energyAssetParentId/);
@@ -86,3 +86,8 @@ assert.match(app,/solarUnresolvedStrings/);
 assert.match(app,/STRINGS · INVERTER RELATIONSHIP NOT YET PUBLISHED/);
 assert.doesNotMatch(app,/<details class="solarStringLink"/);
 assert.match(app,/<article class="solarStringLink"/);
+
+assert.doesNotMatch(solar,/Solar energy facts/);
+assert.doesNotMatch(solar,/Other published hardware/);
+assert.match(app,/energyAppearanceAction/);
+assert.match(app,/data-energy-visual-open/);
