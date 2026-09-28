@@ -3644,6 +3644,7 @@
       const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
       const gridExportToday = rt.number('metering.grid_export_today_kwh');
       return `${this.tabExperienceHeader(rt,'solar',pageVm)}<div class="solarPage solarHardwarePage">
+        ${this.solarEnergyStory(rt)}
         ${this.solarHardwareExperience(rt)}
       </div>`;
     }
