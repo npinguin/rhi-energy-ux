@@ -39,6 +39,8 @@ function readEnergyPublicV2(gateway) {
   const valueAccounting = object(attrs.value_accounting);
   const layers = object(attrs.layers);
   const summary = object(attrs.summary);
+  const experience = object(attrs.experience);
+  const presence = Object.freeze({...object(experience.presence)});
 
   const semantic = raw => {
     const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {value:raw};
@@ -227,6 +229,8 @@ function readEnergyPublicV2(gateway) {
     health:object(attrs.health).status || String(attrs.health || envelope.state || 'UNKNOWN'),
     core,
     summary,
+    experience:Object.freeze({...experience, presence}),
+    presence,
     objects,
     profiles,
     relationships,
