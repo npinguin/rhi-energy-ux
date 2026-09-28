@@ -10,7 +10,7 @@
     "energy",
     "heroes"
   ],
-  "runtime_sha256": "cf13437064c36e56cc81e314b5c73f97aebf04755df88c4786ed958704aab448",
+  "runtime_sha256": "ff680a117511ce17e8c9ca3bb944f976aa25adb730760c5b5b1c4c144dd8824b",
   "files": [
     {
       "path": "assets/energy/byd_lvs_20.webp",
@@ -114,7 +114,7 @@
     },
     {
       "path": "rhi-energy-ux.js",
-      "bytes": 755375
+      "bytes": 773930
     },
     {
       "path": "rhi-energy-ux.js.sha256",
