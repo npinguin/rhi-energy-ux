@@ -11,6 +11,7 @@ if (!app.includes("if(item.id === 'battery') return has('battery', false)")) thr
 if (!app.includes("if(item.id === 'gas') return has('gas', false)")) throw new Error('Gas navigation not presence-gated');
 if (!app.includes("if(item.id === 'consumers') return showConsumers")) throw new Error('Consumers navigation not presence-gated');
 if (!app.includes("if(item.id === 'value') return showValue")) throw new Error('Value navigation not pricing-presence-gated');
-if (!app.includes("presence?.battery === true")) throw new Error('Overview battery surfaces not presence-gated');
+if (!app.includes("experiencePresence()")) throw new Error('Presence not exposed through EnergyRuntime');
+if (!app.includes("rt.experiencePresence().battery === true")) throw new Error('Overview battery surfaces not presence-gated');
 
 console.log('PASS structural capability presence UX');
