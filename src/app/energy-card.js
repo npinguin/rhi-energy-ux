@@ -1207,7 +1207,23 @@
     }
     runtime() { return new EnergyRuntime(this._hass || {}); }
     navigationModel() {
-      return HB_ENERGY_NAVIGATION;
+      const v2=this.publicV2();
+      const presence=v2?.presence || {};
+      const has=(key,fallback=true)=>Object.prototype.hasOwnProperty.call(presence,key)
+        ? presence[key] === true
+        : fallback;
+      const showConsumers=has('flexible_loads', false);
+      const showValue=has('pricing', false);
+      return HB_ENERGY_NAVIGATION.map(section=>({
+        ...section,
+        items:section.items.filter(item=>{
+          if(item.id === 'battery') return has('battery', false);
+          if(item.id === 'gas') return has('gas', false);
+          if(item.id === 'consumers') return showConsumers;
+          if(item.id === 'value') return showValue;
+          return true;
+        })
+      })).filter(section=>section.items.length > 0);
     }
     resolveNavigation(sectionId = '', itemId = '', legacyView = '') {
       const sections = this.navigationModel();
