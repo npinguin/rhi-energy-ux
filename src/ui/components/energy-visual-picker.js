@@ -21,19 +21,13 @@ class HomeBrainEnergyVisualPicker {
     const activeBrand = brand !== "all" && brands.includes(brand) ? brand : "all";
     const visible = activeBrand === "all" ? choices : choices.filter(entry => String(entry.brand || "") === activeBrand);
 
-    const filtersHtml = [
-      `<button type="button" class="${activeBrand === "all" ? "selected" : ""}" data-energy-visual-brand="all">All</button>`,
-      ...brands.map(item => `<button type="button" class="${activeBrand === item ? "selected" : ""}" data-energy-visual-brand="${escapeHtml(item)}">${escapeHtml(item)}</button>`)
-    ].join("");
+    const filtersHtml = rhiUxVisualFilterButtons({ values:brands, active:activeBrand, attribute:"data-energy-visual-brand" });
 
     const choicesHtml = visible.map(entry => {
       const ref = rhiEnergyVisualRef(entry);
       const visual = typeof resolveEnergyVisualRef === "function" ? resolveEnergyVisualRef(ref) : null;
       const selected = ref === current;
-      return `<button class="rhiUxVisualChoice ${selected ? "selected" : ""}" type="button" data-energy-visual-select="${escapeHtml(ref)}" data-energy-visual-asset="${escapeHtml(assetId)}" aria-pressed="${selected ? "true" : "false"}">
-        <span class="rhiUxVisualChoiceImage">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="">` : ""}</span>
-        <span class="rhiUxVisualChoiceCopy"><small>${escapeHtml(entry.brand || "Representative")}</small><b>${escapeHtml(entry.model || entry.label)}</b><em>${escapeHtml(entry.variant || human(type))}</em></span>
-      </button>`;
+      return rhiUxVisualChoice({id:ref,image:visual?.url || "",label:entry.model || entry.label,eyebrow:entry.brand || "Representative",detail:entry.variant || human(type),selected,attributes:{"data-energy-visual-select":ref,"data-energy-visual-asset":assetId}});
     }).join("");
 
     const resetHtml = `<button type="button" data-energy-visual-reset="${escapeHtml(assetId)}">Use profile default</button>`;
