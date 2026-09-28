@@ -1,16 +1,15 @@
-# RHI Energy UX 4.3.16 — STRICT_SOLAR_PRODUCT_HIERARCHY
+# RHI Energy UX 4.3.17 — STRUCTURAL_CAPABILITY_PRESENCE
 
-- Enforce the Solar body in exactly two primary sections: Home Battery, then Solar Production.
-- Nest physical inverter cards inside Solar Production instead of rendering a sibling Inverter System section.
-- Nest each canonical string below its inverter.
-- Nest optimizer/panel combo cards below each canonical string.
-- Keep identity and key energy properties visible; technical metadata stays foldable under Details.
-- Present unresolved topology only as a folded diagnostic exception and never guess ownership.
-- Keep the Appearance entry point visible whenever the backend directly publishes an Energy-owned write route and a compatible visual catalog exists.
-- Pair with Energy E0.15.80 exact-serial SolarEdge topology closure.
-- Preserve Mobility producer-owned visual precedence and shared UX Core 1.5.2 picker grammar.
+- Consume Energy E0.15.81 backend-owned structural capability presence.
+- Hide Home Battery and Gas when those optional subsystems are not configured in the home.
+- Hide Consumers when no flexible-load capability is structurally present.
+- Hide Value when no pricing source is configured.
+- Remove absent Home Battery KPI/reserve placeholders from Overview.
+- Keep configured-but-unavailable capabilities visible so faults and stale telemetry remain visible rather than being mistaken for absence.
+- Keep structural presence semantics backend-owned and UX rendering presentation-only.
+- Add release-blocking structural-presence regression coverage.
 
-Minimum/tested backend: **E0.15.80**.
+Minimum/tested backend: **E0.15.81**.
 UX Core baseline: **1.5.2**.
 Known accepted technical debt: **0**.
 Known accepted feature debt: **0**.
