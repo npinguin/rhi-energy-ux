@@ -48,18 +48,19 @@ assert.match(app,/assetQuickActions\(rt, assetId/);
 assert.match(app,/rt\.commandActionModelsForAsset\(id\)/);
 assert.match(app,/Telemetry limited/);
 assert.match(app,/per-battery power is not published/);
-assert.match(app,/Panels without string relationship/);
+assert.match(app,/solarProductionHierarchy/);
 assert.match(app,/solarOptimizerPrimaryCard/);
-assert.match(app,/POWER OPTIMIZER/);
+assert.match(app,/OPTIMIZER \/ PANEL/);
 assert.doesNotMatch(app,/No panels linked to this zone/);
 assert.match(app,/solarTopologyDetails/);
+assert.match(app,/solarTopologyDiagnostics/);
 assert.match(app,/No charging topology published/);
 
 for (const token of ["flexible_asset.generic","consumer.generic","solar_array.generic","inverter.generic","site_consumption.home","energy_system.home"]) {
   assert.ok(catalog.includes(token), "missing representative visual fallback "+token);
 }
 
-assert.match(core,/RHI UX Core 1\.5\.1/);
+assert.match(core,/RHI UX Core 1\.5\.2/);
 assert.match(core,/function rhiUxContextBar/);
 assert.match(core,/function rhiUxResolveDomainAssetNavigation/);
 assert.ok(core.includes("{asset_id}"), "runtime-safe Core navigation token missing");
