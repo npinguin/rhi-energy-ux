@@ -1,6 +1,6 @@
 {
   "product": "rhi-energy-ux",
-  "source_candidate_version": "4.3.17",
+  "source_candidate_version": "4.3.18",
   "stage": "test_candidate",
   "publication_authority": "github_releases",
   "publication_status": "derive_from_github_release",
@@ -13,7 +13,7 @@
   "target_runtime_proof": "see release/QUALIFICATION.json",
   "rollback": "immutable GitHub/HACS version selection",
   "stable_promotion": "blocked_until_qualification_pass",
-  "tested_backend": "E0.15.81",
+  "tested_backend": "E0.15.83",
   "required_contracts": [
     "RHI_ENERGY_PUBLIC_CONTRACT_V2",
     "RHI_ENERGY_CORE_V1",
@@ -21,11 +21,11 @@
   ],
   "ux_core": {
     "package": "rhi-ux-core",
-    "version": "1.5.2",
-    "source_commit": "16a217a33f6a7cc90d42ad83492e90ba1d364eee",
+    "version": "1.5.3",
+    "source_commit": "bb35ae4920cd6a7e135572beae3fc593ba290cd4",
     "runtime_dependency": false,
     "branding_owner": "rhi-ux-core"
   },
   "minimum_foundation": "F1.8.25",
-  "minimum_mobility_for_cross_domain_visuals": "M0.10.19"
+  "minimum_mobility_for_cross_domain_visuals": "M0.10.20"
 }
