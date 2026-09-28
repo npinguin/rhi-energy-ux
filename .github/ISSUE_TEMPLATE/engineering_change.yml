@@ -1,0 +1,26 @@
+name: Engineering change
+description: RHI change record from user need through closure and release projection
+title: "[Change] "
+body:
+- type: textarea
+  id: need
+  attributes: {label: User / problem statement}
+  validations: {required: true}
+- type: dropdown
+  id: classification
+  attributes: {label: Classification, options: [DEFECT, FEATURE_DEBT, TECH_DEBT, RUNTIME_PROOF_GAP, CONFIG]}
+  validations: {required: true}
+- type: textarea
+  id: impact
+  attributes: {label: Ownership and impact, description: "Owner, packages/contracts, authority, generated projections."}
+  validations: {required: true}
+- type: textarea
+  id: acceptance
+  attributes: {label: Acceptance and runtime proof}
+  validations: {required: true}
+- type: textarea
+  id: prevention
+  attributes: {label: Lessons / prevention}
+- type: textarea
+  id: release
+  attributes: {label: Release-note projection}
