@@ -39,7 +39,7 @@ assert.match(solar,/solarEnergyStory/);
 assert.match(solar,/solarHardwareExperience/);
 assert.doesNotMatch(solar,/solarOperationalExecutionPanel/);
 
-for (const phrase of ["Solar production","Inverter system","Home Battery"]) {
+for (const phrase of ["Solar Production","Home Battery"]) {
   assert.ok(app.includes(phrase), "missing Solar hierarchy section "+phrase);
 }
 assert.match(app,/energyAssetParentId/);
@@ -55,7 +55,7 @@ assert.match(hardware,/unassignedArrays/);
 assert.doesNotMatch(hardware,/'Solar zones'/);
 assert.match(app,/solarModuleCard/);
 assert.match(app,/solarOptimizerPrimaryCard/);
-assert.match(app,/POWER OPTIMIZER/);
+assert.match(app,/OPTIMIZER \/ PANEL/);
 assert.match(app,/SOLAR STRING/);
 assert.match(app,/solarPanelOnlyGrid/);
 assert.doesNotMatch(app,/No panels linked to this zone/);
@@ -82,8 +82,8 @@ for (const file of requiredArtwork) {
 }
 console.log("PASS Solar owns hardware hierarchy; Flow and Planning stay clean");
 
-assert.match(app,/solarUnresolvedStrings/);
-assert.match(app,/STRINGS · INVERTER RELATIONSHIP NOT YET PUBLISHED/);
+assert.match(app,/solarTopologyDiagnostics/);
+assert.match(app,/Topology diagnostics/);
 assert.doesNotMatch(app,/<details class="solarStringLink"/);
 assert.match(app,/<article class="solarStringLink"/);
 
@@ -91,3 +91,7 @@ assert.doesNotMatch(solar,/Solar energy facts/);
 assert.doesNotMatch(solar,/Other published hardware/);
 assert.match(app,/energyAppearanceAction/);
 assert.match(app,/data-energy-visual-open/);
+
+assert.doesNotMatch(app,/solarHardwareSection\(\n\s*'Inverter system'/);
+assert.match(app,/solarProductionHierarchy/);
+assert.match(app,/Aggregate production followed by the physical inverter → string → optimizer\/panel hierarchy/);
