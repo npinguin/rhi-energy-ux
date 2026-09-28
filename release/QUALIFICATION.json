@@ -1,8 +1,8 @@
 {
-  "version": "4.3.16",
-  "candidate_tag": "v4.3.16",
-  "candidate_sha": "b101905163d41fa8da05e746d8db20decf85e34c",
-  "previous_release": "4.3.15",
+  "version": "4.3.17",
+  "candidate_tag": "v4.3.17",
+  "candidate_sha": "pending",
+  "previous_release": "4.3.16",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -69,5 +69,14 @@
   "solar_inverter_string_optimizer_panel_chain": "NOT_EXECUTED",
   "solar_optimizer_panel_combo_card": "NOT_EXECUTED",
   "energy_appearance_entrypoint_direct_contract": "NOT_EXECUTED",
-  "solaredge_exact_serial_parentage": "NOT_EXECUTED"
+  "solaredge_exact_serial_parentage": "NOT_EXECUTED",
+  "backend_structural_presence": "NOT_EXECUTED",
+  "minimal_grid_solar_navigation": "STATIC_PASS_RUNTIME_PENDING",
+  "absent_battery_hidden": "STATIC_PASS_RUNTIME_PENDING",
+  "absent_gas_hidden": "STATIC_PASS_RUNTIME_PENDING",
+  "absent_consumers_hidden": "STATIC_PASS_RUNTIME_PENDING",
+  "absent_pricing_value_hidden": "STATIC_PASS_RUNTIME_PENDING",
+  "configured_unavailable_capability_visible": "NOT_EXECUTED",
+  "overview_optional_participants": "STATIC_PASS_RUNTIME_PENDING",
+  "presence_reload_restart_stability": "NOT_EXECUTED"
 }
