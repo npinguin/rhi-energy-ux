@@ -9,7 +9,7 @@ presentation=(ROOT/"src/app/presentation.js").read_text(encoding="utf-8")
 header=(ROOT/"src/ui/components/page-header.js").read_text(encoding="utf-8")
 card=(ROOT/"src/app/energy-card.js").read_text(encoding="utf-8")
 
-if meta.get("version")!="1.5.2" or meta.get("source_commit")!="16a217a33f6a7cc90d42ad83492e90ba1d364eee":
+if meta.get("version")!="1.5.3" or meta.get("source_commit")!="bb35ae4920cd6a7e135572beae3fc593ba290cd4":
     raise SystemExit("unexpected RHI UX Core pin")
 if meta.get("runtime_dependency") is not False or meta.get("branding_owner")!="rhi-ux-core":
     raise SystemExit("RHI UX Core ownership metadata drift")
@@ -26,4 +26,4 @@ if "__RHI_ASSET_ID__" in vendor: raise SystemExit("stale build-placeholder-style
 if "{asset_id}" not in vendor: raise SystemExit("runtime-safe cross-domain navigation token missing")
 if "COMPANY_LOGO_ASSET" in card:
     raise SystemExit("Energy must not own company-logo transport")
-print("PASS Energy consumes pinned RHI UX Core 1.5.2 including shared visual picker and body-scoped context controls without runtime coupling")
+print("PASS Energy consumes pinned RHI UX Core 1.5.3 including shared visual picker and body-scoped context controls without runtime coupling")
