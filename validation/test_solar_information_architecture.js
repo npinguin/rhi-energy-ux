@@ -49,7 +49,7 @@ assert.match(app,/Storage system with its physical batteries/);
 const hardwareStart = app.indexOf("\n    solarHardwareExperience(rt)");
 const hardwareEnd = app.indexOf("\n    solarEnergyStory(rt)", hardwareStart);
 const hardware = app.slice(hardwareStart, hardwareEnd);
-assert.ok(hardware.indexOf("solarBatterySystem") < hardware.indexOf("solarInverterSystem"), "Home Battery must precede inverter hierarchy in Solar hardware order");
+assert.match(hardware,/solarHardwareExperience">\$\{batterySection\}\$\{productionSection\}/, "rendered Solar body must be Home Battery then Solar Production");
 assert.match(hardware,/stringsForInverter/);
 assert.match(hardware,/unassignedArrays/);
 assert.doesNotMatch(hardware,/'Solar zones'/);
