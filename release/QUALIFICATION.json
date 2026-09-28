@@ -1,8 +1,8 @@
 {
-  "version": "4.3.14",
-  "candidate_tag": "v4.3.14",
+  "version": "4.3.15",
+  "candidate_tag": "v4.3.15",
   "candidate_sha": "pending",
-  "previous_release": "4.3.13",
+  "previous_release": "4.3.14",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -60,5 +60,9 @@
   "shared_core_visual_picker_shell": "NOT_EXECUTED",
   "solar_battery_first_hierarchy": "NOT_EXECUTED",
   "solar_strings_primary_visible": "NOT_EXECUTED",
-  "solar_unresolved_relationship_truthful": "NOT_EXECUTED"
+  "solar_unresolved_relationship_truthful": "NOT_EXECUTED",
+  "battery_aggregate_consistency": "NOT_EXECUTED",
+  "solar_strict_hierarchy": "NOT_EXECUTED",
+  "solar_energy_facts_removed": "NOT_EXECUTED",
+  "appearance_entrypoint_visible": "NOT_EXECUTED"
 }
