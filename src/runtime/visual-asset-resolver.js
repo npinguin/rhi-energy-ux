@@ -59,17 +59,7 @@ function resolveEnergyAssetVisual(asset = {}, registry = null, variant = "card")
     if (!sourceRef.startsWith("energy.logical.")) return null;
   }
 
-  const assetId = String(asset.asset_id || asset.id || "").trim();
   const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
-  const selectedRef = typeof rhiEnergySelectedVisualRef === "function"
-    ? rhiEnergySelectedVisualRef(assetId)
-    : "";
-  const selectedEntry = typeof rhiEnergyVisualEntryFromRef === "function"
-    ? rhiEnergyVisualEntryFromRef(selectedRef)
-    : null;
-  if (selectedEntry && selectedEntry.asset_type === assetType) {
-    return resolveEnergyOwnedVisualRef(selectedRef);
-  }
 
   const sourceEntry = typeof rhiEnergyVisualEntryFromRef === "function"
     ? rhiEnergyVisualEntryFromRef(sourceRef)

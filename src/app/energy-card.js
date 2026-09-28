@@ -1303,7 +1303,10 @@
       }
       const visualReset = event.target.closest('[data-energy-visual-reset]');
       if (visualReset) {
-        if (typeof rhiEnergyClearVisualPreference === 'function') rhiEnergyClearVisualPreference(visualReset.dataset.energyVisualReset || '');
+        const assetId = visualReset.dataset.energyVisualReset || this.energyVisualPickerAssetId || '';
+        if (assetId) {
+          this.requestPropertyWrite(`appearance:${assetId}:visual_ref`, '', { source:'energy_visual_picker_reset', asset_id:assetId });
+        }
         closeVisualEditor();
         this._forceRender = true;
         this.render();
@@ -1326,12 +1329,9 @@
       const visualSave = event.target.closest('[data-energy-visual-save]');
       if (visualSave && !visualSave.disabled) {
         const assetId = visualSave.dataset.energyVisualSave || this.energyVisualPickerAssetId || '';
-        const rt = this.runtime();
-        const asset = typeof rt.asset === 'function'
-          ? rt.asset(assetId)
-          : (typeof rt.assets === 'function' ? rt.assets().find(row => String(row?.asset_id || '') === String(assetId)) : null);
-        if (asset && this.energyVisualPickerDraftRef && typeof rhiEnergySetVisualPreference === 'function') {
-          rhiEnergySetVisualPreference(asset, this.energyVisualPickerDraftRef);
+        const visualRef = String(this.energyVisualPickerDraftRef || '').trim();
+        if (assetId && visualRef) {
+          this.requestPropertyWrite(`appearance:${assetId}:visual_ref`, visualRef, { source:'energy_visual_picker_save', asset_id:assetId });
         }
         closeVisualEditor();
         this._forceRender = true;
@@ -1341,8 +1341,17 @@
       const visualOpen = event.target.closest('[data-energy-visual-open]');
       if (visualOpen) {
         const assetId = visualOpen.dataset.energyVisualOpen || '';
+        const rt = this.runtime();
+        const asset = typeof rt.asset === 'function' ? rt.asset(assetId) : null;
         this.energyVisualPickerAssetId = assetId;
-        this.energyVisualPickerDraftRef = typeof rhiEnergySelectedVisualRef === 'function' ? rhiEnergySelectedVisualRef(assetId) : '';
+        this.energyVisualPickerDraftRef = String(
+          firstDefined(
+            asset?.appearance?.configured_visual_ref,
+            asset?.appearance?.effective_visual_ref,
+            asset?.visual_ref,
+            ''
+          ) || ''
+        );
         this.energyVisualPickerBrand = 'all';
         this._forceRender = true;
         this.render();
@@ -3449,20 +3458,17 @@
         .filter(panel => !childOptimizers.some(optimizer => this.energyAssetParentId(optimizer) === String(firstDefined(panel.asset_id,panel.id,'') || '')))
         .map(panel => this.solarModuleCard(rt,panel,[]))
         .join('');
-      const detailBody = [
-        this.energyAssetDetailDisclosure(rt,enriched),
-        optimizerCards ? `<div class="solarModuleGrid">${optimizerCards}</div>` : '',
-        panelOnlyCards ? `<details class="solarTopologyDetails"><summary>Panels without optimizer publication</summary><div class="solarModuleGrid">${panelOnlyCards}</div></details>` : ''
-      ].join('');
-      return `<details class="solarStringLink" data-solar-string="${escapeHtml(id)}">
-        <summary>
+      const technicalDetails = this.energyAssetDetailDisclosure(rt,enriched);
+      return `<article class="solarStringLink" data-solar-string="${escapeHtml(id)}">
+        <div class="solarStringSummary">
           <span><small>SOLAR STRING</small><b>${escapeHtml(name)}</b></span>
           ${power ? `<span><small>Production now</small><b>${escapeHtml(power.value)}</b></span>` : ''}
           ${childCount !== null ? `<span><small>Modules</small><b>${escapeHtml(childCount)}</b></span>` : ''}
-          <i>Details</i>
-        </summary>
-        <div class="solarStringDetails">${detailBody}</div>
-      </details>`;
+        </div>
+        ${optimizerCards ? `<div class="solarModuleGrid">${optimizerCards}</div>` : ''}
+        ${panelOnlyCards ? `<div class="solarModuleGrid solarPanelOnlyGrid">${panelOnlyCards}</div>` : ''}
+        ${technicalDetails}
+      </article>`;
     }
     solarInverterCard(rt, inverter, strings = [], panelsFor = () => [], optimizersFor = () => []) {
       const inverterId = String(firstDefined(inverter.asset_id,inverter.id,'') || '');
@@ -3472,12 +3478,18 @@
         ${children ? `<div class="solarInverterStrings"><div class="solarInverterStringsHead"><small>STRINGS</small><b>${strings.length}</b></div>${children}</div>` : ''}
       </div>`;
     }
-    solarInverterSystem(rt, inverters = [], stringsForInverter = () => [], panelsFor = () => [], optimizersFor = () => []) {
-      if (!inverters.length) return '';
+    solarInverterSystem(rt, inverters = [], stringsForInverter = () => [], panelsFor = () => [], optimizersFor = () => [], unresolvedStrings = []) {
+      if (!inverters.length && !unresolvedStrings.length) return '';
+      const inverterCards = inverters.length
+        ? `<div class="solarInverterGrid">${inverters.map(asset=>this.solarInverterCard(rt,asset,stringsForInverter(asset),panelsFor,optimizersFor)).join('')}</div>`
+        : '';
+      const unresolved = unresolvedStrings.length
+        ? `<div class="solarUnresolvedStrings"><div class="solarInverterStringsHead"><small>STRINGS · INVERTER RELATIONSHIP NOT YET PUBLISHED</small><b>${unresolvedStrings.length}</b></div><p>Energy keeps these strings visible directly below the inverter system without guessing which inverter owns them.</p><div class="solarStringList">${unresolvedStrings.map(array=>this.solarStringLink(rt,array,panelsFor(array),optimizersFor(array,panelsFor(array)))).join('')}</div></div>`
+        : '';
       return this.solarHardwareSection(
         'Inverter system',
-        'Physical inverters with their canonically linked strings.',
-        `<div class="solarInverterGrid">${inverters.map(asset=>this.solarInverterCard(rt,asset,stringsForInverter(asset),panelsFor,optimizersFor)).join('')}</div>`,
+        'Physical inverters first, followed by their strings, optimizers and panels. Unresolved inverter relationships remain visible without inference.',
+        inverterCards + unresolved,
         `${inverters.length} inverter${inverters.length===1?'':'s'}`,
         'solar-inverter-detail'
       );
@@ -3555,16 +3567,15 @@
         `${production.length} system${production.length===1?'':'s'}`,
         'solar-production-detail'
       ) : '';
-      const inverterSection = this.solarInverterSystem(rt,inverters,stringsForInverter,panelsFor,optimizersFor);
       const batterySection = this.solarBatterySystem(rt,systems,batteries);
+      const inverterSection = this.solarInverterSystem(rt,inverters,stringsForInverter,panelsFor,optimizersFor,unassignedArrays);
       const unassignedBody = [
-        unassignedArrays.length ? `<div class="solarUnassignedPanels"><h3>Strings without inverter relationship</h3><p>These strings remain visible because the backend has not published a canonical inverter parent.</p><div class="solarStringList">${unassignedArrays.map(array=>this.solarStringLink(rt,array,panelsFor(array),optimizersFor(array,panelsFor(array)))).join('')}</div></div>` : '',
         unassignedPanels.length ? `<div class="solarUnassignedPanels"><h3>Panels without string relationship</h3><div class="solarChildGrid">${unassignedPanels.map(panel=>this.energyDeviceStatusCard(rt,panel,'Solar panel')).join('')}</div></div>` : '',
         unassignedOptimizers.length ? `<div class="solarUnassignedPanels"><h3>Other optimizers</h3><div class="solarModuleGrid">${unassignedOptimizers.map(item=>this.solarOptimizerPrimaryCard(rt,item,null)).join('')}</div></div>` : '',
         backup.length ? `<div class="solarUnassignedPanels"><h3>Support devices</h3><div class="solarChildGrid">${backup.map(asset=>this.energyDeviceStatusCard(rt,asset,'Backup interface')).join('')}</div></div>` : ''
       ].join('');
       const unassignedSection = unassignedBody ? this.solarHardwareSection('Other published hardware','Only canonical objects that cannot be placed under an inverter remain here.',unassignedBody) : '';
-      return `<div class="solarHardwareExperience">${productionSection}${inverterSection}${batterySection}${unassignedSection}</div>`;
+      return `<div class="solarHardwareExperience">${batterySection}${productionSection}${inverterSection}${unassignedSection}</div>`;
     }
 
     solarEnergyStory(rt) {
@@ -3606,7 +3617,7 @@
 
         .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
         .solarEnergyStory{padding:10px 12px}.solarValueFlow{display:grid;grid-template-columns:minmax(92px,1fr) auto minmax(92px,1fr) auto minmax(92px,1fr) auto minmax(92px,1fr);gap:7px;align-items:stretch}.solarValueFlow button,.solarFlowNode{border:0;background:#f8fafc;border-radius:10px;padding:8px 10px;text-align:left;min-width:0}.solarValueFlow button{cursor:pointer}.solarValueFlow button:hover{background:#eff6ff;box-shadow:inset 0 0 0 1px #bfdbfe}.solarValueFlow small,.solarValueFlow b,.solarValueFlow span{display:block}.solarValueFlow small{font-size:8px;color:#64748b;font-weight:700}.solarValueFlow b{font-size:14px;color:#0f172a;margin-top:2px;white-space:nowrap}.solarValueFlow span{font-size:8px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.solarValueFlow>i{font-style:normal;align-self:center;color:#64748b;font-size:14px}.solarFlowStatus{margin-top:7px;font-size:8.5px;color:#9a5b17;padding:0 2px}.solarHardwareSection{scroll-margin-top:12px}@media(max-width:720px){.solarValueFlow{grid-template-columns:minmax(72px,1fr) auto minmax(72px,1fr) auto minmax(72px,1fr) auto minmax(72px,1fr);gap:5px}.solarValueFlow button,.solarFlowNode{padding:7px}.solarValueFlow b{font-size:12px}}
-        .solarInverterGrid{display:grid;gap:12px}.solarInverterCard{border:1px solid #e5ebf3;border-radius:15px;background:#fff;padding:10px}.solarInverterCard>.energyDeviceCard{border:0;padding:2px;min-height:150px}.solarInverterStrings{margin-top:8px;border-top:1px solid #edf1f6;padding-top:8px}.solarInverterStringsHead{display:flex;justify-content:space-between;align-items:center;padding:0 4px 6px}.solarInverterStringsHead small{font-size:8px;letter-spacing:.1em;color:#64748b;font-weight:800}.solarInverterStringsHead b{font-size:10px;color:#475569}.solarStringLink{border-top:1px solid #edf1f6}.solarStringLink>summary{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(90px,.7fr) minmax(70px,.5fr) auto;gap:10px;align-items:center;padding:10px 4px;cursor:pointer;list-style:none}.solarStringLink>summary::-webkit-details-marker{display:none}.solarStringLink>summary span small,.solarStringLink>summary span b{display:block}.solarStringLink>summary small{font-size:8px;color:#64748b}.solarStringLink>summary b{font-size:11px;color:#1e293b;margin-top:2px}.solarStringLink>summary i{font-style:normal;font-size:9px;color:#355D96;font-weight:700}.solarStringDetails{padding:0 4px 10px}.solarStringList{border:1px solid #e5ebf3;border-radius:12px;padding:0 8px;background:#fff}@media(max-width:720px){.solarStringLink>summary{grid-template-columns:minmax(0,1fr) auto}.solarStringLink>summary span:not(:first-child){display:none}}
+        .solarInverterGrid{display:grid;gap:12px}.solarInverterCard{border:1px solid #e5ebf3;border-radius:15px;background:#fff;padding:10px}.solarInverterCard>.energyDeviceCard{border:0;padding:2px;min-height:150px}.solarInverterStrings{margin-top:8px;border-top:1px solid #edf1f6;padding-top:8px}.solarInverterStringsHead{display:flex;justify-content:space-between;align-items:center;padding:0 4px 6px}.solarInverterStringsHead small{font-size:8px;letter-spacing:.1em;color:#64748b;font-weight:800}.solarInverterStringsHead b{font-size:10px;color:#475569}.solarStringLink{border-top:1px solid #edf1f6;padding:9px 4px}.solarStringSummary{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(90px,.7fr) minmax(70px,.5fr);gap:10px;align-items:center}.solarStringSummary span small,.solarStringSummary span b{display:block}.solarStringSummary small{font-size:8px;color:#64748b}.solarStringSummary b{font-size:11px;color:#1e293b;margin-top:2px}.solarStringLink>.solarModuleGrid{margin-top:8px}.solarStringLink>.energyAssetDetails{margin-top:8px}.solarStringList{border:1px solid #e5ebf3;border-radius:12px;padding:0 8px;background:#fff}.solarUnresolvedStrings{margin-top:10px;padding-top:8px;border-top:1px solid #edf1f6}.solarUnresolvedStrings>p{margin:0 4px 8px;color:#64748b;font-size:9.5px;line-height:1.4}@media(max-width:720px){.solarStringSummary{grid-template-columns:minmax(0,1fr) auto}.solarStringSummary span:nth-child(2){display:none}}
                 .energyDeviceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.energyDeviceCard{display:grid;grid-template-columns:126px minmax(0,1fr);gap:12px;border:1px solid #e5ebf3;background:#fff;border-radius:14px;padding:12px;min-height:166px}.energyDeviceVisual{height:138px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fbfdff,#f6f8fb);border-radius:11px;overflow:hidden}.energyDeviceVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.energyDeviceVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:5px;box-sizing:border-box}.energyDeviceBody{min-width:0}.energyDeviceTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.energyDeviceTop small{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.energyDeviceTop h3{font-size:13px;line-height:1.25;margin:3px 0 8px}.energyDeviceArea{display:block;margin:-4px 0 7px;color:#64748b;font-size:9px}.batteryContributorArea{display:block;margin-top:3px;color:#64748b;font-size:9px}.energyDeviceState{font-size:9px;background:#eef7f1;color:#3f7f5a;border-radius:999px;padding:5px 7px;white-space:nowrap}.energyDeviceConfig{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.energyDeviceConfig span{font-size:9px;color:#64748b;background:#f8fafc;border-radius:7px;padding:5px 6px}.energyDeviceConfig b{color:#334155;margin-right:4px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyDeviceFacts span{background:#f8fafc;border-radius:7px;padding:6px;min-width:0}.energyDeviceRelation{grid-column:1/-1}.energyDeviceFacts small,.energyDeviceFacts b{display:block}.energyDeviceFacts small{font-size:8px;color:#64748b}.energyDeviceFacts b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.energyDeviceNoFacts{grid-column:1/-1}.energyAssetQuickActions{grid-column:1/-1;display:grid;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid #edf1f6}.energyAssetQuickActions>small{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700}.energyAssetQuickActions>div{display:flex;gap:6px;flex-wrap:wrap}.energyAssetQuickActions .hiAction{min-height:30px;padding:0 9px;font-size:9.5px}
         .energyAssetDetails{margin-top:8px;border-top:1px solid #edf1f6;padding-top:7px}.energyAssetDetails>summary{cursor:pointer;color:#355D96;font-size:9px;font-weight:650;list-style:none}.energyAssetDetails>summary::-webkit-details-marker{display:none}.energyAssetDetails>summary:after{content:" ▾";color:#94a3b8}.energyAssetDetails[open]>summary:after{content:" ▴"}.energyAssetDetailGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:7px}.energyAssetDetailGrid span{min-width:0;background:#f8fafc;border-radius:7px;padding:6px}.energyAssetDetailGrid span.wide{grid-column:1/-1}.energyAssetDetailGrid small,.energyAssetDetailGrid b{display:block}.energyAssetDetailGrid small{font-size:8px;color:#64748b}.energyAssetDetailGrid b{font-size:9.5px;line-height:1.3;overflow-wrap:anywhere}.energyAssetPropertyList{margin-top:8px;padding-top:8px;border-top:1px solid #edf1f6}.energyAssetPropertyTitle{display:block;margin-bottom:6px;font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700}.energyAssetPropertyGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyAssetPropertyGrid span{min-width:0;background:#f8fafc;border-radius:7px;padding:6px}.energyAssetPropertyGrid small,.energyAssetPropertyGrid b{display:block}.energyAssetPropertyGrid small{font-size:8px;color:#64748b}.energyAssetPropertyGrid b{font-size:9.5px;line-height:1.3;overflow-wrap:anywhere}
         .gasContextGrid,.planningContextGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:10px}.gasContextGrid span,.planningContextGrid span{min-width:0;border:1px solid #e5ebf3;border-radius:10px;background:#f8fafc;padding:9px 10px}.gasContextGrid small,.planningContextGrid small,.gasContextGrid b,.planningContextGrid b{display:block}.gasContextGrid small,.planningContextGrid small{font-size:8.5px;color:#64748b}.gasContextGrid b,.planningContextGrid b{font-size:10.5px;line-height:1.3;margin-top:3px;overflow-wrap:anywhere}.planningContextPanel>p{margin:9px 0 0;color:#64748b;font-size:10.5px;line-height:1.4}.planningContextPanel>.empty{margin-top:9px}
@@ -5048,7 +5059,13 @@
       const pickerChoices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(assetType) : [];
       const registeredOwner = visualRef ? String(rt.visualRegistry()?.entry?.(visualRef)?.owner_domain || '').trim() : '';
       const externallyOwned = !!registeredOwner && !['rhi_energy','rhi_energy_ux'].includes(registeredOwner);
-      const canPick = !!assetId && !externallyOwned && pickerChoices.length > 0;
+      const appearance = objectFrom(asset.appearance || {});
+      const appearanceProperty = assetId ? rt.editableProperty(`appearance:${assetId}:visual_ref`) : null;
+      const canPick = !!assetId
+        && !externallyOwned
+        && appearance.editable === true
+        && pickerChoices.length > 0
+        && this.isWritableRow(appearanceProperty);
       const pickerAttrs = canPick
         ? ` data-energy-visual-open="${escapeHtml(assetId)}" role="button" tabindex="0" title="Choose representative image"`
         : '';
@@ -5068,7 +5085,12 @@
       const type = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
       const choices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(type) : [];
       if (!choices.length) return '';
-      const selected = typeof rhiEnergySelectedVisualRef === 'function' ? rhiEnergySelectedVisualRef(assetId) : '';
+      const selected = String(firstDefined(
+        asset.appearance?.configured_visual_ref,
+        asset.appearance?.effective_visual_ref,
+        asset.visual_ref,
+        ''
+      ) || '');
       const fallbackEntry = typeof rhiEnergyDefaultVisualEntry === 'function' ? rhiEnergyDefaultVisualEntry(asset) : null;
       const current = selected || (fallbackEntry && typeof rhiEnergyVisualRef === 'function' ? rhiEnergyVisualRef(fallbackEntry) : '');
       const picker = new HomeBrainEnergyVisualPicker();

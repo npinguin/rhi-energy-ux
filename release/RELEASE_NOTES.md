@@ -1,14 +1,15 @@
-# RHI Energy UX 4.3.13 — SOLAR_HIERARCHY_VALUE_UX
+# RHI Energy UX 4.3.14 — SOLAR_HIERARCHY_PERSISTENT_APPEARANCE
 
-- Nest Solar strings under their canonical inverter instead of presenting strings as peer hardware cards.
-- Keep optimizer and panel detail below the string and suppress empty “No panels linked” boxes.
-- Replace the verbose “From panel to home” story with one compact live value flow: **Solar → Battery → Home ↔ Grid**.
-- Keep inverter hardware as Solar detail rather than a primary energy-flow node.
-- Replace the image picker / wizard hybrid with one compact image editor: optional brand filter, draft selection, explicit Save, Cancel and profile-default reset.
-- Persist an image only on explicit Save; Cancel leaves the stored preference unchanged.
-- Keep hierarchy and live values contract-driven; the UX does not invent missing topology or energy allocation.
+- Move Home Battery ahead of Solar production/inverter hardware detail.
+- Keep Solar strings visible directly below the inverter system; optimizers and panels are primary body content, not hidden behind the string Details toggle.
+- Keep unresolved inverter↔string relationships visible without guessing ownership.
+- Persist Energy-owned appearance through backend Public V2 property writes instead of browser localStorage.
+- Use the shared UX Core 1.5.2 visual picker shell.
+- Preserve producer ownership: Mobility-owned vehicle/charger/flexible-load visuals remain authoritative and cannot be overridden by Energy.
+- Preserve E0.15.77 automation authority, planning, Metering, Value and Retrospective semantics.
 
-Minimum/tested backend: **E0.15.77**.
+Minimum/tested backend: **E0.15.78**.
+UX Core baseline: **1.5.2 @ 16a217a33f6a7cc90d42ad83492e90ba1d364eee**.
 Known accepted technical debt: **0**.
 Known accepted feature debt: **0**.
 

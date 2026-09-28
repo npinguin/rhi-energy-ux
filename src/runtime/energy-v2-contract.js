@@ -161,6 +161,36 @@ function readEnergyPublicV2(gateway) {
       if (!propertyByKey.has(key)) propertyByKey.set(key, row);
       if (assetId) propertyByAssetAndKey.set(`${assetId}::${key}`, row);
     }
+
+    // Appearance is product presentation metadata, not a semantic measurement.
+    // Adapt the backend-owned appearance contract into the generic property writer
+    // without polluting the object's published semantic property set.
+    const appearance = object(asset.appearance);
+    const appearanceWrite = object(appearance.write);
+    const appearancePropertyId = String(appearanceWrite?.data?.property_id || '');
+    if (
+      assetId
+      && appearance.editable === true
+      && appearanceWrite.supported === true
+      && appearancePropertyId
+    ) {
+      const row = Object.freeze({
+        asset_id:assetId,
+        property_id:appearancePropertyId,
+        property_key:appearancePropertyId,
+        key:appearancePropertyId,
+        display_name:'Image',
+        value:appearance.configured_visual_ref ?? null,
+        availability:'AVAILABLE',
+        editable:true,
+        write_supported:true,
+        write:appearanceWrite,
+        operation:object(appearance.operation)
+      });
+      propertyRows.push(row);
+      propertyByKey.set(appearancePropertyId,row);
+      propertyByAssetAndKey.set(`${assetId}::${appearancePropertyId}`,row);
+    }
   }
 
   const publicContractOk = envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2';

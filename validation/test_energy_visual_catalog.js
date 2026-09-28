@@ -2,16 +2,11 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
 
-const store = {};
 const context = {
   console,
   UX_VERSION:"test",
   HERO_IMAGE_BYD_LVS20:"data:image/webp;base64,test",
-  globalThis:null,
-  localStorage:{
-    getItem:key => store[key] || null,
-    setItem:(key,value) => { store[key]=value; }
-  }
+  globalThis:null
 };
 context.globalThis=context;
 vm.createContext(context);
@@ -35,18 +30,13 @@ assert.match(context.rhiEnergyVisualRef(batteryDefault),/^energy\.logical\.batte
 assert.equal(context.rhiEnergyDefaultVisualEntry(inverter).asset_type,"solar_inverter");
 assert.equal(context.rhiEnergyDefaultVisualEntry(grid).asset_type,"grid_connection");
 
-const wrong=context.rhiEnergyVisualRef(context.rhiEnergyVisualCatalogForType("solar_inverter")[0]);
-assert.equal(context.rhiEnergySetVisualPreference(battery,wrong),false);
 const genericBattery=context.rhiEnergyVisualRef(batteryChoices.find(row=>row.id==="battery.home"));
-assert.equal(context.rhiEnergySetVisualPreference(battery,genericBattery),true);
-assert.equal(context.rhiEnergySelectedVisualRef("battery_1"),genericBattery);
-
-const resolved=context.resolveEnergyAssetVisual(battery);
+const persistedBattery={...battery,visual_ref:genericBattery,appearance:{configured_visual_ref:genericBattery,effective_visual_ref:genericBattery,editable:true}};
+const resolved=context.resolveEnergyAssetVisual(persistedBattery);
 assert.ok(resolved && resolved.url);
 assert.equal(resolved.asset_type,"battery");
 assert.equal(resolved.visual_ref,genericBattery);
 
-context.rhiEnergyClearVisualPreference("battery_1");
 const defaultResolved=context.resolveEnergyAssetVisual(battery);
 assert.ok(defaultResolved && defaultResolved.url);
 assert.equal(defaultResolved.asset_type,"battery");
@@ -75,3 +65,6 @@ assert.match(picker,/rhiEnergyVisualCatalogForType/);
 assert.match(picker,/data-energy-visual-select/);
 
 console.log("PASS Energy logical-device visual catalog and type-safe picker");
+
+const catalogSource=fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
+assert.doesNotMatch(catalogSource,/localStorage|visual_preferences|rhiEnergySetVisualPreference|rhiEnergySelectedVisualRef/);

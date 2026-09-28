@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.13';
+  const UX_VERSION = 'R4.3.14';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
@@ -203,6 +203,36 @@ function readEnergyPublicV2(gateway) {
       propertyRows.push(row);
       if (!propertyByKey.has(key)) propertyByKey.set(key, row);
       if (assetId) propertyByAssetAndKey.set(`${assetId}::${key}`, row);
+    }
+
+    // Appearance is product presentation metadata, not a semantic measurement.
+    // Adapt the backend-owned appearance contract into the generic property writer
+    // without polluting the object's published semantic property set.
+    const appearance = object(asset.appearance);
+    const appearanceWrite = object(appearance.write);
+    const appearancePropertyId = String(appearanceWrite?.data?.property_id || '');
+    if (
+      assetId
+      && appearance.editable === true
+      && appearanceWrite.supported === true
+      && appearancePropertyId
+    ) {
+      const row = Object.freeze({
+        asset_id:assetId,
+        property_id:appearancePropertyId,
+        property_key:appearancePropertyId,
+        key:appearancePropertyId,
+        display_name:'Image',
+        value:appearance.configured_visual_ref ?? null,
+        availability:'AVAILABLE',
+        editable:true,
+        write_supported:true,
+        write:appearanceWrite,
+        operation:object(appearance.operation)
+      });
+      propertyRows.push(row);
+      propertyByKey.set(appearancePropertyId,row);
+      propertyByAssetAndKey.set(`${assetId}::${appearancePropertyId}`,row);
     }
   }
 
@@ -475,8 +505,6 @@ function selectEnergyCoverage(store) {
 // Energy logical-device visual catalog.
 // Backend profiles remain semantic and non-visual. This UX module owns representative
 // artwork, same-type defaults, picker options and local presentation preference.
-const RHI_ENERGY_VISUAL_PREFERENCE_KEY = "homebrain.energy.visual_preferences.v1";
-
 const RHI_ENERGY_LOGICAL_VISUALS = Object.freeze([
   { id:"battery_system.home", asset_type:"battery_system", label:"Home battery system", brand:"Generic", model:"Home battery system", variant:"System", profile_patterns:["energy.battery_system."], package_path:"heroes/battery-hero.webp", quality:"representative", selectable:true },
   { id:"battery.byd_lvs_20", asset_type:"battery", label:"BYD Battery-Box Premium LVS 20.0", brand:"BYD", model:"Battery-Box Premium LVS 20.0", variant:"20.0 kWh · 5 × LVS 4.0", profile_patterns:[], package_path:"energy/byd_lvs_20.webp", quality:"verified_model_choice", selectable:true },
@@ -564,52 +592,6 @@ function rhiEnergyDefaultVisualEntry(asset = {}) {
     || candidates.find(entry => /generic|home|provider|market|array|smart_meter/.test(entry.id))
     || candidates[0]
     || null;
-}
-
-function rhiEnergyReadVisualPreferences() {
-  try {
-    const raw = globalThis?.localStorage?.getItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch (_) {
-    return {};
-  }
-}
-
-function rhiEnergySelectedVisualRef(assetId = "") {
-  const id = String(assetId || "").trim();
-  if (!id) return "";
-  return String(rhiEnergyReadVisualPreferences()[id] || "").trim();
-}
-
-function rhiEnergySetVisualPreference(asset = {}, visualRef = "") {
-  const assetId = String(asset.asset_id || asset.id || "").trim();
-  const ref = String(visualRef || "").trim();
-  if (!assetId || !ref) return false;
-  const entry = rhiEnergyVisualEntryFromRef(ref);
-  const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
-  if (!entry || entry.asset_type !== assetType) return false;
-  try {
-    const preferences = rhiEnergyReadVisualPreferences();
-    preferences[assetId] = ref;
-    globalThis?.localStorage?.setItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY, JSON.stringify(preferences));
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-function rhiEnergyClearVisualPreference(assetId = "") {
-  const id = String(assetId || "").trim();
-  if (!id) return false;
-  try {
-    const preferences = rhiEnergyReadVisualPreferences();
-    delete preferences[id];
-    globalThis?.localStorage?.setItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY, JSON.stringify(preferences));
-    return true;
-  } catch (_) {
-    return false;
-  }
 }
 
 // ---- src/runtime/foundation-visual-registry.js ----
@@ -733,17 +715,7 @@ function resolveEnergyAssetVisual(asset = {}, registry = null, variant = "card")
     if (!sourceRef.startsWith("energy.logical.")) return null;
   }
 
-  const assetId = String(asset.asset_id || asset.id || "").trim();
   const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
-  const selectedRef = typeof rhiEnergySelectedVisualRef === "function"
-    ? rhiEnergySelectedVisualRef(assetId)
-    : "";
-  const selectedEntry = typeof rhiEnergyVisualEntryFromRef === "function"
-    ? rhiEnergyVisualEntryFromRef(selectedRef)
-    : null;
-  if (selectedEntry && selectedEntry.asset_type === assetType) {
-    return resolveEnergyOwnedVisualRef(selectedRef);
-  }
 
   const sourceEntry = typeof rhiEnergyVisualEntryFromRef === "function"
     ? rhiEnergyVisualEntryFromRef(sourceRef)
@@ -2849,36 +2821,40 @@ class HomeBrainEnergyVisualPicker {
     const activeBrand = brand !== "all" && brands.includes(brand) ? brand : "all";
     const visible = activeBrand === "all" ? choices : choices.filter(entry => String(entry.brand || "") === activeBrand);
 
-    const filters = brands.length > 1
-      ? `<div class="energyVisualBrandFilter" aria-label="Filter images by brand">
-          <button type="button" class="${activeBrand === "all" ? "selected" : ""}" data-energy-visual-brand="all">All</button>
-          ${brands.map(item => `<button type="button" class="${activeBrand === item ? "selected" : ""}" data-energy-visual-brand="${escapeHtml(item)}">${escapeHtml(item)}</button>`).join("")}
-        </div>`
-      : "";
+    const filtersHtml = [
+      `<button type="button" class="${activeBrand === "all" ? "selected" : ""}" data-energy-visual-brand="all">All</button>`,
+      ...brands.map(item => `<button type="button" class="${activeBrand === item ? "selected" : ""}" data-energy-visual-brand="${escapeHtml(item)}">${escapeHtml(item)}</button>`)
+    ].join("");
 
-    const cards = visible.map(entry => {
+    const choicesHtml = visible.map(entry => {
       const ref = rhiEnergyVisualRef(entry);
       const visual = typeof resolveEnergyVisualRef === "function" ? resolveEnergyVisualRef(ref) : null;
       const selected = ref === current;
-      return `<button class="energyVisualChoice ${selected ? "selected" : ""}" type="button" data-energy-visual-select="${escapeHtml(ref)}" data-energy-visual-asset="${escapeHtml(assetId)}" aria-pressed="${selected ? "true" : "false"}">
-        <span class="energyVisualChoiceImage">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="">` : ""}</span>
-        <span class="energyVisualChoiceCopy"><small>${escapeHtml(entry.brand || "Representative")}</small><b>${escapeHtml(entry.model || entry.label)}</b><em>${escapeHtml(entry.variant || human(type))}</em></span>
+      return `<button class="rhiUxVisualChoice ${selected ? "selected" : ""}" type="button" data-energy-visual-select="${escapeHtml(ref)}" data-energy-visual-asset="${escapeHtml(assetId)}" aria-pressed="${selected ? "true" : "false"}">
+        <span class="rhiUxVisualChoiceImage">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="">` : ""}</span>
+        <span class="rhiUxVisualChoiceCopy"><small>${escapeHtml(entry.brand || "Representative")}</small><b>${escapeHtml(entry.model || entry.label)}</b><em>${escapeHtml(entry.variant || human(type))}</em></span>
       </button>`;
     }).join("");
 
-    return `<div class="energyVisualPickerBackdrop" data-energy-visual-backdrop="1">
-      <section class="energyVisualPickerPanel" role="dialog" aria-modal="true" aria-label="Choose image" data-energy-visual-panel="1">
-        <header><div><small>APPEARANCE · ${escapeHtml(human(type))}</small><h2>Choose image</h2></div><button type="button" class="energyVisualClose" data-energy-visual-cancel="1" aria-label="Cancel">×</button></header>
-        ${filters}
-        <div class="energyVisualChoices">${cards}</div>
-        <footer>
-          <button type="button" class="energyVisualReset" data-energy-visual-reset="${escapeHtml(assetId)}">Use profile default</button>
-          <span class="energyVisualFooterSpacer"></span>
-          <button type="button" class="energyVisualCancel" data-energy-visual-cancel="1">Cancel</button>
-          <button type="button" class="energyVisualSave" data-energy-visual-save="${escapeHtml(assetId)}" ${current ? "" : "disabled"}>Save image</button>
-        </footer>
-      </section>
-    </div>`;
+    const resetHtml = `<button type="button" data-energy-visual-reset="${escapeHtml(assetId)}">Use profile default</button>`;
+    const cancelHtml = `<button type="button" data-energy-visual-cancel="1">Cancel</button>`;
+    const saveHtml = `<button type="button" class="primary" data-energy-visual-save="${escapeHtml(assetId)}" ${current ? "" : "disabled"}>Save appearance</button>`;
+    const closeHtml = `<button type="button" class="energyVisualClose" data-energy-visual-cancel="1" aria-label="Cancel">×</button>`;
+
+    return typeof rhiUxVisualPickerShell === "function"
+      ? rhiUxVisualPickerShell({
+          eyebrow:`Appearance · ${human(type)}`,
+          title:"Choose appearance",
+          description:"Choose the representative image. The selection is persisted by the owning domain and confirmed by readback.",
+          filtersHtml,
+          choicesHtml,
+          resetHtml,
+          cancelHtml,
+          saveHtml,
+          modal:true,
+          closeHtml
+        }).replace('class="rhiUxVisualPickerBackdrop"', 'class="rhiUxVisualPickerBackdrop" data-energy-visual-backdrop="1"')
+      : "";
   }
 }
 
@@ -2886,27 +2862,7 @@ function rhiEnergyVisualPickerStyles() {
   return `
     .assetVisual[data-energy-visual-open]{cursor:pointer;outline:0}
     .assetVisual[data-energy-visual-open]:hover{box-shadow:0 0 0 2px rgba(37,99,235,.16)}
-    .energyVisualPickerBackdrop{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.44);display:grid;place-items:center;padding:20px}
-    .energyVisualPickerPanel{width:min(720px,94vw);max-height:86vh;overflow:auto;background:#fff;border-radius:20px;border:1px solid #e2e8f0;box-shadow:0 30px 80px rgba(15,23,42,.28);padding:18px}
-    .energyVisualPickerPanel header{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
-    .energyVisualPickerPanel header small{font-size:10px;font-weight:800;letter-spacing:.12em;color:#64748b}
-    .energyVisualPickerPanel header h2{margin:4px 0 0;font-size:21px}
     .energyVisualClose{border:0;background:#f1f5f9;border-radius:10px;width:36px;height:36px;font-size:22px;cursor:pointer}
-    .energyVisualBrandFilter{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
-    .energyVisualBrandFilter button{border:1px solid #dbe3ee;background:#fff;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer}
-    .energyVisualBrandFilter button.selected{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}
-    .energyVisualChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
-    .energyVisualChoice{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;align-items:center;text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:14px;padding:10px;cursor:pointer}
-    .energyVisualChoice:hover{border-color:#93c5fd;background:#f8fbff}.energyVisualChoice.selected{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12);background:#f8fbff}
-    .energyVisualChoiceImage{width:104px;height:72px;border-radius:10px;background:#f8fafc;display:grid;place-items:center;overflow:hidden}
-    .energyVisualChoiceImage img{max-width:100%;max-height:100%;object-fit:contain}
-    .energyVisualChoiceCopy{min-width:0}.energyVisualChoiceCopy small,.energyVisualChoiceCopy b,.energyVisualChoiceCopy em{display:block}
-    .energyVisualChoiceCopy small{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:.08em}.energyVisualChoiceCopy b{font-size:13px;margin-top:3px}.energyVisualChoiceCopy em{font-size:10px;color:#64748b;font-style:normal;margin-top:3px}
-    .energyVisualPickerPanel footer{display:flex;align-items:center;gap:8px;margin-top:14px;border-top:1px solid #eef2f7;padding-top:14px}
-    .energyVisualFooterSpacer{flex:1}
-    .energyVisualReset,.energyVisualCancel,.energyVisualSave{border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer}
-    .energyVisualReset,.energyVisualCancel{border:1px solid #dbe3ee;background:#fff}.energyVisualSave{border:1px solid #2563eb;background:#2563eb;color:#fff}.energyVisualSave:disabled{opacity:.45;cursor:default}
-    @media(max-width:700px){.energyVisualChoices{grid-template-columns:1fr}.energyVisualPickerPanel{padding:14px}.energyVisualChoice{grid-template-columns:88px minmax(0,1fr)}.energyVisualChoiceImage{width:88px;height:66px}.energyVisualPickerPanel footer{flex-wrap:wrap}.energyVisualFooterSpacer{display:none}.energyVisualSave{margin-left:auto}}
   `;
 }
 
@@ -3168,7 +3124,10 @@ function rhiEnergyVisualPickerStyles() {
       }
       const visualReset = event.target.closest('[data-energy-visual-reset]');
       if (visualReset) {
-        if (typeof rhiEnergyClearVisualPreference === 'function') rhiEnergyClearVisualPreference(visualReset.dataset.energyVisualReset || '');
+        const assetId = visualReset.dataset.energyVisualReset || this.energyVisualPickerAssetId || '';
+        if (assetId) {
+          this.requestPropertyWrite(`appearance:${assetId}:visual_ref`, '', { source:'energy_visual_picker_reset', asset_id:assetId });
+        }
         closeVisualEditor();
         this._forceRender = true;
         this.render();
@@ -3191,12 +3150,9 @@ function rhiEnergyVisualPickerStyles() {
       const visualSave = event.target.closest('[data-energy-visual-save]');
       if (visualSave && !visualSave.disabled) {
         const assetId = visualSave.dataset.energyVisualSave || this.energyVisualPickerAssetId || '';
-        const rt = this.runtime();
-        const asset = typeof rt.asset === 'function'
-          ? rt.asset(assetId)
-          : (typeof rt.assets === 'function' ? rt.assets().find(row => String(row?.asset_id || '') === String(assetId)) : null);
-        if (asset && this.energyVisualPickerDraftRef && typeof rhiEnergySetVisualPreference === 'function') {
-          rhiEnergySetVisualPreference(asset, this.energyVisualPickerDraftRef);
+        const visualRef = String(this.energyVisualPickerDraftRef || '').trim();
+        if (assetId && visualRef) {
+          this.requestPropertyWrite(`appearance:${assetId}:visual_ref`, visualRef, { source:'energy_visual_picker_save', asset_id:assetId });
         }
         closeVisualEditor();
         this._forceRender = true;
@@ -3206,8 +3162,17 @@ function rhiEnergyVisualPickerStyles() {
       const visualOpen = event.target.closest('[data-energy-visual-open]');
       if (visualOpen) {
         const assetId = visualOpen.dataset.energyVisualOpen || '';
+        const rt = this.runtime();
+        const asset = typeof rt.asset === 'function' ? rt.asset(assetId) : null;
         this.energyVisualPickerAssetId = assetId;
-        this.energyVisualPickerDraftRef = typeof rhiEnergySelectedVisualRef === 'function' ? rhiEnergySelectedVisualRef(assetId) : '';
+        this.energyVisualPickerDraftRef = String(
+          firstDefined(
+            asset?.appearance?.configured_visual_ref,
+            asset?.appearance?.effective_visual_ref,
+            asset?.visual_ref,
+            ''
+          ) || ''
+        );
         this.energyVisualPickerBrand = 'all';
         this._forceRender = true;
         this.render();
@@ -5314,20 +5279,17 @@ function rhiEnergyVisualPickerStyles() {
         .filter(panel => !childOptimizers.some(optimizer => this.energyAssetParentId(optimizer) === String(firstDefined(panel.asset_id,panel.id,'') || '')))
         .map(panel => this.solarModuleCard(rt,panel,[]))
         .join('');
-      const detailBody = [
-        this.energyAssetDetailDisclosure(rt,enriched),
-        optimizerCards ? `<div class="solarModuleGrid">${optimizerCards}</div>` : '',
-        panelOnlyCards ? `<details class="solarTopologyDetails"><summary>Panels without optimizer publication</summary><div class="solarModuleGrid">${panelOnlyCards}</div></details>` : ''
-      ].join('');
-      return `<details class="solarStringLink" data-solar-string="${escapeHtml(id)}">
-        <summary>
+      const technicalDetails = this.energyAssetDetailDisclosure(rt,enriched);
+      return `<article class="solarStringLink" data-solar-string="${escapeHtml(id)}">
+        <div class="solarStringSummary">
           <span><small>SOLAR STRING</small><b>${escapeHtml(name)}</b></span>
           ${power ? `<span><small>Production now</small><b>${escapeHtml(power.value)}</b></span>` : ''}
           ${childCount !== null ? `<span><small>Modules</small><b>${escapeHtml(childCount)}</b></span>` : ''}
-          <i>Details</i>
-        </summary>
-        <div class="solarStringDetails">${detailBody}</div>
-      </details>`;
+        </div>
+        ${optimizerCards ? `<div class="solarModuleGrid">${optimizerCards}</div>` : ''}
+        ${panelOnlyCards ? `<div class="solarModuleGrid solarPanelOnlyGrid">${panelOnlyCards}</div>` : ''}
+        ${technicalDetails}
+      </article>`;
     }
     solarInverterCard(rt, inverter, strings = [], panelsFor = () => [], optimizersFor = () => []) {
       const inverterId = String(firstDefined(inverter.asset_id,inverter.id,'') || '');
@@ -5337,12 +5299,18 @@ function rhiEnergyVisualPickerStyles() {
         ${children ? `<div class="solarInverterStrings"><div class="solarInverterStringsHead"><small>STRINGS</small><b>${strings.length}</b></div>${children}</div>` : ''}
       </div>`;
     }
-    solarInverterSystem(rt, inverters = [], stringsForInverter = () => [], panelsFor = () => [], optimizersFor = () => []) {
-      if (!inverters.length) return '';
+    solarInverterSystem(rt, inverters = [], stringsForInverter = () => [], panelsFor = () => [], optimizersFor = () => [], unresolvedStrings = []) {
+      if (!inverters.length && !unresolvedStrings.length) return '';
+      const inverterCards = inverters.length
+        ? `<div class="solarInverterGrid">${inverters.map(asset=>this.solarInverterCard(rt,asset,stringsForInverter(asset),panelsFor,optimizersFor)).join('')}</div>`
+        : '';
+      const unresolved = unresolvedStrings.length
+        ? `<div class="solarUnresolvedStrings"><div class="solarInverterStringsHead"><small>STRINGS · INVERTER RELATIONSHIP NOT YET PUBLISHED</small><b>${unresolvedStrings.length}</b></div><p>Energy keeps these strings visible directly below the inverter system without guessing which inverter owns them.</p><div class="solarStringList">${unresolvedStrings.map(array=>this.solarStringLink(rt,array,panelsFor(array),optimizersFor(array,panelsFor(array)))).join('')}</div></div>`
+        : '';
       return this.solarHardwareSection(
         'Inverter system',
-        'Physical inverters with their canonically linked strings.',
-        `<div class="solarInverterGrid">${inverters.map(asset=>this.solarInverterCard(rt,asset,stringsForInverter(asset),panelsFor,optimizersFor)).join('')}</div>`,
+        'Physical inverters first, followed by their strings, optimizers and panels. Unresolved inverter relationships remain visible without inference.',
+        inverterCards + unresolved,
         `${inverters.length} inverter${inverters.length===1?'':'s'}`,
         'solar-inverter-detail'
       );
@@ -5420,16 +5388,15 @@ function rhiEnergyVisualPickerStyles() {
         `${production.length} system${production.length===1?'':'s'}`,
         'solar-production-detail'
       ) : '';
-      const inverterSection = this.solarInverterSystem(rt,inverters,stringsForInverter,panelsFor,optimizersFor);
       const batterySection = this.solarBatterySystem(rt,systems,batteries);
+      const inverterSection = this.solarInverterSystem(rt,inverters,stringsForInverter,panelsFor,optimizersFor,unassignedArrays);
       const unassignedBody = [
-        unassignedArrays.length ? `<div class="solarUnassignedPanels"><h3>Strings without inverter relationship</h3><p>These strings remain visible because the backend has not published a canonical inverter parent.</p><div class="solarStringList">${unassignedArrays.map(array=>this.solarStringLink(rt,array,panelsFor(array),optimizersFor(array,panelsFor(array)))).join('')}</div></div>` : '',
         unassignedPanels.length ? `<div class="solarUnassignedPanels"><h3>Panels without string relationship</h3><div class="solarChildGrid">${unassignedPanels.map(panel=>this.energyDeviceStatusCard(rt,panel,'Solar panel')).join('')}</div></div>` : '',
         unassignedOptimizers.length ? `<div class="solarUnassignedPanels"><h3>Other optimizers</h3><div class="solarModuleGrid">${unassignedOptimizers.map(item=>this.solarOptimizerPrimaryCard(rt,item,null)).join('')}</div></div>` : '',
         backup.length ? `<div class="solarUnassignedPanels"><h3>Support devices</h3><div class="solarChildGrid">${backup.map(asset=>this.energyDeviceStatusCard(rt,asset,'Backup interface')).join('')}</div></div>` : ''
       ].join('');
       const unassignedSection = unassignedBody ? this.solarHardwareSection('Other published hardware','Only canonical objects that cannot be placed under an inverter remain here.',unassignedBody) : '';
-      return `<div class="solarHardwareExperience">${productionSection}${inverterSection}${batterySection}${unassignedSection}</div>`;
+      return `<div class="solarHardwareExperience">${batterySection}${productionSection}${inverterSection}${unassignedSection}</div>`;
     }
 
     solarEnergyStory(rt) {
@@ -5471,7 +5438,7 @@ function rhiEnergyVisualPickerStyles() {
 
         .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
         .solarEnergyStory{padding:10px 12px}.solarValueFlow{display:grid;grid-template-columns:minmax(92px,1fr) auto minmax(92px,1fr) auto minmax(92px,1fr) auto minmax(92px,1fr);gap:7px;align-items:stretch}.solarValueFlow button,.solarFlowNode{border:0;background:#f8fafc;border-radius:10px;padding:8px 10px;text-align:left;min-width:0}.solarValueFlow button{cursor:pointer}.solarValueFlow button:hover{background:#eff6ff;box-shadow:inset 0 0 0 1px #bfdbfe}.solarValueFlow small,.solarValueFlow b,.solarValueFlow span{display:block}.solarValueFlow small{font-size:8px;color:#64748b;font-weight:700}.solarValueFlow b{font-size:14px;color:#0f172a;margin-top:2px;white-space:nowrap}.solarValueFlow span{font-size:8px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.solarValueFlow>i{font-style:normal;align-self:center;color:#64748b;font-size:14px}.solarFlowStatus{margin-top:7px;font-size:8.5px;color:#9a5b17;padding:0 2px}.solarHardwareSection{scroll-margin-top:12px}@media(max-width:720px){.solarValueFlow{grid-template-columns:minmax(72px,1fr) auto minmax(72px,1fr) auto minmax(72px,1fr) auto minmax(72px,1fr);gap:5px}.solarValueFlow button,.solarFlowNode{padding:7px}.solarValueFlow b{font-size:12px}}
-        .solarInverterGrid{display:grid;gap:12px}.solarInverterCard{border:1px solid #e5ebf3;border-radius:15px;background:#fff;padding:10px}.solarInverterCard>.energyDeviceCard{border:0;padding:2px;min-height:150px}.solarInverterStrings{margin-top:8px;border-top:1px solid #edf1f6;padding-top:8px}.solarInverterStringsHead{display:flex;justify-content:space-between;align-items:center;padding:0 4px 6px}.solarInverterStringsHead small{font-size:8px;letter-spacing:.1em;color:#64748b;font-weight:800}.solarInverterStringsHead b{font-size:10px;color:#475569}.solarStringLink{border-top:1px solid #edf1f6}.solarStringLink>summary{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(90px,.7fr) minmax(70px,.5fr) auto;gap:10px;align-items:center;padding:10px 4px;cursor:pointer;list-style:none}.solarStringLink>summary::-webkit-details-marker{display:none}.solarStringLink>summary span small,.solarStringLink>summary span b{display:block}.solarStringLink>summary small{font-size:8px;color:#64748b}.solarStringLink>summary b{font-size:11px;color:#1e293b;margin-top:2px}.solarStringLink>summary i{font-style:normal;font-size:9px;color:#355D96;font-weight:700}.solarStringDetails{padding:0 4px 10px}.solarStringList{border:1px solid #e5ebf3;border-radius:12px;padding:0 8px;background:#fff}@media(max-width:720px){.solarStringLink>summary{grid-template-columns:minmax(0,1fr) auto}.solarStringLink>summary span:not(:first-child){display:none}}
+        .solarInverterGrid{display:grid;gap:12px}.solarInverterCard{border:1px solid #e5ebf3;border-radius:15px;background:#fff;padding:10px}.solarInverterCard>.energyDeviceCard{border:0;padding:2px;min-height:150px}.solarInverterStrings{margin-top:8px;border-top:1px solid #edf1f6;padding-top:8px}.solarInverterStringsHead{display:flex;justify-content:space-between;align-items:center;padding:0 4px 6px}.solarInverterStringsHead small{font-size:8px;letter-spacing:.1em;color:#64748b;font-weight:800}.solarInverterStringsHead b{font-size:10px;color:#475569}.solarStringLink{border-top:1px solid #edf1f6;padding:9px 4px}.solarStringSummary{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(90px,.7fr) minmax(70px,.5fr);gap:10px;align-items:center}.solarStringSummary span small,.solarStringSummary span b{display:block}.solarStringSummary small{font-size:8px;color:#64748b}.solarStringSummary b{font-size:11px;color:#1e293b;margin-top:2px}.solarStringLink>.solarModuleGrid{margin-top:8px}.solarStringLink>.energyAssetDetails{margin-top:8px}.solarStringList{border:1px solid #e5ebf3;border-radius:12px;padding:0 8px;background:#fff}.solarUnresolvedStrings{margin-top:10px;padding-top:8px;border-top:1px solid #edf1f6}.solarUnresolvedStrings>p{margin:0 4px 8px;color:#64748b;font-size:9.5px;line-height:1.4}@media(max-width:720px){.solarStringSummary{grid-template-columns:minmax(0,1fr) auto}.solarStringSummary span:nth-child(2){display:none}}
                 .energyDeviceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.energyDeviceCard{display:grid;grid-template-columns:126px minmax(0,1fr);gap:12px;border:1px solid #e5ebf3;background:#fff;border-radius:14px;padding:12px;min-height:166px}.energyDeviceVisual{height:138px;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#fbfdff,#f6f8fb);border-radius:11px;overflow:hidden}.energyDeviceVisual .assetVisual{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.energyDeviceVisual .assetVisual img{width:100%;height:100%;object-fit:contain;object-position:center;padding:5px;box-sizing:border-box}.energyDeviceBody{min-width:0}.energyDeviceTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.energyDeviceTop small{color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}.energyDeviceTop h3{font-size:13px;line-height:1.25;margin:3px 0 8px}.energyDeviceArea{display:block;margin:-4px 0 7px;color:#64748b;font-size:9px}.batteryContributorArea{display:block;margin-top:3px;color:#64748b;font-size:9px}.energyDeviceState{font-size:9px;background:#eef7f1;color:#3f7f5a;border-radius:999px;padding:5px 7px;white-space:nowrap}.energyDeviceConfig{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.energyDeviceConfig span{font-size:9px;color:#64748b;background:#f8fafc;border-radius:7px;padding:5px 6px}.energyDeviceConfig b{color:#334155;margin-right:4px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyDeviceFacts span{background:#f8fafc;border-radius:7px;padding:6px;min-width:0}.energyDeviceRelation{grid-column:1/-1}.energyDeviceFacts small,.energyDeviceFacts b{display:block}.energyDeviceFacts small{font-size:8px;color:#64748b}.energyDeviceFacts b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.energyDeviceNoFacts{grid-column:1/-1}.energyAssetQuickActions{grid-column:1/-1;display:grid;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid #edf1f6}.energyAssetQuickActions>small{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700}.energyAssetQuickActions>div{display:flex;gap:6px;flex-wrap:wrap}.energyAssetQuickActions .hiAction{min-height:30px;padding:0 9px;font-size:9.5px}
         .energyAssetDetails{margin-top:8px;border-top:1px solid #edf1f6;padding-top:7px}.energyAssetDetails>summary{cursor:pointer;color:#355D96;font-size:9px;font-weight:650;list-style:none}.energyAssetDetails>summary::-webkit-details-marker{display:none}.energyAssetDetails>summary:after{content:" ▾";color:#94a3b8}.energyAssetDetails[open]>summary:after{content:" ▴"}.energyAssetDetailGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:7px}.energyAssetDetailGrid span{min-width:0;background:#f8fafc;border-radius:7px;padding:6px}.energyAssetDetailGrid span.wide{grid-column:1/-1}.energyAssetDetailGrid small,.energyAssetDetailGrid b{display:block}.energyAssetDetailGrid small{font-size:8px;color:#64748b}.energyAssetDetailGrid b{font-size:9.5px;line-height:1.3;overflow-wrap:anywhere}.energyAssetPropertyList{margin-top:8px;padding-top:8px;border-top:1px solid #edf1f6}.energyAssetPropertyTitle{display:block;margin-bottom:6px;font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700}.energyAssetPropertyGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.energyAssetPropertyGrid span{min-width:0;background:#f8fafc;border-radius:7px;padding:6px}.energyAssetPropertyGrid small,.energyAssetPropertyGrid b{display:block}.energyAssetPropertyGrid small{font-size:8px;color:#64748b}.energyAssetPropertyGrid b{font-size:9.5px;line-height:1.3;overflow-wrap:anywhere}
         .gasContextGrid,.planningContextGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:10px}.gasContextGrid span,.planningContextGrid span{min-width:0;border:1px solid #e5ebf3;border-radius:10px;background:#f8fafc;padding:9px 10px}.gasContextGrid small,.planningContextGrid small,.gasContextGrid b,.planningContextGrid b{display:block}.gasContextGrid small,.planningContextGrid small{font-size:8.5px;color:#64748b}.gasContextGrid b,.planningContextGrid b{font-size:10.5px;line-height:1.3;margin-top:3px;overflow-wrap:anywhere}.planningContextPanel>p{margin:9px 0 0;color:#64748b;font-size:10.5px;line-height:1.4}.planningContextPanel>.empty{margin-top:9px}
@@ -6913,7 +6880,13 @@ function rhiEnergyVisualPickerStyles() {
       const pickerChoices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(assetType) : [];
       const registeredOwner = visualRef ? String(rt.visualRegistry()?.entry?.(visualRef)?.owner_domain || '').trim() : '';
       const externallyOwned = !!registeredOwner && !['rhi_energy','rhi_energy_ux'].includes(registeredOwner);
-      const canPick = !!assetId && !externallyOwned && pickerChoices.length > 0;
+      const appearance = objectFrom(asset.appearance || {});
+      const appearanceProperty = assetId ? rt.editableProperty(`appearance:${assetId}:visual_ref`) : null;
+      const canPick = !!assetId
+        && !externallyOwned
+        && appearance.editable === true
+        && pickerChoices.length > 0
+        && this.isWritableRow(appearanceProperty);
       const pickerAttrs = canPick
         ? ` data-energy-visual-open="${escapeHtml(assetId)}" role="button" tabindex="0" title="Choose representative image"`
         : '';
@@ -6933,7 +6906,12 @@ function rhiEnergyVisualPickerStyles() {
       const type = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
       const choices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(type) : [];
       if (!choices.length) return '';
-      const selected = typeof rhiEnergySelectedVisualRef === 'function' ? rhiEnergySelectedVisualRef(assetId) : '';
+      const selected = String(firstDefined(
+        asset.appearance?.configured_visual_ref,
+        asset.appearance?.effective_visual_ref,
+        asset.visual_ref,
+        ''
+      ) || '');
       const fallbackEntry = typeof rhiEnergyDefaultVisualEntry === 'function' ? rhiEnergyDefaultVisualEntry(asset) : null;
       const current = selected || (fallbackEntry && typeof rhiEnergyVisualRef === 'function' ? rhiEnergyVisualRef(fallbackEntry) : '');
       const picker = new HomeBrainEnergyVisualPicker();

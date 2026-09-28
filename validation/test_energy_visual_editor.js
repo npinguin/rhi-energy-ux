@@ -10,7 +10,7 @@ for (const required of [
   'data-energy-visual-select',
   'data-energy-visual-save',
   'data-energy-visual-cancel',
-  'Save image',
+  'Save appearance',
   'Use profile default'
 ]) {
   if (!pickerSource.includes(required) && !cardSource.includes(required)) {
@@ -18,13 +18,17 @@ for (const required of [
   }
 }
 
-if (cardSource.includes("rhiEnergySetVisualPreference(asset, visualRef);\n        this.energyVisualPickerAssetId = '';")) {
-  throw new Error('image choice still auto-saves and closes instead of using explicit Save');
-}
 if (!cardSource.includes('energyVisualPickerDraftRef')) throw new Error('image editor requires a draft visual selection');
 if (!cardSource.includes('energyVisualPickerBrand')) throw new Error('image editor requires a local brand filter');
-if (!cardSource.includes("rhiEnergySetVisualPreference(asset, this.energyVisualPickerDraftRef)")) {
-  throw new Error('Save image must persist the draft selection');
+if (!cardSource.includes("energy_visual_picker_save") || !cardSource.includes("appearance:") || !cardSource.includes(":visual_ref")) {
+  throw new Error('Save appearance must persist through canonical Energy appearance property');
+}
+if (!cardSource.includes("energy_visual_picker_reset")) {
+  throw new Error('Use profile default must clear persisted Energy appearance through canonical write');
+}
+if (!pickerSource.includes('rhiUxVisualPickerShell')) throw new Error('Energy picker must use shared UX Core visual picker shell');
+if (/localStorage|rhiEnergySetVisualPreference|rhiEnergySelectedVisualRef/.test(catalogSource+cardSource)) {
+  throw new Error('browser-local appearance persistence returned');
 }
 
 const context = { console, globalThis:{localStorage:null}, Object, Array, String, JSON };
@@ -37,4 +41,4 @@ if (brands.join('|') !== 'Generic|SolarEdge') {
   throw new Error('brand filter must be derived, unique and sorted for the current asset type: ' + brands.join('|'));
 }
 
-console.log('PASS coherent Energy image editor with draft, brand filter and explicit Save');
+console.log('PASS canonical Energy appearance editor with Core shell and backend persistence');
