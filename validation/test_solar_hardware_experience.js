@@ -9,7 +9,6 @@ assert.match(app,/solarValueFlow/);
 assert.match(app,/solarHardwareExperience\(rt\)/);
 assert.match(app,/Inverter system/);
 assert.match(app,/Home Battery/);
-assert.match(app,/Other published hardware/);
 assert.match(app,/solar_array/);
 assert.match(app,/optimizersFor/);
 assert.match(app,/solarTopologyDetails/);
@@ -57,3 +56,7 @@ assert.match(app,/object-fit:contain/);
 assert.match(app,/object-position:center/);
 
 console.log("PASS Solar hardware experience: compact flow + inverter/string hierarchy + measured facts");
+
+assert.doesNotMatch(app,/Solar energy facts/);
+assert.doesNotMatch(app,/Other published hardware/);
+assert.match(app,/energyAppearanceAction/);
