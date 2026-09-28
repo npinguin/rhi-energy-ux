@@ -347,6 +347,9 @@
       if (!this._publicV2) this._publicV2 = readEnergyPublicV2(this.contractGateway());
       return this._publicV2;
     }
+    experiencePresence() {
+      return Object.freeze({...(this.publicV2().presence || {})});
+    }
     contractCompatibility() {
       const v2=this.publicV2();
       return Object.freeze({
