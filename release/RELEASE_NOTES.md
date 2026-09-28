@@ -1,3 +1,8 @@
+# v4.3.18 — planning closure + unified appearance
+
+- Incomplete vehicle charging needs remain visible in Tactical Planning with user-safe guidance.
+- Energy appearance now consumes UX Core 1.5.3 canonical filter and image-choice primitives.
+
 # RHI Energy UX 4.3.17 — STRUCTURAL_CAPABILITY_PRESENCE
 
 - Consume Energy E0.15.81 backend-owned structural capability presence.

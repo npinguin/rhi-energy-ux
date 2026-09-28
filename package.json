@@ -1,6 +1,6 @@
 {
   "name": "rhi-energy-ux",
-  "version": "4.3.17",
+  "version": "4.3.18",
   "private": false,
   "description": "Robotix Home Intelligence Energy UX - HACS Dashboard plugin",
   "license": "GPL-3.0-only",
@@ -10,7 +10,7 @@
     "validate:package": "python validation/validate_hacs_package.py",
     "validate:public": "python validation/validate_public_repository.py",
     "validate": "npm run build && npm run test:contract && npm run test:ux && npm run test:package && npm run test:release",
-    "test": "npm run validate",
+    "test": "npm run validate && npm run test:planning-user-gaps",
     "release:sync": "python tools/sync-release-metadata.py",
     "check:test-ownership": "python validation/validate_test_ownership.py",
     "test:contract": "node validation/test_command_contract.js && node validation/test_energy_v2_projection.js && node validation/test_current_energy_view_model.js && node validation/test_energy_contract_gateway.js && node validation/test_asset_profile_contract.js && node validation/test_visual_ref_contract.js && node validation/test_object_primary_details_contract.js && node validation/test_energy_visual_catalog.js && node validation/test_solar_hardware_experience.js && node validation/test_picture_first_asset_identity.js && node validation/test_asset_visual_everywhere.js && node validation/test_live_consumption_flow_metering.js && node validation/test_flexible_asset_connection_projection.js && node validation/test_planning_contract.js && python validation/validate_contract_gateway_architecture.py && node validation/test_cross_domain_navigation.js",
@@ -24,7 +24,8 @@
     "test:hacs-install": "python validation/test_hacs_install.py",
     "preflight": "npm run validate",
     "check:shared-visual-ownership": "python validation/validate_shared_visual_ownership.py",
-    "check:ux-core": "python validation/validate_ux_core_dependency.py"
+    "check:ux-core": "python validation/validate_ux_core_dependency.py",
+    "test:planning-user-gaps": "node validation/test_planning_user_gaps.mjs"
   },
   "engines": {
     "node": ">=20"

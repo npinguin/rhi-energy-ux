@@ -1,3 +1,7 @@
+## 4.3.18
+
+- Preserve incomplete charging needs in planning UX and adopt UX Core 1.5.3 appearance primitives.
+
 ## 4.3.17 — structural capability presence
 
 - consumes Energy E0.15.81 backend-owned structural experience presence;
