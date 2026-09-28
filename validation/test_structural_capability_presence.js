@@ -13,5 +13,7 @@ if (!app.includes("if(item.id === 'consumers') return showConsumers")) throw new
 if (!app.includes("if(item.id === 'value') return showValue")) throw new Error('Value navigation not pricing-presence-gated');
 if (!app.includes("experiencePresence()")) throw new Error('Presence not exposed through EnergyRuntime');
 if (!app.includes("rt.experiencePresence().battery === true")) throw new Error('Overview battery surfaces not presence-gated');
+if (!app.includes("rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow")) throw new Error('Overview flexible-load aggregate not presence-gated');
+if (!app.includes("rt.experiencePresence().battery === true && balanceVm.battery.direction")) throw new Error('Overview battery flow participant not presence-gated');
 
 console.log('PASS structural capability presence UX');
