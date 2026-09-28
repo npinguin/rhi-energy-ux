@@ -49,7 +49,7 @@ assert.match(app,/Storage system with its physical batteries/);
 const hardwareStart = app.indexOf("\n    solarHardwareExperience(rt)");
 const hardwareEnd = app.indexOf("\n    solarEnergyStory(rt)", hardwareStart);
 const hardware = app.slice(hardwareStart, hardwareEnd);
-assert.ok(hardware.indexOf("solarInverterSystem") < hardware.indexOf("solarBatterySystem"), "inverters must precede battery system");
+assert.ok(hardware.indexOf("solarBatterySystem") < hardware.indexOf("solarInverterSystem"), "Home Battery must precede inverter hierarchy in Solar hardware order");
 assert.match(hardware,/stringsForInverter/);
 assert.match(hardware,/unassignedArrays/);
 assert.doesNotMatch(hardware,/'Solar zones'/);
@@ -57,7 +57,7 @@ assert.match(app,/solarModuleCard/);
 assert.match(app,/solarOptimizerPrimaryCard/);
 assert.match(app,/POWER OPTIMIZER/);
 assert.match(app,/SOLAR STRING/);
-assert.match(app,/Panels without optimizer publication/);
+assert.match(app,/solarPanelOnlyGrid/);
 assert.doesNotMatch(app,/No panels linked to this zone/);
 assert.doesNotMatch(app,/No modules linked/);
 assert.doesNotMatch(app,/Optimizers without panel relationship/);
@@ -81,3 +81,8 @@ for (const file of requiredArtwork) {
   assert.ok(fs.existsSync("src/assets/energy/"+file), "missing verified artwork "+file);
 }
 console.log("PASS Solar owns hardware hierarchy; Flow and Planning stay clean");
+
+assert.match(app,/solarUnresolvedStrings/);
+assert.match(app,/STRINGS · INVERTER RELATIONSHIP NOT YET PUBLISHED/);
+assert.doesNotMatch(app,/<details class="solarStringLink"/);
+assert.match(app,/<article class="solarStringLink"/);
