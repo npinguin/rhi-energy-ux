@@ -3567,8 +3567,8 @@
         `${production.length} system${production.length===1?'':'s'}`,
         'solar-production-detail'
       ) : '';
-      const inverterSection = this.solarInverterSystem(rt,inverters,stringsForInverter,panelsFor,optimizersFor,unassignedArrays);
       const batterySection = this.solarBatterySystem(rt,systems,batteries);
+      const inverterSection = this.solarInverterSystem(rt,inverters,stringsForInverter,panelsFor,optimizersFor,unassignedArrays);
       const unassignedBody = [
         unassignedPanels.length ? `<div class="solarUnassignedPanels"><h3>Panels without string relationship</h3><div class="solarChildGrid">${unassignedPanels.map(panel=>this.energyDeviceStatusCard(rt,panel,'Solar panel')).join('')}</div></div>` : '',
         unassignedOptimizers.length ? `<div class="solarUnassignedPanels"><h3>Other optimizers</h3><div class="solarModuleGrid">${unassignedOptimizers.map(item=>this.solarOptimizerPrimaryCard(rt,item,null)).join('')}</div></div>` : '',
