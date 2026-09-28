@@ -102,9 +102,9 @@ if (model.map(section => section.id).join('|') !== 'energy|intelligence|insights
 const energy = model.find(section => section.id === 'energy');
 const intelligence = model.find(section => section.id === 'intelligence');
 const insights = model.find(section => section.id === 'insights');
-if (energy.items.map(item => item.id).join('|') !== 'overview|flow|solar|battery|consumers|gas') throw new Error('Energy navigation order drifted');
+if (energy.items.map(item => item.id).join('|') !== 'overview|flow|solar') throw new Error('minimal structural-presence Energy navigation drifted');
 if (intelligence.items.map(item => item.id).join('|') !== 'strategy|operational-planning|tactical-planning|strategic-planning') throw new Error('Intelligence navigation order drifted');
-if (insights.items.map(item => item.id).join('|') !== 'metering|value|retrospective') throw new Error('Insights navigation order drifted');
+if (insights.items.map(item => item.id).join('|') !== 'metering|retrospective') throw new Error('minimal structural-presence Insights navigation drifted');
 if (recreated.resolveNavigation('', '', 'solar').item !== 'solar') throw new Error('Solar must resolve to the Energy Solar tab');
 if (recreated.resolveNavigation('', '', 'operational-planning').item !== 'operational-planning') throw new Error('Operational Planning must keep its own renderer');
 if (recreated.resolveNavigation('', '', 'planning').item !== 'tactical-planning') throw new Error('legacy Planning must migrate to Tactical Planning');

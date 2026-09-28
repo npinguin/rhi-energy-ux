@@ -1,3 +1,12 @@
+## 4.3.17 — structural capability presence
+
+- consumes Energy E0.15.81 backend-owned structural experience presence;
+- removes Home Battery, Gas, Consumers and Value navigation when the corresponding optional capability is not part of the configured home;
+- removes absent Home Battery facts and reserve cards from Overview instead of rendering unavailable placeholders;
+- keeps configured-but-unavailable capabilities visible so operational faults are not hidden;
+- keeps frontend presentation-only: presence semantics remain Energy-owned;
+- adds release-blocking structural-presence UX regression coverage.
+
 ## 4.2.7 — Gas hero binary integrity
 
 - fixes Gas hero rendering with a valid RIFF/WEBP asset;
