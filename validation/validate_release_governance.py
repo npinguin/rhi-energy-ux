@@ -15,6 +15,8 @@ compat = load("COMPATIBILITY.json")
 manifest = load("RELEASE_MANIFEST.json")
 status = load("release/RELEASE_STATUS.json")
 qualification = load("release/QUALIFICATION.json")
+release_notes = (ROOT / "release/RELEASE_NOTES.md").read_text(encoding="utf-8")
+changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
 version = str(product["version"])
 expected = {
@@ -44,6 +46,8 @@ expected = {
     "qualification.tag": qualification.get("candidate_tag") == f"v{version}",
     "qualification.rollback": qualification.get("previous_release") == product["rollback_release"].removeprefix("v"),
     "qualification.sha": qualification.get("candidate_sha") == "pending" or bool(re.fullmatch(r"[0-9a-fA-F]{40}", str(qualification.get("candidate_sha","")))),
+    "release_notes_current": version in release_notes.splitlines()[0],
+    "changelog_current": next((line.split()[1] for line in changelog.splitlines() if line.startswith("## ")), "") == version,
     "zero_accepted_debt": manifest.get("known_accepted_technical_debt") == 0 and manifest.get("known_accepted_feature_debt") == 0,
 }
 failed=[name for name, ok in expected.items() if not ok]
