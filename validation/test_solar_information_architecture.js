@@ -35,7 +35,7 @@ const solar = method("solar");
 
 assert.doesNotMatch(flow,/Physical energy devices|energyHardwareCards|solarHardwareExperience/);
 assert.doesNotMatch(planning,/Physical energy devices|energyHardwareCards|solarHardwareExperience|Solar support devices/);
-assert.doesNotMatch(solar,/solarEnergyStory/);
+assert.match(solar,/solarEnergyStory/);
 assert.match(solar,/solarHardwareExperience/);
 assert.doesNotMatch(solar,/solarOperationalExecutionPanel/);
 
