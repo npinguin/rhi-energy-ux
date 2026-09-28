@@ -1207,8 +1207,7 @@
     }
     runtime() { return new EnergyRuntime(this._hass || {}); }
     navigationModel() {
-      const v2=this.publicV2();
-      const presence=v2?.presence || {};
+      const presence=this.runtime().experiencePresence();
       const has=(key,fallback=true)=>Object.prototype.hasOwnProperty.call(presence,key)
         ? presence[key] === true
         : fallback;
@@ -2582,10 +2581,10 @@
       return `${this.tabExperienceHeader(rt,'overview',pageVm)}
         <div class="overviewCoreGrid">
           <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon orange">☀</span><div><h2>Production & supply</h2><p>Energy available to the home now.</p></div></div>${sourceRows.join('') || `<div class="empty compact"><b>Supply unavailable</b><span>Current supply cannot be determined from canonical measurements.</span></div>`}</section>
-          <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(reason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>Grid</small><b>${escapeHtml(fmtKw(gridValue,'—'))} ${escapeHtml(gridDirection)}</b></div>${rt.publicV2().presence?.battery === true ? `<div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div>` : ''}</div></div></section>
+          <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(reason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>Grid</small><b>${escapeHtml(fmtKw(gridValue,'—'))} ${escapeHtml(gridDirection)}</b></div>${rt.experiencePresence().battery === true ? `<div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div>` : ''}</div></div></section>
           <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>Consumption</h2><p>Site demand and its active components.</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'})}${contributorRows}${balanceVm.battery.direction === 'into_storage' && balanceVm.battery.displayPowerKw !== null ? this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}) : ''}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${this.overviewEnergyRow({icon:'',label:gridDirection === 'Exporting' ? 'Grid Export' : gridDirection === 'Importing' ? 'Grid Import' : 'Grid',subtitle:'Grid boundary',value:fmtKw(gridValue,'—'),variant:'boundary'})}</section>
         </div>
-        <div class="bottomInsights overviewSupportFacts"><div class="insight"><span>Solar remaining today</span><b>${fmtKwh(solarRemaining)}</b><small>Forecast left</small></div>${rt.publicV2().presence?.battery === true ? `<div class="insight"><span>Home Battery reserve</span><b>${reservePct===null?'Not available':fmtPct(reservePct)}</b><small>${reservePct===null?'Reserve setting unavailable':'Protected minimum'}</small></div>` : ''}</div>${this.overviewExperiencePanel(rt)}`;
+        <div class="bottomInsights overviewSupportFacts"><div class="insight"><span>Solar remaining today</span><b>${fmtKwh(solarRemaining)}</b><small>Forecast left</small></div>${rt.experiencePresence().battery === true ? `<div class="insight"><span>Home Battery reserve</span><b>${reservePct===null?'Not available':fmtPct(reservePct)}</b><small>${reservePct===null?'Reserve setting unavailable':'Protected minimum'}</small></div>` : ''}</div>${this.overviewExperiencePanel(rt)}`;
     }
     commandForLoad(rt, assetId, role) {
       // Manual flexible-load controls bind only to the public operational
