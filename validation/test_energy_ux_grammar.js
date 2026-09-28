@@ -60,7 +60,7 @@ for (const token of ["flexible_asset.generic","consumer.generic","solar_array.ge
   assert.ok(catalog.includes(token), "missing representative visual fallback "+token);
 }
 
-assert.match(core,/RHI UX Core 1\.5\.2/);
+assert.match(core,/RHI UX Core 1\.5\.3/);
 assert.match(core,/function rhiUxContextBar/);
 assert.match(core,/function rhiUxResolveDomainAssetNavigation/);
 assert.ok(core.includes("{asset_id}"), "runtime-safe Core navigation token missing");
