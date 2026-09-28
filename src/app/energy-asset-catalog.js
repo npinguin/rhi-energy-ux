@@ -1,8 +1,6 @@
 // Energy logical-device visual catalog.
 // Backend profiles remain semantic and non-visual. This UX module owns representative
 // artwork, same-type defaults, picker options and local presentation preference.
-const RHI_ENERGY_VISUAL_PREFERENCE_KEY = "homebrain.energy.visual_preferences.v1";
-
 const RHI_ENERGY_LOGICAL_VISUALS = Object.freeze([
   { id:"battery_system.home", asset_type:"battery_system", label:"Home battery system", brand:"Generic", model:"Home battery system", variant:"System", profile_patterns:["energy.battery_system."], package_path:"heroes/battery-hero.webp", quality:"representative", selectable:true },
   { id:"battery.byd_lvs_20", asset_type:"battery", label:"BYD Battery-Box Premium LVS 20.0", brand:"BYD", model:"Battery-Box Premium LVS 20.0", variant:"20.0 kWh · 5 × LVS 4.0", profile_patterns:[], package_path:"energy/byd_lvs_20.webp", quality:"verified_model_choice", selectable:true },
@@ -90,50 +88,4 @@ function rhiEnergyDefaultVisualEntry(asset = {}) {
     || candidates.find(entry => /generic|home|provider|market|array|smart_meter/.test(entry.id))
     || candidates[0]
     || null;
-}
-
-function rhiEnergyReadVisualPreferences() {
-  try {
-    const raw = globalThis?.localStorage?.getItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch (_) {
-    return {};
-  }
-}
-
-function rhiEnergySelectedVisualRef(assetId = "") {
-  const id = String(assetId || "").trim();
-  if (!id) return "";
-  return String(rhiEnergyReadVisualPreferences()[id] || "").trim();
-}
-
-function rhiEnergySetVisualPreference(asset = {}, visualRef = "") {
-  const assetId = String(asset.asset_id || asset.id || "").trim();
-  const ref = String(visualRef || "").trim();
-  if (!assetId || !ref) return false;
-  const entry = rhiEnergyVisualEntryFromRef(ref);
-  const assetType = String(asset.asset_type || asset.object_class || "").trim().toLowerCase();
-  if (!entry || entry.asset_type !== assetType) return false;
-  try {
-    const preferences = rhiEnergyReadVisualPreferences();
-    preferences[assetId] = ref;
-    globalThis?.localStorage?.setItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY, JSON.stringify(preferences));
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-function rhiEnergyClearVisualPreference(assetId = "") {
-  const id = String(assetId || "").trim();
-  if (!id) return false;
-  try {
-    const preferences = rhiEnergyReadVisualPreferences();
-    delete preferences[id];
-    globalThis?.localStorage?.setItem?.(RHI_ENERGY_VISUAL_PREFERENCE_KEY, JSON.stringify(preferences));
-    return true;
-  } catch (_) {
-    return false;
-  }
 }
