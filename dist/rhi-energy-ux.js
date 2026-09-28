@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.16';
+  const UX_VERSION = 'R4.3.17';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
@@ -82,6 +82,8 @@ function readEnergyPublicV2(gateway) {
   const valueAccounting = object(attrs.value_accounting);
   const layers = object(attrs.layers);
   const summary = object(attrs.summary);
+  const experience = object(attrs.experience);
+  const presence = Object.freeze({...object(experience.presence)});
 
   const semantic = raw => {
     const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {value:raw};
@@ -270,6 +272,8 @@ function readEnergyPublicV2(gateway) {
     health:object(attrs.health).status || String(attrs.health || envelope.state || 'UNKNOWN'),
     core,
     summary,
+    experience:Object.freeze({...experience, presence}),
+    presence,
     objects,
     profiles,
     relationships,
@@ -1399,6 +1403,9 @@ function readEnergyCommandContract(gateway) {
     publicV2() {
       if (!this._publicV2) this._publicV2 = readEnergyPublicV2(this.contractGateway());
       return this._publicV2;
+    }
+    experiencePresence() {
+      return Object.freeze({...(this.publicV2().presence || {})});
     }
     contractCompatibility() {
       const v2=this.publicV2();
@@ -3053,7 +3060,22 @@ function rhiEnergyVisualPickerStyles() {
     }
     runtime() { return new EnergyRuntime(this._hass || {}); }
     navigationModel() {
-      return HB_ENERGY_NAVIGATION;
+      const presence=this.runtime().experiencePresence();
+      const has=(key,fallback=true)=>Object.prototype.hasOwnProperty.call(presence,key)
+        ? presence[key] === true
+        : fallback;
+      const showConsumers=has('flexible_loads', false);
+      const showValue=has('pricing', false);
+      return HB_ENERGY_NAVIGATION.map(section=>({
+        ...section,
+        items:section.items.filter(item=>{
+          if(item.id === 'battery') return has('battery', false);
+          if(item.id === 'gas') return has('gas', false);
+          if(item.id === 'consumers') return showConsumers;
+          if(item.id === 'value') return showValue;
+          return true;
+        })
+      })).filter(section=>section.items.length > 0);
     }
     resolveNavigation(sectionId = '', itemId = '', legacyView = '') {
       const sections = this.navigationModel();
@@ -4412,10 +4434,10 @@ function rhiEnergyVisualPickerStyles() {
       return `${this.tabExperienceHeader(rt,'overview',pageVm)}
         <div class="overviewCoreGrid">
           <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon orange">☀</span><div><h2>Production & supply</h2><p>Energy available to the home now.</p></div></div>${sourceRows.join('') || `<div class="empty compact"><b>Supply unavailable</b><span>Current supply cannot be determined from canonical measurements.</span></div>`}</section>
-          <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(reason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>Grid</small><b>${escapeHtml(fmtKw(gridValue,'—'))} ${escapeHtml(gridDirection)}</b></div><div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div></div></div></section>
-          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>Consumption</h2><p>Site demand and its active components.</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'})}${contributorRows}${balanceVm.battery.direction === 'into_storage' && balanceVm.battery.displayPowerKw !== null ? this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}) : ''}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${this.overviewEnergyRow({icon:'',label:gridDirection === 'Exporting' ? 'Grid Export' : gridDirection === 'Importing' ? 'Grid Import' : 'Grid',subtitle:'Grid boundary',value:fmtKw(gridValue,'—'),variant:'boundary'})}</section>
+          <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(reason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>Grid</small><b>${escapeHtml(fmtKw(gridValue,'—'))} ${escapeHtml(gridDirection)}</b></div>${rt.experiencePresence().battery === true ? `<div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div>` : ''}</div></div></section>
+          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>Consumption</h2><p>Site demand and its active components.</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'}) : ''}${contributorRows}${rt.experiencePresence().battery === true && balanceVm.battery.direction === 'into_storage' && balanceVm.battery.displayPowerKw !== null ? this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}) : ''}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${this.overviewEnergyRow({icon:'',label:gridDirection === 'Exporting' ? 'Grid Export' : gridDirection === 'Importing' ? 'Grid Import' : 'Grid',subtitle:'Grid boundary',value:fmtKw(gridValue,'—'),variant:'boundary'})}</section>
         </div>
-        <div class="bottomInsights overviewSupportFacts"><div class="insight"><span>Solar remaining today</span><b>${fmtKwh(solarRemaining)}</b><small>Forecast left</small></div><div class="insight"><span>Home Battery reserve</span><b>${reservePct===null?'Not available':fmtPct(reservePct)}</b><small>${reservePct===null?'Reserve setting unavailable':'Protected minimum'}</small></div></div>${this.overviewExperiencePanel(rt)}`;
+        <div class="bottomInsights overviewSupportFacts"><div class="insight"><span>Solar remaining today</span><b>${fmtKwh(solarRemaining)}</b><small>Forecast left</small></div>${rt.experiencePresence().battery === true ? `<div class="insight"><span>Home Battery reserve</span><b>${reservePct===null?'Not available':fmtPct(reservePct)}</b><small>${reservePct===null?'Reserve setting unavailable':'Protected minimum'}</small></div>` : ''}</div>${this.overviewExperiencePanel(rt)}`;
     }
     commandForLoad(rt, assetId, role) {
       // Manual flexible-load controls bind only to the public operational
