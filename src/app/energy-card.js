@@ -1070,11 +1070,13 @@
       this.selectedPlanningHorizonId = interaction.selectedPlanningHorizonId || 'D0';
       this.selectedMeteringHorizonId = interaction.selectedMeteringHorizonId || 'D0';
       this.selectedMeteringPeriodId = interaction.selectedMeteringPeriodId || 'today';
+      this.selectedGasHorizonId = interaction.selectedGasHorizonId || 'month';
       this._meteringPeriodHydrated = Object.prototype.hasOwnProperty.call(interaction, 'selectedMeteringPeriodId');
       this.meteringSort = interaction.meteringSort || 'default';
       this.consumerSort = interaction.consumerSort || 'power';
       this.consumerFilter = interaction.consumerFilter || 'all';
       this.writeFeedback = {};
+      this.pendingAppearanceByAsset = {};
       this.remediationFeedback = {};
       this.editSession = null;
       this.pendingRuntimeRender = false;
@@ -1121,6 +1123,7 @@
           selectedPlanningHorizonId: this.selectedPlanningHorizonId,
           selectedMeteringHorizonId: this.selectedMeteringHorizonId,
           selectedMeteringPeriodId: this.selectedMeteringPeriodId,
+          selectedGasHorizonId: this.selectedGasHorizonId,
           meteringSort: this.meteringSort,
           consumerSort: this.consumerSort,
           consumerFilter: this.consumerFilter,
@@ -1136,6 +1139,7 @@
     set hass(hass) {
       this._hass = hass;
       this.reconcileWriteFeedback();
+      this.reconcilePendingAppearances();
       this.syncMeteringPeriodFromRuntime();
       if (this.editSession) { this.pendingRuntimeRender = true; return; }
       this._preserveViewportOnRender = true;
@@ -1323,6 +1327,7 @@
       if (visualReset) {
         const assetId = visualReset.dataset.energyVisualReset || this.energyVisualPickerAssetId || '';
         if (assetId) {
+          this.pendingAppearanceByAsset[assetId] = '';
           this.requestPropertyWrite(`appearance:${assetId}:visual_ref`, '', { source:'energy_visual_picker_reset', asset_id:assetId });
         }
         closeVisualEditor();
@@ -1349,6 +1354,7 @@
         const assetId = visualSave.dataset.energyVisualSave || this.energyVisualPickerAssetId || '';
         const visualRef = String(this.energyVisualPickerDraftRef || '').trim();
         if (assetId && visualRef) {
+          this.pendingAppearanceByAsset[assetId] = visualRef;
           this.requestPropertyWrite(`appearance:${assetId}:visual_ref`, visualRef, { source:'energy_visual_picker_save', asset_id:assetId });
         }
         closeVisualEditor();
@@ -1434,6 +1440,14 @@
       if (consumerFilter && !consumerFilter.disabled) { this.consumerFilter = consumerFilter.dataset.consumerFilter || 'all'; this.render(); return; }
       const profilePick = event.target.closest('[data-strategy-profile-id]');
       if (profilePick && !profilePick.disabled) { this.selectedStrategyProfileId = profilePick.dataset.strategyProfileId || ''; this.render(); return; }
+      const gasHorizon = event.target.closest('[data-gas-horizon]');
+      if (gasHorizon && !gasHorizon.disabled) {
+        this.selectedGasHorizonId = gasHorizon.dataset.gasHorizon || 'month';
+        this.persistInteractionContext();
+        this._forceRender = true;
+        this.render();
+        return;
+      }
       const planningHorizon = event.target.closest('[data-planning-horizon]');
       if (planningHorizon && !planningHorizon.disabled) { this.selectedPlanningHorizonId = planningHorizon.dataset.planningHorizon || 'D0'; this.render(); return; }
       const scopePick = event.target.closest('[data-scope-id]');
@@ -1701,6 +1715,26 @@
         }
       });
     }
+    reconcilePendingAppearances() {
+      if (!this._hass || !Object.keys(this.pendingAppearanceByAsset || {}).length) return;
+      const runtime = this.runtime();
+      Object.entries(this.pendingAppearanceByAsset).forEach(([assetId, expected]) => {
+        const feedback = this.writeFeedback[`appearance:${assetId}:visual_ref`];
+        if (feedback && ['rejected','timed_out'].includes(String(feedback.state || '').toLowerCase())) {
+          delete this.pendingAppearanceByAsset[assetId];
+          return;
+        }
+        const asset = runtime.asset(assetId) || {};
+        const actual = String(firstDefined(
+          asset?.appearance?.configured_visual_ref,
+          asset?.appearance?.effective_visual_ref,
+          asset?.visual_ref,
+          ''
+        ) || '');
+        if (actual === String(expected || '')) delete this.pendingAppearanceByAsset[assetId];
+      });
+    }
+
     requestPropertyWrite(propertyKey, value, context = {}) {
       const runtime = this.runtime();
       const catalogRow = runtime.editableProperty(propertyKey);
@@ -3591,7 +3625,7 @@
         'solar-production-detail'
       ) : '';
       const batterySection = this.solarBatterySystem(rt,systems,batteries);
-      return `<div class="solarHardwareExperience">${batterySection}${productionSection}${inverterSection}</div>`;
+      return `<div class="solarHardwareExperience">${batterySection}${productionSection}</div>`;
     }
 
     solarEnergyStory(rt) {
@@ -4310,7 +4344,6 @@
         <div class="batteryGrid batteryGridTwoUp">
           <section class="panel batteryHero"><h2>Home Battery state</h2><p>Combined operational truth for the Home Battery system.</p><div class="batteryGauge"><b>${escapeHtml(fmtPct(soc))}</b><span>${escapeHtml(fmtKwh(available))} / ${escapeHtml(fmtKwh(capacity))}</span><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div>${this.kv('State', human(state))}${this.kv('Power now', fmtKw(power,'—'))}${this.kv('Available energy', fmtKwh(available))}${this.kv('Capacity', fmtKwh(capacity))}${reserve === null ? '' : this.kv('Reserve',fmtPct(reserve))}${this.kv('Health', human(batteryVm.health))}${systemDetails}</section>
           <section class="panel" id="battery-contributors"><h2>Home Battery contributors</h2><p>Physical batteries contributing to the aggregate.</p><div class="batteryContributorList">${children.map(id => this.batteryChildCard(rt, id)).join('') || `<div class="empty"><b>No Home Battery units published</b><span>Home Battery aggregate only.</span></div>`}</div></section>
-          ${(() => { const profile = this.strategyProfileForDomain(rt, 'battery'); return profile ? this.strategyTable(rt, profile, { title: 'Home Battery strategy', description: 'Configured Home Battery policy.' }) : `<section class="panel strategyTablePanel"><div class="strategyTableHead"><div><h2>Home Battery strategy</h2><p>No Home Battery strategy profile is published.</p></div></div></section>`; })()}
         </div>
       </div>`;
     }
@@ -4506,7 +4539,7 @@
       const unavailableSelectedProfile = this.selectedStrategyProfileId && !selected
         ? `<option value="${escapeHtml(this.selectedStrategyProfileId)}" selected disabled>Selected profile temporarily unavailable</option>`
         : '';
-      const profilePicker = profiles.length ? `<section class="panel strategyProfilePicker compact"><div><h2>Strategy profile</h2><p>Choose the policy set you want to review or adjust.</p></div><label class="strategyProfileSelect"><span>Profile</span><select data-strategy-profile-select>${unavailableSelectedProfile}${profiles.map(profile => `<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>${selected ? `<small>${escapeHtml(this.profileUserDescription(selected))}</small>` : `<small>The selected profile is temporarily unavailable. Your selection is preserved.</small>`}</section>` : '';
+      const profilePicker = profiles.length ? `<section class="panel strategyProfilePicker compact"><div><h2>Settings profile</h2><p>Choose the policy set you want to review or adjust.</p></div><label class="strategyProfileSelect"><span>Profile</span><select data-strategy-profile-select>${unavailableSelectedProfile}${profiles.map(profile => `<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>${selected ? `<small>${escapeHtml(this.profileUserDescription(selected))}</small>` : `<small>The selected profile is temporarily unavailable. Your selection is preserved.</small>`}</section>` : '';
       const effectiveRowsForProfile = selectedId
         ? effectiveStrategies.filter(strategy => {
             const text = `${strategy.profile_id || ''} ${strategy.strategy_profile_id || ''} ${strategy.profile_type || ''} ${strategy.asset_type || ''} ${strategy.policy_profile || ''}`.toLowerCase();
@@ -4525,8 +4558,8 @@
         ? this.componentSegmentedControl(automationOptions, automationMode, 'automationModeControl')
         : `<div class="profileNoControls">Automation mode is not writable in the current public contract.</div>`;
       return `${this.tabExperienceHeader(rt,'strategies',pageVm)}<div class="strategiesPage strategyProfilesPage strategyProfileUx">
-        <section class="panel strategyAutomationMode"><div><h2>Automation mode</h2><p>Choose how Home Intelligence may act. The configured value is written through the canonical Energy property interface and confirmed by readback.</p></div>${automationControl}${this.editablePropertyFeedback(automationRow)}</section>
-        ${profilePicker || `<section class="panel"><h2>No strategy profiles published</h2><p>Waiting for canonical V2 strategy configuration.</p></section>`}
+        <section class="panel strategyAutomationMode"><div><h2>Automation mode</h2><p>Choose how Home Intelligence may act. Domain ownership stays in the backend; changes are confirmed by authoritative readback.</p></div>${automationControl}${this.editablePropertyFeedback(automationRow)}</section>
+        ${profilePicker || `<section class="panel"><h2>No settings profiles published</h2><p>Waiting for canonical domain settings.</p></section>`}
         <div class="profileEditorColumn">${selected ? this.strategyProfileCard(rt, selected) : ''}</div>
         <section class="panel effectivePolicyPreview"><h2>Current policy effect${selected ? ` · ${escapeHtml(this.profileUserLabel(selected))}` : ''}</h2><p>Configured, effective and influencing policy state.</p><div class="effectivePolicyList">${effectiveRows || `<div class="empty"><b>No effective strategy published</b><span>Waiting for canonical V2 effective strategy.</span></div>`}</div></section>
         <section class="panel strategyParticipation"><h2>Participating assets</h2><p>The same central participation model used across Energy.</p><div class="effectivePolicyList">${this.flexibleAssetDomain(rt).consumerFacing().map(vm=>`<div class="planningTransparencyRow"><div class="strategyAssetIdentity">${this.assetVisual(vm.raw,{size:'xs',fallbackIcon:this.flexibleAssetIcon(vm.raw)})}<div><b>${escapeHtml(rt.assetName(vm.id))}</b><span>${escapeHtml(vm.isDisabled?'Excluded from planning':'Included in flexible planning')}</span></div></div><strong>${escapeHtml(human(vm.participation))}</strong></div>`).join('') || `<div class="empty"><b>No flexible assets published</b></div>`}</div></section>
@@ -5011,6 +5044,9 @@
         [/Backend did not publish allowed values\.?/gi,'No selectable options are currently available.'],
         [/Options not published/gi,'Options unavailable'],
         [/No public write route published/gi,'Editing is unavailable'],
+        [/Producer Command Unavailable/gi,'Action unavailable'],
+        [/Requested charge power is Unavailable\.?/gi,'Charging target unavailable'],
+        [/Physical Vehicle Identity Unproven/gi,'Vehicle is not confirmed connected'],
         [/No public command published/gi,'Action unavailable'],
         [/No command published/gi,'Action unavailable'],
         [/No additional explanation is needed/gi,'No additional explanation available'],
@@ -5064,12 +5100,17 @@
       // assetVisual is called from many page/card helpers that receive rt themselves.
       // Never depend on a free-scoped `rt`; resolve the current HA runtime explicitly.
       const rt = this.runtime();
-      const visualRef = String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
+      const assetId = String(firstDefined(asset.asset_id, asset.id, '') || '').trim();
+      const hasPendingAppearance = Object.prototype.hasOwnProperty.call(this.pendingAppearanceByAsset || {}, assetId);
+      const pendingVisualRef = hasPendingAppearance ? String(this.pendingAppearanceByAsset[assetId] || '') : '';
+      const visualRef = hasPendingAppearance
+        ? pendingVisualRef
+        : String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
+      const visualAsset = hasPendingAppearance ? { ...asset, visual_ref:pendingVisualRef } : asset;
       const resolved = typeof resolveEnergyAssetVisual === 'function'
-        ? resolveEnergyAssetVisual(asset, rt.visualRegistry(), size === 'lg' ? 'detail' : 'card')
+        ? resolveEnergyAssetVisual(visualAsset, rt.visualRegistry(), size === 'lg' ? 'detail' : 'card')
         : (visualRef ? rt.resolveVisualRef(visualRef, size === 'lg' ? 'detail' : 'card') : null);
       const label = this.planningAssetName(asset);
-      const assetId = String(firstDefined(asset.asset_id, asset.id, '') || '').trim();
       const assetType = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
       const pickerChoices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(assetType) : [];
       const registeredOwner = visualRef ? String(rt.visualRegistry()?.entry?.(visualRef)?.owner_domain || '').trim() : '';
@@ -5416,7 +5457,8 @@
             <div class="rhiUxFooterAction">Resolve the listed runtime/backend condition, then reload this view to verify recovery.</div>
           </div>
         </details>` : '';
-      return `<footer class="hiRuntimeFooter rhiUxFooter" aria-label="RHI Energy release information"><span>RHI Energy UX ${escapeHtml(footer.uxVersion || UX_VERSION)}</span><span>Backend ${escapeHtml(backend)}</span>${issueDetails}</footer>`;
+      const status = issue ? (issue.severity === 'error' ? 'Attention' : 'Degraded') : (footer.runtimeTrusted === false ? 'Attention' : 'Ready');
+      return `<footer class="hiRuntimeFooter rhiUxFooter" aria-label="RHI Energy release information"><span>RHI Energy UX ${escapeHtml(footer.uxVersion || UX_VERSION)}</span><span>Backend ${escapeHtml(backend)}</span><span>Status ${escapeHtml(status)}</span>${issueDetails}</footer>`;
     }
     renderError(view, error) {
       const message = error && error.message ? error.message : String(error || 'Unknown render error');
@@ -5429,7 +5471,7 @@
       const headerEnd = body.indexOf(marker);
       if (headerEnd < 0) return body;
       const split = headerEnd + marker.length;
-      return `${body.slice(0, split)}<div id="hi-body-${escapeHtml(this.view)}">${body.slice(split)}</div>${this.understandingFooter(rt, this.view)}`;
+      return `${body.slice(0, split)}<div id="hi-body-${escapeHtml(this.view)}">${body.slice(split)}</div>`;
     }
     patchDomNode(current, next) {
       if (!current || !next) return;
