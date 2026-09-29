@@ -36,18 +36,19 @@ assert.match(battery,/assetQuickActions\(rt,assetId,3\)/);
 const consumerStart = app.indexOf("\n    consumerExplorerCard(");
 const consumerEnd = app.indexOf("\n    filterAndSortConsumers(", consumerStart);
 const consumer = app.slice(consumerStart, consumerEnd);
-assert.match(consumer,/\['Required'/);
-assert.match(consumer,/\['Planned today'/);
-assert.match(consumer,/\['Still to plan'/);
+assert.doesNotMatch(consumer,/\['Required'/);
+assert.doesNotMatch(consumer,/\['Planned today'/);
+assert.doesNotMatch(consumer,/\['Still to plan'/);
+assert.match(consumer,/\['Energy need'/);
 assert.match(consumer,/managedAssetRelationship/);
 assert.match(consumer,/energyAssetDetailDisclosure\(rt,asset\)/);
 
 const consumersStart = app.indexOf("\n    consumers(rt)");
 const consumersEnd = app.indexOf("\n    strategies(rt)", consumersStart);
 const consumers = app.slice(consumersStart, consumersEnd);
-assert.match(consumers,/consumerPrimarySummary/);
-assert.match(consumers,/flexible_total_need_kwh/);
-assert.match(consumers,/planned_flexible_energy_kwh/);
-assert.match(consumers,/still_unresolved_kwh/);
+assert.doesNotMatch(consumers,/consumerPrimarySummary/);
+assert.doesNotMatch(consumers,/productStoryCard\(\{ eyebrow:'Managed energy'/);
+assert.match(consumers,/Managed flexible assets/);
+assert.match(consumers,/domain\.consumerFacing\(\)/);
 
 console.log("PASS asset tabs use compact primary truth with progressive details");
