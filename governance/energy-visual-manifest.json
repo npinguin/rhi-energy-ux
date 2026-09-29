@@ -278,15 +278,15 @@
     },
     {
       "asset_type": "solar_zone",
-      "target_package_path": "energy/solar_zone_generic.webp",
-      "artwork_status": "pending_binary_publication",
-      "quality": "generic_family"
+      "artwork_status": "published_approved",
+      "quality": "generic_family",
+      "package_path": "energy/solar_zone_generic.webp"
     }
   ],
   "publication_state": {
     "base_version": "4.3.18",
     "branch": "feat/energy-visual-library-v1",
     "binary_policy": "src/dist byte parity required",
-    "status": "physical_catalog_alignment_in_progress"
+    "status": "candidate_complete_pending_ci_and_release"
   }
 }
