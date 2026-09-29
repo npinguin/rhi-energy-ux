@@ -4,7 +4,7 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "assets"
 DIST = ROOT / "dist" / "assets"
-ALLOWED = {".svg", ".webp", ".png", ".jpg", ".jpeg"}
+ALLOWED = {".svg", ".webp", ".png", ".jpg", ".jpeg"}\nALLOWED_METADATA = {"metadata/energy-visual-manifest.json"}
 SAFE = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
 
 def inventory(root: Path):
@@ -14,7 +14,7 @@ def inventory(root: Path):
         for part in rel.parts:
             if not SAFE.fullmatch(part):
                 raise SystemExit(f"unsafe asset path segment: {rel.as_posix()}")
-        if path.suffix.lower() not in ALLOWED:
+        if path.suffix.lower() not in ALLOWED and rel_text not in ALLOWED_METADATA:
             raise SystemExit(f"unsupported asset extension: {rel.as_posix()}")
         rows.append(rel.as_posix())
     return rows
