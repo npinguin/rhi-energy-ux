@@ -60,6 +60,7 @@ const HB_ENERGY_HERO_ASSETS = Object.freeze({
 const HB_ENERGY_PROFILE_ALIASES = Object.freeze({
   "solar-generation": "solar",
   planning: "outlook",
+  settings: "strategies",
   "strategic-planning": "strategies"
 });
 
