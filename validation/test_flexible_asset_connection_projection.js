@@ -19,7 +19,9 @@ const context = {
       visual_ref:'energy.logical.flexible_load.generic',
       effective_connection_id:'charger_driveway',
       assigned_connection_id:'charger_driveway',
-      connection_state:'asset_connected'
+      physical_connection_id:null,
+      physical_identity_proven:false,
+      connection_state:'disconnected'
     } : {
       asset_id:assetId,
       asset_type:'flexible_load',
@@ -48,7 +50,10 @@ const runtime = {
     current_power_kw:0,
     visual_ref:'mobility.vehicle.volkswagen.id4.2024-2026.ev.costa-azul',
     effective_connection_id:'charger_driveway',
-    connection_state:'asset_connected'
+    assigned_connection_id:'charger_driveway',
+    physical_connection_id:null,
+    physical_identity_proven:false,
+    connection_state:'disconnected'
   },{
     asset_id:'vehicle_waiting',
     source_asset_kind:'vehicle',
@@ -88,7 +93,7 @@ assert.equal(domain.planningParticipants().length,1,'only planning-ready managed
 assert.equal(domain.consumerFacing().find(vm=>vm.id==='vehicle_waiting').isInfrastructure,false);
 assert.equal(domain.planningRows()[0].asset_id,'vehicle_id4');
 assert.equal(domain.physicalFlowParticipants()[0].id,'vehicle_id4');
-assert.equal(domain.physicalFlowParticipants().length,1,'charger-linked idle vehicle must remain in physical topology');
+assert.equal(domain.physicalFlowParticipants().length,1,'assigned vehicle remains visible in Flow inventory without being called physically connected');
 
 const card = fs.readFileSync('src/app/energy-card.js','utf8');
 assert.ok(card.includes('canonicalConnectionSnapshot(rt)'));
@@ -121,10 +126,11 @@ const chainMarkers = [
 for (const marker of chainMarkers) {
   assert.ok(card.includes(marker), 'missing physical consumer chain invariant: '+marker);
 }
-assert.ok(card.includes("['connected','asset_connected'].includes(connectionState)"), 'asset_connected must be treated as connected');
-assert.ok(card.includes('consumer.effective_connection_id'));
-assert.ok(card.includes('consumer.assigned_connection_id'));
-assert.ok(card.includes('consumer.physical_connection_id'));
+assert.ok(card.includes("physicalIdentityProven"), 'Flow must require producer proof of physical vehicle identity');
+assert.ok(card.includes("physicalConnectionId"), 'Flow must distinguish physical connection from assignment');
+assert.ok(card.includes("consumer.assigned_connection_id"));
+assert.ok(card.includes("consumer.physical_connection_id"));
+assert.ok(!card.includes("|| ['connected','asset_connected'].includes(connectionState)"), 'charger occupancy must not prove vehicle connection');
 console.log('PASS physical consumer rows are connection targets, never charger infrastructure');
 
 
