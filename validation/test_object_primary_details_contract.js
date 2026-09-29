@@ -107,7 +107,10 @@ for (const objectType of [
 assert.match(app,/for \(const key of spec\.keys \|\| \[spec\.key\]\)/);
 assert.match(app,/home_consumption\.power_kw/);
 assert.match(app,/solar_zone\.power_w/);
-assert.match(app,/Published properties/);
+assert.match(app,/property\.presentation\.family|row\.presentation/);
+assert.match(app,/data-property-family/);
+assert.match(app,/Source & connectivity/);
+assert.match(app,/Diagnostics/);
 assert.match(app,/projection\?\.properties/);
 assert.match(app,/\['solar_array','solar_zone'\]/);
 assert.match(app,/productionSection/);
