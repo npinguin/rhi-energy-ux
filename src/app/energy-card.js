@@ -4440,62 +4440,63 @@
       const stop = commands.find(c => rt.commandRole(c) === 'stop');
       const pause = commands.find(c => rt.commandRole(c) === 'pause');
       const resume = commands.find(c => rt.commandRole(c) === 'resume');
-      const stateRaw = firstDefined(planning.product_state, planning.status, planning.state, row.status, planning.active ? 'active' : planning.waiting ? 'waiting' : planning.planned ? 'planned' : asset.operating_state, 'available');
-      const state = this.userStateText(stateRaw);
+      const stateRaw = firstDefined(
+        asset.user_status,
+        planning.user_status,
+        planning.product_state,
+        planning.status,
+        planning.state,
+        row.status,
+        asset.operating_state,
+        'available'
+      );
+      const state = asset.user_status ? String(asset.user_status) : this.userStateText(stateRaw);
       const availability = String(firstDefined(asset.availability_state, status.unavailable ? 'unavailable' : 'available') || '').toLowerCase();
       const healthRaw = firstDefined(asset.health, asset.lifecycle_state, asset.status, '');
       const health = status.unavailable ? 'Unavailable' : healthRaw ? human(healthRaw) : 'Available';
+
       const assignedConnection = objectFrom(asset.connection_presentation?.assigned || {});
       const physicalConnection = objectFrom(asset.connection_presentation?.physical || {});
-      const chargerId = String(firstDefined(asset.physical_connection_id, asset.assigned_connection_id, asset.effective_connection_id, asset.charger_asset_id, asset.connection_asset_id, asset.execution_target_asset_id, '') || '');
+      const physicalChargerId = String(firstDefined(asset.physical_connection_id, physicalConnection.asset_id, '') || '');
+      const assignedChargerId = String(firstDefined(asset.assigned_connection_id, assignedConnection.asset_id, asset.effective_connection_id, '') || '');
+      const physicalProven = asset.physical_identity_proven === true && !!physicalChargerId;
       const relationName = firstDefined(
-        asset.physical_identity_proven === true ? physicalConnection.display_name : assignedConnection.display_name,
-        rt.assetName(chargerId),
-        chargerId ? human(chargerId) : ''
+        physicalProven ? physicalConnection.display_name : assignedConnection.display_name,
+        physicalProven ? rt.assetName(physicalChargerId) : rt.assetName(assignedChargerId),
+        ''
       );
-      const relationState = String(firstDefined(asset.user_status, asset.connection_state, '') || '');
-      const relation = relationName ? `${relationName} · ${human(relationState || 'Assigned')}` : '';
-      const reason = humanReason(firstDefined(planning.user_reason_label, planning.waiting_reason, planning.waiting_reason_code, planning.reason, planning.reason_code, row.reason), state === 'Ready' ? 'Ready when you need it.' : 'Home Intelligence is monitoring this asset.');
+      const relationLabel = relationName
+        ? `${physicalProven ? 'Connected via' : 'Assigned to'} ${relationName}`
+        : '';
+
       const paused = /paused|hold/.test(String(stateRaw || '').toLowerCase()) || rt.commandEnabled(resume);
-      const executionPolicy = this.automationExecutionPolicy(rt);
-      let recommendation = 'Home Intelligence will keep monitoring this asset.';
-      if (/waiting/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
-        ? 'Home Intelligence may act automatically when the planned conditions are available.'
-        : executionPolicy.configuredMode === 'advice'
-          ? 'Home Intelligence will keep the recommendation ready and wait for your approval.'
-          : 'Planning remains visible, but managed execution is disabled.';
-      if (/planned|scheduled/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
-        ? 'Home Intelligence has included this asset in the executable current plan.'
-        : 'Home Intelligence has included this asset in the advisory plan.';
-      if (/active|charging|running/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
-        ? 'Let Home Intelligence continue unless you want to stop or pause control.'
-        : 'Current physical execution is shown separately from advisory planning.';
-      if (paused) recommendation = 'Resume managed participation when you want Home Intelligence to include this asset again.';
       const actions = [
         paused ? this.componentActionButton(resume, 'Resume managed control', id) : this.componentActionButton(pause, 'Pause managed control', id),
         /active|charging|running/.test(String(stateRaw || '').toLowerCase()) ? this.componentActionButton(stop, 'Stop now', id) : this.componentActionButton(startCommand, 'Start now', id)
       ].join('');
+
       const currentPower = asNumber(firstDefined(row.current_power_kw, row.actual_power_kw, row.power_kw, raw.current_power_kw, raw.actual_power_kw, raw.power_kw));
       const requestedPower = asNumber(firstDefined(row.requested_power_kw, raw.requested_power_kw));
       const energyNeed = asNumber(firstDefined(
-        planning.energy_to_target_kwh, planning.energy_needed_kwh, planning.remaining_energy_kwh, planning.energy_need_kwh,
-        row.energy_to_target_kwh, row.energy_needed_kwh, row.remaining_energy_kwh, row.energy_need_kwh,
-        raw.energy_to_target_kwh, raw.energy_needed_kwh, raw.remaining_energy_kwh, raw.energy_need_kwh
+        planning.energy_need_kwh, planning.energy_to_target_kwh, planning.energy_needed_kwh,
+        row.energy_to_target_kwh, row.energy_needed_kwh, row.energy_need_kwh,
+        raw.energy_to_target_kwh, raw.energy_needed_kwh, raw.energy_need_kwh
       ));
       const plannedToday = asNumber(firstDefined(planning.planned_today_kwh, row.planned_today_kwh, raw.planned_today_kwh));
       const plannedTomorrow = asNumber(firstDefined(planning.planned_tomorrow_kwh, row.planned_tomorrow_kwh, raw.planned_tomorrow_kwh));
-      const stillToPlan = asNumber(firstDefined(planning.still_to_plan_kwh, planning.remaining_need_kwh, planning.unresolved_horizon_kwh, row.still_to_plan_kwh, raw.still_to_plan_kwh));
-      const planningLabel = firstDefined(planning.user_state_label, planning.product_state, planning.status, planning.state, '');
+      const stillToPlan = asNumber(firstDefined(planning.still_to_plan_kwh, row.still_to_plan_kwh, raw.still_to_plan_kwh));
+      const planningLabel = firstDefined(planning.user_status, planning.user_state_label, planning.product_state, planning.status, planning.state, '');
       const area = this.energyAssetAreaLabel(asset);
+
       const facts = [
         ['Power now', fmtKw(currentPower,'0.0 kW')],
-        energyNeed !== null ? ['Required', fmtKwh(energyNeed)] : null,
-        plannedToday !== null ? ['Planned today', fmtKwh(plannedToday)] : null,
-        stillToPlan !== null ? ['Still to plan', fmtKwh(stillToPlan)] : null,
+        energyNeed !== null ? ['Energy need', fmtKwh(energyNeed)] : null,
         planningLabel ? ['Plan', human(planningLabel)] : null
-      ].filter(Boolean).slice(0,3);
-      const details = `${this.kv('Availability', human(availability))}${this.kv('Health', health)}${this.kv('Current power', fmtKw(currentPower, '0.0 kW'))}${this.kv('Requested power', fmtKw(requestedPower, '—'))}${energyNeed !== null ? this.kv('Energy needed',fmtKwh(energyNeed)) : ''}${plannedToday !== null ? this.kv('Planned today',fmtKwh(plannedToday)) : ''}${plannedTomorrow !== null ? this.kv('Planned tomorrow',fmtKwh(plannedTomorrow)) : ''}${stillToPlan !== null ? this.kv('Still to plan',fmtKwh(stillToPlan)) : ''}${this.kv('Automation', human(firstDefined(row.automation_mode, raw.automation_mode, 'Advice')))}${relation ? this.kv('Relationship', relation) : ''}${this.energyAssetDetailDisclosure(rt,asset)}`;
-      return `<article class="managedAssetCard"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${area ? `${escapeHtml(area)} · ` : ''}${escapeHtml(state)} · ${escapeHtml(health)}</span></div></div><b>${fmtKw(currentPower, '0.0 kW')}</b></div><div class="managedAssetFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>${relation ? `<div class="managedAssetRelationship"><small>Connection</small><b>${escapeHtml(relation)}</b></div>` : ''}${actions ? `<div class="managedAssetActions">${actions}</div>` : ''}${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}</article>`;
+      ].filter(Boolean);
+
+      const details = `${this.kv('Availability', human(availability))}${this.kv('Health', health)}${this.kv('Current power', fmtKw(currentPower, '0.0 kW'))}${this.kv('Requested power', fmtKw(requestedPower, '—'))}${energyNeed !== null ? this.kv('Energy needed',fmtKwh(energyNeed)) : ''}${plannedToday !== null ? this.kv('Planned today',fmtKwh(plannedToday)) : ''}${plannedTomorrow !== null ? this.kv('Planned tomorrow',fmtKwh(plannedTomorrow)) : ''}${stillToPlan !== null ? this.kv('Still to plan',fmtKwh(stillToPlan)) : ''}${this.kv('Automation', human(firstDefined(row.automation_mode, raw.automation_mode, 'Advice')))}${relationLabel ? this.kv('Relationship', relationLabel) : ''}${this.energyAssetDetailDisclosure(rt,asset)}`;
+
+      return `<article class="managedAssetCard compact"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${area ? `${escapeHtml(area)} · ` : ''}${escapeHtml(state)} · ${escapeHtml(health)}</span></div></div><b>${fmtKw(currentPower, '0.0 kW')}</b></div><div class="managedAssetFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>${relationName ? `<div class="managedAssetRelationship"><small>${physicalProven ? 'Connected via' : 'Assigned to'}</small><b>${escapeHtml(relationName)}</b></div>` : ''}${actions ? `<div class="managedAssetActions">${actions}</div>` : ''}${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}</article>`;
     }
 
     filterAndSortConsumers(rows = []) {
