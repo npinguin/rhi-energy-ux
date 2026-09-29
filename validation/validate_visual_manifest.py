@@ -11,8 +11,6 @@ DIST_ASSETS = ROOT / "dist" / "assets"
 data = json.loads(MANIFEST.read_text(encoding="utf-8"))
 if data.get("schema_version") != 2:
     raise SystemExit("energy visual manifest schema drifted")
-if data.get("migration_complete") is not False:
-    raise SystemExit("visual migration must remain incomplete until final package QA is closed")
 
 policy = data.get("policy") or {}
 if policy.get("dashboard_heroes_out_of_scope") is not True:
@@ -21,6 +19,8 @@ if policy.get("hero_as_asset_fallback_forbidden") is not True:
     raise SystemExit("hero-as-asset fallback must be forbidden")
 if policy.get("cross_concept_fallback_forbidden") is not True:
     raise SystemExit("cross-concept fallback must be forbidden")
+if policy.get("generic_fallback_required_per_supported_asset_type") is not True:
+    raise SystemExit("every supported physical asset type must declare a generic fallback")
 
 expected = {
     "battery_system",
@@ -82,7 +82,13 @@ for row in targets:
     if (SRC_ASSETS / rel).read_bytes() != (DIST_ASSETS / rel).read_bytes():
         raise SystemExit(f"src/dist bytes differ for physical asset: {rel}")
 
-for row in data.get("generic_assets") or []:
+generic_rows = data.get("generic_assets") or []
+generic_types = [str(row.get("asset_type") or "") for row in generic_rows]
+if set(generic_types) != expected or len(generic_types) != len(expected):
+    raise SystemExit("generic fallback inventory must contain exactly one row per supported physical type")
+
+all_generic_published = True
+for row in generic_rows:
     if row.get("asset_type") not in expected:
         raise SystemExit(f"generic asset uses non-physical type: {row}")
     rel = str(row.get("package_path") or row.get("target_package_path") or "")
@@ -90,11 +96,19 @@ for row in data.get("generic_assets") or []:
         raise SystemExit(f"generic asset missing path: {row}")
     if rel.startswith("heroes/"):
         raise SystemExit(f"hero artwork used as generic physical asset: {rel}")
-    if row.get("artwork_status") == "published_approved":
+    status = str(row.get("artwork_status") or "")
+    if status not in {"published_approved", "planned"}:
+        raise SystemExit(f"unsupported generic artwork status: {status}")
+    if status == "published_approved":
         if not (SRC_ASSETS / rel).is_file() or not (DIST_ASSETS / rel).is_file():
             raise SystemExit(f"published generic asset missing: {rel}")
         if (SRC_ASSETS / rel).read_bytes() != (DIST_ASSETS / rel).read_bytes():
             raise SystemExit(f"src/dist bytes differ for generic asset: {rel}")
+    else:
+        all_generic_published = False
+
+if bool(data.get("migration_complete")) != all_generic_published:
+    raise SystemExit("migration_complete must reflect whether every generic fallback is published")
 
 catalog = CATALOG.read_text(encoding="utf-8")
 catalog_types = set(re.findall(r'asset_type:"([a-z0-9_]+)"', catalog))
@@ -114,5 +128,5 @@ for rel in sorted(catalog_paths):
 
 print(
     f"PASS Energy physical visual manifest: {len(expected)} physical concepts, "
-    f"{len(targets)} product assets, no hero/cross-concept fallback"
+    f"{len(targets)} product assets, {sum(1 for row in generic_rows if row.get('artwork_status') == 'published_approved')}/{len(expected)} generic fallbacks published, no hero/cross-concept fallback"
 )
