@@ -10,7 +10,9 @@
     "hero_as_asset_fallback_forbidden": true,
     "cross_concept_fallback_forbidden": true,
     "default_policy": "exact configured/product match, otherwise first selectable catalog entry of same asset_type, otherwise no image",
-    "backend_artwork_paths_forbidden": true
+    "backend_artwork_paths_forbidden": true,
+    "generic_fallback_required_per_supported_asset_type": true,
+    "target_default_policy": "exact configured/product match, otherwise generic asset of the same asset_type, otherwise no image"
   },
   "supported_asset_types": [
     "battery_system",
@@ -277,16 +279,61 @@
       "quality": "generic_family"
     },
     {
+      "asset_type": "battery",
+      "target_package_path": "energy/battery_generic.webp",
+      "artwork_status": "planned",
+      "quality": "generic_family"
+    },
+    {
       "asset_type": "solar_zone",
+      "package_path": "energy/solar_zone_generic.webp",
       "artwork_status": "published_approved",
-      "quality": "generic_family",
-      "package_path": "energy/solar_zone_generic.webp"
+      "quality": "generic_family"
+    },
+    {
+      "asset_type": "solar_panel",
+      "target_package_path": "energy/solar_panel_generic.webp",
+      "artwork_status": "planned",
+      "quality": "generic_family"
+    },
+    {
+      "asset_type": "solar_inverter",
+      "target_package_path": "energy/solar_inverter_generic.webp",
+      "artwork_status": "planned",
+      "quality": "generic_family"
+    },
+    {
+      "asset_type": "solar_optimizer",
+      "target_package_path": "energy/solar_optimizer_generic.webp",
+      "artwork_status": "planned",
+      "quality": "generic_family"
+    },
+    {
+      "asset_type": "backup_interface",
+      "target_package_path": "energy/backup_interface_generic.webp",
+      "artwork_status": "planned",
+      "quality": "generic_family"
+    },
+    {
+      "asset_type": "gas_meter",
+      "target_package_path": "energy/gas_meter_generic.webp",
+      "artwork_status": "planned",
+      "quality": "generic_family"
+    },
+    {
+      "asset_type": "grid_meter",
+      "target_package_path": "energy/grid_meter_generic.webp",
+      "artwork_status": "planned",
+      "quality": "generic_family"
     }
   ],
   "publication_state": {
-    "base_version": "4.3.18",
-    "branch": "feat/energy-visual-library-v1",
+    "released_version": "4.3.19",
+    "branch": "main",
     "binary_policy": "src/dist byte parity required",
-    "status": "candidate_complete_pending_ci_and_release"
-  }
+    "status": "product_visual_library_released_generic_fallback_completion_pending"
+  },
+  "migration_blockers": [
+    "generic_fallback_artwork_missing_for_7_supported_asset_types"
+  ]
 }
