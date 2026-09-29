@@ -26,7 +26,8 @@ assert.match(app,/The UX never estimates missing consumption/);
 
 assert.match(app,/energyDeviceStatusCard\(rt, gas\.asset, 'Gas meter'\)/);
 assert.match(app,/gas: \{ image:hbEnergyHeroAsset\('gas'\)/);
-assert.ok(catalog.includes('gas_meter.smart_meter') && catalog.includes('package_path:"heroes/gas-hero.webp"'),"Gas meter catalog fallback may retain the logical-device WebP visual");
+assert.ok(catalog.includes('gas_meter.flonidan_uniflo_g4') && catalog.includes('package_path:"energy/flonidan_uniflo_g4srtv.webp"'),"Gas meter physical catalog must use the approved FLONIDAN product visual");
+assert.doesNotMatch(catalog,/heroes\//,"dashboard hero artwork must not appear in the physical asset catalog");
 
 const gasStart = app.indexOf("\n    gas(rt)");
 const gasEnd = app.indexOf("\n    battery(rt)", gasStart);
