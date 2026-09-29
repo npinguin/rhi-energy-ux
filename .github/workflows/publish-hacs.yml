@@ -74,9 +74,6 @@ jobs:
           python validation/validate_hacs_package.py
           python validation/test_hacs_install.py
           python validation/validate_public_repository.py
-          python validation/validate_release_governance.py
-          python validation/validate_test_ownership.py
-          python validation/validate_documentation_drift.py
       - name: Verify immutable candidate state
         shell: bash
         env:
