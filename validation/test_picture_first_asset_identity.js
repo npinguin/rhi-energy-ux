@@ -15,8 +15,11 @@ const required = [
 for (const token of required) {
   if (!card.includes(token)) throw new Error('missing picture-first asset identity usage: ' + token);
 }
-if (!card.includes('resolveEnergyAssetVisual(asset, rt.visualRegistry()')) {
-  throw new Error('asset visual primitive must resolve canonical visual_ref through Foundation registry context');
+if (!card.includes('resolveEnergyAssetVisual(visualAsset, rt.visualRegistry()')) {
+  throw new Error('asset visual primitive must resolve canonical or pending visual_ref through Foundation registry context');
+}
+if (!card.includes('pendingAppearanceByAsset')) {
+  throw new Error('asset visual primitive must keep pending appearance until authoritative readback');
 }
 if (card.includes("visualRef.startsWith('mobility.')")) {
   throw new Error('Energy visual picker must not hardcode Mobility ownership');
