@@ -10,7 +10,7 @@ const core = fs.readFileSync("src/vendor/rhi-ux-core.js","utf8");
 for (const token of [
   'id:"overview", label:"Overview"', 'id:"flow", label:"Flow"', 'id:"solar", label:"Solar"',
   'id:"battery", label:"Home Battery"', 'id:"consumers", label:"Consumers"', 'id:"gas", label:"Gas"',
-  'id:"strategy", label:"Strategy"', 'id:"operational-planning", label:"Operational Planning"',
+  'id:"settings", label:"Settings"', 'id:"operational-planning", label:"Operational Planning"',
   'id:"tactical-planning", label:"Tactical Planning"', 'id:"strategic-planning", label:"Strategic Planning"',
   'id:"metering", label:"Metering"', 'id:"value", label:"Value"', 'id:"retrospective", label:"Retrospective"'
 ]) assert.ok(presentation.includes(token), "missing existing tab "+token);
@@ -97,3 +97,10 @@ assert.ok(app.includes('Strategy configuration is the authority for longer-term 
 assert.ok(!app.includes('Strategic planning content follows in the next screen pass'), "Strategic Planning placeholder must not return");
 
 console.log("PASS Energy 4.3 canonical page/body controls, asset grammar, visuals and responsive ownership");
+
+
+const intelligenceBlock = presentation.slice(presentation.indexOf('id:"intelligence"'), presentation.indexOf('id:"insights"'));
+assert.ok(intelligenceBlock.lastIndexOf('id:"settings"') > intelligenceBlock.indexOf('id:"strategic-planning"'), "Settings must be the last Intelligence tab");
+assert.ok(!app.includes("understandingFooter(rt, this.view)"), "legacy Conclusion footer must not be injected into product views");
+assert.ok(app.includes("pendingAppearanceByAsset"), "appearance changes need pending state until backend readback");
+assert.ok(app.includes("Status ${escapeHtml(status)}"), "runtime footer must expose status");
