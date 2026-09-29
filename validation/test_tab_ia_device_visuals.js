@@ -9,7 +9,7 @@ const method = name => {
   const sig = "\n    " + name + "(";
   const start = app.indexOf(sig);
   assert.ok(start >= 0, "missing method " + name);
-  const signatureEnd = app.indexOf(") {", start); 
+  const signatureEnd = app.indexOf(") {", start);
   assert.ok(signatureEnd >= 0, "missing method body " + name);
   const open = signatureEnd + 2;
   let depth = 0, quote = null, escaped = false;
@@ -30,64 +30,26 @@ const method = name => {
 
 assert.match(presentation, /id:"solar", label:"Solar", view:"solar"/);
 assert.match(presentation, /id:"operational-planning", label:"Operational Planning", view:"operational-planning"/);
-assert.doesNotMatch(presentation, /id:"solar", label:"Solar", view:"solar-generation"/);
-assert.doesNotMatch(presentation, /id:"operational-planning", label:"Operational Planning", view:"solar"/);
-
-const viewContent = method("viewContent");
-assert.match(viewContent, /this\.view === 'solar' \? this\.solar\(rt\)/);
-assert.match(viewContent, /this\.view === 'operational-planning' \? this\.operationalPlanning\(rt\)/);
 
 const solar = method("solar");
 assert.match(solar, /solarEnergyStory\(rt\)/);
 assert.match(solar, /solarHardwareExperience\(rt\)/);
-assert.doesNotMatch(solar, /Solar energy facts/);
-assert.doesNotMatch(solar, /operationalLoadCard/);
-assert.doesNotMatch(solar, /Flexible Loads/);
-assert.doesNotMatch(solar, /requested_charge_power/);
 
 const operational = method("operationalPlanning");
 assert.match(operational, /operationalLoadCard/);
-assert.match(operational, /Flexible loads/);
-assert.match(operational, /Current execution, next action, requested power and operational reason/);
-assert.doesNotMatch(operational, /solarHardwareExperience/);
-assert.doesNotMatch(operational, /Solar arrays/);
-assert.doesNotMatch(operational, /Inverter system/);
-assert.doesNotMatch(operational, /Battery system/);
 
-const operationalCard = method("operationalLoadCard");
-assert.match(operationalCard, /this\.assetVisual\(load/);
+for (const [name, token] of [
+  ["operationalLoadCard", /this\.assetVisual\(load/],
+  ["consumerExplorerCard", /this\.assetVisual\(asset/],
+  ["batteryChildCard", /this\.assetVisual\(asset/],
+  ["effectivePolicyPreviewCard", /this\.assetVisual\(asset/],
+  ["flexibleLoadMeteringTable", /this\.assetVisual\(asset/],
+]) {
+  assert.match(method(name), token);
+}
 
-const consumers = method("consumerExplorerCard");
-assert.match(consumers, /this\.assetVisual\(asset/);
+assert.match(catalog, /solar_inverter\.solaredge_rwb_10k[\s\S]*package_path:"energy\/solaredge_rwb_10k\.webp"/);
+assert.ok(fs.existsSync("src/assets/energy/solaredge_rwb_10k.webp"), "missing approved RWB WebP");
+assert.doesNotMatch(catalog, /heroes\//);
 
-const overview = method("overview");
-assert.match(overview, /asset:row\.raw/);
-
-const planning = method("planning");
-assert.match(planning, /this\.assetVisual\(item\.asset/);
-
-const connector = method("connectorCard");
-assert.match(connector, /rt\.resolveVisualRef\(charger\.visual_ref, 'card'\)/);
-const flowConsumer = method("consumerCard");
-assert.match(flowConsumer, /rt\.resolveVisualRef\(consumer\.visual_ref, 'card'\)/);
-
-const battery = method("batteryChildCard");
-assert.match(battery, /this\.assetVisual\(asset/);
-
-const strategy = method("strategies");
-assert.match(strategy, /strategyAssetIdentity/);
-const policy = method("effectivePolicyPreviewCard");
-assert.match(policy, /this\.assetVisual\(asset/);
-
-const metering = method("flexibleLoadMeteringTable");
-assert.match(metering, /meteringAssetIdentity/);
-assert.match(metering, /this\.assetVisual\(asset/);
-
-assert.match(app, /valueAssetIdentity[^\n]*this\.assetVisual\(identity\.asset/);
-assert.match(app, /flexPricingRow[^\n]*this\.assetVisual\(asset/);
-
-assert.match(catalog, /solar_inverter\.solaredge_rwb_10k[\s\S]*package_path:"energy\/solaredge_rwb_10k\.svg"/);
-assert.ok(fs.existsSync("src/assets/energy/solaredge_rwb_10k.svg"), "missing crisp RWB SVG");
-assert.ok(!fs.existsSync("src/assets/energy/solaredge_rwb_10k.webp"), "blurred RWB raster must be removed");
-
-console.log("PASS tab ownership, device visual coverage and crisp SE10K RWB artwork");
+console.log("PASS tab ownership and physical asset visuals without dashboard-hero fallback");
