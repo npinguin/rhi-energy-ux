@@ -4,7 +4,8 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src" / "assets"
 DIST = ROOT / "dist" / "assets"
-ALLOWED = {".svg", ".webp", ".png", ".jpg", ".jpeg"}\nALLOWED_METADATA = {"metadata/energy-visual-manifest.json"}
+ALLOWED = {".svg", ".webp", ".png", ".jpg", ".jpeg"}
+ALLOWED_METADATA = {"metadata/energy-visual-manifest.json"}
 SAFE = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
 
 def inventory(root: Path):
