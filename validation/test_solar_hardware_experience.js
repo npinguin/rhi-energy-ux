@@ -38,7 +38,7 @@ assert.match(hierarchy,/stringsForInverter/);
 assert.match(hierarchy,/unassignedArrays/);
 assert.doesNotMatch(hierarchy,/const zoneCards = arrays\.map/);
 assert.doesNotMatch(hierarchy,/'Solar zones'/);
-assert.match(app,/SOLAR STRING/);
+assert.match(app,/SOLAR ZONE \/ STRING/);
 assert.match(app,/data-solar-string/);
 
 for (const id of [
