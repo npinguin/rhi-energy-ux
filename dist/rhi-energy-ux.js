@@ -2896,6 +2896,15 @@ function rhiEnergyVisualPickerStyles() {
     .assetVisual[data-energy-visual-open]{cursor:pointer;outline:0}
     .assetVisual[data-energy-visual-open]:hover{box-shadow:0 0 0 2px rgba(37,99,235,.16)}
     .energyVisualClose{border:0;background:#f1f5f9;border-radius:10px;width:36px;height:36px;font-size:22px;cursor:pointer}
+
+    /* Source artwork dimensions never dictate picker tile geometry. */
+    .rhiUxVisualChoice{grid-template-columns:112px minmax(0,1fr)!important;min-height:98px!important;overflow:hidden}
+    .rhiUxVisualChoiceImage{width:112px!important;height:76px!important;min-width:112px!important;min-height:76px!important;max-width:112px!important;max-height:76px!important;overflow:hidden!important}
+    .rhiUxVisualChoiceImage img{display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;object-position:center!important}
+    @media(max-width:760px){
+      .rhiUxVisualChoice{grid-template-columns:96px minmax(0,1fr)!important}
+      .rhiUxVisualChoiceImage{width:96px!important;min-width:96px!important;max-width:96px!important}
+    }
   `;
 }
 
@@ -2926,6 +2935,7 @@ function rhiEnergyVisualPickerStyles() {
       this.consumerSort = interaction.consumerSort || 'power';
       this.consumerFilter = interaction.consumerFilter || 'all';
       this.writeFeedback = {};
+      this.pendingAppearanceByAsset = {};
       this.remediationFeedback = {};
       this.editSession = null;
       this.pendingRuntimeRender = false;
@@ -2987,6 +2997,7 @@ function rhiEnergyVisualPickerStyles() {
     set hass(hass) {
       this._hass = hass;
       this.reconcileWriteFeedback();
+      this.reconcilePendingAppearances();
       this.syncMeteringPeriodFromRuntime();
       if (this.editSession) { this.pendingRuntimeRender = true; return; }
       this._preserveViewportOnRender = true;
@@ -3174,6 +3185,7 @@ function rhiEnergyVisualPickerStyles() {
       if (visualReset) {
         const assetId = visualReset.dataset.energyVisualReset || this.energyVisualPickerAssetId || '';
         if (assetId) {
+          this.pendingAppearanceByAsset[assetId] = '';
           this.requestPropertyWrite(`appearance:${assetId}:visual_ref`, '', { source:'energy_visual_picker_reset', asset_id:assetId });
         }
         closeVisualEditor();
@@ -3200,6 +3212,7 @@ function rhiEnergyVisualPickerStyles() {
         const assetId = visualSave.dataset.energyVisualSave || this.energyVisualPickerAssetId || '';
         const visualRef = String(this.energyVisualPickerDraftRef || '').trim();
         if (assetId && visualRef) {
+          this.pendingAppearanceByAsset[assetId] = visualRef;
           this.requestPropertyWrite(`appearance:${assetId}:visual_ref`, visualRef, { source:'energy_visual_picker_save', asset_id:assetId });
         }
         closeVisualEditor();
@@ -3552,6 +3565,26 @@ function rhiEnergyVisualPickerStyles() {
         }
       });
     }
+    reconcilePendingAppearances() {
+      if (!this._hass || !Object.keys(this.pendingAppearanceByAsset || {}).length) return;
+      const runtime = this.runtime();
+      Object.entries(this.pendingAppearanceByAsset).forEach(([assetId, expected]) => {
+        const feedback = this.writeFeedback[`appearance:${assetId}:visual_ref`];
+        if (feedback && ['rejected','timed_out'].includes(String(feedback.state || '').toLowerCase())) {
+          delete this.pendingAppearanceByAsset[assetId];
+          return;
+        }
+        const asset = runtime.asset(assetId) || {};
+        const actual = String(firstDefined(
+          asset?.appearance?.configured_visual_ref,
+          asset?.appearance?.effective_visual_ref,
+          asset?.visual_ref,
+          ''
+        ) || '');
+        if (actual === String(expected || '')) delete this.pendingAppearanceByAsset[assetId];
+      });
+    }
+
     requestPropertyWrite(propertyKey, value, context = {}) {
       const runtime = this.runtime();
       const catalogRow = runtime.editableProperty(propertyKey);
@@ -6915,12 +6948,17 @@ function rhiEnergyVisualPickerStyles() {
       // assetVisual is called from many page/card helpers that receive rt themselves.
       // Never depend on a free-scoped `rt`; resolve the current HA runtime explicitly.
       const rt = this.runtime();
-      const visualRef = String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
+      const assetId = String(firstDefined(asset.asset_id, asset.id, '') || '').trim();
+      const hasPendingAppearance = Object.prototype.hasOwnProperty.call(this.pendingAppearanceByAsset || {}, assetId);
+      const pendingVisualRef = hasPendingAppearance ? String(this.pendingAppearanceByAsset[assetId] || '') : '';
+      const visualRef = hasPendingAppearance
+        ? pendingVisualRef
+        : String(firstDefined(asset.visual_ref, asset.visualRef, asset.raw?.visual_ref, '') || '').trim();
+      const visualAsset = hasPendingAppearance ? { ...asset, visual_ref:pendingVisualRef } : asset;
       const resolved = typeof resolveEnergyAssetVisual === 'function'
-        ? resolveEnergyAssetVisual(asset, rt.visualRegistry(), size === 'lg' ? 'detail' : 'card')
+        ? resolveEnergyAssetVisual(visualAsset, rt.visualRegistry(), size === 'lg' ? 'detail' : 'card')
         : (visualRef ? rt.resolveVisualRef(visualRef, size === 'lg' ? 'detail' : 'card') : null);
       const label = this.planningAssetName(asset);
-      const assetId = String(firstDefined(asset.asset_id, asset.id, '') || '').trim();
       const assetType = String(firstDefined(asset.asset_type, asset.object_class, '') || '').trim().toLowerCase();
       const pickerChoices = typeof rhiEnergyVisualCatalogForType === 'function' ? rhiEnergyVisualCatalogForType(assetType) : [];
       const registeredOwner = visualRef ? String(rt.visualRegistry()?.entry?.(visualRef)?.owner_domain || '').trim() : '';
@@ -6937,9 +6975,9 @@ function rhiEnergyVisualPickerStyles() {
         : '';
       if (resolved?.url) {
         const alt = decorative ? '' : label;
-        return `<span class="assetVisual assetVisual-${escapeHtml(size)}"${pickerAttrs}><img src="${escapeHtml(resolved.url)}" alt="${escapeHtml(alt)}" style="filter:${escapeHtml(resolved.filter || 'none')}"></span>`;
+        return `<span class="assetVisual assetVisual-${escapeHtml(size)}"${pickerAttrs}><img src="${escapeHtml(resolved.url)}" alt="${escapeHtml(alt)}" style="filter:${escapeHtml(resolved.filter || 'none')}">${canPick ? '<span class="assetVisualAppearance">Appearance</span>' : ''}</span>`;
       }
-      return `<span class="assetVisual assetVisual-${escapeHtml(size)} assetVisualFallback"${pickerAttrs} aria-hidden="${canPick ? 'false' : 'true'}">${escapeHtml(fallbackIcon)}</span>`;
+      return `<span class="assetVisual assetVisual-${escapeHtml(size)} assetVisualFallback"${pickerAttrs} aria-hidden="${canPick ? 'false' : 'true'}">${escapeHtml(fallbackIcon)}${canPick ? '<span class="assetVisualAppearance">Appearance</span>' : ''}</span>`;
     }
     energyVisualPickerOverlay(rt) {
       const assetId = String(this.energyVisualPickerAssetId || '').trim();
