@@ -143,11 +143,13 @@ console.log('PASS one charger row per physical connection and producer visual ow
 
 assert.ok(card.includes('assetDomain.consumerFacing()'), 'Operational Planning must use consumer-facing assets');
 assert.ok(card.includes('domain.consumerFacing().map'), 'Consumers must use consumer-facing assets');
-assert.ok(card.includes('planningParticipants().map'), 'Planning projections must use planning participants');
+assert.ok(card.includes('consumerFacing().map'), 'Tactical Planning must receive the full user-facing flexible inventory');
 assert.ok(card.includes('vm?.isInfrastructure'), 'Value/consumer escape hatches must reject infrastructure');
 console.log('PASS infrastructure-only charger fallback cannot leak into managed consumer/planning surfaces');
 
 
-assert.ok(card.includes('const assetTotals = allAssetTotals;'), 'Tactical Planning must keep zero/no-plan participants visible');
-assert.ok(!card.includes('const assetTotals = allAssetTotals.filter(item => {'), 'Tactical Planning must not hide valid participants based on non-zero energy');
-console.log('PASS Tactical Planning preserves valid zero/no-plan participants');
+assert.ok(card.includes('const visibleAssetTotals = allAssetTotals;'), 'Tactical Planning status list must keep every user-facing asset visible');
+assert.ok(card.includes('canonical.planning_eligible !== false'), 'Planning lane participation must remain backend-owned');
+assert.ok(card.includes('const planningLoadRows = visibleAssetTotals.map'), 'Non-plannable assets must remain visible with status');
+assert.ok(card.includes("this.bodyContextBar(rt,'planning','planning-body')"), 'Today/Tomorrow horizon selector must be explicit on Tactical Planning');
+console.log('PASS Tactical Planning separates visible inventory from backend-owned planning eligibility');
