@@ -48,3 +48,13 @@ if (context.globalThis.rhiEnergyVisualCatalogForType('grid_connection').length !
 }
 
 console.log('PASS canonical Energy appearance editor with physical-only catalog and backend persistence');
+
+if (!pickerSource.includes('.rhiUxVisualChoiceImage img') || !pickerSource.includes('object-fit:contain!important')) {
+  throw new Error('picker artwork must be bounded independently of source dimensions');
+}
+if (!cardSource.includes('pendingAppearanceByAsset') || !cardSource.includes('reconcilePendingAppearances')) {
+  throw new Error('appearance selection must render optimistically until authoritative readback');
+}
+if (!cardSource.includes('assetVisualAppearance')) {
+  throw new Error('Appearance action must be rendered consistently inside the image zone');
+}
