@@ -2603,15 +2603,21 @@
       if (balanceVm.solarKw !== null && balanceVm.solarKw > 0.05) sourceRows.push(this.overviewEnergyRow({icon:'☀',label:'Solar',subtitle:'Producing now',value:fmtKw(balanceVm.solarKw),progress:this.progress(balanceVm.solarKw)}));
       if (balanceVm.battery.direction === 'out_of_storage' && balanceVm.battery.displayPowerKw !== null) sourceRows.push(this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}));
       if (balanceVm.gridImportKw !== null && balanceVm.gridImportKw > 0.05) sourceRows.push(this.overviewEnergyRow({icon:'⚡',label:'Grid Import',subtitle:'Importing',value:fmtKw(balanceVm.gridImportKw),progress:this.progress(balanceVm.gridImportKw)}));
-      const contributors = balanceVm.flexible.filter(row => row.powerKw !== null && row.powerKw > 0.05);
-      const contributorRows = contributors.map(row => this.overviewEnergyRow({icon:this.flexibleAssetIcon(row.raw || {display_name:row.name}),asset:row.raw || null,label:row.name,subtitle:'Flexible Load contributor',value:fmtKw(row.powerKw,'—'),variant:'child'})).join('');
+      const flexibleInventory = this.flexibleAssetDomain(rt).consumerFacing().map(vm => {
+        const raw = vm.raw || {};
+        const powerKw = asNumber(firstDefined(raw.current_power_kw, raw.actual_power_kw, raw.power_kw));
+        const status = String(firstDefined(raw.user_status, raw.connection_state, vm.operation, vm.participation, 'Available'));
+        return { raw, name:raw.display_name || rt.assetName(vm.id) || human(vm.id), powerKw, status };
+      });
+      const contributors = flexibleInventory;
+      const contributorRows = contributors.map(row => this.overviewEnergyRow({icon:this.flexibleAssetIcon(row.raw || {display_name:row.name}),asset:row.raw || null,label:row.name,subtitle:human(row.status),value:fmtKw(row.powerKw,'—'),variant:'child'})).join('');
       const siteConsumptionText = fmtKw(balanceVm.siteConsumptionKw,'—');
       const homeConsumptionSubtitle = balanceVm.homeConsumptionKw === null
         ? (String(balanceVm.homeStatus || '').toUpperCase() === 'INCOMPLETE' ? 'Unavailable · Flexible Load power incomplete' : 'Household consumption unavailable')
         : 'Household consumption excluding Flexible Loads';
       const flexibleLoadsSubtitle = balanceVm.flexibleLoadsKw === null
         ? (String(balanceVm.flexibleStatus || '').toUpperCase() === 'INCOMPLETE' ? 'Measurement incomplete' : 'Measurement unavailable')
-        : `${contributors.length} active contributor${contributors.length===1?'':'s'}`;
+        : `${contributors.length} managed asset${contributors.length===1?'':'s'}`;
       const gridDirection = balanceVm.grid.label;
       const gridValue = balanceVm.grid.displayPowerKw;
       const recommendation = String(firstDefined(d.what_text, d.recommendation_text, d.recommendation, d.summary, 'Monitoring current energy flow') || 'Monitoring current energy flow');
@@ -2620,8 +2626,7 @@
           <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon orange">☀</span><div><h2>Production & supply</h2><p>Energy available to the home now.</p></div></div>${sourceRows.join('') || `<div class="empty compact"><b>Supply unavailable</b><span>Current supply cannot be determined from canonical measurements.</span></div>`}</section>
           <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(reason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>Grid</small><b>${escapeHtml(fmtKw(gridValue,'—'))} ${escapeHtml(gridDirection)}</b></div>${rt.experiencePresence().battery === true ? `<div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div>` : ''}</div></div></section>
           <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>Consumption</h2><p>Site demand and its active components.</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'}) : ''}${contributorRows}${rt.experiencePresence().battery === true && balanceVm.battery.direction === 'into_storage' && balanceVm.battery.displayPowerKw !== null ? this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}) : ''}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${this.overviewEnergyRow({icon:'',label:gridDirection === 'Exporting' ? 'Grid Export' : gridDirection === 'Importing' ? 'Grid Import' : 'Grid',subtitle:'Grid boundary',value:fmtKw(gridValue,'—'),variant:'boundary'})}</section>
-        </div>
-        <div class="bottomInsights overviewSupportFacts"><div class="insight"><span>Solar remaining today</span><b>${fmtKwh(solarRemaining)}</b><small>Forecast left</small></div>${rt.experiencePresence().battery === true ? `<div class="insight"><span>Home Battery reserve</span><b>${reservePct===null?'Not available':fmtPct(reservePct)}</b><small>${reservePct===null?'Reserve setting unavailable':'Protected minimum'}</small></div>` : ''}</div>${this.overviewExperiencePanel(rt)}`;
+        </div>${this.overviewExperiencePanel(rt)}`;
     }
     commandForLoad(rt, assetId, role) {
       // Manual flexible-load controls bind only to the public operational
@@ -2926,7 +2931,9 @@
       const reason = String(load.availability_reason || rt.value(`${id}.availability_reason`, '') || '').toLowerCase();
       if (/not.?connected|disconnected|unplugged|no_connection|charger_not_connected/.test(`${availability} ${reason}`)) return { label: 'Not connected', tone: 'warn', hint: 'Connect to enable planning and charging.' };
       if (/disabled|inactive/.test(String(load.lifecycle_status || '').toLowerCase())) return { label: 'Disabled', tone: 'off', hint: 'This load is disabled and excluded from planning.' };
-      if (/available|connected|ready|active/.test(`${availability} ${reason}`) || load.effective_charger || load.parent_asset_id) return { label: 'Connected', tone: 'ok', hint: '' };
+      if (load.physical_connection_id && load.physical_identity_proven === true) return { label: 'Connected', tone: 'ok', hint: '' };
+      if (load.assigned_connection_id || load.effective_connection_id) return { label: 'Not connected', tone: 'warn', hint: 'A charger is assigned, but this vehicle is not physically identified as connected.' };
+      if (/available|ready|active/.test(`${availability} ${reason}`)) return { label: 'Available', tone: 'neutral', hint: '' };
       return { label: human(load.availability_state || 'Unknown'), tone: 'neutral', hint: human(load.availability_reason || '') };
     }
     planningDisplayFor(rt, load, id, planning, powerKw, energyNeed) {
@@ -3111,7 +3118,7 @@
         .map(action => `<span><b>${escapeHtml(action.label || human(action.role))}:</b> ${escapeHtml(humanReason(action.reason, 'Currently unavailable'))}</span>`)
         .join('');
       const powerAvailability = requestedControl && this.isWritableRow(requestedRow) ? '' : ((!requestedRow || requestedRow.missing) ? '<span>Requested charge power is not published.</span>' : `<span><b>Requested power:</b> ${escapeHtml(requestedRow.editable_reason || 'Requested charge power is currently read-only.')}</span>`);
-      const controlAvailability = commandAvailability || powerAvailability ? `<div class="controlAvailability">${commandAvailability}${powerAvailability}</div>` : '';
+      const controlDiagnostics = commandAvailability || powerAvailability ? `<div class="controlAvailability">${commandAvailability}${powerAvailability}</div>` : '';
       const plannedTodayKwh = asNumber(planning.planned_today_kwh);
       const nextAction = String(firstDefined(planning.what_text, planning.next_action_label, planning.next_action, planningView.state, 'Wait'));
       const canonicalWhy = String(firstDefined(planning.why_text, planning.user_reason_label, planning.reason_label, planningView.why, whyHint, 'No explanation published.'));
@@ -3127,7 +3134,7 @@
       return `<article class="flexLoadCard solarLoadRow ${exceptional?'exceptional':''}">
         <div class="solarLoadSummary"><div class="solarLoadIdentity">${this.assetVisual(load,{size:'sm',fallbackIcon:this.flexibleAssetIcon(load)})}<div><div class="solarLoadName"><h3>${escapeHtml(load.display_name || human(id))}</h3><span class="priorityBadge">${escapeHtml(priorityLabel)}</span></div><small><i class="dot green"></i>${escapeHtml(connection.label)}</small></div></div>
         <div class="solarLoadFact"><small>Now / live</small><b>${escapeHtml(liveState)}</b><span>${fmtKw(powerKw,'—')}</span></div><div class="solarLoadFact"><small>Next action</small><b class="nextActionBadge">${escapeHtml(nextAction)}</b></div><div class="solarLoadFact"><small>Power target</small><b>${fmtKw(requested,'—')}</b></div><div class="solarLoadFact"><small>Planned today</small><b>${fmtKwh(plannedTodayKwh,'—')}</b></div><div class="solarLoadFact solarLoadWhy"><small>Why / reason</small><b>${escapeHtml(canonicalWhy)}</b></div><div class="solarLoadFact"><small>Status</small><b class="planStatusBadge ${exceptional?'exception':(conformanceKnown?'ok':'unknown')}">${exceptional?'Exceptional !':(conformanceKnown?'No published exception':'Status unavailable')}</b></div></div>
-        <div class="solarLoadControls"><div class="requestedSlot"><small class="controlTitle">Requested charge power</small>${requestedControl || `<label class="sliderField unavailable"><div><span>Requested charge power</span><b>—</b></div><input type="range" disabled></label>`}${maxPowerText ? `<em class="maxPowerHint">${escapeHtml(maxPowerText)}</em>` : ''}</div>${actionButtons ? `<div class="loadActions decisionActions"><span>Manual intervention</span>${actionButtons}</div>` : ''}</div>${controlAvailability}${infoBanner}<div class="loadDetailsFull">${this.componentDetailsBlock(detailsId, 'Details', `${this.kv('Planning', human(planning.state || '—'))}${this.kv('Why', canonicalWhy)}${this.kv('Asset id', id)}${sourceAssetLink}`)}</div>
+        <div class="solarLoadControls"><div class="requestedSlot"><small class="controlTitle">Requested charge power</small>${requestedControl || `<label class="sliderField unavailable"><div><span>Requested charge power</span><b>—</b></div><input type="range" disabled></label>`}${maxPowerText ? `<em class="maxPowerHint">${escapeHtml(maxPowerText)}</em>` : ''}</div>${actionButtons ? `<div class="loadActions decisionActions"><span>Manual intervention</span>${actionButtons}</div>` : ''}</div>${infoBanner}<div class="loadDetailsFull">${this.componentDetailsBlock(detailsId, 'Details', `${this.kv('Planning', human(planning.state || '—'))}${this.kv('Why', canonicalWhy)}${this.kv('Asset id', id)}${controlDiagnostics}${sourceAssetLink}`)}</div>
       </article>`;
     }
     energyAssetContext(rt, asset = {}) {
@@ -3814,24 +3821,29 @@
       const active = asBool(firstDefined(consumer.active, rt.value(`${id}.active`, false)));
       const charging = asBool(firstDefined(consumer.charging, rt.value(`${id}.charging`, false))) || /charging/i.test(String(operating || ''));
       const connectionState = String(firstDefined(consumer.connection_state, '') || '').trim().toLowerCase();
-      const connected = asBool(firstDefined(consumer.connected, rt.value(`${id}.connected`, false)))
-        || ['connected','asset_connected'].includes(connectionState);
-      const available = !/unavailable|offline|disconnected/i.test(String(firstDefined(consumer.availability_state, '')));
-      const charger = firstDefined(
-        consumer.effective_charger,
-        consumer.effective_connection_id,
-        consumer.assigned_connection_id,
-        consumer.physical_connection_id,
-        consumer.charger_asset_id,
-        consumer.connection_asset_id,
-        consumer.execution_target_asset_id,
+      const physicalConnectionId = String(firstDefined(consumer.physical_connection_id, '') || '');
+      const physicalIdentityProven = consumer.physical_identity_proven === true || consumer.connected_identity_proven === true;
+      const connected = Boolean(physicalConnectionId && physicalIdentityProven);
+      const assignedPresentation = objectFrom(consumer.connection_presentation?.assigned || {});
+      const physicalPresentation = objectFrom(consumer.connection_presentation?.physical || {});
+      const assignedId = String(firstDefined(consumer.assigned_connection_id, consumer.effective_connection_id, '') || '');
+      const connectionName = firstDefined(
+        connected ? physicalPresentation.display_name : assignedPresentation.display_name,
+        connected ? rt.assetName(physicalConnectionId) : rt.assetName(assignedId),
         ''
       );
-      const requested = asNumber(firstDefined(consumer.requested_power_kw_effective, consumer.requested_power_kw));
-      const state = charging ? 'Charging' : active || (power !== null && power > 0.05) ? 'Active' : connected ? 'Connected' : available ? 'Available' : 'Unavailable';
+      const state = charging && connected
+        ? 'Charging'
+        : active && connected
+          ? 'Active'
+          : connected
+            ? 'Connected'
+            : assignedId
+              ? 'Not connected'
+              : human(firstDefined(consumer.user_status, consumer.availability_state, 'Not connected'));
       const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
-      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(state)}${charger ? ` · ${escapeHtml(rt.assetName(charger) || human(charger))}` : ''}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(state)}${connectionName ? ` · ${escapeHtml(connectionName)}` : ''}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
     flowConsumers(rt, connectionSnapshot = { rows:[] }) {
       const domain = this.flexibleAssetDomain(rt);
@@ -3983,16 +3995,21 @@
         .forEach(vm => {
           const asset = vm.raw || {};
           const chargerId = firstDefined(
-            asset.effective_charger,
-            asset.effective_connection_id,
-            asset.assigned_connection_id,
             asset.physical_connection_id,
+            asset.assigned_connection_id,
+            asset.effective_connection_id,
             asset.charger_asset_id,
             asset.connection_asset_id,
             asset.execution_target_asset_id,
             ''
           );
-          if (chargerId) materialize(chargerId, vm.id, { connection_state:asset.connection_state });
+          const consumerId = asset.physical_connection_id && asset.physical_identity_proven === true ? vm.id : '';
+          if (chargerId) materialize(chargerId, consumerId, {
+            connection_state:asset.connection_state,
+            assigned_asset_id:vm.id,
+            relationship_status:asset.relationship_status,
+            relationship_reason:asset.relationship_reason
+          });
         });
 
       // Public connected_to relationships remain authoritative when present.
@@ -4392,8 +4409,16 @@
       const availability = String(firstDefined(asset.availability_state, status.unavailable ? 'unavailable' : 'available') || '').toLowerCase();
       const healthRaw = firstDefined(asset.health, asset.lifecycle_state, asset.status, '');
       const health = status.unavailable ? 'Unavailable' : healthRaw ? human(healthRaw) : 'Available';
-      const chargerId = String(firstDefined(asset.effective_charger, asset.charger_asset_id, asset.connection_asset_id, asset.execution_target_asset_id, '') || '');
-      const relation = chargerId ? `${rt.assetName(chargerId) || human(chargerId)} · ${human(firstDefined(asset.connection_state,'linked'))}` : '';
+      const assignedConnection = objectFrom(asset.connection_presentation?.assigned || {});
+      const physicalConnection = objectFrom(asset.connection_presentation?.physical || {});
+      const chargerId = String(firstDefined(asset.physical_connection_id, asset.assigned_connection_id, asset.effective_connection_id, asset.charger_asset_id, asset.connection_asset_id, asset.execution_target_asset_id, '') || '');
+      const relationName = firstDefined(
+        asset.physical_identity_proven === true ? physicalConnection.display_name : assignedConnection.display_name,
+        rt.assetName(chargerId),
+        chargerId ? human(chargerId) : ''
+      );
+      const relationState = String(firstDefined(asset.user_status, asset.connection_state, '') || '');
+      const relation = relationName ? `${relationName} · ${human(relationState || 'Assigned')}` : '';
       const reason = humanReason(firstDefined(planning.user_reason_label, planning.waiting_reason, planning.waiting_reason_code, planning.reason, planning.reason_code, row.reason), state === 'Ready' ? 'Ready when you need it.' : 'Home Intelligence is monitoring this asset.');
       const paused = /paused|hold/.test(String(stateRaw || '').toLowerCase()) || rt.commandEnabled(resume);
       const executionPolicy = this.automationExecutionPolicy(rt);
@@ -4432,9 +4457,9 @@
         plannedToday !== null ? ['Planned today', fmtKwh(plannedToday)] : null,
         stillToPlan !== null ? ['Still to plan', fmtKwh(stillToPlan)] : null,
         planningLabel ? ['Plan', human(planningLabel)] : null
-      ].filter(Boolean).slice(0,5);
+      ].filter(Boolean).slice(0,3);
       const details = `${this.kv('Availability', human(availability))}${this.kv('Health', health)}${this.kv('Current power', fmtKw(currentPower, '0.0 kW'))}${this.kv('Requested power', fmtKw(requestedPower, '—'))}${energyNeed !== null ? this.kv('Energy needed',fmtKwh(energyNeed)) : ''}${plannedToday !== null ? this.kv('Planned today',fmtKwh(plannedToday)) : ''}${plannedTomorrow !== null ? this.kv('Planned tomorrow',fmtKwh(plannedTomorrow)) : ''}${stillToPlan !== null ? this.kv('Still to plan',fmtKwh(stillToPlan)) : ''}${this.kv('Automation', human(firstDefined(row.automation_mode, raw.automation_mode, 'Advice')))}${relation ? this.kv('Relationship', relation) : ''}${this.energyAssetDetailDisclosure(rt,asset)}`;
-      return `<article class="managedAssetCard"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${area ? `${escapeHtml(area)} · ` : ''}${escapeHtml(state)} · ${escapeHtml(health)}</span></div></div><b>${fmtKw(currentPower, '0.0 kW')}</b></div><div class="managedAssetFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>${relation ? `<div class="managedAssetRelationship"><small>Connected via</small><b>${escapeHtml(relation)}</b></div>` : ''}<div class="managedAssetStory"><p>${escapeHtml(reason)}</p><div><small>What Home Intelligence will do</small><b>${escapeHtml(recommendation)}</b></div></div>${actions ? `<div class="managedAssetActions">${actions}</div>` : ''}${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}</article>`;
+      return `<article class="managedAssetCard"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${area ? `${escapeHtml(area)} · ` : ''}${escapeHtml(state)} · ${escapeHtml(health)}</span></div></div><b>${fmtKw(currentPower, '0.0 kW')}</b></div><div class="managedAssetFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>${relation ? `<div class="managedAssetRelationship"><small>Connection</small><b>${escapeHtml(relation)}</b></div>` : ''}${actions ? `<div class="managedAssetActions">${actions}</div>` : ''}${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}</article>`;
     }
 
     filterAndSortConsumers(rows = []) {
@@ -4521,8 +4546,6 @@
       const cards = participating.map(row=>this.consumerExplorerCard(rt,row)).join('');
       const disabledRows = disabled.map(row=>{ const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return this.disabledFlexibleAssetCard(rt,vm?.raw||row,vm?.planning||{}); }).join('');
       return `${this.tabExperienceHeader(rt,'consumers',pageVm)}${this.bodyContextBar(rt,'consumers','consumer-list')}<div class="consumersPage productPortalPage">
-        <section class="consumerPrimarySummary" aria-label="Managed energy summary">${summaryFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</section>
-        ${this.productStoryCard({ eyebrow:'Managed energy', title:story, why, recommendation:unavailableCount?'Review unavailable assets and published reasons.':'No manual action is required unless a published command is offered.', tone:'blue' })}
         <section class="panel consumerExplorer" id="consumer-list"><div class="consumerExplorerHeader"><div><h2>Managed assets</h2><p>Primary cards show current power and published energy need. Details hold the deeper technical context.</p></div><strong>${fmtKw(totalPower,'—')}</strong></div><div class="consumerExplorerList">${cards || `<div class="empty"><b>No managed assets</b><span>Enable participation for an asset to let Home Intelligence manage it.</span></div>`}</div></section>
         ${disabledRows ? `<details class="panel compactDisclosure"><summary>Other assets (${disabled.length})</summary><p>These assets are not managed by Home Intelligence.</p><div class="disabledAssetList">${disabledRows}</div></details>` : ''}
       </div>`;
@@ -5330,6 +5353,7 @@
       };
       if (!vm.contractSupported) return `${this.tabExperienceHeader(rt,'planning',planningHeader)}${this.contractGap('Tactical planning unavailable','The backend did not publish canonical Planning energy lanes.')}`;
       const participatingCount = assetTotals.length;
+      const allFlexibleAssets = this.flexibleAssetDomain(rt).consumerFacing().map(vm => vm.raw || {});
       const nextLines = assetTotals.map(item => this.assetIdentityChip(item.asset,fmtKw(firstDefined(item.asset.requested_power_kw,item.asset.requested_charge_power_kw,item.asset.requested_power_kw_effective),'—'))).join('');
       const planningLoadRows = assetTotals.map(item => {
         const canonical=item.canonical||{};
@@ -5338,12 +5362,14 @@
         const why=String(firstDefined(canonical.why_text,canonical.reason_label,'No explanation published.'));
         return `<article class="planningLoadRow"><div class="planningLoadIdentity">${this.assetVisual(item.asset,{size:'sm',fallbackIcon:this.planningAssetIcon(item.asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(item.asset))}</b><span class="priorityBadge">${escapeHtml(priority)}</span></div><small><i class="dot ${/connected/i.test(String(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'')))?'green':'gray'}"></i>${escapeHtml(human(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'Connection unavailable')))}</small></div></div><div><small>Next action</small><b class="nextActionBadge">${escapeHtml(next)}</b></div><div><small>Requested power</small><b>${fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')}</b></div><div><small>Planned today</small><b>${fmtKwh(item.plannedEnergy,'—')}</b></div><div><small>Why / reason</small><b>${escapeHtml(why)}</b></div><div><small>Plan status</small><b class="planStatusBadge ${/at.?risk|blocked|failed/i.test(String(firstDefined(canonical.exception_state,canonical.risk_state,canonical.today_status,'')))?'exception':'unknown'}">${escapeHtml(firstDefined(canonical.plan_conformance_label,canonical.exception_label,canonical.risk_label,'Status unavailable'))}</b></div></article>`;
       }).join('');
-      const incompletePlanningRows = asArray(vm.assets).filter(asset => asset && asset.planning_input_ready === false).map(asset => { const blockers=asArray(asset.planning_blockers); const userReason=blockers.includes('target_soc_not_configured')?'Set a target charge level.':blockers.includes('ready_by_not_configured')?'Set a ready-by time.':blockers.includes('charger_not_assigned')?'Assign a charger.':'Charging information is incomplete.'; return `<article class="planningLoadRow planningInputIncomplete"><div class="planningLoadIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.planningAssetIcon(asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(asset))}</b></div><small>${escapeHtml(userReason)}</small></div></div><div><small>Current charge</small><b>${fmtPct(asset.current_soc_pct)}</b></div><div><small>Target</small><b>${fmtPct(asset.target_soc_pct)}</b></div><div><small>Ready by</small><b>${escapeHtml(asset.ready_by || 'Not set')}</b></div><div><small>Charging power</small><b>${fmtKw(asset.max_power_kw,'—')}</b></div><div><small>Status</small><b class="planStatusBadge exception">Needs setup</b></div></article>`; }).join('');
+      const plannedIds = new Set(assetTotals.map(item => assetKey(item.asset)));
+      const incompletePlanningRows = allFlexibleAssets.filter(asset => asset && !plannedIds.has(assetKey(asset))).map(asset => { const blockers=asArray(asset.planning_blockers); const userReason=blockers.includes('target_soc_not_configured')?'Set a target charge level.':blockers.includes('ready_by_not_configured')?'Set a ready-by time.':blockers.includes('charger_not_assigned')?'Assign a charger.':'Charging information is incomplete.'; return `<article class="planningLoadRow planningInputIncomplete"><div class="planningLoadIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.planningAssetIcon(asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(asset))}</b></div><small>${escapeHtml(userReason)}</small></div></div><div><small>Current charge</small><b>${fmtPct(asset.current_soc_pct)}</b></div><div><small>Target</small><b>${fmtPct(asset.target_soc_pct)}</b></div><div><small>Ready by</small><b>${escapeHtml(asset.ready_by || 'Not set')}</b></div><div><small>Charging power</small><b>${fmtKw(asset.max_power_kw,'—')}</b></div><div><small>Status</small><b class="planStatusBadge exception">Needs setup</b></div></article>`; }).join('');
       const planningReason = human(firstDefined(vm.summary.reason, vm.horizon.reason, vm.currentActionIntent.reason, vm.quality.reason, vm.complete ? 'Planning data is available.' : 'No complete hourly allocation is currently published.'));
       const planningContext = `<section class="panel planningContextPanel"><div class="planningContextGrid"><span><small>Horizon</small><b>${escapeHtml(horizonLabel)}</b></span><span><small>Plan state</small><b>${escapeHtml(statusLabel)}</b></span><span><small>Hourly buckets</small><b>${vm.rows.length}</b></span><span><small>Participating loads</small><b>${assetTotals.length}</b></span><span><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></span><span><small>Planning source</small><b>Energy public planning contract</b></span></div><p>${escapeHtml(planningReason)}</p>${vm.rows.length ? '' : '<div class="empty"><b>No hourly allocation published for this horizon</b><span>The UX keeps unavailable hours empty and does not estimate a schedule.</span></div>'}</section>`;
       return `${this.tabExperienceHeader(rt,'planning',planningHeader)}
+      ${this.bodyContextBar(rt,'planning','planning-body')}
       ${planningContext}
-      <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>${vm.buckets.length} published bucket${vm.buckets.length===1?'':'s'} · backend timestamps preserved · no interpolation · zero values hidden · Grid out fixed at table end</p></div><span>All primary values are kWh per bucket</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>published by Planning</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Canonical Tactical plan projected without frontend recalculation.</p></div></div><div class="planningLoadList">${planningLoadRows || incompletePlanningRows || '<div class="empty"><b>No flexible loads currently need planning</b></div>'}</div></section>`;
+      <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>${vm.buckets.length} published bucket${vm.buckets.length===1?'':'s'} · backend timestamps preserved · no interpolation · zero values hidden · Grid out fixed at table end</p></div><span>All primary values are kWh per bucket</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>published by Planning</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Canonical Tactical plan projected without frontend recalculation.</p></div></div><div class="planningLoadList">${planningLoadRows || incompletePlanningRows ? planningLoadRows + incompletePlanningRows : '<div class="empty"><b>No flexible loads currently need planning</b></div>'}</div></section>`;
     }
 
     strategicPlanning(rt) {
