@@ -2728,10 +2728,10 @@ const HB_ENERGY_NAVIGATION = Object.freeze([
     id: "intelligence",
     label: "Intelligence",
     items: [
-      { id:"strategy", label:"Strategy", view:"strategies", title:"Strategy", description:"Strategy overview, effective policy and current runtime state." },
       { id:"operational-planning", label:"Operational Planning", view:"operational-planning", title:"Operational Planning", description:"What should happen now and in the next hours." },
       { id:"tactical-planning", label:"Tactical Planning", view:"planning", title:"Tactical Planning", description:"How energy is allocated across today and tomorrow." },
-      { id:"strategic-planning", label:"Strategic Planning", view:"strategic-planning", title:"Strategic Planning", description:"Longer-term energy goals, constraints and optimisation." }
+      { id:"strategic-planning", label:"Strategic Planning", view:"strategic-planning", title:"Strategic Planning", description:"Longer-term energy goals, constraints and optimisation." },
+      { id:"settings", label:"Settings", view:"strategies", title:"Settings", description:"Review and edit domain-owned Energy settings and policies." }
     ]
   },
   {
@@ -2769,6 +2769,7 @@ const HB_ENERGY_HERO_ASSETS = Object.freeze({
 const HB_ENERGY_PROFILE_ALIASES = Object.freeze({
   "solar-generation": "solar",
   planning: "outlook",
+  settings: "strategies",
   "strategic-planning": "strategies"
 });
 
@@ -2921,6 +2922,7 @@ function rhiEnergyVisualPickerStyles() {
       this.selectedPlanningHorizonId = interaction.selectedPlanningHorizonId || 'D0';
       this.selectedMeteringHorizonId = interaction.selectedMeteringHorizonId || 'D0';
       this.selectedMeteringPeriodId = interaction.selectedMeteringPeriodId || 'today';
+      this.selectedGasHorizonId = interaction.selectedGasHorizonId || 'month';
       this._meteringPeriodHydrated = Object.prototype.hasOwnProperty.call(interaction, 'selectedMeteringPeriodId');
       this.meteringSort = interaction.meteringSort || 'default';
       this.consumerSort = interaction.consumerSort || 'power';
@@ -2972,6 +2974,7 @@ function rhiEnergyVisualPickerStyles() {
           selectedPlanningHorizonId: this.selectedPlanningHorizonId,
           selectedMeteringHorizonId: this.selectedMeteringHorizonId,
           selectedMeteringPeriodId: this.selectedMeteringPeriodId,
+          selectedGasHorizonId: this.selectedGasHorizonId,
           meteringSort: this.meteringSort,
           consumerSort: this.consumerSort,
           consumerFilter: this.consumerFilter,
@@ -3085,7 +3088,7 @@ function rhiEnergyVisualPickerStyles() {
       if (bySection && byItem) return { section:bySection.id, item:byItem.id, view:byItem.view };
       const legacy = {
         overview:['energy','overview'], flow:['energy','flow'], battery:['energy','battery'], consumers:['energy','consumers'], gas:['energy','gas'],
-        strategies:['intelligence','strategy'], intelligence:['intelligence','strategy'], solar:['energy','solar'], 'operational-planning':['intelligence','operational-planning'],
+        strategies:['intelligence','settings'], intelligence:['intelligence','settings'], solar:['energy','solar'], 'operational-planning':['intelligence','operational-planning'],
         planning:['intelligence','tactical-planning'], outlook:['intelligence','tactical-planning'],
         metering:['insights','metering'], value:['insights','value'], retrospective:['insights','retrospective'],
         'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','strategic-planning']
@@ -3285,6 +3288,14 @@ function rhiEnergyVisualPickerStyles() {
       if (consumerFilter && !consumerFilter.disabled) { this.consumerFilter = consumerFilter.dataset.consumerFilter || 'all'; this.render(); return; }
       const profilePick = event.target.closest('[data-strategy-profile-id]');
       if (profilePick && !profilePick.disabled) { this.selectedStrategyProfileId = profilePick.dataset.strategyProfileId || ''; this.render(); return; }
+      const gasHorizon = event.target.closest('[data-gas-horizon]');
+      if (gasHorizon && !gasHorizon.disabled) {
+        this.selectedGasHorizonId = gasHorizon.dataset.gasHorizon || 'month';
+        this.persistInteractionContext();
+        this._forceRender = true;
+        this.render();
+        return;
+      }
       const planningHorizon = event.target.closest('[data-planning-horizon]');
       if (planningHorizon && !planningHorizon.disabled) { this.selectedPlanningHorizonId = planningHorizon.dataset.planningHorizon || 'D0'; this.render(); return; }
       const scopePick = event.target.closest('[data-scope-id]');
@@ -3901,41 +3912,6 @@ function rhiEnergyVisualPickerStyles() {
       return `<section class="rhiUxContextBar" aria-label="View"${aria}><small>View</small><div class="rhiUxContextControls">${controls}</div></section>`;
     }
 
-    understandingFooter(rt, tab) {
-      const d = rt.decision();
-      const balanceVm = this.canonicalLiveEnergyBalance(rt);
-      const siteDemand = balanceVm.siteConsumptionKw;
-      const homeDemand = balanceVm.homeConsumptionKw;
-      const demand = siteDemand;
-      const solar = balanceVm.solarKw;
-      const gridImport = balanceVm.gridImportKw;
-      const gridExport = balanceVm.gridExportKw;
-      const batterySoc = balanceVm.battery.socPct;
-      const assets = rt.primaryFlexibleAssets();
-      const activeAssets = assets.filter(a => (asNumber(firstDefined(a.power_kw, a.current_power_kw, a.actual_power_kw),0) || 0) > 0.05).length;
-      const outlook = this.selectedHorizon(rt.outlookHorizons(), this.selectedOutlookHorizonId) || {};
-      const balance = asNumber(firstDefined(outlook.summary?.balance?.balance_kwh, outlook.summary?.balance?.outlook_balance_kwh, outlook.balance_kwh));
-      const value = this.valuePeriodContext(rt);
-      const period = this.periodLabel(this.selectedMeteringPeriodId);
-      const conclusions = {
-        overview: [siteDemand !== null ? `Site Consumption is ${fmtKw(siteDemand,'—')}.` : (homeDemand !== null ? `Home Consumption is ${fmtKw(homeDemand,'—')}; Site Consumption is unavailable.` : 'Site Consumption is unavailable.'), batterySoc !== null ? `Home Battery state of charge is ${fmtPct(batterySoc)}.` : 'Home Battery state of charge is unavailable.', 'Energy evidence'],
-        outlook: [balance !== null ? `${this.horizonLabel(outlook)} has an expected balance of ${fmtKwh(balance)}.` : 'The selected forecast balance is unavailable.', 'Forecast values remain estimates and may change as conditions develop.', 'Forecast evidence'],
-        flow: [gridExport > 0.05 ? `The home is exporting ${fmtKw(gridExport)}.` : gridImport > 0.05 ? `The home is importing ${fmtKw(gridImport)}.` : 'The home is balanced locally.', `${fmtKw(solar)} solar is currently available.`, 'Flow evidence'],
-        solar: [(solar || 0) > 0.05 ? `Solar is currently producing ${fmtKw(solar)}.` : 'No meaningful solar production is visible now.', 'Flexible loads use the surplus currently available for them.', 'Solar evidence'],
-        battery: [batterySoc !== null ? `Storage is at ${fmtPct(batterySoc)}.` : 'Storage state is unavailable.', 'Reserve and available actions follow the active strategy.', 'Storage evidence'],
-        consumers: [`${assets.length} controllable assets are available; ${activeAssets} are active now.`, 'Attribution is shown when reliable allocation is available.', 'Consumer evidence'],
-        strategies: ['Configured intent and effective strategy are shown separately.', 'The effective strategy can differ when current conditions require it.', 'Strategy evidence'],
-        metering: (() => { const vm=this.buildMeteringPeriodViewModel(rt); const measured=[['solar production',vm.solar],['consumption',vm.consumption],['grid import',vm.gridImport],['grid export',vm.gridExport]].filter(([,value])=>value!==null); const lead=measured.length ? `${vm.label} ${measured[0][0]} is ${fmtKwh(measured[0][1])}.` : `${vm.label} measurements are unavailable.`; return [lead, `${vm.qualityLabel} measurement quality for the selected period.`, 'Measurement evidence']; })(),
-        intelligence: [human(d.recommendation || 'No recommendation available.'), human(d.reason || 'No explanation available.'), 'Decision evidence'],
-        value: [value.interpretation, value.attention, 'Financial evidence'],
-        planning: ['The table shows only Planning-owned hourly allocations.', 'Unavailable hours remain empty rather than estimated.', 'Planning evidence'],
-        gas: (() => { const gas=this.gasModel(rt); return gas.asset ? [gas.totalM3 !== null ? `Gas meter total is ${this.gasVolume(gas.totalM3)}.` : 'Gas meter is connected; the total reading is not currently available.', gas.totalEntityId ? 'Measured daily consumption is available in the 30-day history.' : 'Consumption history will appear when the canonical total meter entity is available.', 'Gas evidence'] : ['Gas consumption is not measured yet.', 'Connect one authoritative total-increasing gas meter to enable measured usage and history.', 'Gas evidence']; })(),
-        retrospective: ['Energy Intelligence reviewed its measurable performance.', 'Scores reflect published evidence coverage and never invent missing results.', 'Retrospective evidence']
-      };
-      const [title, support, action] = conclusions[tab] || ['Energy information is available.','Open Diagnostics for technical details.','Evidence'];
-      return `<section class="hiConclusionFooter" id="hi-conclusion-${escapeHtml(tab)}"><div class="hiConclusionMain"><span class="hiConclusionIcon">✦</span><div><small>Conclusion</small><h2>${escapeHtml(title)}</h2><p>${escapeHtml(support)}</p></div></div></section>`;
-    }
-
     valueStateLabel(state) {
       const normalized = String(state || '').trim().toLowerCase();
       if (['complete','ok','ready'].includes(normalized)) return 'Complete';
@@ -4179,7 +4155,7 @@ function rhiEnergyVisualPickerStyles() {
           entities:[entityId],
           stat_types:['change'],
           period:'day',
-          days_to_show:30,
+          days_to_show:({week:7,month:30,quarter:90,year:365}[this.selectedGasHorizonId] || 30),
           chart_type:'bar',
           hide_legend:true
         });
@@ -4240,8 +4216,8 @@ function rhiEnergyVisualPickerStyles() {
         solar: { image:hbEnergyHeroAsset('solar-generation'), icon:'☀', eyebrow:'Solar', title:(solar||0)>0.05?'Generating now':'Not generating', value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
         battery: { image:hbEnergyHeroAsset('battery'), icon:'▣', eyebrow:'Home Battery', title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(this.batteryReservePct(rt)),'Protected minimum']] },
         consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',flexibleLoadBudget===null?'Not published':fmtKw(flexibleLoadBudget),flexibleLoadBudget===null?'Planning budget not published':'Current planning budget'],['◷','Planning',flexibleLoadBudget===null && flexNeed===null?'Incomplete':this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),flexibleLoadBudget===null?'Budget not published':'Planning data available']] },
-        gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:'Gas', title:gas.asset ? 'Gas consumption' : 'Gas meter not connected', value:this.gasVolume(gas.totalM3), unit:'total meter reading', explanation:gas.asset ? 'Measured gas use, meter health and 30-day history.' : 'Connect one authoritative gas meter to start measured consumption history.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),gas.flowM3h===null?'Not measured':'Current measured flow'],['◫','Meter total',this.gasVolume(gas.totalM3),gas.totalM3===null?'Not measured':'Cumulative meter reading'],['↺','History',gas.totalEntityId?'30 days':'Not available',gas.totalEntityId?'Daily measured consumption':'Waiting for total meter'],['✓','Health',gas.asset?human(gas.health):'Not configured',gas.asset?'Gas meter health':'Authoritative source required']] },
-        strategies: { image:hbEnergyHeroAsset('strategies'), icon:'◎', eyebrow:'Strategies', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Configured intent and the strategy currently in effect', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
+        gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:'Gas', title:gas.asset ? 'Gas consumption' : 'Gas meter not connected', value:this.gasVolume(gas.totalM3), unit:'total meter reading', explanation:gas.asset ? 'Measured gas use, meter health and 30-day history.' : 'Connect one authoritative gas meter to start measured consumption history.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),gas.flowM3h===null?'Not measured':'Current measured flow'],['◫','Meter total',this.gasVolume(gas.totalM3),gas.totalM3===null?'Not measured':'Cumulative meter reading'],['↺','History',gas.totalEntityId?({week:'7 days',month:'30 days',quarter:'90 days',year:'365 days'}[this.selectedGasHorizonId] || '30 days'):'Not available',gas.totalEntityId?'Daily measured consumption':'Waiting for total meter'],['✓','Health',gas.asset?human(gas.health):'Not configured',gas.asset?'Gas meter health':'Authoritative source required']] },
+        strategies: { image:hbEnergyHeroAsset('strategies'), icon:'◎', eyebrow:'Settings', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Domain-owned settings, configured intent and effective policy', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
         'operational-planning': { image:hbEnergyHeroAsset('operational-planning'), icon:'◷', eyebrow:'Operational Planning', title:this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'), value:fmtKw(flexPower), unit:'managed power now', explanation:'Current flexible-load execution and next actions', tone:'purple', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Managed power now'],['⌂','Energy need',fmtKwh(flexNeed),'Known remaining need'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Current operational state'],['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'),'Energy control mode']] },
         metering: { image:hbEnergyHeroAsset('metering'), icon:'▥', eyebrow:'Metering', title:meteringContext.label, value:meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar), unit:'Solar production', explanation:`Measured energy flows this ${meteringContext.label.toLowerCase()}`, tone:'blue', metrics:[['▥','Consumption',meteringContext.consumption === null ? 'Unavailable' : fmtKwh(meteringContext.consumption),meteringContext.label],['☀','Solar',meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar),meteringContext.label],['↓','Grid import',meteringContext.gridImport === null ? 'Unavailable' : fmtKwh(meteringContext.gridImport),meteringContext.label],['↑','Grid export',meteringContext.gridExport === null ? 'Unavailable' : fmtKwh(meteringContext.gridExport),meteringContext.label]] },
         intelligence: { image:hbEnergyHeroAsset('intelligence'), icon:'✦', eyebrow:'Home Intelligence', title:status, value:this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'), unit:'automation mode', explanation:'Your home energy control center', tone:'orange', metrics:[['✓','Status',status,'Current intelligence state'],['✦','Confidence',this.productStateLabel(decision.confidence || rt.value('energy_intelligence.confidence','unknown'), 'Not available'),'Decision confidence'],['◎','Recommendation',recommendation,'What Home Intelligence advises'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
@@ -4438,7 +4414,7 @@ function rhiEnergyVisualPickerStyles() {
           <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(reason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>Grid</small><b>${escapeHtml(fmtKw(gridValue,'—'))} ${escapeHtml(gridDirection)}</b></div>${rt.experiencePresence().battery === true ? `<div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div>` : ''}</div></div></section>
           <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>Consumption</h2><p>Site demand and its active components.</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'}) : ''}${contributorRows}${rt.experiencePresence().battery === true && balanceVm.battery.direction === 'into_storage' && balanceVm.battery.displayPowerKw !== null ? this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}) : ''}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${this.overviewEnergyRow({icon:'',label:gridDirection === 'Exporting' ? 'Grid Export' : gridDirection === 'Importing' ? 'Grid Import' : 'Grid',subtitle:'Grid boundary',value:fmtKw(gridValue,'—'),variant:'boundary'})}</section>
         </div>
-        <div class="bottomInsights overviewSupportFacts"><div class="insight"><span>Solar remaining today</span><b>${fmtKwh(solarRemaining)}</b><small>Forecast left</small></div>${rt.experiencePresence().battery === true ? `<div class="insight"><span>Home Battery reserve</span><b>${reservePct===null?'Not available':fmtPct(reservePct)}</b><small>${reservePct===null?'Reserve setting unavailable':'Protected minimum'}</small></div>` : ''}</div>${this.overviewExperiencePanel(rt)}`;
+        ${this.overviewExperiencePanel(rt)}`;
     }
     commandForLoad(rt, assetId, role) {
       // Manual flexible-load controls bind only to the public operational
@@ -5480,7 +5456,7 @@ function rhiEnergyVisualPickerStyles() {
 
     energyHardwareStyles() {
       return `
-        .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceCard{max-width:720px}.gasMeterPanel .energyDeviceGrid{grid-template-columns:minmax(0,720px)}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasContextGrid,.planningContextGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gasStatisticsHost{min-height:220px}}
+        .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasHistoryControls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.gasHistoryControls>span{font-size:9px;color:#64748b}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceCard{max-width:720px}.gasMeterPanel .energyDeviceGrid{grid-template-columns:minmax(0,720px)}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasContextGrid,.planningContextGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gasStatisticsHost{min-height:220px}}
 
         .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
         .solarEnergyStory{padding:10px 12px}.solarValueFlow{display:grid;grid-template-columns:minmax(92px,1fr) auto minmax(92px,1fr) auto minmax(92px,1fr) auto minmax(92px,1fr);gap:7px;align-items:stretch}.solarValueFlow button,.solarFlowNode{border:0;background:#f8fafc;border-radius:10px;padding:8px 10px;text-align:left;min-width:0}.solarValueFlow button{cursor:pointer}.solarValueFlow button:hover{background:#eff6ff;box-shadow:inset 0 0 0 1px #bfdbfe}.solarValueFlow small,.solarValueFlow b,.solarValueFlow span{display:block}.solarValueFlow small{font-size:8px;color:#64748b;font-weight:700}.solarValueFlow b{font-size:14px;color:#0f172a;margin-top:2px;white-space:nowrap}.solarValueFlow span{font-size:8px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.solarValueFlow>i{font-style:normal;align-self:center;color:#64748b;font-size:14px}.solarFlowStatus{margin-top:7px;font-size:8.5px;color:#9a5b17;padding:0 2px}.solarHardwareSection{scroll-margin-top:12px}@media(max-width:720px){.solarValueFlow{grid-template-columns:minmax(72px,1fr) auto minmax(72px,1fr) auto minmax(72px,1fr) auto minmax(72px,1fr);gap:5px}.solarValueFlow button,.solarFlowNode{padding:7px}.solarValueFlow b{font-size:12px}}
@@ -6128,8 +6104,11 @@ function rhiEnergyVisualPickerStyles() {
       const hasMeter = !!gas.asset;
       const meter = hasMeter ? this.energyDeviceStatusCard(rt, gas.asset, 'Gas meter') : '';
       const historyAvailable = !!gas.totalEntityId;
+      const gasHorizons = [['week','Week'],['month','Month'],['quarter','Quarter'],['year','Year']];
+      const gasHorizonLabel = gasHorizons.find(([id])=>id===this.selectedGasHorizonId)?.[1] || 'Month';
+      const gasHorizonSelector = `<div class="scopeSelector gasHorizonSelector" aria-label="Gas history horizon">${gasHorizons.map(([id,label])=>`<button type="button" class="scopeOption ${this.selectedGasHorizonId===id?'active':''}" data-gas-horizon="${id}">${label}</button>`).join('')}</div>`;
       const graph = historyAvailable
-        ? `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily measured gas use from Home Assistant long-term statistics on the canonical total-increasing meter.</p></div><span>Last 30 days</span></div><div class="gasStatisticsHost" data-gas-statistics-host data-entity-id="${escapeHtml(gas.totalEntityId)}"></div></section>`
+        ? `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily measured gas use from Home Assistant long-term statistics on the canonical total-increasing meter.</p></div><div class="gasHistoryControls"><span>${escapeHtml(gasHorizonLabel)}</span>${gasHorizonSelector}</div></div><div class="gasStatisticsHost" data-gas-statistics-host data-entity-id="${escapeHtml(gas.totalEntityId)}"></div></section>`
         : `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily gas consumption will appear here when a canonical total-increasing gas meter is available.</p></div></div><div class="empty"><b>No measured gas history yet</b><span>Connect the authoritative gas meter to enable Home Assistant long-term statistics. The UX never estimates missing consumption.</span></div></section>`;
       const setupOrMeter = hasMeter
         ? `<section class="panel gasMeterPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Gas meter</h2><p>Current meter state and measured values.</p></div></div>${meter}</section>`
@@ -6161,7 +6140,6 @@ function rhiEnergyVisualPickerStyles() {
         <div class="batteryGrid batteryGridTwoUp">
           <section class="panel batteryHero"><h2>Home Battery state</h2><p>Combined operational truth for the Home Battery system.</p><div class="batteryGauge"><b>${escapeHtml(fmtPct(soc))}</b><span>${escapeHtml(fmtKwh(available))} / ${escapeHtml(fmtKwh(capacity))}</span><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div>${this.kv('State', human(state))}${this.kv('Power now', fmtKw(power,'—'))}${this.kv('Available energy', fmtKwh(available))}${this.kv('Capacity', fmtKwh(capacity))}${reserve === null ? '' : this.kv('Reserve',fmtPct(reserve))}${this.kv('Health', human(batteryVm.health))}${systemDetails}</section>
           <section class="panel" id="battery-contributors"><h2>Home Battery contributors</h2><p>Physical batteries contributing to the aggregate.</p><div class="batteryContributorList">${children.map(id => this.batteryChildCard(rt, id)).join('') || `<div class="empty"><b>No Home Battery units published</b><span>Home Battery aggregate only.</span></div>`}</div></section>
-          ${(() => { const profile = this.strategyProfileForDomain(rt, 'battery'); return profile ? this.strategyTable(rt, profile, { title: 'Home Battery strategy', description: 'Configured Home Battery policy.' }) : `<section class="panel strategyTablePanel"><div class="strategyTableHead"><div><h2>Home Battery strategy</h2><p>No Home Battery strategy profile is published.</p></div></div></section>`; })()}
         </div>
       </div>`;
     }
@@ -6310,34 +6288,11 @@ function rhiEnergyVisualPickerStyles() {
       const visibleRows = this.filterAndSortConsumers(rows);
       const participating = visibleRows.filter(row => { const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return !vm || (vm.isParticipating && !vm.isDisabled); });
       const disabled = visibleRows.filter(row => domain.byId(row.asset_id||row.consumer_id||row.id)?.isDisabled);
-      const statuses = participating.map(row => {
-        const vm=domain.byId(row.asset_id||row.consumer_id||row.id);
-        return this.canonicalOperationalStatus(rt, vm?.raw||row, vm?.planning||{});
-      });
-      const activeCount = statuses.filter(state => state.isCharging).length;
-      const unavailableCount = statuses.filter(state => state.unavailable).length;
       const totalPower = asNumber(summary.current_power_kw);
-      const planningVm = this.buildPlanningViewModel(rt);
-      const todayTotals = objectFrom(planningVm.todayTotals || {});
-      const totalNeed = asNumber(firstDefined(todayTotals.flexible_total_need_kwh,summary.flexible_total_need_kwh,summary.required_energy_kwh));
-      const totalPlanned = asNumber(firstDefined(todayTotals.planned_flexible_energy_kwh,todayTotals.planned_today_kwh,summary.planned_today_kwh));
-      const stillToPlan = asNumber(firstDefined(todayTotals.still_unresolved_kwh,todayTotals.unresolved_horizon_kwh,summary.still_to_plan_kwh));
-      const summaryFacts = [
-        ['Power now',totalPower === null ? '—' : fmtKw(totalPower)],
-        ['Required today',totalNeed === null ? '—' : fmtKwh(totalNeed)],
-        ['Planned today',totalPlanned === null ? '—' : fmtKwh(totalPlanned)],
-        ['Still to plan',stillToPlan === null ? '—' : fmtKwh(stillToPlan)]
-      ];
-      const story = activeCount
-        ? `${activeCount} managed asset${activeCount===1?' is':'s are'} using measured power now.`
-        : participating.length ? `Home Intelligence is managing ${participating.length} asset${participating.length===1?'':'s'}; none has measured active power now.` : 'No assets are currently managed by Home Intelligence.';
-      const why = unavailableCount ? `${unavailableCount} asset${unavailableCount===1?' is':'s are'} currently unavailable.` : 'Planning state is shown separately from live execution.';
       const cards = participating.map(row=>this.consumerExplorerCard(rt,row)).join('');
       const disabledRows = disabled.map(row=>{ const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return this.disabledFlexibleAssetCard(rt,vm?.raw||row,vm?.planning||{}); }).join('');
       return `${this.tabExperienceHeader(rt,'consumers',pageVm)}${this.bodyContextBar(rt,'consumers','consumer-list')}<div class="consumersPage productPortalPage">
-        <section class="consumerPrimarySummary" aria-label="Managed energy summary">${summaryFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</section>
-        ${this.productStoryCard({ eyebrow:'Managed energy', title:story, why, recommendation:unavailableCount?'Review unavailable assets and published reasons.':'No manual action is required unless a published command is offered.', tone:'blue' })}
-        <section class="panel consumerExplorer" id="consumer-list"><div class="consumerExplorerHeader"><div><h2>Managed assets</h2><p>Primary cards show current power and published energy need. Details hold the deeper technical context.</p></div><strong>${fmtKw(totalPower,'—')}</strong></div><div class="consumerExplorerList">${cards || `<div class="empty"><b>No managed assets</b><span>Enable participation for an asset to let Home Intelligence manage it.</span></div>`}</div></section>
+        <section class="panel consumerExplorer" id="consumer-list"><div class="consumerExplorerHeader"><div><h2>Managed flexible assets</h2><p>Primary cards show current power and published energy need. Details hold the deeper technical context.</p></div><strong>${fmtKw(totalPower,'—')}</strong></div><div class="consumerExplorerList">${cards || `<div class="empty"><b>No managed assets</b><span>Enable participation for an asset to let Home Intelligence manage it.</span></div>`}</div></section>
         ${disabledRows ? `<details class="panel compactDisclosure"><summary>Other assets (${disabled.length})</summary><p>These assets are not managed by Home Intelligence.</p><div class="disabledAssetList">${disabledRows}</div></details>` : ''}
       </div>`;
     }
@@ -6357,7 +6312,7 @@ function rhiEnergyVisualPickerStyles() {
       const unavailableSelectedProfile = this.selectedStrategyProfileId && !selected
         ? `<option value="${escapeHtml(this.selectedStrategyProfileId)}" selected disabled>Selected profile temporarily unavailable</option>`
         : '';
-      const profilePicker = profiles.length ? `<section class="panel strategyProfilePicker compact"><div><h2>Strategy profile</h2><p>Choose the policy set you want to review or adjust.</p></div><label class="strategyProfileSelect"><span>Profile</span><select data-strategy-profile-select>${unavailableSelectedProfile}${profiles.map(profile => `<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>${selected ? `<small>${escapeHtml(this.profileUserDescription(selected))}</small>` : `<small>The selected profile is temporarily unavailable. Your selection is preserved.</small>`}</section>` : '';
+      const profilePicker = profiles.length ? `<section class="panel strategyProfilePicker compact"><div><h2>Settings profile</h2><p>Choose the domain policy set you want to review or adjust.</p></div><label class="strategyProfileSelect"><span>Profile</span><select data-strategy-profile-select>${unavailableSelectedProfile}${profiles.map(profile => `<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>${selected ? `<small>${escapeHtml(this.profileUserDescription(selected))}</small>` : `<small>The selected profile is temporarily unavailable. Your selection is preserved.</small>`}</section>` : '';
       const effectiveRowsForProfile = selectedId
         ? effectiveStrategies.filter(strategy => {
             const text = `${strategy.profile_id || ''} ${strategy.strategy_profile_id || ''} ${strategy.profile_type || ''} ${strategy.asset_type || ''} ${strategy.policy_profile || ''}`.toLowerCase();
@@ -6376,8 +6331,8 @@ function rhiEnergyVisualPickerStyles() {
         ? this.componentSegmentedControl(automationOptions, automationMode, 'automationModeControl')
         : `<div class="profileNoControls">Automation mode is not writable in the current public contract.</div>`;
       return `${this.tabExperienceHeader(rt,'strategies',pageVm)}<div class="strategiesPage strategyProfilesPage strategyProfileUx">
-        <section class="panel strategyAutomationMode"><div><h2>Automation mode</h2><p>Choose how Home Intelligence may act. The configured value is written through the canonical Energy property interface and confirmed by readback.</p></div>${automationControl}${this.editablePropertyFeedback(automationRow)}</section>
-        ${profilePicker || `<section class="panel"><h2>No strategy profiles published</h2><p>Waiting for canonical V2 strategy configuration.</p></section>`}
+        <section class="panel strategyAutomationMode"><div><h2>Automation mode</h2><p>Choose how Home Intelligence may act. Domain ownership stays in the backend; changes are confirmed by authoritative readback.</p></div>${automationControl}${this.editablePropertyFeedback(automationRow)}</section>
+        ${profilePicker || `<section class="panel"><h2>No settings profiles published</h2><p>Waiting for canonical domain settings.</p></section>`}
         <div class="profileEditorColumn">${selected ? this.strategyProfileCard(rt, selected) : ''}</div>
         <section class="panel effectivePolicyPreview"><h2>Current policy effect${selected ? ` · ${escapeHtml(this.profileUserLabel(selected))}` : ''}</h2><p>Configured, effective and influencing policy state.</p><div class="effectivePolicyList">${effectiveRows || `<div class="empty"><b>No effective strategy published</b><span>Waiting for canonical V2 effective strategy.</span></div>`}</div></section>
         <section class="panel strategyParticipation"><h2>Participating assets</h2><p>The same central participation model used across Energy.</p><div class="effectivePolicyList">${this.flexibleAssetDomain(rt).consumerFacing().map(vm=>`<div class="planningTransparencyRow"><div class="strategyAssetIdentity">${this.assetVisual(vm.raw,{size:'xs',fallbackIcon:this.flexibleAssetIcon(vm.raw)})}<div><b>${escapeHtml(rt.assetName(vm.id))}</b><span>${escapeHtml(vm.isDisabled?'Excluded from planning':'Included in flexible planning')}</span></div></div><strong>${escapeHtml(human(vm.participation))}</strong></div>`).join('') || `<div class="empty"><b>No flexible assets published</b></div>`}</div></section>
@@ -7191,7 +7146,7 @@ function rhiEnergyVisualPickerStyles() {
       };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}
         <div class="strategicPlanningPage">
-          <section class="panel strategicPlanningIntro"><h2>Strategic posture</h2><p>Strategy configuration is the authority for longer-term intent. This view is read-only: edit intent on Strategy; Tactical Planning owns today/tomorrow scheduling and Operational Planning owns execution.</p></section>
+          <section class="panel strategicPlanningIntro"><h2>Strategic posture</h2><p>Strategy configuration is the authority for longer-term intent. This view is read-only: edit intent in Settings; Tactical Planning owns today/tomorrow scheduling and Operational Planning owns execution.</p></section>
           <div class="strategyGrid">
             ${section('Goals & policy','What Home Intelligence is trying to optimise over time.',objectiveRows)}
             ${section('Constraints & resilience','Boundaries that planning must respect.',constraintRows)}
@@ -7267,7 +7222,8 @@ function rhiEnergyVisualPickerStyles() {
             <div class="rhiUxFooterAction">Resolve the listed runtime/backend condition, then reload this view to verify recovery.</div>
           </div>
         </details>` : '';
-      return `<footer class="hiRuntimeFooter rhiUxFooter" aria-label="RHI Energy release information"><span>RHI Energy UX ${escapeHtml(footer.uxVersion || UX_VERSION)}</span><span>Backend ${escapeHtml(backend)}</span>${issueDetails}</footer>`;
+      const status = issue ? (issue.severity === 'error' ? 'Attention' : 'Degraded') : (footer.runtimeTrusted === false ? 'Attention' : 'Ready');
+      return `<footer class="hiRuntimeFooter rhiUxFooter" aria-label="RHI Energy release information"><span>RHI Energy UX ${escapeHtml(footer.uxVersion || UX_VERSION)}</span><span>Backend ${escapeHtml(backend)}</span><span>Status ${escapeHtml(status)}</span>${issueDetails}</footer>`;
     }
     renderError(view, error) {
       const message = error && error.message ? error.message : String(error || 'Unknown render error');
@@ -7280,7 +7236,7 @@ function rhiEnergyVisualPickerStyles() {
       const headerEnd = body.indexOf(marker);
       if (headerEnd < 0) return body;
       const split = headerEnd + marker.length;
-      return `${body.slice(0, split)}<div id="hi-body-${escapeHtml(this.view)}">${body.slice(split)}</div>${this.understandingFooter(rt, this.view)}`;
+      return `${body.slice(0, split)}<div id="hi-body-${escapeHtml(this.view)}">${body.slice(split)}</div>`;
     }
     patchDomNode(current, next) {
       if (!current || !next) return;
