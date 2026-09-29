@@ -41,7 +41,7 @@ function selectEnergyPlanning(store, horizon='D0') {
       flexible_still_to_plan_kwh:row.flexible_still_to_plan_kwh ?? null
     }),
     buckets:Array.isArray(row.buckets) ? row.buckets : [],
-    flexible_plan:{},
+    flexible_plan:planning.flexible_plan && typeof planning.flexible_plan === 'object' ? planning.flexible_plan : {},
     planning_objects:Array.isArray(store?.planningObjects) ? store.planningObjects : [],
     source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons'
   });
