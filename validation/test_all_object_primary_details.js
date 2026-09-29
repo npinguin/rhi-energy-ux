@@ -75,6 +75,9 @@ assert.match(flowCharger,/connection_state/);
 assert.match(flowCharger,/physical_power_kw/);
 const flowConsumer = method("consumerCard");
 assert.match(flowConsumer,/Connected/);
-assert.match(flowConsumer,/effective_charger/);
+assert.match(flowConsumer,/assigned_connection_id/);
+assert.match(flowConsumer,/physical_connection_id/);
+assert.match(flowConsumer,/physical_identity_proven/);
+assert.doesNotMatch(flowConsumer,/effective_charger/, "Flow must not reconstruct charger relationship from deprecated effective_charger alias");
 
 console.log("PASS explicit primary/details contract across Energy object types");
