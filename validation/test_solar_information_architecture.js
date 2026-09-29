@@ -56,7 +56,7 @@ assert.doesNotMatch(hardware,/'Solar zones'/);
 assert.match(app,/solarModuleCard/);
 assert.match(app,/solarOptimizerPrimaryCard/);
 assert.match(app,/OPTIMIZER \/ PANEL/);
-assert.match(app,/SOLAR STRING/);
+assert.match(app,/SOLAR ZONE \/ STRING/);
 assert.match(app,/solarPanelOnlyGrid/);
 assert.doesNotMatch(app,/No panels linked to this zone/);
 assert.doesNotMatch(app,/No modules linked/);
