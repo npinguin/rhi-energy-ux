@@ -12,12 +12,13 @@ def inventory(root: Path):
     rows = []
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
         rel = path.relative_to(root)
+        rel_text = rel.as_posix()
         for part in rel.parts:
             if not SAFE.fullmatch(part):
-                raise SystemExit(f"unsafe asset path segment: {rel.as_posix()}")
+                raise SystemExit(f"unsafe asset path segment: {rel_text}")
         if path.suffix.lower() not in ALLOWED and rel_text not in ALLOWED_METADATA:
-            raise SystemExit(f"unsupported asset extension: {rel.as_posix()}")
-        rows.append(rel.as_posix())
+            raise SystemExit(f"unsupported asset extension: {rel_text}")
+        rows.append(rel_text)
     return rows
 
 source_files = inventory(SRC)
