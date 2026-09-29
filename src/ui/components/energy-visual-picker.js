@@ -57,5 +57,15 @@ function rhiEnergyVisualPickerStyles() {
     .assetVisual[data-energy-visual-open]{cursor:pointer;outline:0}
     .assetVisual[data-energy-visual-open]:hover{box-shadow:0 0 0 2px rgba(37,99,235,.16)}
     .energyVisualClose{border:0;background:#f1f5f9;border-radius:10px;width:36px;height:36px;font-size:22px;cursor:pointer}
+
+    /* Energy owns the modal content contract: source artwork dimensions may never
+       dictate picker tile geometry. Keep every product on one bounded canvas. */
+    .rhiUxVisualChoice{grid-template-columns:112px minmax(0,1fr)!important;min-height:98px!important;overflow:hidden}
+    .rhiUxVisualChoiceImage{width:112px!important;height:76px!important;min-width:112px!important;min-height:76px!important;max-width:112px!important;max-height:76px!important;overflow:hidden!important}
+    .rhiUxVisualChoiceImage img{display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;object-position:center!important}
+    @media(max-width:760px){
+      .rhiUxVisualChoice{grid-template-columns:96px minmax(0,1fr)!important}
+      .rhiUxVisualChoiceImage{width:96px!important;min-width:96px!important;max-width:96px!important}
+    }
   `;
 }
