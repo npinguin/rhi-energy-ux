@@ -12,8 +12,7 @@ assert.ok(pkg.scripts["release:check"].includes("test:release"), "explicit relea
 assert.ok(publish.includes("version_already_published"), "publication must skip already-published engineering versions");
 assert.ok(publish.includes("npm run release:check"), "publication boundary must own release metadata validation");
 assert.ok(publish.includes("needs.scope.outputs.publish == 'true'"), "publication must be gated by candidate scope");
-assert.ok(governance.includes("A normal implementation or defect PR may validate and merge without inventing a new version.")
-  || governance.includes("version bump"),
+assert.ok(governance.includes("A normal implementation, defect or governance PR is release-neutral."),
   "release governance must document release-neutral engineering validation");
 
 console.log("PASS Energy UX release lifecycle separation");
