@@ -56,7 +56,7 @@ assert.doesNotMatch(hardware,/'Solar zones'/);
 assert.match(app,/solarModuleCard/);
 assert.match(app,/solarOptimizerPrimaryCard/);
 assert.match(app,/OPTIMIZER \/ PANEL/);
-assert.match(app,/SOLAR STRING/);
+assert.match(app,/SOLAR ZONE \/ STRING/);
 assert.match(app,/solarPanelOnlyGrid/);
 assert.doesNotMatch(app,/No panels linked to this zone/);
 assert.doesNotMatch(app,/No modules linked/);
@@ -95,3 +95,9 @@ assert.match(app,/data-energy-visual-open/);
 assert.doesNotMatch(app,/solarHardwareSection\(\n\s*'Inverter system'/);
 assert.match(app,/solarProductionHierarchy/);
 assert.match(app,/Aggregate production followed by the physical inverter → string → optimizer\/panel hierarchy/);
+
+
+assert.match(app,/solarProductionRepresentative/);
+assert.match(app,/energy\.logical\.solar_zone\.generic/);
+assert.match(app,/solarStringVisual/);
+assert.doesNotMatch(app,/solarHardwareSection\(\n\s*'Inverter system'/,"inverters must not be projected in a duplicate standalone section");
