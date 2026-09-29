@@ -3,7 +3,7 @@ import json
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = ROOT / "src" / "assets" / "metadata" / "energy-visual-manifest.json"
+MANIFEST = ROOT / "governance" / "energy-visual-manifest.json"
 CATALOG = ROOT / "src" / "app" / "energy-asset-catalog.js"
 SRC_ASSETS = ROOT / "src" / "assets"
 
