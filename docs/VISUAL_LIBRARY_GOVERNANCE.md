@@ -74,3 +74,44 @@ Energy must not contain producer-specific brand/model switches, image-key aliase
 Adding a new producer vehicle/charger visual must require zero product-specific Energy source changes. Unknown or invalid registry entries render neutrally; they never resolve to another real product or the Energy flexible-load hero.
 
 This invariant is machine-enforced by `validation/test_visual_ref_contract.js` and `validation/validate_shared_visual_ownership.py`.
+
+
+## Shared visual-library contract
+
+Energy keeps all Energy artwork package-local. Shared Core defines visual grammar, dimensions and quality taxonomy; it does not own Energy product binaries.
+
+Canonical visual classes:
+- `hero_scene`: 2400×800, 3:1, with focal point and safe area;
+- `product_wide`: 1600×950, transparent;
+- `product_square`: 1400×1400, transparent;
+- `product_landscape`: 1600×1200, transparent.
+
+Hero, product and generic fallback families are separate. A hero asset must never become the final implementation of a generic same-type fallback.
+
+Reusable product discovery follows exact identity from SKU → brand/model → brand/type → official manufacturer → authorised distributor → generated/derived appearance.
+
+## Reusable-context boundary
+
+The visual manifest, catalog, documentation and package assets may contain reusable brand, model, variant, SKU, provenance and quality metadata only.
+
+They must not contain customer names, project names, site names, addresses, serial numbers, deployment counts or installation-specific ownership/context.
+
+## Physical versus logical concepts
+
+Physical Energy assets may have exact product artwork and, when semantically justified, exact backend profiles. Logical aggregations and structural property groups do not become product identities merely because they have a visual.
+
+Current physical visual inventory includes batteries, inverters, optimizers, panels, backup interface, HomeWizard P1 meter, FLONIDAN gas meter and Sagemcom grid meter/source device.
+
+Logical or structural concepts such as `grid_connection`, `grid_phase`, `solar_production`, `solar_array`, `home_consumption`, `price_source`, `solar_forecast`, `flexible_load`, `flexible_asset`, `consumer` and `energy_system` remain non-product concepts.
+
+## Publication rule
+
+A new or replaced visual is published only when:
+1. canonical source and packaged dist copies exist;
+2. source and dist bytes are identical;
+3. declared dimensions/background policy are met;
+4. the catalog points only to existing package assets;
+5. product identity is reusable and non-deployment-specific;
+6. CI validates catalog, manifest and package parity.
+
+The visual migration stays explicitly incomplete until these conditions are closed for every required visual family.
