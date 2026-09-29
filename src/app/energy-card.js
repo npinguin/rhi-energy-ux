@@ -3393,10 +3393,25 @@
         const label = firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property'));
         let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
         if (field.unit && value !== '—' && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
-        return { label, value };
+        const presentation = objectFrom(row.presentation || {});
+        return { label, value, family:String(presentation.family || 'summary') };
       }).filter(Boolean);
-      const propertyHtml = publishedProperties.length
-        ? `<div class="energyAssetPropertyList"><small class="energyAssetPropertyTitle">Published properties</small><div class="energyAssetPropertyGrid">${publishedProperties.map(row=>`<span><small>${escapeHtml(row.label)}</small><b>${escapeHtml(row.value)}</b></span>`).join('')}</div></div>`
+      const familyLabels = {
+        summary:'Summary',
+        energy:'Energy',
+        configuration:'Configuration',
+        control:'Control',
+        source_connectivity:'Source & connectivity',
+        diagnostics:'Diagnostics'
+      };
+      const familyOrder = ['summary','energy','configuration','control','source_connectivity','diagnostics'];
+      const groupedProperties = familyOrder.map(family => {
+        const familyRows = publishedProperties.filter(row => row.family === family);
+        if (!familyRows.length) return '';
+        return `<section class="energyAssetPropertyFamily" data-property-family="${escapeHtml(family)}"><small class="energyAssetPropertyTitle">${escapeHtml(familyLabels[family] || human(family))}</small><div class="energyAssetPropertyGrid">${familyRows.map(row=>`<span><small>${escapeHtml(row.label)}</small><b>${escapeHtml(row.value)}</b></span>`).join('')}</div></section>`;
+      }).join('');
+      const propertyHtml = groupedProperties
+        ? `<div class="energyAssetPropertyList">${groupedProperties}</div>`
         : '';
       return `<details class="energyAssetDetails"><summary>Details</summary><div class="energyAssetDetailGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value ?? '—'))}</b></span>`).join('')}${missing.length ? `<span class="wide"><small>Missing publication fields</small><b>${escapeHtml(missing.join(' · '))}</b></span>` : ''}</div>${propertyHtml}</details>`;
     }
