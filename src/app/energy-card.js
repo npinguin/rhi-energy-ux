@@ -4288,7 +4288,6 @@
         <div class="batteryGrid batteryGridTwoUp">
           <section class="panel batteryHero"><h2>Home Battery state</h2><p>Combined operational truth for the Home Battery system.</p><div class="batteryGauge"><b>${escapeHtml(fmtPct(soc))}</b><span>${escapeHtml(fmtKwh(available))} / ${escapeHtml(fmtKwh(capacity))}</span><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div>${this.kv('State', human(state))}${this.kv('Power now', fmtKw(power,'—'))}${this.kv('Available energy', fmtKwh(available))}${this.kv('Capacity', fmtKwh(capacity))}${reserve === null ? '' : this.kv('Reserve',fmtPct(reserve))}${this.kv('Health', human(batteryVm.health))}${systemDetails}</section>
           <section class="panel" id="battery-contributors"><h2>Home Battery contributors</h2><p>Physical batteries contributing to the aggregate.</p><div class="batteryContributorList">${children.map(id => this.batteryChildCard(rt, id)).join('') || `<div class="empty"><b>No Home Battery units published</b><span>Home Battery aggregate only.</span></div>`}</div></section>
-          ${(() => { const profile = this.strategyProfileForDomain(rt, 'battery'); return profile ? this.strategyTable(rt, profile, { title: 'Home Battery strategy', description: 'Configured Home Battery policy.' }) : `<section class="panel strategyTablePanel"><div class="strategyTableHead"><div><h2>Home Battery strategy</h2><p>No Home Battery strategy profile is published.</p></div></div></section>`; })()}
         </div>
       </div>`;
     }
