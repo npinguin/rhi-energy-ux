@@ -5233,7 +5233,7 @@
     buildPlanningViewModel(rt) {
       const horizonId = this.selectedPlanningHorizonId || 'D0';
       const domainAssets = this.flexibleAssetDomain(rt).all();
-      const assets = this.flexibleAssetDomain(rt).planningParticipants().map(vm => vm.raw);
+      const assets = this.flexibleAssetDomain(rt).consumerFacing().map(vm => vm.raw);
       const storage = domainAssets.find(vm => vm.isStorage && !vm.isDisabled)?.raw || null;
       return createPlanningViewModel({ gateway: rt.contractGateway(), horizonId, flexibleAssets: assets, storage });
     }
@@ -5257,6 +5257,8 @@
       const assetKey = asset => String(asset.asset_id || asset.id || '');
       const totals = vm.laneTotals;
       const canonicalAssetsById = vm.planningAssetsById || {};
+      const backendFlexiblePlan = objectFrom(rt.publicV2()?.planning?.flexible_plan || {});
+      const backendPlanningAssets = new Map(asArray(backendFlexiblePlan.assets).map(row => [String(row.asset_id || ''), objectFrom(row)]));
       const assetTotalsById = totals.flexibleAssetsById;
       const plannedForAsset = assetId => {
         const raw = assetTotalsById[assetId];
@@ -5266,7 +5268,10 @@
         return asNumber(firstDefined(row.energy_kwh, row.planned_energy_kwh, row.total_kwh, row.value));
       };
       const allAssetTotals = vm.assets.map(asset => {
-        const canonical = objectFrom(canonicalAssetsById[assetKey(asset)] || vm.planningAssets.find(row => String(row.asset_id || '') === assetKey(asset)) || {});
+        const canonical = {
+          ...objectFrom(canonicalAssetsById[assetKey(asset)] || vm.planningAssets.find(row => String(row.asset_id || '') === assetKey(asset)) || {}),
+          ...objectFrom(backendPlanningAssets.get(assetKey(asset)) || {})
+        };
         const published = objectFrom(assetTotalsById[assetKey(asset)]);
         return {
           asset,
@@ -5282,7 +5287,8 @@
       }, 0);
       // Tactical Planning shows every real planning participant. Zero/no-plan is
       // a valid state and must not make a vehicle disappear from the horizon.
-      const assetTotals = allAssetTotals;
+      const assetTotals = allAssetTotals.filter(item => item.canonical.planning_eligible !== false && item.asset.planning_input_ready !== false);
+      const visibleAssetTotals = allAssetTotals;
 
       const solarTotal = totals.solarKwh;
       const batteryOutTotal = totals.homeBatteryOutKwh;
@@ -5388,12 +5394,13 @@
       const participatingCount = assetTotals.length;
       const allFlexibleAssets = this.flexibleAssetDomain(rt).consumerFacing().map(vm => vm.raw || {});
       const nextLines = assetTotals.map(item => this.assetIdentityChip(item.asset,fmtKw(firstDefined(item.asset.requested_power_kw,item.asset.requested_charge_power_kw,item.asset.requested_power_kw_effective),'—'))).join('');
-      const planningLoadRows = assetTotals.map(item => {
+      const planningLoadRows = visibleAssetTotals.map(item => {
         const canonical=item.canonical||{};
         const priority=human(firstDefined(item.asset.energy_control_priority,item.asset.priority_label,'Normal'));
-        const next=String(firstDefined(canonical.what_text,canonical.next_action_label,canonical.next_action,canonical.today_label,'Wait'));
-        const why=String(firstDefined(canonical.why_text,canonical.reason_label,'No explanation published.'));
-        return `<article class="planningLoadRow"><div class="planningLoadIdentity">${this.assetVisual(item.asset,{size:'sm',fallbackIcon:this.planningAssetIcon(item.asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(item.asset))}</b><span class="priorityBadge">${escapeHtml(priority)}</span></div><small><i class="dot ${/connected/i.test(String(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'')))?'green':'gray'}"></i>${escapeHtml(human(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'Connection unavailable')))}</small></div></div><div><small>Next action</small><b class="nextActionBadge">${escapeHtml(next)}</b></div><div><small>Requested power</small><b>${fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')}</b></div><div><small>Planned today</small><b>${fmtKwh(item.plannedEnergy,'—')}</b></div><div><small>Why / reason</small><b>${escapeHtml(why)}</b></div><div><small>Plan status</small><b class="planStatusBadge ${/at.?risk|blocked|failed/i.test(String(firstDefined(canonical.exception_state,canonical.risk_state,canonical.today_status,'')))?'exception':'unknown'}">${escapeHtml(firstDefined(canonical.plan_conformance_label,canonical.exception_label,canonical.risk_label,'Status unavailable'))}</b></div></article>`;
+        const eligible = canonical.planning_eligible !== false && canonical.planning_input_ready !== false;
+        const next=eligible ? String(firstDefined(canonical.what_text,canonical.next_action_label,canonical.next_action,canonical.today_label,'Wait')) : 'Not in plan';
+        const why=eligible ? String(firstDefined(canonical.user_status,canonical.why_text,canonical.reason_label,'Planning ready')) : String(firstDefined(canonical.user_status,'Planning inputs incomplete'));
+        return `<article class="planningLoadRow"><div class="planningLoadIdentity">${this.assetVisual(item.asset,{size:'sm',fallbackIcon:this.planningAssetIcon(item.asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(item.asset))}</b><span class="priorityBadge">${escapeHtml(priority)}</span></div><small><i class="dot ${/connected/i.test(String(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'')))?'green':'gray'}"></i>${escapeHtml(human(firstDefined(item.asset.connection_state,item.asset.physical_connection_state,'Connection unavailable')))}</small></div></div><div><small>Next action</small><b class="nextActionBadge">${escapeHtml(next)}</b></div><div><small>Requested power</small><b>${fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')}</b></div><div><small>Planned today</small><b>${fmtKwh(item.plannedEnergy,'—')}</b></div><div><small>Why / reason</small><b>${escapeHtml(why)}</b></div><div><small>Plan status</small><b class="planStatusBadge ${eligible?'ok':'exception'}">${escapeHtml(eligible ? firstDefined(canonical.user_status,'Planning ready') : firstDefined(canonical.user_status,'Needs setup'))}</b></div></article>`;
       }).join('');
       const plannedIds = new Set(assetTotals.map(item => assetKey(item.asset)));
       const incompletePlanningRows = allFlexibleAssets.filter(asset => asset && !plannedIds.has(assetKey(asset))).map(asset => { const blockers=asArray(asset.planning_blockers); const userReason=blockers.includes('target_soc_not_configured')?'Set a target charge level.':blockers.includes('ready_by_not_configured')?'Set a ready-by time.':blockers.includes('charger_not_assigned')?'Assign a charger.':'Charging information is incomplete.'; return `<article class="planningLoadRow planningInputIncomplete"><div class="planningLoadIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.planningAssetIcon(asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(asset))}</b></div><small>${escapeHtml(userReason)}</small></div></div><div><small>Current charge</small><b>${fmtPct(asset.current_soc_pct)}</b></div><div><small>Target</small><b>${fmtPct(asset.target_soc_pct)}</b></div><div><small>Ready by</small><b>${escapeHtml(asset.ready_by || 'Not set')}</b></div><div><small>Charging power</small><b>${fmtKw(asset.max_power_kw,'—')}</b></div><div><small>Status</small><b class="planStatusBadge exception">Needs setup</b></div></article>`; }).join('');
@@ -5611,7 +5618,8 @@
 
 
       .scopeSelector{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}.scopeSelectorTitle{display:none}.scopeButtons{display:flex;gap:4px;flex-wrap:wrap}.scopeSelector>select{display:none}
-      .hiConclusionFooter{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:linear-gradient(135deg,rgba(255,255,255,.98),rgba(247,250,252,.96))}
+      .managedAssetCard.compact{padding:10px!important;gap:8px!important}.managedAssetCard.compact .managedAssetStory{display:none!important}.managedAssetCard.compact .managedAssetFacts{gap:6px!important}.managedAssetCard.compact .managedAssetFacts span{padding:6px 8px!important}.managedAssetCard.compact .managedAssetIdentity h3{font-size:13px!important}.managedAssetCard.compact .managedAssetIdentity span,.managedAssetCard.compact small{font-size:9px!important}
+      .hiConclusionFooter{display:none!important;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:linear-gradient(135deg,rgba(255,255,255,.98),rgba(247,250,252,.96))}
       .hiConclusionMain{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;align-items:start}.hiConclusionIcon{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:rgba(3,169,244,.08)}.hiConclusionFooter small{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}.hiConclusionFooter h2{font-size:13px;line-height:1.2;margin:1px 0 2px}.hiConclusionFooter p{font-size:10px;line-height:1.3;margin:0;color:var(--muted)}.hiConclusionFooter details{margin:0;min-width:128px}
       .hiTechnicalFooter{margin:8px 0 0;border-top:1px solid rgba(148,163,184,.24);padding-top:6px;color:#94a3b8;font-size:9px}.hiTechnicalFooter>summary{display:flex;justify-content:space-between;gap:10px;align-items:center;cursor:pointer;list-style:none;padding:4px 2px}.hiTechnicalFooter>summary::-webkit-details-marker{display:none}.hiTechnicalFooter>summary span{font-weight:600}.hiTechnicalFooter>summary b{font-weight:500;color:#94a3b8}.hiTechnicalInterfaceList{display:grid;gap:2px;padding:5px 2px 2px}.hiTechnicalInterfaceRow{display:grid;grid-template-columns:8px minmax(150px,.8fr) minmax(220px,1.2fr) auto;gap:7px;align-items:center;padding:3px 0;border-top:1px solid rgba(148,163,184,.12)}.hiTechnicalInterfaceRow div{display:grid}.hiTechnicalInterfaceRow b{font-size:9px;color:#64748b}.hiTechnicalInterfaceRow small{font-size:8px;color:#94a3b8}.hiTechnicalInterfaceRow code{font-size:8px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hiTechnicalInterfaceRow em{font-size:8px;font-style:normal;color:#94a3b8}.hiTechnicalDot{width:5px;height:5px;border-radius:50%;background:#cbd5e1}.hiTechnicalDot.ok{background:#86b99a}.hiTechnicalDot.warn{background:#d6a75c}.hiRuntimeFooter{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 9px;margin:3px 0 0;padding:3px 2px 0;border:0;background:transparent;color:#94a3b8;font-size:8.5px;line-height:1.2;opacity:.82}.hiRuntimeFooter span+span:before{content:"·";margin-right:9px;color:#cbd5e1}.hiRuntimeFooter .hiReleaseIssue{font-weight:650}.hiRuntimeFooter .hiReleaseIssue.warning{color:#b7791f}.hiRuntimeFooter .hiReleaseIssue.error{color:#b42318}
       #hi-body-overview>.summaryRow:first-child,#hi-body-consumers .consumerMixKpis,#hi-body-intelligence>.intelligencePage>.summaryRow:first-child{display:none}
