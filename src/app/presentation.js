@@ -19,10 +19,10 @@ const HB_ENERGY_NAVIGATION = Object.freeze([
     id: "intelligence",
     label: "Intelligence",
     items: [
-      { id:"strategy", label:"Strategy", view:"strategies", title:"Strategy", description:"Strategy overview, effective policy and current runtime state." },
       { id:"operational-planning", label:"Operational Planning", view:"operational-planning", title:"Operational Planning", description:"What should happen now and in the next hours." },
       { id:"tactical-planning", label:"Tactical Planning", view:"planning", title:"Tactical Planning", description:"How energy is allocated across today and tomorrow." },
-      { id:"strategic-planning", label:"Strategic Planning", view:"strategic-planning", title:"Strategic Planning", description:"Longer-term energy goals, constraints and optimisation." }
+      { id:"strategic-planning", label:"Strategic Planning", view:"strategic-planning", title:"Strategic Planning", description:"Longer-term energy goals, constraints and optimisation." },
+      { id:"settings", label:"Settings", view:"strategies", title:"Settings", description:"Review and edit domain-owned Energy settings and policies." }
     ]
   },
   {
