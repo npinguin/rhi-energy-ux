@@ -4530,9 +4530,9 @@
       const totalPower = asNumber(summary.current_power_kw);
       const planningVm = this.buildPlanningViewModel(rt);
       const todayTotals = objectFrom(planningVm.todayTotals || {});
-      const totalNeed = asNumber(firstDefined(todayTotals.flexible_total_need_kwh,summary.flexible_total_need_kwh,summary.required_energy_kwh));
-      const totalPlanned = asNumber(firstDefined(todayTotals.planned_flexible_energy_kwh,todayTotals.planned_today_kwh,summary.planned_today_kwh));
-      const stillToPlan = asNumber(firstDefined(todayTotals.still_unresolved_kwh,todayTotals.unresolved_horizon_kwh,summary.still_to_plan_kwh));
+      const totalNeed = asNumber(firstDefined(todayTotals.flexible_required_kwh,todayTotals.flexible_total_need_kwh,summary.flexible_total_need_kwh,summary.required_energy_kwh));
+      const totalPlanned = asNumber(firstDefined(todayTotals.flexible_planned_kwh,todayTotals.planned_flexible_energy_kwh,todayTotals.planned_today_kwh,summary.planned_today_kwh));
+      const stillToPlan = asNumber(firstDefined(todayTotals.flexible_still_to_plan_kwh,todayTotals.still_unresolved_kwh,todayTotals.unresolved_horizon_kwh,summary.still_to_plan_kwh));
       const summaryFacts = [
         ['Power now',totalPower === null ? '—' : fmtKw(totalPower)],
         ['Required today',totalNeed === null ? '—' : fmtKwh(totalNeed)],
@@ -5316,12 +5316,20 @@
       const canonicalTotals = vm.horizonId === 'D0'
         ? objectFrom(vm.todayTotals)
         : objectFrom(vm.tomorrowTotals);
-      const totalNeed = asNumber(canonicalTotals.flexible_total_need_kwh);
+      const totalNeed = asNumber(firstDefined(
+        canonicalTotals.flexible_required_kwh,
+        canonicalTotals.flexible_total_need_kwh
+      ));
       const totalPlanned = asNumber(firstDefined(
+        canonicalTotals.flexible_planned_kwh,
         canonicalTotals.planned_flexible_energy_kwh,
         vm.horizonId === 'D1' ? canonicalTotals.planned_tomorrow_kwh : canonicalTotals.planned_today_kwh
       ));
-      const remainingNeed = asNumber(firstDefined(canonicalTotals.still_unresolved_kwh, canonicalTotals.unresolved_horizon_kwh));
+      const remainingNeed = asNumber(firstDefined(
+        canonicalTotals.flexible_still_to_plan_kwh,
+        canonicalTotals.still_unresolved_kwh,
+        canonicalTotals.unresolved_horizon_kwh
+      ));
       const planStatus = String(firstDefined(vm.currentActionIntent.action_state, vm.currentActionIntent.state, vm.summary.plan_status, vm.horizon.status, vm.horizon.state, vm.complete?'available':'unavailable'));
       const confidence = firstDefined(vm.quality.confidence, vm.horizon.confidence, 'Limited');
       const statusLabel = /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
