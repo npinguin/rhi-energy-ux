@@ -2,7 +2,7 @@
 
 Status: **visual inventory restored on Energy UX 4.3.18 baseline — migration still incomplete**
 
-This matrix is the canonical human-readable coverage view for the Energy visual-library migration. It mirrors the machine-readable inventory in `src/assets/metadata/energy-visual-manifest.json`.
+This matrix is the canonical human-readable coverage view for the Energy visual-library migration. It mirrors the machine-readable inventory in `governance/energy-visual-manifest.json`.
 
 ## Decision vocabulary
 
