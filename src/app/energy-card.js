@@ -4540,8 +4540,13 @@
           ...published,
           asset_id:vm.id,
           visual_ref:firstDefined(raw.visual_ref, published.visual_ref, ''),
-          charger_asset_id:firstDefined(raw.charger_asset_id, raw.effective_charger, raw.connection_asset_id, published.charger_asset_id, published.effective_charger, published.connection_asset_id, ''),
+          connection_presentation:firstDefined(raw.connection_presentation, published.connection_presentation, {}),
+          assigned_connection_id:firstDefined(raw.assigned_connection_id, published.assigned_connection_id, ''),
+          effective_connection_id:firstDefined(raw.effective_connection_id, published.effective_connection_id, ''),
+          physical_connection_id:firstDefined(raw.physical_connection_id, published.physical_connection_id, ''),
+          physical_identity_proven:firstDefined(raw.physical_identity_proven, published.physical_identity_proven, false),
           connection_state:firstDefined(raw.connection_state, published.connection_state, ''),
+          user_status:firstDefined(raw.user_status, published.user_status, ''),
           participation_state:vm.participation,
           operational_state:vm.operation
         };
@@ -4556,34 +4561,19 @@
         return !/(^|_)(charger|connection|charging_point)(_|$)/.test(kind);
       }));
       const visibleRows = this.filterAndSortConsumers(rows);
-      const participating = visibleRows.filter(row => { const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return !vm || (vm.isParticipating && !vm.isDisabled); });
-      const disabled = visibleRows.filter(row => domain.byId(row.asset_id||row.consumer_id||row.id)?.isDisabled);
-      const statuses = participating.map(row => {
+      const participating = visibleRows.filter(row => {
         const vm=domain.byId(row.asset_id||row.consumer_id||row.id);
-        return this.canonicalOperationalStatus(rt, vm?.raw||row, vm?.planning||{});
+        return !vm || (vm.isParticipating && !vm.isDisabled);
       });
-      const activeCount = statuses.filter(state => state.isCharging).length;
-      const unavailableCount = statuses.filter(state => state.unavailable).length;
+      const disabled = visibleRows.filter(row => domain.byId(row.asset_id||row.consumer_id||row.id)?.isDisabled);
       const totalPower = asNumber(summary.current_power_kw);
-      const planningVm = this.buildPlanningViewModel(rt);
-      const todayTotals = objectFrom(planningVm.todayTotals || {});
-      const totalNeed = asNumber(firstDefined(todayTotals.flexible_required_kwh,todayTotals.flexible_total_need_kwh,summary.flexible_total_need_kwh,summary.required_energy_kwh));
-      const totalPlanned = asNumber(firstDefined(todayTotals.flexible_planned_kwh,todayTotals.planned_flexible_energy_kwh,todayTotals.planned_today_kwh,summary.planned_today_kwh));
-      const stillToPlan = asNumber(firstDefined(todayTotals.flexible_still_to_plan_kwh,todayTotals.still_unresolved_kwh,todayTotals.unresolved_horizon_kwh,summary.still_to_plan_kwh));
-      const summaryFacts = [
-        ['Power now',totalPower === null ? '—' : fmtKw(totalPower)],
-        ['Required today',totalNeed === null ? '—' : fmtKwh(totalNeed)],
-        ['Planned today',totalPlanned === null ? '—' : fmtKwh(totalPlanned)],
-        ['Still to plan',stillToPlan === null ? '—' : fmtKwh(stillToPlan)]
-      ];
-      const story = activeCount
-        ? `${activeCount} managed asset${activeCount===1?' is':'s are'} using measured power now.`
-        : participating.length ? `Home Intelligence is managing ${participating.length} asset${participating.length===1?'':'s'}; none has measured active power now.` : 'No assets are currently managed by Home Intelligence.';
-      const why = unavailableCount ? `${unavailableCount} asset${unavailableCount===1?' is':'s are'} currently unavailable.` : 'Planning state is shown separately from live execution.';
       const cards = participating.map(row=>this.consumerExplorerCard(rt,row)).join('');
-      const disabledRows = disabled.map(row=>{ const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return this.disabledFlexibleAssetCard(rt,vm?.raw||row,vm?.planning||{}); }).join('');
+      const disabledRows = disabled.map(row=>{
+        const vm=domain.byId(row.asset_id||row.consumer_id||row.id);
+        return this.disabledFlexibleAssetCard(rt,vm?.raw||row,vm?.planning||{});
+      }).join('');
       return `${this.tabExperienceHeader(rt,'consumers',pageVm)}${this.bodyContextBar(rt,'consumers','consumer-list')}<div class="consumersPage productPortalPage">
-        <section class="panel consumerExplorer" id="consumer-list"><div class="consumerExplorerHeader"><div><h2>Managed assets</h2><p>Primary cards show current power and published energy need. Details hold the deeper technical context.</p></div><strong>${fmtKw(totalPower,'—')}</strong></div><div class="consumerExplorerList">${cards || `<div class="empty"><b>No managed assets</b><span>Enable participation for an asset to let Home Intelligence manage it.</span></div>`}</div></section>
+        <section class="panel consumerExplorer" id="consumer-list"><div class="consumerExplorerHeader"><div><h2>Managed flexible assets</h2><p>Live status and current energy context. Planning eligibility is shown without hiding assets; deeper technical evidence stays under Details.</p></div><strong>${fmtKw(totalPower,'—')}</strong></div><div class="consumerExplorerList">${cards || `<div class="empty"><b>No managed assets</b><span>Enable participation for an asset to let Home Intelligence manage it.</span></div>`}</div></section>
         ${disabledRows ? `<details class="panel compactDisclosure"><summary>Other assets (${disabled.length})</summary><p>These assets are not managed by Home Intelligence.</p><div class="disabledAssetList">${disabledRows}</div></details>` : ''}
       </div>`;
     }
