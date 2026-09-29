@@ -1,9 +1,10 @@
-# RHI Energy UX 4.3.18 — PLANNING_USER_CLOSURE
+# RHI Energy UX 4.3.19 — PHYSICAL_VISUAL_LIBRARY
 
-- Keep incomplete Mobility charging demand visible instead of presenting it as no planned flexible loads.
-- Expose planning-input blockers fail-closed when required charging intent is incomplete.
-- Consume RHI UX Core 1.5.3 shared visual-picker primitives without moving domain semantics into presentation.
-- Target Mobility M0.10.20 for cross-domain charging visuals and planning context.
-- Preserve backend-owned Energy planning, command and readiness authority.
+- Restrict asset visuals to physical user-world Energy concepts.
+- Keep dashboard hero artwork separate from product/default asset imagery.
+- Publish the approved physical Energy image library, including the generic solar-zone visual.
+- Resolve defaults only within the same physical concept; no cross-concept fallback.
+- Consume exact backend product-profile visual identity from Energy E0.15.84.
+- Preserve producer-owned cross-domain visuals through the Foundation visual registry.
 
 Target Home Assistant qualification remains required before stable promotion.
