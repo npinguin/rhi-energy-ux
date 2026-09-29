@@ -104,6 +104,11 @@ const planningGateway = {
         contract_version:'2.0.0',
         objects:[], profiles:[], relationships:[], commands:[], configuration:{}, intelligence:{}, overview:{}, activity:[], value_accounting:{}, layers:{planning_objects:[]},
         planning:{
+          flexible_plan:{
+            assets:[
+              {asset_id:'vehicle_id4',display_name:'VW ID4',visible:true,planning_eligible:true,planning_input_ready:true,planning_status:'READY',energy_need_kwh:5.8,planned_today_kwh:3.2,planned_tomorrow_kwh:4.7,still_to_plan_kwh:0}
+            ]
+          },
           horizons:{
             D0:{ horizon_id:'D0', required_kwh:12.4, planned_kwh:9.8, still_to_plan_kwh:2.6, flexible_required_kwh:5.8, flexible_planned_kwh:3.2, flexible_still_to_plan_kwh:2.6, status:'AVAILABLE', execution_status:'NOT_MEASURED',
               summary:{lane_totals:{sources:{solar_kwh:7.0,battery_out_kwh:1.0,grid_in_kwh:2.0},consumers:{home_kwh:6.8,flexible_loads_kwh:3.2,flexible_assets:[{asset_id:'vehicle_id4',planned_energy_kwh:3.2}]},boundary:{grid_out_kwh:0.0},source_total_kwh:10.0,use_total_kwh:10.0,balance_delta_kwh:0}},
@@ -124,6 +129,9 @@ assert.equal(normalizePlanningLaneTotals(d1Contract.laneTotals).flexibleLoadsKwh
 console.log('PASS canonical V2 planning horizons without frontend total derivation');
 
 assert.equal(d1Contract.planningTodayTotals.buckets.length,1);
+assert.equal(d1Contract.planningAssets.length,1);
+assert.equal(d1Contract.planningAssetsById.vehicle_id4.planned_today_kwh,3.2);
+assert.equal(d1Contract.flexiblePlan.assets[0].planning_eligible,true);
 const d0Contract = readPlanningContract(planningGateway, 'D0');
 assert.equal(d0Contract.buckets.length,1,'Tactical buckets must survive Public V2');
 const d0LaneTotals = normalizePlanningLaneTotals(d0Contract.laneTotals);
