@@ -99,7 +99,7 @@ assert.ok(!app.includes('Strategic planning content follows in the next screen p
 console.log("PASS Energy 4.3 canonical page/body controls, asset grammar, visuals and responsive ownership");
 
 
-const intelligenceBlock = presentation.slice(presentation.indexOf('id:"intelligence"'), presentation.indexOf('id:"insights"'));
+const intelligenceBlock = presentation.slice(presentation.indexOf('id: "intelligence"'), presentation.indexOf('id: "insights"'));
 assert.ok(intelligenceBlock.lastIndexOf('id:"settings"') > intelligenceBlock.indexOf('id:"strategic-planning"'), "Settings must be the last Intelligence tab");
 assert.ok(!app.includes("understandingFooter(rt, this.view)"), "legacy Conclusion footer must not be injected into product views");
 assert.ok(app.includes("pendingAppearanceByAsset"), "appearance changes need pending state until backend readback");
