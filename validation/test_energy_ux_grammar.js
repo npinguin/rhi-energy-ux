@@ -56,8 +56,22 @@ assert.match(app,/solarTopologyDetails/);
 assert.match(app,/solarTopologyDiagnostics/);
 assert.match(app,/No charging topology published/);
 
-for (const token of ["flexible_asset.generic","consumer.generic","solar_array.generic","inverter.generic","site_consumption.home","energy_system.home"]) {
-  assert.ok(catalog.includes(token), "missing representative visual fallback "+token);
+for (const token of [
+  "battery_system.generic",
+  "battery.byd_lvs_20",
+  "solar_zone.generic",
+  "solar_panel.sunpower_x21_335_blk",
+  "solar_inverter.solaredge_rwb_10k",
+  "solar_optimizer.solaredge_s500b",
+  "backup_interface.solaredge_3phase",
+  "gas_meter.flonidan_uniflo_g4",
+  "grid_meter.sagemcom_t211_d3"
+]) {
+  assert.ok(catalog.includes(token), "missing physical visual catalog entry "+token);
+}
+assert.doesNotMatch(catalog,/heroes\//);
+for (const logicalType of ["flexible_asset","consumer","solar_array","inverter","site_consumption","energy_system"]) {
+  assert.ok(!catalog.includes(`asset_type:"${logicalType}"`), "logical/non-canonical visual fallback returned "+logicalType);
 }
 
 assert.match(core,/RHI UX Core 1\.5\.3/);

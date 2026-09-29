@@ -18,16 +18,21 @@ RHI Energy UX follows `docs/UX_RELEASE_STANDARD.md`. This file adds Energy-speci
 
 Do not duplicate current package/backend identity in engineer notes or validators as an independent authority.
 
+## Engineering validation versus release preparation
+
+A normal implementation, defect or governance PR is release-neutral. It may validate and merge
+without inventing a new package version merely because an older version is already published.
+`npm run validate` owns functional, technical, package and UX correctness. Candidate/release
+bookkeeping is checked explicitly with `npm run release:check` at the publication boundary.
+
 ## Release path
 
 ```text
 branch
-→ generate complete candidate package
 → PR
-→ one full Validate gate
+→ one full release-neutral Validate gate
    → candidate build
-   → owned test suites
-   → complete-package immutability check
+   → owned functional/technical test suites
    → deterministic second-build proof
    → committed-dist equality
    → HACS validation
@@ -56,7 +61,10 @@ One invariant has one owner. Domain tests do not own release identity. Footer te
 
 ## Release identity
 
-Run `npm run release:sync` when preparing a new candidate. It synchronizes machine-readable release metadata from `package.json` and `release/product.json`.
+Run `npm run release:sync` only when intentionally preparing a new candidate. It synchronizes machine-readable release metadata from `package.json` and `release/product.json`.
+
+Run `npm run release:check` at the candidate/publication boundary. Release notes, changelog,
+candidate tag and immutable-version policy must not be prerequisites for functional/technical PR validation.
 
 Release notes and changelog are human history, not machine authorities.
 
@@ -64,10 +72,12 @@ Release notes and changelog are human history, not machine authorities.
 
 Published HACS package bytes are immutable.
 
-For an already published version, Validate rebuilds and compares the **complete generated `dist/` tree** with the immutable tag:
+Published candidate bytes remain immutable, but that rule is enforced at candidate publication,
+not during ordinary engineering validation.
 
-- identical package bytes → governance/test/documentation refactoring may continue without fake version churn;
-- any changed runtime, asset, checksum or package-manifest byte → a new package version is mandatory.
+If the current package version already has an immutable tag, Publish HACS skips publication for
+that merge. This allows engineering work to validate and merge without fake version churn. A new
+version is created only when an engineer intentionally prepares the next candidate.
 
 ## Build budget
 

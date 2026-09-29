@@ -17,11 +17,40 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  scope:
+    name: Determine candidate publication
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.scope.outputs.publish }}
+      reason: ${{ steps.scope.outputs.reason }}
+    steps:
+      - name: Checkout exact validated main
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          ref: ${{ env.CANDIDATE_SHA }}
+      - name: Determine whether this version is publishable
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          if git ls-remote --exit-code --tags "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "reason=version_already_published" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "reason=new_candidate_version" >> "$GITHUB_OUTPUT"
+          fi
+
   verify:
+    needs: scope
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      needs.scope.outputs.publish == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main')
+       github.event.workflow_run.head_branch == 'main'))
     name: Verify validated HACS package
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -41,12 +70,10 @@ jobs:
           python-version: '3.12'
       - name: Verify committed package and release metadata
         run: |
+          npm run release:check
           python validation/validate_hacs_package.py
           python validation/test_hacs_install.py
           python validation/validate_public_repository.py
-          python validation/validate_release_governance.py
-          python validation/validate_test_ownership.py
-          python validation/validate_documentation_drift.py
       - name: Verify immutable candidate state
         shell: bash
         env:

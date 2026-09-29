@@ -43,20 +43,26 @@ assert.match(app,/data-solar-string/);
 
 for (const id of [
   "battery.byd_lvs_20",
-  "battery.solaredge_home_48v_9_6",
+  "battery.solaredge_home_48v",
+  "battery.huawei_luna2000_15_s0",
+  "solar_zone.generic",
   "solar_panel.sunpower_x21_335_blk",
   "solar_panel.jinkosolar_jkm435n_54hl4r",
   "solar_inverter.solaredge_rwb_10k",
   "solar_inverter.solaredge_rws_8k",
   "solar_optimizer.solaredge_s500b",
   "backup_interface.solaredge_3phase",
-  "grid_connection.homewizard_p1"
-]) assert.ok(catalog.includes(id), `missing catalog entry ${id}`);
+  "gas_meter.flonidan_uniflo_g4",
+  "grid_meter.sagemcom_t211_d3"
+]) assert.ok(catalog.includes(id), `missing physical catalog entry ${id}`);
+
+assert.ok(!catalog.includes("grid_connection.homewizard_p1"), "logical grid_connection must not own a product image");
+assert.doesNotMatch(catalog,/heroes\//);
 
 assert.match(app,/object-fit:contain/);
 assert.match(app,/object-position:center/);
 
-console.log("PASS Solar hardware experience: compact flow + inverter/string hierarchy + measured facts");
+console.log("PASS Solar hardware experience with physical-only image catalog");
 
 assert.doesNotMatch(app,/Solar energy facts/);
 assert.doesNotMatch(app,/Other published hardware/);

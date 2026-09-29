@@ -37,22 +37,6 @@ jobs:
         run: npm ci
       - name: Full validation
         run: npm run validate
-      - name: Protect immutable published package
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION=$(node -p "require('./package.json').version")
-          TAG="v${VERSION}"
-          if git ls-remote --exit-code --tags "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${TAG}" >/dev/null 2>&1; then
-            git fetch --tags --force
-            rm -rf /tmp/published-rhi-energy
-            mkdir -p /tmp/published-rhi-energy
-            git archive "${TAG}" dist | tar -x -C /tmp/published-rhi-energy
-            diff -qr /tmp/published-rhi-energy/dist dist
-            echo "${TAG} already exists; complete HACS package bytes are unchanged."
-          else
-            echo "${TAG} is not published yet; candidate package may advance before first publication."
-          fi
       - name: Deterministic two-build proof
         shell: bash
         run: |

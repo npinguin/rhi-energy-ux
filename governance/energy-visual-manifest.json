@@ -1,0 +1,292 @@
+{
+  "schema_version": 2,
+  "id": "rhi.energy.visual-library.v2",
+  "migration_complete": false,
+  "package": "rhi-energy-ux",
+  "hacs_asset_root": "dist/assets",
+  "policy": {
+    "scope": "physical user-world concepts only",
+    "dashboard_heroes_out_of_scope": true,
+    "hero_as_asset_fallback_forbidden": true,
+    "cross_concept_fallback_forbidden": true,
+    "default_policy": "exact configured/product match, otherwise first selectable catalog entry of same asset_type, otherwise no image",
+    "backend_artwork_paths_forbidden": true
+  },
+  "supported_asset_types": [
+    "battery_system",
+    "battery",
+    "solar_zone",
+    "solar_panel",
+    "solar_inverter",
+    "solar_optimizer",
+    "backup_interface",
+    "gas_meter",
+    "grid_meter"
+  ],
+  "concept_coverage": [
+    {
+      "asset_type": "battery_system",
+      "classification": "physical_installation_composition",
+      "product_profile_applicable": false,
+      "default_package_path": "energy/battery_system_4_towers.webp"
+    },
+    {
+      "asset_type": "battery",
+      "classification": "physical_product",
+      "product_profile_applicable": true,
+      "default_catalog_id": "battery.byd_lvs_20"
+    },
+    {
+      "asset_type": "solar_zone",
+      "classification": "physical_installation_group",
+      "product_profile_applicable": false,
+      "default_package_path": "energy/solar_zone_generic.webp"
+    },
+    {
+      "asset_type": "solar_panel",
+      "classification": "physical_product",
+      "product_profile_applicable": true,
+      "default_catalog_id": "solar_panel.sunpower_x21_335_blk"
+    },
+    {
+      "asset_type": "solar_inverter",
+      "classification": "physical_product",
+      "product_profile_applicable": true,
+      "default_catalog_id": "solar_inverter.solaredge_rwb_10k"
+    },
+    {
+      "asset_type": "solar_optimizer",
+      "classification": "physical_product",
+      "product_profile_applicable": true,
+      "default_catalog_id": "solar_optimizer.solaredge_s500b"
+    },
+    {
+      "asset_type": "backup_interface",
+      "classification": "physical_product",
+      "product_profile_applicable": true,
+      "default_catalog_id": "backup_interface.solaredge_3phase"
+    },
+    {
+      "asset_type": "gas_meter",
+      "classification": "physical_product",
+      "product_profile_applicable": true,
+      "default_catalog_id": "gas_meter.flonidan_uniflo_g4"
+    },
+    {
+      "asset_type": "grid_meter",
+      "classification": "physical_product",
+      "product_profile_applicable": true,
+      "default_catalog_id": "grid_meter.sagemcom_t211_d3"
+    }
+  ],
+  "product_search_targets": [
+    {
+      "asset_type": "battery",
+      "brand": "BYD",
+      "model": "Battery-Box Premium LVS 20.0",
+      "variant": "5 modules / 20 kWh",
+      "sku": "",
+      "package_path": "energy/byd_lvs_20.webp",
+      "backend_profile_id": "byd_battery_box_premium_lvs_5_module_20kwh",
+      "artwork_status": "published_approved",
+      "quality": "verified_product"
+    },
+    {
+      "asset_type": "battery",
+      "brand": "SolarEdge",
+      "model": "Home Battery 48V",
+      "variant": "BAT-05K48",
+      "sku": "BAT-05K48",
+      "package_path": "energy/solaredge_home_battery_48v_9_6.webp",
+      "backend_profile_id": "solaredge_48v_home_battery",
+      "artwork_status": "published_approved",
+      "quality": "verified_product"
+    },
+    {
+      "asset_type": "battery",
+      "brand": "Huawei",
+      "model": "LUNA2000-15-S0",
+      "variant": "15 kWh",
+      "sku": "LUNA2000-15-S0",
+      "package_path": "energy/huawei_luna2000_15_s0.webp",
+      "backend_profile_id": "huawei_luna2000_15_s0",
+      "artwork_status": "published_approved",
+      "quality": "verified_product"
+    },
+    {
+      "asset_type": "battery",
+      "brand": "sonnen",
+      "model": "sonnenBatterie 10",
+      "variant": "10 kWh",
+      "sku": "",
+      "package_path": "energy/sonnen_batterie_10_10kwh.webp",
+      "backend_profile_id": "sonnen_batterie_10_10kwh",
+      "artwork_status": "published_approved",
+      "quality": "verified_appearance"
+    },
+    {
+      "asset_type": "battery",
+      "brand": "sonnen",
+      "model": "sonnenBatterie 10",
+      "variant": "20 kWh",
+      "sku": "",
+      "package_path": "energy/sonnen_batterie_10_20kwh.webp",
+      "backend_profile_id": "sonnen_batterie_10_20kwh",
+      "artwork_status": "published_approved",
+      "quality": "verified_appearance"
+    },
+    {
+      "asset_type": "solar_inverter",
+      "brand": "SolarEdge",
+      "model": "Home Hub 10 kW",
+      "variant": "SE10K-RWB48",
+      "sku": "SE10K-RWB48BFN4",
+      "package_path": "energy/solaredge_rwb_10k.webp",
+      "backend_profile_id": "solaredge_home_hub_10k",
+      "artwork_status": "published_approved",
+      "quality": "verified_appearance"
+    },
+    {
+      "asset_type": "solar_inverter",
+      "brand": "SolarEdge",
+      "model": "StorEdge 8 kW",
+      "variant": "SE8K-RWS",
+      "sku": "SE8K-RWS48BEN4",
+      "package_path": "energy/solaredge_rws_8k.webp",
+      "backend_profile_id": "solaredge_rws_8k",
+      "artwork_status": "published_approved",
+      "quality": "verified_product"
+    },
+    {
+      "asset_type": "solar_inverter",
+      "brand": "SolarEdge",
+      "model": "Three Phase Inverter 7 kW",
+      "variant": "SE7K",
+      "sku": "SE7K-RW0TEBNN4",
+      "package_path": "energy/solaredge_se7k_rw0tebnn4.webp",
+      "backend_profile_id": "solaredge_three_phase_7k",
+      "artwork_status": "published_approved",
+      "quality": "verified_appearance"
+    },
+    {
+      "asset_type": "solar_inverter",
+      "brand": "Huawei",
+      "model": "SUN2000-4.6KTL-L1",
+      "variant": "4.6 kW / single phase",
+      "sku": "SUN2000-4.6KTL-L1",
+      "package_path": "energy/huawei_sun2000_4_6ktl_l1.webp",
+      "backend_profile_id": "huawei_sun2000_4_6ktl_l1",
+      "artwork_status": "published_approved",
+      "quality": "verified_product"
+    },
+    {
+      "asset_type": "solar_inverter",
+      "brand": "SMA",
+      "model": "Sunny Boy 5.0",
+      "variant": "5.0 kW / single phase",
+      "sku": "SB5.0-1AV-41",
+      "package_path": "energy/sma_sunny_boy_5_0_sb5_0_1av_41.webp",
+      "backend_profile_id": "sma_sunny_boy_5_0_sb5_0_1av_41",
+      "artwork_status": "published_approved",
+      "quality": "verified_product"
+    },
+    {
+      "asset_type": "solar_inverter",
+      "brand": "SMA",
+      "model": "Sunny Tripower 7000TL",
+      "variant": "7.0 kW / three phase",
+      "sku": "STP 7000TL-20",
+      "package_path": "energy/sma_sunny_tripower_7000tl_20.webp",
+      "backend_profile_id": "sma_sunny_tripower_7000tl_20",
+      "artwork_status": "published_approved",
+      "quality": "verified_product"
+    },
+    {
+      "asset_type": "solar_optimizer",
+      "brand": "SolarEdge",
+      "model": "Power Optimizer S500B",
+      "variant": "",
+      "sku": "S500B-1GM4MRM-NA02",
+      "package_path": "energy/solaredge_s500b_optimizer.webp",
+      "backend_profile_id": null,
+      "artwork_status": "published_approved",
+      "quality": "verified_product"
+    },
+    {
+      "asset_type": "solar_panel",
+      "brand": "SunPower",
+      "model": "SPR-X21-335-BLK",
+      "variant": "335 W",
+      "sku": "SPR-X21-335-BLK",
+      "package_path": "energy/sunpower_spr_x21_335_blk.webp",
+      "backend_profile_id": null,
+      "artwork_status": "published_approved",
+      "quality": "verified_product"
+    },
+    {
+      "asset_type": "solar_panel",
+      "brand": "JinkoSolar",
+      "model": "JKM435N-54HL4R",
+      "variant": "435 W",
+      "sku": "JKM435N-54HL4R",
+      "package_path": "energy/jinkosolar_jkm435n_54hl4r.webp",
+      "backend_profile_id": null,
+      "artwork_status": "published_approved",
+      "quality": "verified_product"
+    },
+    {
+      "asset_type": "backup_interface",
+      "brand": "SolarEdge",
+      "model": "Home Backup Interface 3 Phase",
+      "variant": "Three phase",
+      "sku": "BI-NEUNU-3P-01",
+      "package_path": "energy/solaredge_backup_interface_3phase.webp",
+      "backend_profile_id": null,
+      "artwork_status": "published_approved",
+      "quality": "verified_appearance"
+    },
+    {
+      "asset_type": "gas_meter",
+      "brand": "FLONIDAN",
+      "model": "UniFlo G4",
+      "variant": "Smart diaphragm gas meter",
+      "sku": "G4SRTV",
+      "package_path": "energy/flonidan_uniflo_g4srtv.webp",
+      "backend_profile_id": "flonidan_uniflo_g4",
+      "artwork_status": "published_approved",
+      "quality": "verified_appearance"
+    },
+    {
+      "asset_type": "grid_meter",
+      "brand": "Sagemcom",
+      "model": "T211-D3",
+      "variant": "",
+      "sku": "T211-D3",
+      "package_path": "energy/sagemcom_t211_d3.webp",
+      "backend_profile_id": null,
+      "artwork_status": "published_approved",
+      "quality": "verified_appearance",
+      "technical_profile_status": "withheld_until_verified_product_data"
+    }
+  ],
+  "generic_assets": [
+    {
+      "asset_type": "battery_system",
+      "package_path": "energy/battery_system_4_towers.webp",
+      "artwork_status": "published_approved",
+      "quality": "generic_family"
+    },
+    {
+      "asset_type": "solar_zone",
+      "artwork_status": "published_approved",
+      "quality": "generic_family",
+      "package_path": "energy/solar_zone_generic.webp"
+    }
+  ],
+  "publication_state": {
+    "base_version": "4.3.18",
+    "branch": "feat/energy-visual-library-v1",
+    "binary_policy": "src/dist byte parity required",
+    "status": "candidate_complete_pending_ci_and_release"
+  }
+}

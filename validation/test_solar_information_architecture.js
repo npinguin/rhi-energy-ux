@@ -63,13 +63,13 @@ assert.doesNotMatch(app,/No modules linked/);
 assert.doesNotMatch(app,/Optimizers without panel relationship/);
 assert.doesNotMatch(app,/summary>Panels \(/);
 assert.doesNotMatch(app,/summary>Optimizers \(/);
-assert.match(catalog,/solar_production\.sunpower_x21_335_blk/);
-assert.match(catalog,/solar_production\.jinkosolar_jkm435n_54hl4r/);
+assert.match(catalog,/solar_panel\.sunpower_x21_335_blk/);
+assert.match(catalog,/solar_panel\.jinkosolar_jkm435n_54hl4r/);
 
 const requiredArtwork = [
   "byd_lvs_20.webp",
   "solaredge_home_battery_48v_9_6.webp",
-  "solaredge_rwb_10k.svg",
+  "solaredge_rwb_10k.webp",
   "solaredge_rws_8k.webp",
   "solaredge_backup_interface_3phase.webp",
   "solaredge_s500b_optimizer.webp",

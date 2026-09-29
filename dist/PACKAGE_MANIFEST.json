@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "product": "rhi-energy-ux",
-  "version": "4.3.18",
+  "version": "4.3.19",
   "source_manifest_schema": 1,
   "hacs_package_root": "dist",
   "hacs_filename": "rhi-energy-ux.js",
@@ -10,23 +10,55 @@
     "energy",
     "heroes"
   ],
-  "runtime_sha256": "1dd654cc6c15d4d97612b6e15c395738c7f5b0e4e12dd0d34c48d49103448099",
+  "runtime_sha256": "3a6e0aa3c93d825a433d43183a4315c0b4523b00bff2deda96994cc256f667ec",
   "files": [
+    {
+      "path": "assets/energy/battery_system_4_towers.webp",
+      "bytes": 81706
+    },
     {
       "path": "assets/energy/byd_lvs_20.webp",
       "bytes": 9264
     },
     {
+      "path": "assets/energy/flonidan_uniflo_g4srtv.webp",
+      "bytes": 79862
+    },
+    {
       "path": "assets/energy/homewizard_p1.webp",
-      "bytes": 8596
+      "bytes": 41872
+    },
+    {
+      "path": "assets/energy/huawei_luna2000_15_s0.webp",
+      "bytes": 40900
+    },
+    {
+      "path": "assets/energy/huawei_sun2000_4_6ktl_l1.webp",
+      "bytes": 69094
     },
     {
       "path": "assets/energy/jinkosolar_jkm435n_54hl4r.webp",
       "bytes": 9856
     },
     {
+      "path": "assets/energy/sagemcom_t211_d3.webp",
+      "bytes": 75366
+    },
+    {
+      "path": "assets/energy/sma_sunny_boy_5_0_sb5_0_1av_41.webp",
+      "bytes": 55466
+    },
+    {
+      "path": "assets/energy/sma_sunny_tripower_7000tl_20.webp",
+      "bytes": 67608
+    },
+    {
+      "path": "assets/energy/solar_zone_generic.webp",
+      "bytes": 696448
+    },
+    {
       "path": "assets/energy/solaredge_backup_interface_3phase.webp",
-      "bytes": 7203
+      "bytes": 55390
     },
     {
       "path": "assets/energy/solaredge_home_battery_48v_9_6.webp",
@@ -37,12 +69,28 @@
       "bytes": 2559
     },
     {
+      "path": "assets/energy/solaredge_rwb_10k.webp",
+      "bytes": 35408
+    },
+    {
       "path": "assets/energy/solaredge_rws_8k.webp",
-      "bytes": 8044
+      "bytes": 45162
     },
     {
       "path": "assets/energy/solaredge_s500b_optimizer.webp",
       "bytes": 14512
+    },
+    {
+      "path": "assets/energy/solaredge_se7k_rw0tebnn4.webp",
+      "bytes": 46880
+    },
+    {
+      "path": "assets/energy/sonnen_batterie_10_10kwh.webp",
+      "bytes": 29354
+    },
+    {
+      "path": "assets/energy/sonnen_batterie_10_20kwh.webp",
+      "bytes": 25058
     },
     {
       "path": "assets/energy/sunpower_spr_x21_335_blk.webp",
@@ -114,7 +162,7 @@
     },
     {
       "path": "rhi-energy-ux.js",
-      "bytes": 778087
+      "bytes": 774516
     },
     {
       "path": "rhi-energy-ux.js.sha256",

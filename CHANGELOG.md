@@ -1,3 +1,11 @@
+## 4.3.19 — physical visual library
+
+- limits asset visuals to physical user-world Energy concepts;
+- separates dashboard heroes from product and fallback artwork;
+- publishes the physical Energy image catalog including a generic solar-zone visual;
+- resolves defaults only within the same physical concept;
+- aligns product visual identity with Energy E0.15.84 evidence-backed profiles.
+
 ## 4.3.18 — planning user closure
 
 - keeps incomplete charging demand visible in Tactical Planning;
