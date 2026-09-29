@@ -30,6 +30,9 @@ if (!pickerSource.includes('rhiUxVisualPickerShell')) throw new Error('Energy pi
 if (/localStorage|rhiEnergySetVisualPreference|rhiEnergySelectedVisualRef/.test(catalogSource+cardSource)) {
   throw new Error('browser-local appearance persistence returned');
 }
+if (/heroes\//.test(catalogSource)) {
+  throw new Error('dashboard hero artwork leaked into physical visual picker catalog');
+}
 
 const context = { console, globalThis:{localStorage:null}, Object, Array, String, JSON };
 vm.createContext(context);
@@ -37,8 +40,11 @@ vm.runInContext(catalogSource + '\n'
   + 'globalThis.rhiEnergyVisualCatalogForType=rhiEnergyVisualCatalogForType;'
   + 'globalThis.rhiEnergyVisualBrandsForType=rhiEnergyVisualBrandsForType;', context);
 const brands = Array.from(context.globalThis.rhiEnergyVisualBrandsForType('solar_inverter'));
-if (brands.join('|') !== 'Generic|SolarEdge') {
-  throw new Error('brand filter must be derived, unique and sorted for the current asset type: ' + brands.join('|'));
+if (brands.join('|') !== 'Huawei|SMA|SolarEdge') {
+  throw new Error('brand filter must be derived, unique and sorted for the current physical asset type: ' + brands.join('|'));
+}
+if (context.globalThis.rhiEnergyVisualCatalogForType('grid_connection').length !== 0) {
+  throw new Error('logical grid_connection must not expose physical image choices');
 }
 
-console.log('PASS canonical Energy appearance editor with Core shell and backend persistence');
+console.log('PASS canonical Energy appearance editor with physical-only catalog and backend persistence');
