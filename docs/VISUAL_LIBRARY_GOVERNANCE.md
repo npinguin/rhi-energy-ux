@@ -1,117 +1,85 @@
-# Energy logical-device visual library governance
+# Energy physical visual library governance
 
-Energy UX adopts the Mobility visual-library pattern per logical Energy device type.
+## Principle
+
+Energy UX provides images for physical/tangible concepts in the user's world that can
+be related to the Energy domain. It does not attempt to illustrate every backend
+concept.
+
+Dashboard heroes are a separate page-level storytelling system. A hero is never an
+asset default or product fallback.
 
 ## Ownership
 
-The Energy backend owns semantic identity, `asset_type`, `profile_id`, runtime truth and property publication. Energy backend profiles remain non-visual. Energy and every producer domain register their own visual catalog with the Foundation Visual Asset Registry at boot.
+The Energy backend owns semantic identity, canonical `asset_type`, exact
+`profile_id`, runtime truth, capabilities and semantic `visual_ref`.
 
-Energy UX owns Energy-domain representative artwork, Energy-only presentation preferences, same-type Energy fallbacks and picker rendering. It does not own or copy another domain's product catalog or artwork.
+Energy UX owns Energy package-local artwork, the physical image picker and temporary
+same-type defaults.
+
+Foundation owns generic cross-domain visual registration/resolution.
 
 A visual never changes Energy semantics.
 
+## Physical catalog types
+
+- `battery_system`
+- `battery`
+- `solar_zone`
+- `solar_panel`
+- `solar_inverter`
+- `solar_optimizer`
+- `backup_interface`
+- `gas_meter`
+- `grid_meter`
+
+`battery_system` and `solar_zone` are physical installation compositions and may
+have generic physical artwork without pretending to be manufacturer products.
+
+## Excluded concepts
+
+Logical, service, derived and structural concepts have no Energy asset image fallback.
+Examples include `grid_connection`, `grid_phase`, `solar_production`,
+`solar_optimizer_site`, `solar_inverter_phase`, `solar_source`,
+`home_consumption`, `solar_forecast`, `price_source` and `flexible_load`.
+
+Cross-domain physical loads preserve their producer-owned `visual_ref`.
+
 ## Resolution order
 
-1. Foundation-registered producer-owned `visual_ref` for producer-domain assets such as Mobility consumers. Resolution is generic through registry presentation metadata.
-2. User-selected Energy UX visual preference for the exact logical asset.
-3. Best matching representative visual from the Energy profile/integration context.
-4. Generic fallback from the same logical `asset_type`.
-5. Existing icon fallback when no catalog exists for that type.
+1. registered producer/domain `visual_ref` when present;
+2. configured Energy UX visual for the same physical type;
+3. exact backend product/profile visual when available;
+4. first selectable catalog entry for the exact same physical `asset_type`;
+5. no image / neutral icon.
 
-A real logical type must never silently resolve to artwork registered for another type.
+Cross-concept fallback is forbidden.
 
-## Logical device types
+## Backend profile rule
 
-The catalog is partitioned for:
+Product profiles are created only for real physical products with verified reusable
+identity and technical data. No generic product stubs are created to satisfy visual
+coverage. Brand + model are required; variant, SKU, manufacturer part number and
+model year are optional exact discriminators.
 
-- battery_system
-- battery
-- grid_connection
-- grid_phase
-- solar_production
-- solar_inverter
-- solar_inverter_phase
-- solar_optimizer
-- solar_forecast
-- gas_meter
-- price_source
-- home_consumption
-- flexible_load
+Runtime state, site/customer/deployment data and artwork paths are forbidden in
+backend profiles.
 
-## Picker
+## Visual classes
 
-The picker always starts from the current logical asset and only receives entries returned by `rhiEnergyVisualCatalogForType(asset_type)`.
+- `hero_scene`: 2400×800 — dashboards only;
+- `product_wide`: 1600×950 transparent;
+- `product_square`: 1400×1400 transparent;
+- `product_landscape`: 1600×1200 transparent.
 
-Presentation choices are stored as UX-local preferences because the current Energy Public Contract intentionally keeps profiles non-visual. A future backend-owned writable presentation property may replace only the preference adapter; the catalog and resolver remain UX-owned.
+## Machine gates
 
-## Drift prevention
+CI proves:
 
-CI must prove:
-
-- catalogs are type partitioned;
-- a battery cannot select an inverter visual;
-- profile defaults stay inside the logical type;
-- unknown profiles fall back inside the logical type;
-- producer-domain `visual_ref` remains authoritative;
-- all screens use the common `resolveEnergyAssetVisual` path.
-
-
-## Cross-domain hard invariant
-
-For producer-domain flexible assets the only supported path is:
-
-```text
-producer semantic asset
-→ producer-owned visual_ref
-→ producer registers presentation at boot
-→ Foundation validates/publishes registry entry
-→ Energy preserves visual_ref losslessly
-→ Energy UX renders the registered presentation generically
-```
-
-Energy must not contain producer-specific brand/model switches, image-key aliases, copied producer artwork, asset-id/display-name inference or hand-maintained `visual_ref → file` maps.
-
-Adding a new producer vehicle/charger visual must require zero product-specific Energy source changes. Unknown or invalid registry entries render neutrally; they never resolve to another real product or the Energy flexible-load hero.
-
-This invariant is machine-enforced by `validation/test_visual_ref_contract.js` and `validation/validate_shared_visual_ownership.py`.
-
-
-## Shared visual-library contract
-
-Energy keeps all Energy artwork package-local. Shared Core defines visual grammar, dimensions and quality taxonomy; it does not own Energy product binaries.
-
-Canonical visual classes:
-- `hero_scene`: 2400×800, 3:1, with focal point and safe area;
-- `product_wide`: 1600×950, transparent;
-- `product_square`: 1400×1400, transparent;
-- `product_landscape`: 1600×1200, transparent.
-
-Hero, product and generic fallback families are separate. A hero asset must never become the final implementation of a generic same-type fallback.
-
-Reusable product discovery follows exact identity from SKU → brand/model → brand/type → official manufacturer → authorised distributor → generated/derived appearance.
-
-## Reusable-context boundary
-
-The visual manifest, catalog, documentation and package assets may contain reusable brand, model, variant, SKU, provenance and quality metadata only.
-
-They must not contain customer names, project names, site names, addresses, serial numbers, deployment counts or installation-specific ownership/context.
-
-## Physical versus logical concepts
-
-Physical Energy assets may have exact product artwork and, when semantically justified, exact backend profiles. Logical aggregations and structural property groups do not become product identities merely because they have a visual.
-
-Current physical visual inventory includes batteries, inverters, optimizers, panels, backup interface, HomeWizard P1 meter, FLONIDAN gas meter and Sagemcom grid meter/source device.
-
-Logical or structural concepts such as `grid_connection`, `grid_phase`, `solar_production`, `solar_array`, `home_consumption`, `price_source`, `solar_forecast`, `flexible_load`, `flexible_asset`, `consumer` and `energy_system` remain non-product concepts.
-
-## Publication rule
-
-A new or replaced visual is published only when:
-1. canonical source and packaged dist copies exist;
-2. source and dist bytes are identical;
-3. declared dimensions/background policy are met;
-4. the catalog points only to existing package assets;
-5. product identity is reusable and non-deployment-specific;
-6. CI validates catalog, manifest and package parity.
-
-The visual migration stays explicitly incomplete until these conditions are closed for every required visual family.
+- manifest and catalog expose only the physical catalog type set;
+- no `heroes/` path occurs in the physical catalog;
+- every catalog path exists in source and dist;
+- source/dist bytes match;
+- logical concepts do not acquire asset fallbacks;
+- producer-domain visual refs remain authoritative;
+- customer/project/site context cannot leak into reusable metadata.
