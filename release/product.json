@@ -4,7 +4,7 @@
   "minimum_backend": "E0.15.86",
   "tested_backend": "E0.15.86",
   "stage": "test_candidate",
-  "rollback_release": "v4.3.20",
+  "rollback_release": "v4.3.21",
   "runtime_artifact": "dist/rhi-energy-ux.js",
   "hacs_repository_type": "dashboard",
   "hacs_validation_category": "plugin",
@@ -13,7 +13,7 @@
   "hacs_package_root": "dist",
   "hacs_delivery_mode": "immutable_tag_dist_tree",
   "release_asset_policy": "none",
-  "version": "4.3.21",
+  "version": "4.3.22",
   "required_contracts": [
     "RHI_ENERGY_PUBLIC_CONTRACT_V2",
     "RHI_ENERGY_CORE_V1",
@@ -21,8 +21,8 @@
   ],
   "ux_core": {
     "package": "rhi-ux-core",
-    "version": "1.5.4",
-    "source_commit": "75a2559a49b952887d4684cca7820eb925c55d09",
+    "version": "1.5.5",
+    "source_commit": "55e122d7749f0010ec6de5f4a152f103c35c58d4",
     "runtime_dependency": false,
     "branding_owner": "rhi-ux-core"
   },
