@@ -38,7 +38,7 @@ assert.match(hierarchy,/stringsForInverter/);
 assert.match(hierarchy,/unassignedArrays/);
 assert.doesNotMatch(hierarchy,/const zoneCards = arrays\.map/);
 assert.doesNotMatch(hierarchy,/'Solar zones'/);
-assert.match(app,/SOLAR STRING/);
+assert.match(app,/SOLAR ZONE \/ STRING/);
 assert.match(app,/data-solar-string/);
 
 for (const id of [
@@ -67,3 +67,9 @@ console.log("PASS Solar hardware experience with physical-only image catalog");
 assert.doesNotMatch(app,/Solar energy facts/);
 assert.doesNotMatch(app,/Other published hardware/);
 assert.match(app,/energyAppearanceAction/);
+
+
+assert.match(app,/solarProductionRepresentative/);
+assert.match(app,/energy\.logical\.solar_zone\.generic/);
+assert.match(app,/solarStringVisual/);
+assert.match(app,/SOLAR ZONE \/ STRING/);
