@@ -1,3 +1,13 @@
+## 4.3.21 — RELEASE_RECOVERY_INTEGRITY_CLOSURE
+
+- consume Energy E0.15.86 canonical planning participants instead of structural planning objects;
+- keep real managed consumers visible in Tactical Planning even when planning inputs are incomplete;
+- make Today/Tomorrow the primary horizon selector and remove the redundant technical planning context box;
+- consume backend-owned Settings profile groups and participating battery/charger hierarchy;
+- preserve backend write/readback authority and avoid frontend strategy or relationship reconstruction;
+- retain UX Core 1.5.4 appearance geometry and pending/readback lifecycle;
+- qualify against Foundation F1.8.35, Mobility M0.10.24 and Energy E0.15.86.
+
 ## 4.3.20 — CORE_1_5_4_STRUCTURAL_CLOSURE
 
 - publish the merged Core 1.5.4 appearance/picker lifecycle and structural Energy UX closure under a new immutable candidate;
