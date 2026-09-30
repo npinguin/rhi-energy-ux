@@ -2089,9 +2089,454 @@ function readEnergyCommandContract(gateway) {
   };
 
 
-  // __RHI_FLEXIBLE_ASSET_MODULES__
+  // ---- src/domain/models/flexible-asset-model.js ----
+class FlexibleAssetDomainModel {
+    constructor(runtime) {
+      this.runtime = runtime;
+      this._all = null;
+      this._byId = null;
+    }
+    assetContext(asset = {}) {
+      const id = String(firstDefined(asset.asset_id, asset.flexible_asset_id, asset.target_asset_id, ''));
+      if (!id || typeof readEnergyAssetContext !== 'function') return { available:false, asset:null, profile:null, publication:null };
+      return readEnergyAssetContext(this.runtime.contractGateway(), id);
+    }
+    isInfrastructure(asset = {}) {
+      const sourceContext = asset.source_context && typeof asset.source_context === 'object' ? asset.source_context : {};
+      const mobilityContext = sourceContext.mobility && typeof sourceContext.mobility === 'object' ? sourceContext.mobility : {};
+      const values = [
+        asset.participation_state,
+        asset.source_asset_kind,
+        asset.asset_type,
+        asset.object_class,
+        asset.energy_asset_role,
+        mobilityContext.consumer_fallback
+      ].map(value => String(value || '').trim().toLowerCase());
+      return asset.infrastructure_only === true
+        || values.includes('infrastructure_only')
+        || values.includes('unassigned_charger')
+        || values.includes('charger')
+        || values.includes('connection');
+    }
+    isStorage(asset = {}) {
+      const context = this.assetContext(asset);
+      const values = [
+        context.asset?.asset_type,
+        context.profile?.asset_type,
+        asset.energy_asset_role,
+        asset.asset_type,
+        asset.ux_asset_type,
+        asset.flexible_role,
+        asset.category
+      ].map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
+      return values.some(value => ['battery','battery_system','storage','storage_cluster'].includes(value));
+    }
+    planningFor(assetId) {
+      return this.runtime.planningOutcomeFor(assetId) || {};
+    }
+    participationState(asset = {}, planning = {}) {
+      if (this.isStorage(asset)) return 'storage';
+      if (this.isInfrastructure(asset)) return 'infrastructure_only';
+      const context = this.assetContext(asset);
+      const explicit = String(firstDefined(
+        context.asset?.participation_state,
+        asset.participation_state,
+        asset.automation_participation,
+        asset.planning_participation,
+        ''
+      ) || '').trim().toLowerCase();
+      if (['disabled','excluded','off','not_participating','not participating'].includes(explicit)) return 'disabled';
+      if (['participating','enabled','active'].includes(explicit)) {
+        const availability = String(firstDefined(context.asset?.availability_state, asset.availability_state, '') || '').trim().toLowerCase();
+        return ['unavailable','disconnected','offline','blocked'].includes(availability) ? 'temporarily_unavailable' : 'participating';
+      }
+      const lifecycle = String(firstDefined(asset.lifecycle_state, asset.lifecycle_status, '') || '').trim().toLowerCase();
+      if (['disabled','inactive'].includes(lifecycle)) return 'disabled';
+      return 'unknown';
+    }
+    operationalState(asset = {}, planning = {}) {
+      const context = this.assetContext(asset);
+      const raw = String(firstDefined(
+        context.asset?.operating_state,
+        asset.operating_state,
+        asset.operation_state,
+        planning.product_state,
+        planning.state,
+        planning.status,
+        ''
+      ) || '').trim().toLowerCase();
+      const aliases = {
+        charging:'active', running:'active', executing:'active',
+        selected:'planned', pending:'waiting',
+        offline:'unavailable', disconnected:'unavailable', blocked:'unavailable',
+        hold:'paused'
+      };
+      const normalized = aliases[raw] || raw;
+      return ['paused','starting','stopping','active','planned','waiting','unavailable','idle'].includes(normalized)
+        ? normalized
+        : 'unknown';
+    }
+    build(asset = {}) {
+      const id = String(firstDefined(asset.asset_id, asset.flexible_asset_id, asset.target_asset_id, ''));
+      const planning = this.planningFor(id);
+      const context = this.assetContext(asset);
+      // Materialize one UX asset from two canonical views of the same V2 object:
+      // core.flexible.assets owns participation/planning semantics, while objects[]
+      // carries richer producer identity such as visual_ref and charger linkage.
+      // No semantic inference or cross-domain lookup is performed here.
+      const materialized = context.asset
+        ? {
+            // Energy object context enriches the producer-owned flexible row.
+            // Producer identity must win for visual_ref, asset kind and connection semantics.
+            ...context.asset,
+            ...asset,
+            asset_id:id,
+            visual_ref:String(firstDefined(asset.visual_ref, context.asset.visual_ref, '') || '')
+          }
+        : { ...asset, asset_id:id };
+      const participation = this.participationState(materialized, planning);
+      return {
+        id,
+        raw: materialized,
+        planning,
+        profile: context.profile,
+        profileId: String(materialized.profile_id || context.profile?.profile_id || ''),
+        publication: context.publication,
+        visualRef: String(firstDefined(materialized.visual_ref, '') || ''),
+        visual: typeof this.runtime.resolveVisualRef === 'function'
+          ? this.runtime.resolveVisualRef(firstDefined(materialized.visual_ref, ''), 'card')
+          : null,
+        publicationGap: typeof energyAssetPublicationGap === 'function'
+          ? energyAssetPublicationGap(this.runtime.contractGateway(), id)
+          : { status:'unavailable', missing:[] },
+        participation,
+        operation: this.operationalState(materialized, planning),
+        isStorage: participation === 'storage',
+        isInfrastructure: participation === 'infrastructure_only',
+        isDisabled: participation === 'disabled',
+        isParticipating: participation === 'participating' || participation === 'temporarily_unavailable',
+        isTemporarilyUnavailable: participation === 'temporarily_unavailable'
+      };
+    }
+    all() {
+      if (!this._all) {
+        this._all = this.runtime.primaryFlexibleAssets().map(asset => this.build(asset));
+        this._byId = new Map(this._all.map(vm => [vm.id, vm]));
+      }
+      return this._all;
+    }
+    byId(assetId) { this.all(); return this._byId.get(String(assetId)) || null; }
+    consumerFacing() { return this.all().filter(vm => !vm.isStorage && !vm.isInfrastructure); }
+    participating() { return this.consumerFacing().filter(vm => vm.isParticipating); }
+    planningParticipants() {
+      return this.participating().filter(vm => vm.raw?.planning_input_ready !== false);
+    }
+    disabled() { return this.consumerFacing().filter(vm => vm.isDisabled); }
+    infrastructure() { return this.all().filter(vm => vm.isInfrastructure); }
+    storage() { return this.all().filter(vm => vm.isStorage); }
+    planningRows() {
+      const published = new Map(this.runtime.planningIndexRows().map(row => [String(row.asset_id || row.consumer_id || row.id || ''), row]));
+      return this.planningParticipants().map(vm => {
+        const row = published.get(vm.id) || vm.planning || {};
+        return {
+          ...row,
+          asset_id: vm.id,
+          participation_state: vm.participation,
+          operational_state: vm.operation,
+          status: vm.operation,
+          state: vm.operation,
+          waiting: vm.operation === 'waiting',
+          planned: vm.operation === 'planned',
+          active: vm.operation === 'active',
+          paused: vm.operation === 'paused'
+        };
+      });
+    }
+    summary() {
+      const rows = this.planningRows();
+      return {
+        participating_count: rows.length,
+        disabled_count: this.disabled().length,
+        storage_count: this.storage().length,
+        infrastructure_count: this.infrastructure().length,
+        waiting_count: rows.filter(row => row.operational_state === 'waiting').length,
+        planned_count: rows.filter(row => row.operational_state === 'planned').length,
+        active_count: rows.filter(row => row.operational_state === 'active').length,
+        paused_count: rows.filter(row => row.operational_state === 'paused').length,
+        temporarily_unavailable_count: rows.filter(row => row.participation_state === 'temporarily_unavailable').length
+      };
+    }
+    physicalFlowParticipants() {
+      const relationships = this.runtime.connectedRelationships();
+      const related = new Set();
+      relationships.forEach(rel => {
+        if (rel.from_asset_id) related.add(String(rel.from_asset_id));
+        if (rel.to_asset_id) related.add(String(rel.to_asset_id));
+      });
+      return this.participating().filter(vm => {
+        const asset = vm.raw || {};
+        const measured = asNumber(firstDefined(asset.current_power_kw, asset.actual_power_kw, asset.power_kw, this.runtime.number(`${vm.id}.current_power_kw`), this.runtime.number(`${vm.id}.power_kw`))) || 0;
+        const connectionState = String(firstDefined(asset.connection_state, '') || '').trim().toLowerCase();
+        const connected = asBool(firstDefined(asset.connected, this.runtime.value(`${vm.id}.connected`, false)), false)
+          || ['connected','asset_connected'].includes(connectionState);
+        const charger = firstDefined(
+          asset.effective_charger,
+          asset.effective_connection_id,
+          asset.assigned_connection_id,
+          asset.physical_connection_id,
+          asset.charger_asset_id,
+          asset.connection_asset_id,
+          asset.execution_target_asset_id,
+          ''
+        );
+        return measured > 0.05 || connected || related.has(vm.id) || Boolean(charger) || (charger && related.has(String(charger)));
+      });
+    }
+  }
 
-  // __RHI_PLANNING_MODULES__
+  // ---- src/domain/planning/contract-adapter.js ----
+// Canonical support is capability-based. R1.79.3 compatibility is deliberately bounded to the
+// published bucket fields and must not become a second planning owner.
+  function planningArray(value) {
+    const parsed = parseMaybeJson(value, value);
+    return Array.isArray(parsed) ? parsed : [];
+  }
+
+  function planningParticipantId(row = {}) {
+    return String(firstDefined(row.participant_id, row.asset_id, row.target_asset_id, row.flexible_asset_id, ''));
+  }
+
+  function planningEnergyFromPower(row = {}, durationMinutes = 60) {
+    const direct = asNumber(firstDefined(row.planned_demand_kwh, row.planned_supply_kwh, row.planned_energy_kwh, row.energy_kwh));
+    if (direct !== null) return direct;
+    const power = asNumber(firstDefined(row.planned_power_kw, row.power_kw, row.allocated_power_kw));
+    return power === null ? null : power * Math.max(0, asNumber(durationMinutes) || 60) / 60;
+  }
+
+  function signedPlanningGrid(bucket = {}) {
+    const signed = asNumber(firstDefined(bucket.grid_net_kwh, bucket.expected_grid_net_kwh, bucket.net_grid_kwh, bucket.grid_kwh));
+    if (signed !== null) return { importKwh: Math.max(0, signed), exportKwh: Math.max(0, -signed) };
+    return {
+      importKwh: asNumber(firstDefined(bucket.expected_grid_import_kwh, bucket.grid_import_kwh)),
+      exportKwh: asNumber(firstDefined(bucket.expected_grid_export_kwh, bucket.grid_export_kwh))
+    };
+  }
+
+  function adaptPlanningBucket(bucket = {}, contractVersion = '') {
+    const version = String(contractVersion || '');
+    const isR1794 = ['advisory_source_lane','advisory_consumer_lane','advisory_boundary_flows','advisory_lane_balance_delta_kwh']
+      .some(key => Object.prototype.hasOwnProperty.call(bucket, key));
+    const isR1793 = version.includes('R1.79.3');
+    if (!isR1794 && !isR1793) return { raw:bucket, id:String(firstDefined(bucket.bucket_id,bucket.id,'')), startTime:firstDefined(bucket.start_time,bucket.start,bucket.bucket_start,''), endTime:firstDefined(bucket.end_time,bucket.end,bucket.bucket_end,''), durationMinutes:asNumber(bucket.duration_minutes)||60, sources:[], consumers:[], boundary:{gridExportKwh:null}, balanceDeltaKwh:null, state:'unavailable', reason:'unsupported_planning_contract', confidence:'', forecastQuality:'', disclosure:'', canonicalLanes:false, contractSupported:false, contractFamily:'unsupported' };
+    const durationMinutes = asNumber(bucket.duration_minutes) || 60;
+    const canonicalSources = planningArray(bucket.advisory_source_lane);
+    const canonicalConsumers = planningArray(bucket.advisory_consumer_lane);
+    const hasCanonicalLanes = isR1794;
+    let sources = canonicalSources;
+    let consumers = canonicalConsumers;
+    let boundary = objectFrom(parseMaybeJson(bucket.advisory_boundary_flows, bucket.advisory_boundary_flows || {}));
+
+    if (!hasCanonicalLanes) {
+      const grid = signedPlanningGrid(bucket);
+      const allocations = planningArray(firstDefined(bucket.asset_allocations, bucket.asset_allocations_json, []));
+      sources = [
+        { participant_id:'solar', display_name:'Solar', participant_type:'producer', lane_role:'source', flow_direction:'production', planned_supply_kwh:asNumber(bucket.solar_forecast_kwh), planning_state:'forecast', forecast_quality:bucket.forecast_quality },
+        { participant_id:'grid', display_name:'Grid', participant_type:'grid_connection', lane_role:'source', flow_direction:(grid.importKwh || 0) > 0 ? 'import' : 'idle', planned_supply_kwh:grid.importKwh, planning_state:(grid.importKwh || 0) > 0 ? 'residual_supply' : 'not_required' }
+      ];
+      consumers = [
+        { participant_id:'home', display_name:'Home', participant_type:'fixed_consumer', lane_role:'consumer', flow_direction:'consume', planned_demand_kwh:asNumber(bucket.base_demand_forecast_kwh), planning_state:'forecast' },
+        ...allocations.map(row => ({ ...row, participant_id:planningParticipantId(row), lane_role:'consumer', flow_direction:'charge', planned_demand_kwh:planningEnergyFromPower(row, durationMinutes), allocation_state:firstDefined(row.allocation_state, 'advisory') }))
+      ];
+      boundary = { grid_export_kwh:grid.exportKwh };
+    }
+
+    const normalize = (row, laneRole) => ({
+      ...row,
+      participantId: planningParticipantId(row),
+      laneRole,
+      energyKwh: planningEnergyFromPower(row, durationMinutes),
+      powerKw: asNumber(firstDefined(row.planned_power_kw, row.power_kw, row.allocated_power_kw)),
+      state: String(firstDefined(row.planning_state, row.state, row.status, '') || '').toLowerCase(),
+      allocationState: String(firstDefined(row.allocation_state, '') || '').toLowerCase(),
+      executionAllowed: firstDefined(row.plan_execution_allowed, null),
+      reason: firstDefined(row.reason_label, row.user_reason_label, row.reason_code, row.reason, '')
+    });
+    const normalizedSources = sources.map(row => normalize(row, 'source'));
+    const normalizedConsumers = consumers.map(row => normalize(row, 'consumer'));
+    return {
+      raw: bucket,
+      id: String(firstDefined(bucket.bucket_id, bucket.id, '')),
+      startTime: firstDefined(bucket.start_time, bucket.start, bucket.bucket_start, ''),
+      endTime: firstDefined(bucket.end_time, bucket.end, bucket.bucket_end, ''),
+      durationMinutes,
+      sources: normalizedSources,
+      consumers: normalizedConsumers,
+      boundary: { gridExportKwh: asNumber(firstDefined(boundary.grid_export_kwh, boundary.export_kwh)) },
+      balanceDeltaKwh: asNumber(bucket.advisory_lane_balance_delta_kwh),
+      state: String(firstDefined(bucket.planning_state, bucket.state, '') || '').toLowerCase(),
+      reason: firstDefined(bucket.reason_label, bucket.reason_code, bucket.reason, ''),
+      confidence: firstDefined(bucket.confidence, ''),
+      forecastQuality: firstDefined(bucket.forecast_quality, ''),
+      disclosure: firstDefined(bucket.estimation_disclosure, ''),
+      canonicalLanes: hasCanonicalLanes
+      ,contractSupported: true
+      ,contractFamily: isR1794 ? 'R1.79.4' : 'R1.79.3'
+    };
+  }
+  if (typeof module !== 'undefined' && module.exports) module.exports = { adaptPlanningBucket, signedPlanningGrid, planningEnergyFromPower };
+
+// ---- src/domain/planning/planning-contract.js ----
+// Authoritative Planning contract reader. No cross-domain fallback and no business recalculation.
+  function planningObject(value) {
+    const parsed = parseMaybeJson(value, value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  }
+  function planningRows(value) {
+    const parsed = parseMaybeJson(value, value);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === 'object') return Object.values(parsed);
+    return [];
+  }
+  function planningById(value) {
+    const parsed = parseMaybeJson(value, value);
+    if (Array.isArray(parsed)) {
+      return Object.fromEntries(parsed.map((row, index) => [
+        String(row?.horizon_id || row?.id || (index === 0 ? 'D0' : 'D1')).toUpperCase(),
+        planningObject(row)
+      ]));
+    }
+    return planningObject(parsed);
+  }
+  function readPlanningContract(gateway, horizonId = 'D0') {
+    const normalized = String(horizonId || 'D0').toUpperCase();
+    const v2 = readEnergyPublicV2(gateway);
+    const planning = planningObject(v2.planning);
+    const horizonsById = planningById(planning.horizons);
+    const horizon = planningObject(horizonsById[normalized] || horizonsById[normalized.toLowerCase()]);
+    const summary = horizon;
+    const canonicalLaneTotals = planningObject(planningObject(horizon.summary).lane_totals || horizon.lane_totals);
+    const laneTotals = planningObject({
+      ...canonicalLaneTotals,
+      required_kwh:horizon.required_kwh,
+      planned_kwh:horizon.planned_kwh,
+      executed_kwh:horizon.executed_kwh,
+      still_to_plan_kwh:horizon.still_to_plan_kwh,
+      flexible_required_kwh:horizon.flexible_required_kwh,
+      flexible_planned_kwh:horizon.flexible_planned_kwh,
+      flexible_executed_kwh:horizon.flexible_executed_kwh,
+      flexible_still_to_plan_kwh:horizon.flexible_still_to_plan_kwh
+    });
+    const buckets = planningRows(firstDefined(horizon.buckets, horizon.timeline, horizon.rows))
+      .map((row,index)=>({ bucket_id:row?.bucket_id || row?.id || `bucket_${index+1}`, ...planningObject(row) }));
+    const planningObjects = planningRows(v2.layers?.planning_objects);
+    const planningAssets = planningObjects.filter(row => String(row.asset_id || row.target_asset_id || ''));
+    const planningAssetsById = Object.fromEntries(planningAssets.map(row => [String(row.asset_id || row.target_asset_id), planningObject(row)]));
+    const d0 = planningObject(horizonsById.D0);
+    const d1 = planningObject(horizonsById.D1);
+    const d0Totals = planningObject(d0);
+    const d1Totals = planningObject(d1);
+    return Object.freeze({
+      entityId:v2.envelope.entityId,
+      contractVersion:v2.contractVersion,
+      available:v2.available,
+      attrs:planning,
+      planningAssets,
+      planningAssetsById,
+      planningTodayTotals:d0Totals,
+      planningTomorrowTotals:d1Totals,
+      planningCombinedTotals:{},
+      horizonsById,
+      horizonId:normalized,
+      horizon,
+      summary,
+      laneTotals,
+      buckets,
+      currentPlanningBucket:{},
+      currentActionIntent:{},
+      totalsSource:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons'
+    });
+  }
+
+  function normalizePlanningLaneTotals(rawTotals = {}) {
+    const totals = planningObject(rawTotals);
+    const sources = planningObject(totals.sources);
+    const consumers = planningObject(totals.consumers);
+    const boundary = planningObject(totals.boundary);
+    const flexibleRaw = firstDefined(
+      consumers.flexible_assets,
+      totals.flexible_assets,
+      totals.flexible_loads_by_asset,
+      totals.flexible_load_totals_by_asset,
+      totals.consumer_totals_by_asset,
+      totals.assets_by_id,
+      {}
+    );
+    const parsedFlexible = parseMaybeJson(flexibleRaw, flexibleRaw);
+    const flexibleAssetsById = Array.isArray(parsedFlexible)
+      ? Object.fromEntries(parsedFlexible.map(row => [String(row?.asset_id || row?.id || ''), planningObject(row)]).filter(([id]) => id))
+      : planningObject(parsedFlexible);
+    const value = (...keys) => {
+      for (const key of keys) {
+        for (const scope of [totals, sources, consumers, boundary]) {
+          const number = asNumber(scope[key]);
+          if (number !== null) return number;
+        }
+      }
+      return null;
+    };
+    return Object.freeze({
+      raw: totals,
+      sources,
+      consumers,
+      boundary,
+      flexibleAssetsById,
+      solarKwh: value('solar_kwh','solar_production_kwh','solar_total_kwh'),
+      homeBatteryOutKwh: value('home_battery_supply_kwh','home_battery_discharge_kwh','battery_discharge_kwh','battery_out_kwh'),
+      gridInKwh: value('grid_in_kwh','grid_import_kwh'),
+      homeKwh: value('home_kwh','home_consumption_kwh','fixed_demand_kwh'),
+      flexibleLoadsKwh: value('managed_energy_kwh','flexible_loads_kwh','planned_flexible_kwh','flexible_planned_kwh'),
+      homeBatteryInKwh: value('home_battery_charge_kwh','battery_charge_kwh','battery_in_kwh'),
+      gridOutKwh: value('grid_out_kwh','grid_export_kwh'),
+      sourceTotalKwh: value('source_total_kwh','sources_total_kwh'),
+      useTotalKwh: value('use_total_kwh','demand_total_kwh','consumer_total_kwh'),
+      balanceDeltaKwh: value('balance_delta_kwh','lane_balance_delta_kwh'),
+      homeBatteryNeedKwh: value('home_battery_need_kwh','battery_reserve_need_kwh')
+    });
+  }
+  if (typeof module !== 'undefined' && module.exports) module.exports = { readPlanningContract, normalizePlanningLaneTotals };
+
+// ---- src/domain/planning/planning-view-model.js ----
+// Stable UX model builder for Planning. Renderers receive meaning, never backend paths.
+  function createPlanningViewModel({ gateway, horizonId, flexibleAssets = [], storage = null }) {
+    const contract = readPlanningContract(gateway, horizonId);
+    const laneTotals = normalizePlanningLaneTotals(contract.laneTotals);
+    const rows = contract.buckets.map(bucket => adaptPlanningBucket(bucket, contract.contractVersion));
+    const quality = planningObject(contract.horizon.quality);
+    const contractSupported = contract.available === true && String(contract.contractVersion || '').startsWith('2.');
+    const stateText = String(firstDefined(contract.horizon.state, contract.horizon.status, quality.health, contract.horizon.quality, '')).toLowerCase();
+    return Object.freeze({
+      horizonId: contract.horizonId,
+      horizon: contract.horizon,
+      buckets: contract.buckets,
+      assets: flexibleAssets,
+      planningAssets: contract.planningAssets,
+      planningAssetsById: contract.planningAssetsById,
+      todayTotals: contract.planningTodayTotals,
+      tomorrowTotals: contract.planningTomorrowTotals,
+      combinedTotals: contract.planningCombinedTotals,
+      storage,
+      rows,
+      summary: contract.summary,
+      laneTotals,
+      quality,
+      currentActionIntent: contract.currentActionIntent,
+      contractVersion: contract.contractVersion,
+      contractSupported,
+      currentBucketId: String(contract.currentPlanningBucket.bucket_id || ''),
+      totalsSource: contract.totalsSource,
+      complete: contractSupported && !/incomplete|partial|unavailable/.test(stateText)
+    });
+  }
 
   // __RHI_PRESENTATION_MODULES__
 
