@@ -3332,42 +3332,84 @@
       return '';
     }
 
+    energyAssetConfigurationDisclosure(rt, asset = {}) {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      if (!id) return '';
+      const rows = rt.editablePropertyRows().filter(row => {
+        const key = String(firstDefined(row.property_id,row.property_key,row.key,'') || '');
+        const rowAsset = String(firstDefined(row.asset_id,row.target_asset_id,'') || '');
+        if (/^appearance:/.test(key)) return false;
+        return rowAsset === id || key.startsWith(`${id}.`);
+      });
+      if (!rows.length) return '';
+      const controls = rows.map(row => {
+        const label = firstDefined(row.display_name,row.label,human(row.field_key || row.property_key || row.key || 'Setting'));
+        const allowed = allowedValuesForRow(row);
+        const value = rowValue(row, null);
+        const valueType = String(firstDefined(row.value_type,row.type,typeof value) || '').toLowerCase();
+        const editorType = allowed.length ? 'select'
+          : valueType === 'boolean' ? 'toggle'
+          : (asNumber(firstDefined(row.min,row.minimum,null)) !== null || asNumber(firstDefined(row.max,row.maximum,null)) !== null) ? 'range'
+          : 'number';
+        return this.editablePropertyControl(row,{title:label,type:editorType,fallbackValue:value,fallbackOptions:allowed});
+      }).filter(Boolean).join('');
+      return controls ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${controls}</div></details>` : '';
+    }
+
     energyAssetDetailDisclosure(rt, asset = {}) {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       if (!id) return '';
       const profile = objectFrom(enriched.profile || {});
+      const projection = rt.assetProjection(id) || {};
+      const parentId = this.energyAssetParentId(enriched);
+      const parentName = parentId ? String(rt.assetName(parentId) || '').trim() : '';
+      const area = this.energyAssetAreaLabel(enriched);
+      const primaryLabels = new Set(this.energyAssetFacts(rt,enriched,8).map(row=>String(row.label || '').toLowerCase()));
+      const rows = [
+        area ? ['Area',area] : null,
+        parentName ? ['Part of',parentName] : null,
+        firstDefined(profile.display_name,profile.label,profile.name,'') ? ['Profile',firstDefined(profile.display_name,profile.label,profile.name,'')] : null
+      ].filter(Boolean);
+      const technical = /(^|\s)(source|asset id|lifecycle|telemetry|health|raw status|timestamp|last update)(\s|$)/i;
+      const properties = (projection?.properties || []).map(row => {
+        const field = row?.projection || {};
+        if (!field.resolved) return null;
+        const label = String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || '');
+        if (!label || technical.test(label) || primaryLabels.has(label.toLowerCase())) return null;
+        let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
+        if (value === '—') return null;
+        if (field.unit && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
+        return [label,value];
+      }).filter(Boolean);
+      const all = [...rows,...properties];
+      if (!all.length) return '';
+      return `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${all.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
+    }
+
+    energyAssetDiagnosticsDisclosure(rt, asset = {}) {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      if (!id) return '';
       const publication = objectFrom(enriched.publication || {});
       const projection = rt.assetProjection(id) || {};
       const lifecycle = objectFrom(projection.lifecycle || {});
-      const parentId = this.energyAssetParentId(enriched);
-      const area = this.energyAssetAreaLabel(enriched);
       const telemetry = publication.resolution_complete === false ? 'Incomplete'
         : publication.complete === false ? 'Partial'
         : publication.complete === true ? 'Complete' : 'Unknown';
-      const rows = [
-        ['Area', area || '—'],
-        ['Type', human(firstDefined(enriched.asset_type,enriched.object_class,'device'))],
-        ['Parent', parentId || '—'],
-        ['Profile', firstDefined(profile.display_name,profile.label,profile.name,enriched.profile_id,'—')],
-        ['Lifecycle', firstDefined(lifecycle.state,enriched.health,enriched.status,'—')],
-        ['Telemetry', telemetry],
-        ['Source', firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'—')],
-        ['Asset id', id]
-      ];
+      const source = firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'');
+      const rawStatus = firstDefined(enriched.raw_status,enriched.status_code,enriched.vendor_status,'');
       const missing = Array.isArray(publication.missing) ? publication.missing : Array.isArray(publication.missing_fields) ? publication.missing_fields : [];
-      const publishedProperties = (projection?.properties || []).map(row => {
-        const field = row?.projection || {};
-        if (!field.resolved) return null;
-        const label = firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property'));
-        let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
-        if (field.unit && value !== '—' && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
-        return { label, value };
-      }).filter(Boolean);
-      const propertyHtml = publishedProperties.length
-        ? `<div class="energyAssetPropertyList"><small class="energyAssetPropertyTitle">Published properties</small><div class="energyAssetPropertyGrid">${publishedProperties.map(row=>`<span><small>${escapeHtml(row.label)}</small><b>${escapeHtml(row.value)}</b></span>`).join('')}</div></div>`
-        : '';
-      return `<details class="energyAssetDetails"><summary>Details</summary><div class="energyAssetDetailGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value ?? '—'))}</b></span>`).join('')}${missing.length ? `<span class="wide"><small>Missing publication fields</small><b>${escapeHtml(missing.join(' · '))}</b></span>` : ''}</div>${propertyHtml}</details>`;
+      const rows = [
+        ['Asset id',id],
+        source ? ['Source',source] : null,
+        ['Lifecycle',firstDefined(lifecycle.state,enriched.health,enriched.status,'Unknown')],
+        ['Telemetry',telemetry],
+        rawStatus ? ['Raw status',rawStatus] : null,
+        missing.length ? ['Missing publication fields',missing.join(' · ')] : null
+      ].filter(Boolean);
+      return `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
     }
 
     energyAppearanceAction(rt, asset = {}) {
