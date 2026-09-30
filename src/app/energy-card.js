@@ -4575,27 +4575,37 @@
       const d = rt.decision();
       const profiles = rt.strategyProfileRows();
       const effectiveStrategies = rt.effectiveStrategyRows();
-      const planningRows = this.flexibleAssetDomain(rt).planningRows();
-      const visibleCommands = rt.visibleCommands().filter(c => rt.commandVisible(c));
       const fallbackProfile = profiles[0] || null;
-      const selected = this.selectedStrategyProfileId
+      let selected = this.selectedStrategyProfileId
         ? (rt.strategyProfileFor(this.selectedStrategyProfileId) || null)
         : fallbackProfile;
-      if (selected && !this.selectedStrategyProfileId) this.selectedStrategyProfileId = selected.profile_id;
+      if (!selected && fallbackProfile) selected = fallbackProfile;
+      if (selected && this.selectedStrategyProfileId !== selected.profile_id) this.selectedStrategyProfileId = selected.profile_id;
       const selectedId = selected?.profile_id || '';
-      const unavailableSelectedProfile = this.selectedStrategyProfileId && !selected
-        ? `<option value="${escapeHtml(this.selectedStrategyProfileId)}" selected disabled>Selected profile temporarily unavailable</option>`
+      const selectedTopic = selected ? this.profileSettingsTopic(selected) : '';
+
+      const topicGroups = new Map();
+      profiles.forEach(profile => {
+        const topic = this.profileSettingsTopic(profile);
+        if (!topicGroups.has(topic)) topicGroups.set(topic, []);
+        topicGroups.get(topic).push(profile);
+      });
+      const topicOrder = ['Home & priorities','Battery','EV charging','Solar','Grid & tariffs','Home & resilience'];
+      const topics = [...topicGroups.entries()].sort(([left],[right]) => {
+        const li=topicOrder.indexOf(left), ri=topicOrder.indexOf(right);
+        if(li>=0 || ri>=0) return (li<0?99:li)-(ri<0?99:ri);
+        return left.localeCompare(right);
+      });
+      const topicButtons = topics.map(([topic,rows]) => {
+        const target = rows[0];
+        const active = topic === selectedTopic;
+        return `<button type="button" class="settingsTopicButton${active?' active':''}" data-settings-topic-profile="${escapeHtml(target.profile_id || '')}" aria-pressed="${active?'true':'false'}"><b>${escapeHtml(topic)}</b><span>${escapeHtml(this.profileUserDescription(target))}</span></button>`;
+      }).join('');
+      const selectedGroup = selectedTopic ? (topicGroups.get(selectedTopic) || []) : [];
+      const variantSelect = selectedGroup.length > 1
+        ? `<label class="settingsVariantSelect"><span>Policy set</span><select data-strategy-profile-select>${selectedGroup.map(profile=>`<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id)===String(selectedId)?' selected':''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>`
         : '';
-      const profilePicker = profiles.length ? `<section class="panel strategyProfilePicker compact"><div><h2>Settings profile</h2><p>Choose the domain policy set you want to review or adjust.</p></div><label class="strategyProfileSelect"><span>Profile</span><select data-strategy-profile-select>${unavailableSelectedProfile}${profiles.map(profile => `<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>${selected ? `<small>${escapeHtml(this.profileUserDescription(selected))}</small>` : `<small>The selected profile is temporarily unavailable. Your selection is preserved.</small>`}</section>` : '';
-      const effectiveRowsForProfile = selectedId
-        ? effectiveStrategies.filter(strategy => {
-            const text = `${strategy.profile_id || ''} ${strategy.strategy_profile_id || ''} ${strategy.profile_type || ''} ${strategy.asset_type || ''} ${strategy.policy_profile || ''}`.toLowerCase();
-            const wanted = String(selectedId).toLowerCase();
-            return text.includes(wanted) || text.includes(String(selected.profile_type || '').toLowerCase()) || text.includes(String(selected.asset_type || '').toLowerCase());
-          })
-        : effectiveStrategies;
-      const effectiveRows = (effectiveRowsForProfile.length ? effectiveRowsForProfile : effectiveStrategies).map(strategy => this.effectivePolicyPreviewCard(rt, strategy)).join('');
-      const diagnostics = `${this.kv('Editable strategy source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy')}${this.kv('Effective context source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy.effective_properties')}${this.kv('Planning outcome source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning')}${this.kv('Explanation source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.intelligence')}${this.kv('Action source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.commands')}${this.kv('Selected profile', selectedId || 'None')}`;
+
       const automationRow = rt.editableProperty('energy.automation_mode') || rt.row('energy.automation_mode');
       const automationMode = rowValue(automationRow, this.energyAutomationMode(rt,d) || 'advice');
       const automationOptions = allowedValuesForRow(automationRow).length
@@ -4604,16 +4614,29 @@
       const automationControl = this.isWritableRow(automationRow)
         ? this.componentSegmentedControl(automationOptions, automationMode, 'automationModeControl')
         : `<div class="profileNoControls">Automation mode is not writable in the current public contract.</div>`;
-      return `${this.tabExperienceHeader(rt,'strategies',pageVm)}<div class="strategiesPage strategyProfilesPage strategyProfileUx">
-        <section class="panel strategyAutomationMode"><div><h2>Automation mode</h2><p>Choose how Home Intelligence may act. Domain ownership stays in the backend; changes are confirmed by authoritative readback.</p></div>${automationControl}${this.editablePropertyFeedback(automationRow)}</section>
-        ${profilePicker || `<section class="panel"><h2>No settings profiles published</h2><p>Waiting for canonical domain settings.</p></section>`}
-        <div class="profileEditorColumn">${selected ? this.strategyProfileCard(rt, selected) : ''}</div>
-        <section class="panel effectivePolicyPreview"><h2>Current policy effect${selected ? ` · ${escapeHtml(this.profileUserLabel(selected))}` : ''}</h2><p>Configured, effective and influencing policy state.</p><div class="effectivePolicyList">${effectiveRows || `<div class="empty"><b>No effective strategy published</b><span>Waiting for canonical V2 effective strategy.</span></div>`}</div></section>
-        <section class="panel strategyParticipation"><h2>Participating assets</h2><p>Physical control and planning structure published by Energy.</p><div class="settingsParticipationTree">${rt.settingsParticipationRows().map(parent=>{
-          const parentAsset=rt.asset(parent.asset_id) || parent;
-          const children=asArray(parent.children);
-          return `<article class="settingsParticipationRoot"><div class="settingsParticipationRootHead">${this.assetVisual(parentAsset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(parentAsset)})}<div><b>${escapeHtml(parent.display_name || rt.assetName(parent.asset_id) || human(parent.asset_id))}</b><span>${escapeHtml(human(parent.participation_role || parent.asset_type || 'Participating'))}</span></div></div><div class="settingsParticipationChildren">${children.map(child=>{const childAsset=rt.asset(child.asset_id)||child;return `<div class="settingsParticipationChild">${this.assetVisual(childAsset,{size:'xs',fallbackIcon:this.flexibleAssetIcon(childAsset)})}<div><b>${escapeHtml(child.display_name || rt.assetName(child.asset_id) || human(child.asset_id))}</b><span>${escapeHtml(human(child.relationship_type || child.asset_type || 'Member'))}</span></div>${child.planning_eligible===undefined?'':`<strong>${child.planning_eligible?'Planning ready':'Not planning ready'}</strong>`}</div>`;}).join('') || '<div class="settingsParticipationEmpty">No related assets published</div>'}</div></article>`;
-        }).join('') || `<div class="empty"><b>No participating structure published</b><span>Energy has not published a control/planning hierarchy.</span></div>`}</div></section>
+
+      const effectiveRowsForProfile = selectedId
+        ? effectiveStrategies.filter(strategy => {
+            const text = `${strategy.profile_id || ''} ${strategy.strategy_profile_id || ''} ${strategy.profile_type || ''} ${strategy.asset_type || ''} ${strategy.policy_profile || ''}`.toLowerCase();
+            const wanted = String(selectedId).toLowerCase();
+            return text.includes(wanted) || text.includes(String(selected?.profile_type || '').toLowerCase()) || text.includes(String(selected?.asset_type || '').toLowerCase());
+          })
+        : effectiveStrategies;
+      const effectiveRows = (effectiveRowsForProfile.length ? effectiveRowsForProfile : effectiveStrategies).map(strategy => this.effectivePolicyPreviewCard(rt,strategy)).join('');
+      const participation = rt.settingsParticipationRows().map(parent => {
+        const parentAsset=rt.asset(parent.asset_id) || parent;
+        const children=asArray(parent.children);
+        return `<article class="settingsParticipationRoot"><div class="settingsParticipationRootHead">${this.assetVisual(parentAsset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(parentAsset)})}<div><b>${escapeHtml(parent.display_name || rt.assetName(parent.asset_id) || human(parent.asset_id))}</b><span>${escapeHtml(human(parent.participation_role || parent.asset_type || 'Participating'))}</span></div></div><div class="settingsParticipationChildren">${children.map(child=>{const childAsset=rt.asset(child.asset_id)||child;return `<div class="settingsParticipationChild">${this.assetVisual(childAsset,{size:'xs',fallbackIcon:this.flexibleAssetIcon(childAsset)})}<div><b>${escapeHtml(child.display_name || rt.assetName(child.asset_id) || human(child.asset_id))}</b><span>${escapeHtml(human(child.relationship_type || child.asset_type || 'Member'))}</span></div></div>`;}).join('')}</div></article>`;
+      }).join('');
+
+      return `${this.tabExperienceHeader(rt,'strategies',pageVm)}<div class="strategiesPage settingsTopicPage">
+        <section class="panel strategyAutomationMode compactSettingsBlock"><div><h2>Automation</h2><p>Choose how much Home Intelligence may act for you.</p></div>${automationControl}${this.editablePropertyFeedback(automationRow)}</section>
+        <section class="panel settingsTopicChooser"><div class="settingsTopicHead"><h2>What do you want to adjust?</h2><p>Settings are grouped by the part of your energy system you want to influence.</p></div><div class="settingsTopicGrid">${topicButtons || '<div class="empty"><b>No settings topics available</b><span>No editable Energy policy profiles are currently published.</span></div>'}</div></section>
+        ${selected ? `<section class="settingsSelectedTopic"><div class="settingsSelectedTopicHead"><div><small>SETTINGS</small><h2>${escapeHtml(selectedTopic)}</h2></div>${variantSelect}</div>${this.strategyProfileCard(rt,selected)}</section>` : ''}
+        <details class="panel settingsAdvancedDisclosure"><summary>Advanced</summary><div class="settingsAdvancedBody">
+          <section><h3>Effective behavior</h3><div class="effectivePolicyList">${effectiveRows || '<div class="empty compact"><b>No effective behavior published</b></div>'}</div></section>
+          ${participation ? `<section><h3>Participating assets</h3><div class="settingsParticipationTree">${participation}</div></section>` : ''}
+        </div></details>
       </div>`;
     }
 
