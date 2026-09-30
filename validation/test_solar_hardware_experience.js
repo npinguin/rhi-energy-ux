@@ -73,3 +73,8 @@ assert.match(app,/solarProductionRepresentative/);
 assert.match(app,/energy\.logical\.solar_zone\.generic/);
 assert.match(app,/solarStringVisual/);
 assert.match(app,/SOLAR ZONE \/ STRING/);
+
+
+const solarProductionRender = hierarchy.match(/production\.map\(asset=>this\.energyDeviceStatusCard\(rt,asset,'Solar production',\{showVisual:false\}\)\)/);
+assert.ok(solarProductionRender, "Solar Production aggregate must suppress the duplicate device visual when representative panel artwork is present");
+assert.match(app,/energyDeviceCardNoVisual/);
