@@ -752,30 +752,32 @@
     strategyProfileRows() {
       if (this._strategyProfiles) return this._strategyProfiles;
       const v2=this.publicV2();
-      const rows=asArray(v2.configuration?.strategy?.configured?.properties);
-      const labels={home:'Home Intelligence',battery:'Home Battery',solar:'Solar',grid:'Grid',flexible_loads:'Flexible Loads',resilience:'Resilience'};
-      const groups=new Map();
-      rows.forEach(raw=>{
-        const row=objectFrom(raw);
-        const group=String(row.group || row.asset_id || 'home');
-        const current=groups.get(group) || {
-          strategy_id:group, profile_id:group, profile_type:group, asset_type:group,
-          profile_label:labels[group] || human(group),
-          display_name:labels[group] || human(group),
+      // Settings grouping is Energy-owned. UX consumes the published groups and
+      // never rebuilds them from property-name/group heuristics.
+      this._strategyProfiles=asArray(v2.configuration?.strategy?.profiles).map(raw=>{
+        const profile=objectFrom(raw);
+        const profileId=String(profile.profile_id || '');
+        const configured=asArray(profile.configured_properties).map(row=>({
+          entity_id:v2.envelope.entityId,
+          ...objectFrom(row),
+          profile_id:profileId,
+          strategy_profile_id:profileId
+        }));
+        return {
+          ...profile,
+          strategy_id:profileId,
+          profile_id:profileId,
+          profile_type:profileId,
+          asset_type:profileId,
+          profile_label:profile.display_name || human(profileId),
+          display_name:profile.display_name || human(profileId),
           entity_id:v2.envelope.entityId,
           contract_role:'editable_strategy_profile',
-          ux_primary_behavior_source:false,
-          not_planning_outcome:true,
-          not_command_readiness:true,
-          editable_field_rows:[],
-          properties:[]
+          editable_field_rows:configured.filter(row=>canonicalEditableProperty(row)),
+          properties:configured,
+          effective_properties:asArray(profile.effective_properties)
         };
-        const normalized={ entity_id:v2.envelope.entityId, ...row, profile_id:group, strategy_profile_id:group };
-        current.properties.push(normalized);
-        if (canonicalEditableProperty(normalized)) current.editable_field_rows.push(normalized);
-        groups.set(group,current);
-      });
-      this._strategyProfiles=[...groups.values()];
+      }).filter(profile=>profile.profile_id);
       return this._strategyProfiles;
     }
     strategyProfileFor(profileId) {
@@ -821,6 +823,12 @@
         if (hit) return hit;
       }
       return null;
+    }
+    settingsParticipationRows() {
+      const v2=this.publicV2();
+      return asArray(v2.configuration?.strategy?.participating_assets)
+        .map(row=>objectFrom(row))
+        .filter(row=>row.asset_id);
     }
     effectiveStrategyRows() {
       if (this._effectiveStrategies) return this._effectiveStrategies;
