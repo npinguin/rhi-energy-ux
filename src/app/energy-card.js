@@ -3542,11 +3542,7 @@
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id),'Solar string');
       const facts = this.energyAssetFacts(rt,enriched,8);
-      const power = facts.find(fact => /^Power now$/i.test(String(fact.label || ''))) || null;
-      const childCount = firstDefined(
-        facts.find(fact => /^Child count$/i.test(String(fact.label || '')))?.value,
-        childOptimizers.length || childPanels.length || null
-      );
+      const power = facts.find(fact => /^(Power now|Production now)$/i.test(String(fact.label || ''))) || null;
       const panelById = new Map(childPanels.map(panel => [String(firstDefined(panel.asset_id,panel.id,'') || ''),panel]));
       const optimizerCards = childOptimizers.map(optimizer => {
         const linkedPanel = panelById.get(this.energyAssetParentId(optimizer)) || null;
@@ -3556,26 +3552,22 @@
         .filter(panel => !childOptimizers.some(optimizer => this.energyAssetParentId(optimizer) === String(firstDefined(panel.asset_id,panel.id,'') || '')))
         .map(panel => this.solarModuleCard(rt,panel,[]))
         .join('');
-      const technicalDetails = this.energyAssetDetailDisclosure(rt,enriched);
+      const children = optimizerCards || panelOnlyCards
+        ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children · ${childOptimizers.length + childPanels.length}</summary><div class="energyAssetFoldBody solarModuleGrid">${optimizerCards}${panelOnlyCards}</div></details>`
+        : '';
       return `<article class="solarStringLink" data-solar-string="${escapeHtml(id)}">
         <div class="solarStringSummary">
           <div class="solarStringVisual">${this.assetVisual(enriched,{size:'sm',fallbackIcon:'☀',decorative:false})}</div>
           <span><small>SOLAR ZONE / STRING</small><b>${escapeHtml(name)}</b></span>
-          ${power ? `<span><small>Production now</small><b>${escapeHtml(power.value)}</b></span>` : ''}
-          ${childCount !== null ? `<span><small>Modules</small><b>${escapeHtml(childCount)}</b></span>` : ''}
+          ${power ? `<span><small>Producing</small><b>${escapeHtml(power.value)}</b></span>` : ''}
         </div>
-        ${optimizerCards ? `<div class="solarModuleGrid">${optimizerCards}</div>` : ''}
-        ${panelOnlyCards ? `<div class="solarModuleGrid solarPanelOnlyGrid">${panelOnlyCards}</div>` : ''}
-        ${technicalDetails}
+        <div class="energyAssetFoldStack">${this.energyAssetConfigurationDisclosure(rt,enriched)}${this.energyAssetDetailDisclosure(rt,enriched)}${this.energyAssetDiagnosticsDisclosure(rt,enriched)}${children}</div>
       </article>`;
     }
     solarInverterCard(rt, inverter, strings = [], panelsFor = () => [], optimizersFor = () => []) {
       const inverterId = String(firstDefined(inverter.asset_id,inverter.id,'') || '');
       const children = strings.map(string => this.solarStringLink(rt,string,panelsFor(string),optimizersFor(string,panelsFor(string)))).join('');
-      return `<div class="solarInverterCard" data-solar-inverter="${escapeHtml(inverterId)}">
-        ${this.energyDeviceStatusCard(rt,inverter,'Solar inverter')}
-        ${children ? `<div class="solarInverterStrings"><div class="solarInverterStringsHead"><small>STRINGS</small><b>${strings.length}</b></div>${children}</div>` : ''}
-      </div>`;
+      return `<div class="solarInverterCard" data-solar-inverter="${escapeHtml(inverterId)}">${this.energyDeviceStatusCard(rt,inverter,'Solar inverter',children)}</div>`;
     }
     solarInverterSystem(rt, inverters = [], stringsForInverter = () => [], panelsFor = () => [], optimizersFor = () => [], unresolvedStrings = []) {
       if (!inverters.length && !unresolvedStrings.length) return '';
