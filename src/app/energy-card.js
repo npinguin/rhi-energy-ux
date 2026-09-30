@@ -4446,64 +4446,62 @@
     consumerExplorerCard(rt, row = {}) {
       const id = row.asset_id || row.consumer_id || row.id || 'consumer';
       const vm = this.flexibleAssetDomain(rt).byId(id);
-      if (vm?.isDisabled) return this.disabledFlexibleAssetCard(rt, vm.raw || row, vm.planning || {});
+      if (vm?.isDisabled) return this.disabledFlexibleAssetCard(rt,vm.raw || row,vm.planning || {});
       const planning = vm?.planning || rt.planningOutcomeFor(id) || {};
       const raw = vm?.raw || row;
-      const asset = this.energyAssetContext(rt, { ...raw, ...row, visual_ref:firstDefined(raw.visual_ref,row.visual_ref,'') });
-      const status = this.canonicalOperationalStatus(rt, asset, planning);
-      const commands = rt.commandsForAsset(id);
-      const startCommand = commands.find(c => rt.commandRole(c) === 'start');
-      const stop = commands.find(c => rt.commandRole(c) === 'stop');
-      const pause = commands.find(c => rt.commandRole(c) === 'pause');
-      const resume = commands.find(c => rt.commandRole(c) === 'resume');
-      const stateRaw = firstDefined(planning.product_state, planning.status, planning.state, row.status, planning.active ? 'active' : planning.waiting ? 'waiting' : planning.planned ? 'planned' : asset.operating_state, 'available');
+      const asset = this.energyAssetContext(rt,{...raw,...row,visual_ref:firstDefined(raw.visual_ref,row.visual_ref,'')});
+      const stateRaw = firstDefined(planning.product_state,planning.status,planning.state,asset.operating_state,'available');
       const state = this.userStateText(stateRaw);
-      const availability = String(firstDefined(asset.availability_state, status.unavailable ? 'unavailable' : 'available') || '').toLowerCase();
-      const healthRaw = firstDefined(asset.health, asset.lifecycle_state, asset.status, '');
-      const health = status.unavailable ? 'Unavailable' : healthRaw ? human(healthRaw) : 'Available';
-      const chargerId = String(firstDefined(asset.effective_charger, asset.charger_asset_id, asset.connection_asset_id, asset.execution_target_asset_id, '') || '');
-      const relation = chargerId ? `${rt.assetName(chargerId) || human(chargerId)} · ${human(firstDefined(asset.connection_state,'linked'))}` : '';
-      const reason = humanReason(firstDefined(planning.user_reason_label, planning.waiting_reason, planning.waiting_reason_code, planning.reason, planning.reason_code, row.reason), state === 'Ready' ? 'Ready when you need it.' : 'Home Intelligence is monitoring this asset.');
-      const paused = /paused|hold/.test(String(stateRaw || '').toLowerCase()) || rt.commandEnabled(resume);
-      const executionPolicy = this.automationExecutionPolicy(rt);
-      let recommendation = 'Home Intelligence will keep monitoring this asset.';
-      if (/waiting/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
-        ? 'Home Intelligence may act automatically when the planned conditions are available.'
-        : executionPolicy.configuredMode === 'advice'
-          ? 'Home Intelligence will keep the recommendation ready and wait for your approval.'
-          : 'Planning remains visible, but managed execution is disabled.';
-      if (/planned|scheduled/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
-        ? 'Home Intelligence has included this asset in the executable current plan.'
-        : 'Home Intelligence has included this asset in the advisory plan.';
-      if (/active|charging|running/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
-        ? 'Let Home Intelligence continue unless you want to stop or pause control.'
-        : 'Current physical execution is shown separately from advisory planning.';
-      if (paused) recommendation = 'Resume managed participation when you want Home Intelligence to include this asset again.';
-      const actions = [
-        paused ? this.componentActionButton(resume, 'Resume managed control', id) : this.componentActionButton(pause, 'Pause managed control', id),
-        /active|charging|running/.test(String(stateRaw || '').toLowerCase()) ? this.componentActionButton(stop, 'Stop now', id) : this.componentActionButton(startCommand, 'Start now', id)
-      ].join('');
-      const currentPower = asNumber(firstDefined(row.current_power_kw, row.actual_power_kw, row.power_kw, raw.current_power_kw, raw.actual_power_kw, raw.power_kw));
-      const requestedPower = asNumber(firstDefined(row.requested_power_kw, raw.requested_power_kw));
+      const currentPower = asNumber(firstDefined(row.current_power_kw,row.actual_power_kw,row.power_kw,raw.current_power_kw,raw.actual_power_kw,raw.power_kw,null));
       const energyNeed = asNumber(firstDefined(
-        planning.energy_to_target_kwh, planning.energy_needed_kwh, planning.remaining_energy_kwh, planning.energy_need_kwh,
-        row.energy_to_target_kwh, row.energy_needed_kwh, row.remaining_energy_kwh, row.energy_need_kwh,
-        raw.energy_to_target_kwh, raw.energy_needed_kwh, raw.remaining_energy_kwh, raw.energy_need_kwh
+        planning.energy_to_target_kwh,planning.energy_needed_kwh,planning.remaining_energy_kwh,planning.energy_need_kwh,
+        row.energy_to_target_kwh,row.energy_needed_kwh,row.remaining_energy_kwh,row.energy_need_kwh,
+        raw.energy_to_target_kwh,raw.energy_needed_kwh,raw.remaining_energy_kwh,raw.energy_need_kwh
       ));
-      const plannedToday = asNumber(firstDefined(planning.planned_today_kwh, row.planned_today_kwh, raw.planned_today_kwh));
-      const plannedTomorrow = asNumber(firstDefined(planning.planned_tomorrow_kwh, row.planned_tomorrow_kwh, raw.planned_tomorrow_kwh));
-      const stillToPlan = asNumber(firstDefined(planning.still_to_plan_kwh, planning.remaining_need_kwh, planning.unresolved_horizon_kwh, row.still_to_plan_kwh, raw.still_to_plan_kwh));
-      const planningLabel = firstDefined(planning.user_state_label, planning.product_state, planning.status, planning.state, '');
-      const area = this.energyAssetAreaLabel(asset);
-      const facts = [
-        ['Power now', fmtKw(currentPower,'—')],
-        energyNeed !== null ? ['Required', fmtKwh(energyNeed)] : null,
-        plannedToday !== null ? ['Planned today', fmtKwh(plannedToday)] : null,
-        stillToPlan !== null ? ['Still to plan', fmtKwh(stillToPlan)] : null,
-        planningLabel ? ['Plan', human(planningLabel)] : null
-      ].filter(Boolean).slice(0,5);
-      const details = `${this.kv('Availability', human(availability))}${this.kv('Health', health)}${this.kv('Current power', fmtKw(currentPower, '—'))}${this.kv('Requested power', fmtKw(requestedPower, '—'))}${energyNeed !== null ? this.kv('Energy needed',fmtKwh(energyNeed)) : ''}${plannedToday !== null ? this.kv('Planned today',fmtKwh(plannedToday)) : ''}${plannedTomorrow !== null ? this.kv('Planned tomorrow',fmtKwh(plannedTomorrow)) : ''}${stillToPlan !== null ? this.kv('Still to plan',fmtKwh(stillToPlan)) : ''}${this.kv('Automation', human(firstDefined(row.automation_mode, raw.automation_mode, 'Advice')))}${relation ? this.kv('Relationship', relation) : ''}${this.energyAssetDetailDisclosure(rt,asset)}`;
-      return `<article class="managedAssetCard"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${area ? `${escapeHtml(area)} · ` : ''}${escapeHtml(state)} · ${escapeHtml(health)}</span></div></div><b>${fmtKw(currentPower, '—')}</b></div><div class="managedAssetFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>${relation ? `<div class="managedAssetRelationship"><small>Connected via</small><b>${escapeHtml(relation)}</b></div>` : ''}<div class="managedAssetStory"><p>${escapeHtml(reason)}</p><div><small>What Home Intelligence will do</small><b>${escapeHtml(recommendation)}</b></div></div>${actions ? `<div class="managedAssetActions">${actions}</div>` : ''}${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}</article>`;
+      const plannedToday = asNumber(firstDefined(planning.planned_today_kwh,row.planned_today_kwh,raw.planned_today_kwh,null));
+      const stillToPlan = asNumber(firstDefined(planning.still_to_plan_kwh,planning.remaining_need_kwh,row.still_to_plan_kwh,raw.still_to_plan_kwh,null));
+      const readyBy = String(firstDefined(planning.ready_by,planning.deadline_time,row.ready_by,raw.ready_by,'') || '').trim();
+      const chargerId = String(firstDefined(asset.effective_charger,asset.charger_asset_id,asset.connection_asset_id,asset.execution_target_asset_id,'') || '');
+      const chargerDisplay = String(firstDefined(
+        asset.effective_charger_display_name,
+        asset.charger_display_name,
+        asset.connection_display_name,
+        asset.physical_connection_display_name,
+        chargerId ? rt.assetName(chargerId) : '',
+        ''
+      ) || '').trim();
+      const relation = chargerId ? (chargerDisplay || 'Charger unavailable') : '';
+      const requestedRow = this.flexiblePropertyRow(rt,id,['requested_charge_power_kw','requested_power_kw','energy_control_requested_power_kw','target_power_kw','setpoint_power_kw','charge_power_setpoint_kw']);
+      const requested = rowValue(requestedRow,null) ?? row.requested_power_kw ?? raw.requested_power_kw ?? null;
+      const requestedControl = requestedRow && !requestedRow.missing && this.isWritableRow(requestedRow)
+        ? this.editablePropertyControl(requestedRow,{title:'Requested charge power',description:'Charging power requested from this asset.',type:'range',fallbackValue:requested,immediateWrite:true})
+        : '';
+      const actions = rt.commandActionModelsForAsset(id).filter(action=>['start','stop','pause','resume'].includes(action.role) && action.visible && action.enabled);
+      const keyFacts = [
+        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
+        readyBy ? ['Ready by',human(readyBy)] : null,
+        plannedToday !== null ? ['Planned today',fmtKwh(plannedToday)] : null,
+        stillToPlan !== null ? ['Still to plan',fmtKwh(stillToPlan)] : null
+      ].filter(Boolean).slice(0,4);
+      const configuration = requestedControl
+        ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${requestedControl}</div></details>`
+        : '';
+      const detailRows = [
+        relation ? ['Connection',relation] : null,
+        requested !== null ? ['Requested power',fmtKw(requested,'—')] : null,
+        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
+        plannedToday !== null ? ['Planned today',fmtKwh(plannedToday)] : null,
+        stillToPlan !== null ? ['Still to plan',fmtKwh(stillToPlan)] : null
+      ].filter(Boolean);
+      const details = detailRows.length
+        ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
+        : '';
+      const diagnostics = `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid"><span><small>Asset id</small><b>${escapeHtml(id)}</b></span><span><small>Health</small><b>${escapeHtml(human(firstDefined(asset.health,asset.lifecycle_state,asset.status,'Unknown')))}</b></span>${requestedControl ? '' : `<span><small>Requested charge power</small><b>${escapeHtml(requestedRow && !requestedRow.missing ? (requestedRow.editable_reason || 'Read-only') : 'Not published')}</b></span>`}</div></details>`;
+      return `<article class="managedAssetCard compactManagedAsset"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${escapeHtml(state)}${relation ? ` · ${escapeHtml(relation)}` : ''}</span></div></div><b>${escapeHtml(fmtKw(currentPower,'—'))}</b></div>
+        ${keyFacts.length ? `<div class="managedAssetFacts">${keyFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>` : ''}
+        ${actions.length ? `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${actions.map(action=>this.componentActionModelButton(action)).join('')}</div></div>` : ''}
+        <div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div>
+      </article>`;
     }
 
     filterAndSortConsumers(rows = []) {
