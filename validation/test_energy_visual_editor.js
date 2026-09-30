@@ -48,3 +48,9 @@ if (context.globalThis.rhiEnergyVisualCatalogForType('grid_connection').length !
 }
 
 console.log('PASS canonical Energy appearance editor with physical-only catalog and backend persistence');
+
+
+const coreVendor = fs.readFileSync('src/vendor/rhi-ux-core.js','utf8');
+if (!coreVendor.includes('.rhiUxVisualChoiceImage{width:104px;height:68px')) throw new Error('UX Core 1.5.4 must own bounded visual choice geometry');
+if (!cardSource.includes('pendingAppearanceByAsset') || !cardSource.includes('reconcilePendingAppearances')) throw new Error('Energy appearance selection must remain pending until authoritative readback');
+if (!cardSource.includes('assetVisualAppearance')) throw new Error('Appearance action must be rendered consistently inside the image zone');
