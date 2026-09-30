@@ -10,7 +10,8 @@
 - Keep infrastructure-only charger fallbacks outside managed consumer/planning product surfaces.
 - Retain UX Core 1.5.4 as the authoritative appearance-picker geometry and shared presentation primitive.
 
-Coordinated candidate baseline:
+## Coordinated candidate baseline
+
 - Foundation **F1.8.35**
 - Mobility **M0.10.24**
 - Energy **E0.15.86**
