@@ -1389,6 +1389,14 @@
         this.render();
         return;
       }
+      const settingsTopic = event.target.closest('[data-settings-topic-profile]');
+      if (settingsTopic && !settingsTopic.disabled) {
+        this.selectedStrategyProfileId = settingsTopic.dataset.settingsTopicProfile || '';
+        this.persistInteractionContext();
+        this._forceRender = true;
+        this.render();
+        return;
+      }
       const strategyEdit = event.target.closest('[data-strategy-edit]');
       if (strategyEdit && !strategyEdit.disabled) { this.strategyEditProfileId = strategyEdit.dataset.strategyEdit || ''; this.render(); return; }
       const strategyCancel = event.target.closest('[data-strategy-cancel]');
@@ -4153,6 +4161,16 @@
     }
     profileKind(profile = {}) {
       return String(profile.profile_id || profile.strategy_profile_id || profile.profile_type || profile.asset_type || '').toLowerCase();
+    }
+    profileSettingsTopic(profile = {}) {
+      const key = `${this.profileKind(profile)} ${profile.display_name || ''} ${profile.label || ''}`.toLowerCase();
+      if (/vehicle|ev|charging/.test(key)) return 'EV charging';
+      if (/battery|storage/.test(key)) return 'Battery';
+      if (/solar|surplus/.test(key)) return 'Solar';
+      if (/grid|tariff|price|pricing/.test(key)) return 'Grid & tariffs';
+      if (/resilience/.test(key)) return 'Home & resilience';
+      if (/home|generic|flexible/.test(key)) return 'Home & priorities';
+      return this.profileUserLabel(profile);
     }
     profileUserLabel(profile = {}) {
       const explicit = firstDefined(profile.user_label, profile.profile_user_label, profile.display_label, profile.profile_label, profile.display_name, profile.name, profile.label, '');
