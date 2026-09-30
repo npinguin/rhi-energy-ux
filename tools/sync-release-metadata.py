@@ -51,6 +51,7 @@ manifest["version"] = version
 manifest["stage"] = product["stage"]
 manifest["energy_contract"] = product["contract"]
 manifest["minimum_backend"] = product["minimum_backend"]
+manifest["tested_backend_baseline"] = product["tested_backend"]
 manifest["runtime_artifact"] = product["runtime_artifact"]
 manifest["runtime_checksum_artifact"] = product["runtime_checksum_artifact"]
 manifest["package_manifest"] = product["package_manifest"]

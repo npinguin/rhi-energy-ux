@@ -1,3 +1,10 @@
+## 4.3.20 — CORE_1_5_4_STRUCTURAL_CLOSURE
+
+- publish the merged Core 1.5.4 appearance/picker lifecycle and structural Energy UX closure under a new immutable candidate;
+- align release status, compatibility and tested backend to Energy E0.15.85;
+- preserve backend ownership for remaining #139 planning/connection semantics;
+- prevent post-tag package drift from remaining under v4.3.19.
+
 ## 4.3.19 — physical visual library
 
 - limits asset visuals to physical user-world Energy concepts;
