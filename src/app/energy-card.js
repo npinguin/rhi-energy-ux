@@ -5426,36 +5426,55 @@
         byKey.set(key, { ...(byKey.get(key) || {}), ...objectFrom(row), property_key:key });
       });
       const rows = [...byKey.values()];
-      const objectiveRows = rows.filter(row => /objective|goal|mode|solar_policy|grid_policy|battery_policy/i.test(row.property_key));
-      const constraintRows = rows.filter(row => /reserve|minimum|maximum|limit|deadline|priority|resilience|threshold/i.test(row.property_key));
-      const optimisationRows = rows.filter(row => !objectiveRows.includes(row) && !constraintRows.includes(row));
       const valueText = row => {
         const value = firstDefined(row.effective_value,row.value,row.configured_value,row.selected_value,row.current_value,null);
-        if (value === null) return 'Not published';
+        if (value === null || value === undefined || value === '') return 'Not published';
         return this.genericValueWithUnit(value, firstDefined(row.unit,row.native_unit,''));
       };
-      const rowMarkup = row => `<div class="planningTransparencyRow"><div><b>${escapeHtml(human(row.label || row.name || row.property_key))}</b><span>${escapeHtml(row.profile_id ? human(row.profile_id) : 'Effective strategy')}</span></div><strong>${escapeHtml(valueText(row))}</strong></div>`;
-      const section = (title, description, items) => `<section class="panel"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p><div class="effectivePolicyList">${items.length ? items.map(rowMarkup).join('') : '<div class="empty"><b>No values published</b><span>The canonical strategy contract does not currently publish values for this section.</span></div>'}</div></section>`;
+      const topicFor = row => {
+        const text = `${row.property_key || ''} ${row.profile_id || ''} ${row.profile_type || ''} ${row.asset_type || ''}`.toLowerCase();
+        if (/resilience|essential|shed/.test(text)) return 'Resilience';
+        if (/vehicle|ev|charging|deadline/.test(text)) return 'EV charging';
+        if (/battery|reserve|storage/.test(text)) return 'Battery';
+        if (/solar|surplus/.test(text)) return 'Solar';
+        if (/grid|tariff|price|pricing|import|export/.test(text)) return 'Grid & tariffs';
+        return 'Home & priorities';
+      };
+      const topicOrder = ['Home & priorities','Battery','EV charging','Solar','Grid & tariffs','Resilience'];
+      const grouped = new Map(topicOrder.map(topic=>[topic,[]]));
+      rows.forEach(row => {
+        const topic = topicFor(row);
+        if (!grouped.has(topic)) grouped.set(topic,[]);
+        grouped.get(topic).push(row);
+      });
+      const topicCards = [...grouped.entries()].filter(([,items])=>items.length).map(([topic,items]) => {
+        const lines = items.slice(0,8).map(row => {
+          const label = this.profileFieldLabel(row);
+          return `<div class="strategicBehaviorRow"><span>${escapeHtml(label)}</span><b>${escapeHtml(valueText(row))}</b></div>`;
+        }).join('');
+        return `<section class="panel strategicBehaviorCard"><h2>${escapeHtml(topic)}</h2><div class="strategicBehaviorRows">${lines}</div></section>`;
+      }).join('');
+
+      const modeRow = rows.find(row=>/automation.*mode|energy.*automation.*mode|operating.*mode/i.test(String(row.property_key || ''))) || null;
+      const objectiveRow = rows.find(row=>/primary.*objective|home.*objective/i.test(String(row.property_key || ''))) || null;
+      const mode = modeRow ? valueText(modeRow) : this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'),'Advice');
+      const objective = objectiveRow ? valueText(objectiveRow) : '';
+      const posture = [mode,objective].filter(value=>value && value!=='Not published').join(' · ');
       const model = {
         ...base,
         image:hbEnergyHeroAsset('strategic-planning'),
         title:'Strategic Planning',
-        explanation:'Longer-term goals, constraints and optimisation policy.',
+        explanation:'What your current Energy settings mean for longer-term behavior.',
         metrics:[
-          ['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'),'Automatic'),'Current control mode'],
-          ['◇','Objectives',String(objectiveRows.length),'Published strategic goals and policies'],
-          ['◫','Constraints',String(constraintRows.length),'Published limits and resilience constraints'],
-          ['↗','Tactical horizon','D0 / D1','Scheduling remains owned by Tactical Planning']
+          ['◎','Strategy',posture || 'Not published','Current longer-term posture'],
+          ['◇','Topics',String([...grouped.values()].filter(items=>items.length).length),'Policy areas currently influencing strategy'],
+          ['↗','Tactical horizon','D0 / D1','Today and tomorrow remain in Tactical Planning']
         ]
       };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}
-        <div class="strategicPlanningPage">
-          <section class="panel strategicPlanningIntro"><h2>Strategic posture</h2><p>Strategy configuration is the authority for longer-term intent. This view is read-only: edit intent in Settings; Tactical Planning owns today/tomorrow scheduling and Operational Planning owns execution.</p></section>
-          <div class="strategyGrid">
-            ${section('Goals & policy','What Home Intelligence is trying to optimise over time.',objectiveRows)}
-            ${section('Constraints & resilience','Boundaries that planning must respect.',constraintRows)}
-          </div>
-          ${optimisationRows.length ? section('Other effective policy','Additional effective strategy values currently influencing planning.',optimisationRows) : ''}
+        <div class="strategicPlanningPage strategicBehaviorPage">
+          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not published')}</h2><p>This is the read-only meaning of your current Settings. Change intent in Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
+          <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No strategic behavior published</b><span>Current Energy settings do not expose strategic values yet.</span></div></section>'}</div>
         </div>`;
     }
 
