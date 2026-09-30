@@ -29,6 +29,7 @@ expected = {
     "manifest.version": manifest.get("version") == version,
     "manifest.contract": manifest.get("energy_contract") == product["contract"],
     "manifest.minimum_backend": manifest.get("minimum_backend") == product["minimum_backend"],
+    "manifest.tested_backend": manifest.get("tested_backend_baseline") == product["tested_backend"],
     "manifest.stage": manifest.get("stage") == product["stage"],
     "status.version": status.get("source_candidate_version") == version,
     "status.contract": status.get("contract") == product["contract"],
