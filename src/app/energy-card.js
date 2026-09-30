@@ -3424,30 +3424,37 @@
       return `<button type="button" class="energyAppearanceAction" data-energy-visual-open="${escapeHtml(id)}">Appearance</button>`;
     }
 
-    energyDeviceStatusCard(rt, asset = {}, roleLabel = '') {
+    energyDeviceStatusCard(rt, asset = {}, roleLabel = '', childrenHtml = '') {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
       const type = String(firstDefined(enriched.asset_type,enriched.object_class,'device') || 'device');
       const facts = this.energyAssetFacts(rt,enriched,5);
-      const projection = id ? rt.assetProjection(id) : null;
-      const lifecycle = String(firstDefined(projection?.lifecycle?.state, enriched.health, enriched.status, '') || '');
-      const availability = String(firstDefined(enriched.availability_state,enriched.connection_state,'') || '');
-      const unavailable = /unavailable|offline|disconnected|failed/i.test(`${availability} ${lifecycle}`);
-      const degraded = /degraded|warning|attention|incomplete/i.test(lifecycle);
-      const statusLabel = unavailable ? 'Unavailable' : degraded ? 'Needs attention' : lifecycle && !/unknown/i.test(lifecycle) ? human(lifecycle) : 'Available';
+      const stateFact = facts.find(row => /^(state|status|direction)$/i.test(String(row.label || ''))) || null;
+      const measuredPower = this.measuredAssetPower(enriched);
+      const solarLike = /solar|inverter|panel|optimizer/.test(type);
+      const primaryState = stateFact?.value
+        || (solarLike && measuredPower !== null ? (measuredPower > 0.005 ? 'Producing' : 'Idle') : '')
+        || '';
       const area = this.energyAssetAreaLabel(enriched);
       const parentId = this.energyAssetParentId(enriched);
       const parentName = parentId ? String(rt.assetName(parentId) || '').trim() : '';
       const relation = parentName ? `<span class="energyDeviceRelation"><small>Part of</small><b>${escapeHtml(parentName)}</b></span>` : '';
       const actions = this.assetQuickActions(rt,id,3);
-      const details = facts.length
-        ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
-        : `<span><small>Operational data</small><b>Telemetry not published</b></span>`;
+      const keyFacts = facts.filter(row => !/^(state|status)$/i.test(String(row.label || ''))).slice(0,4);
+      const keyProperties = keyFacts.length
+        ? keyFacts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
+        : `<span><small>Energy state</small><b>${escapeHtml(primaryState || 'Unavailable')}</b></span>`;
+      const configuration = this.energyAssetConfigurationDisclosure(rt,enriched);
+      const details = this.energyAssetDetailDisclosure(rt,enriched);
+      const diagnostics = this.energyAssetDiagnosticsDisclosure(rt,enriched);
+      const children = childrenHtml
+        ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children</summary><div class="energyAssetFoldBody energyAssetChildrenBody">${childrenHtml}</div></details>`
+        : '';
       return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
         <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
-        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div><div class="energyDeviceTopActions"><span class="energyDeviceState">${escapeHtml(statusLabel)}</span>${this.energyAppearanceAction(rt,enriched)}</div></div>
-        <div class="energyDeviceFacts">${details}${relation}</div>${actions}${this.energyAssetDetailDisclosure(rt,enriched)}</div>
+        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div>${primaryState ? `<div class="energyDeviceTopActions"><span class="energyDeviceState">${escapeHtml(primaryState)}</span></div>` : ''}</div>
+        <div class="energyDeviceFacts">${keyProperties}${relation}</div>${actions}<div class="energyAssetFoldStack">${configuration}${details}${diagnostics}${children}</div></div>
       </article>`;
     }
 
