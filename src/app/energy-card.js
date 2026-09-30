@@ -3059,61 +3059,64 @@
     operationalLoadCard(rt, load, recommendation, targetId) {
       const id = load.asset_id;
       const actionModels = rt.commandActionModelsForAsset(id).filter(action => ['start','stop','pause','resume'].includes(action.role));
-      const actionByRole = role => actionModels.find(action => action.role === role) || null;
-      const startCommand = actionByRole('start')?.command || null;
-      const stopCommand = actionByRole('stop')?.command || null;
-      const pauseCommand = actionByRole('pause')?.command || null;
-      const resumeCommand = actionByRole('resume')?.command || null;
-      const actionButtons = actionModels.map(action => this.componentActionModelButton(action)).join('');
-      const charger = load.effective_charger ? rt.assetName(load.effective_charger) : (load.parent_asset_id ? rt.assetName(load.parent_asset_id) : human(load.flexible_role || load.energy_asset_role || 'Flexible load'));
-      const requestedRow = this.flexiblePropertyRow(rt, id, ['requested_charge_power_kw', 'requested_power_kw', 'energy_control_requested_power_kw', 'target_power_kw', 'setpoint_power_kw', 'charge_power_setpoint_kw']);
-      const requestedEffectiveRow = this.flexiblePropertyRow(rt, id, ['requested_power_kw_effective']);
-      const requested = rowValue(requestedRow, null) ?? rowValue(requestedEffectiveRow, null) ?? load.requested_charge_power_kw ?? load.requested_power_kw ?? load.requested_power_kw_effective ?? load.min_power_kw;
+      const enabledActions = actionModels.filter(action => action.visible && action.enabled);
+      const unavailableActions = actionModels.filter(action => action.visible && !action.enabled);
+      const requestedRow = this.flexiblePropertyRow(rt, id, ['requested_charge_power_kw','requested_power_kw','energy_control_requested_power_kw','target_power_kw','setpoint_power_kw','charge_power_setpoint_kw']);
+      const requestedEffectiveRow = this.flexiblePropertyRow(rt,id,['requested_power_kw_effective']);
+      const requested = rowValue(requestedRow,null) ?? rowValue(requestedEffectiveRow,null) ?? load.requested_charge_power_kw ?? load.requested_power_kw ?? load.requested_power_kw_effective ?? null;
       const planning = load.energy_planning || rt.planningOutcomeFor(id) || {};
       if (this.isDisabledFlexibleAsset(rt, load, planning)) return this.disabledFlexibleAssetCard(rt, load, planning);
-      const powerKw = load.power_kw;
-      const energyNeed = load.energy_to_target_kwh ?? this.targetEnergyValue(rt, id, load);
-      const detailsId = `operational-load-${id}`;
-      const connection = this.flexibleConnectionLabel(rt, load, id);
-      const planningView = this.planningDisplayFor(rt, load, id, planning, powerKw, energyNeed);
-      const eta = this.etaDisplayFor(planning);
-      const automation = this.automationDisplayFor(rt, load, id);
-      const requestedControl = requestedRow && !requestedRow.missing
-        ? this.editablePropertyControl(requestedRow, { title:'Requested charge power', description:'Maximum charging power requested from this device.', type:'range', fallbackValue:requested, immediateWrite:true })
+      const powerKw = asNumber(firstDefined(load.actual_power_kw,load.current_power_kw,load.power_kw,null));
+      const energyNeed = asNumber(load.energy_to_target_kwh ?? this.targetEnergyValue(rt,id,load));
+      const plannedTodayKwh = asNumber(firstDefined(planning.planned_today_kwh,planning.today_planned_kwh,null));
+      const connection = this.flexibleConnectionLabel(rt,load,id);
+      const planningView = this.planningDisplayFor(rt,load,id,planning,powerKw,energyNeed);
+      const explicitState = String(firstDefined(load.operating_state,load.current_status,'') || '');
+      const liveState = explicitState ? human(explicitState) : (powerKw === null ? 'Not measured' : powerKw > 0.05 ? 'Active' : 'Idle');
+      const nextActionRaw = String(firstDefined(planning.what_text,planning.next_action_label,planning.next_action,'') || '').trim();
+      const nextAction = nextActionRaw && !/^none$/i.test(nextActionRaw) ? human(nextActionRaw) : '';
+      const reasonRaw = String(firstDefined(planning.why_text,planning.user_reason_label,planning.reason_label,planning.reason,planning.reason_code,'') || '').trim();
+      const reason = reasonRaw && !/^(none|no explanation available\.?|no explanation published\.?)$/i.test(reasonRaw) ? humanReason(reasonRaw,'') : '';
+      const requestedControl = requestedRow && !requestedRow.missing && this.isWritableRow(requestedRow)
+        ? this.editablePropertyControl(requestedRow,{title:'Requested charge power',description:'Charging power requested from this asset.',type:'range',fallbackValue:requested,immediateWrite:true})
         : '';
-      const priority = this.priorityControl(rt, load, id);
-      const whyHint = planningView.sub || human(planning.blocked_reason || load.availability_reason || '');
-      const showWhy = this.isMeaningfulPrimaryValue(planningView.why, { allowZero: true }) || this.isMeaningfulPrimaryValue(whyHint, { allowZero: true });
-      const showEta = this.isMeaningfulPrimaryValue(eta.main, { allowZero: true });
-      const showExpected = this.isMeaningfulPrimaryValue(planningView.expected, { allowZero: true });
-      const cardFlags = `${showWhy ? '' : ' noWhy'}${showEta ? '' : ' noEta'}${showExpected ? '' : ' noExpected'}`;
-      const infoBanner = connection.hint ? `<div class="loadNotice"><span>ⓘ</span><b>${escapeHtml(connection.label)}</b><em>${escapeHtml(connection.hint)}</em></div>` : '';
-      const publishedMaxPower = asNumber(requestedRow?.max ?? requestedRow?.maximum ?? this.validationMeta(requestedRow).max);
-      const maxPowerText = publishedMaxPower !== null ? fmtKw(publishedMaxPower) : '';
-      const commandAvailability = actionModels
-        .filter(action => action.visible && !action.enabled)
-        .map(action => `<span><b>${escapeHtml(action.label || human(action.role))}:</b> ${escapeHtml(humanReason(action.reason, 'Currently unavailable'))}</span>`)
-        .join('');
-      const powerAvailability = requestedControl && this.isWritableRow(requestedRow) ? '' : ((!requestedRow || requestedRow.missing) ? '<span>Requested charge power is not published.</span>' : `<span><b>Requested power:</b> ${escapeHtml(requestedRow.editable_reason || 'Requested charge power is currently read-only.')}</span>`);
-      const controlAvailability = commandAvailability || powerAvailability ? `<div class="controlAvailability">${commandAvailability}${powerAvailability}</div>` : '';
-      const plannedTodayKwh = asNumber(planning.planned_today_kwh);
-      const nextAction = String(firstDefined(planning.what_text, planning.next_action_label, planning.next_action, planningView.state, 'Wait'));
-      const canonicalWhy = String(firstDefined(planning.why_text, planning.user_reason_label, planning.reason_label, planningView.why, whyHint, 'No explanation published.'));
-      const liveState = human(firstDefined(load.operating_state, load.current_status, 'Unavailable'));
-      const priorityLabel = human(firstDefined(load.priority_label, load.energy_control_priority, 'Normal'));
-      const operationalStatus = this.canonicalOperationalStatus(rt, load, planning);
-      const exceptional = operationalStatus.exceptional === true;
-      const conformanceKnown = operationalStatus.exceptional !== null;
-      const sourceAssetPath = rt.sourceAssetNavigation(load);
-      const sourceAssetLink = sourceAssetPath
-        ? `<button type="button" class="action sourceAssetLink" data-source-asset-nav="${escapeHtml(sourceAssetPath)}">Open source asset</button>`
+      const priority = this.priorityControl(rt,load,id);
+      const configurationBody = [requestedControl,priority].filter(Boolean).join('');
+      const configuration = configurationBody
+        ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${configurationBody}</div></details>`
         : '';
-      return `<article class="flexLoadCard solarLoadRow ${exceptional?'exceptional':''}">
-        <div class="solarLoadSummary"><div class="solarLoadIdentity">${this.assetVisual(load,{size:'sm',fallbackIcon:this.flexibleAssetIcon(load)})}<div><div class="solarLoadName"><h3>${escapeHtml(load.display_name || human(id))}</h3><span class="priorityBadge">${escapeHtml(priorityLabel)}</span></div><small><i class="dot green"></i>${escapeHtml(connection.label)}</small></div></div>
-        <div class="solarLoadFact"><small>Now / live</small><b>${escapeHtml(liveState)}</b><span>${fmtKw(powerKw,'—')}</span></div><div class="solarLoadFact"><small>Next action</small><b class="nextActionBadge">${escapeHtml(nextAction)}</b></div><div class="solarLoadFact"><small>Power target</small><b>${fmtKw(requested,'—')}</b></div><div class="solarLoadFact"><small>Planned today</small><b>${fmtKwh(plannedTodayKwh,'—')}</b></div><div class="solarLoadFact solarLoadWhy"><small>Why / reason</small><b>${escapeHtml(canonicalWhy)}</b></div><div class="solarLoadFact"><small>Status</small><b class="planStatusBadge ${exceptional?'exception':(conformanceKnown?'ok':'unknown')}">${exceptional?'Exceptional !':(conformanceKnown?'No published exception':'Status unavailable')}</b></div></div>
-        <div class="solarLoadControls"><div class="requestedSlot"><small class="controlTitle">Requested charge power</small>${requestedControl || `<label class="sliderField unavailable"><div><span>Requested charge power</span><b>—</b></div><input type="range" disabled></label>`}${maxPowerText ? `<em class="maxPowerHint">${escapeHtml(maxPowerText)}</em>` : ''}</div>${actionButtons ? `<div class="loadActions decisionActions"><span>Manual intervention</span>${actionButtons}</div>` : ''}</div>${controlAvailability}${infoBanner}<div class="loadDetailsFull">${this.componentDetailsBlock(detailsId, 'Details', `${this.kv('Planning', human(planning.state || '—'))}${this.kv('Why', canonicalWhy)}${this.kv('Asset id', id)}${sourceAssetLink}`)}</div>
+      const detailsRows = [
+        ['Connection',connection.label || 'Unavailable'],
+        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
+        plannedTodayKwh !== null ? ['Planned today',fmtKwh(plannedTodayKwh)] : null,
+        nextAction ? ['Next action',nextAction] : null,
+        reason ? ['Reason',reason] : null
+      ].filter(Boolean);
+      const details = detailsRows.length
+        ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailsRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
+        : '';
+      const diagnosticRows = [
+        ['Asset id',id],
+        ...unavailableActions.map(action=>[`${action.label || human(action.role)} command`,humanReason(action.reason,'Unavailable')]),
+        requestedControl ? null : ['Requested charge power',requestedRow && !requestedRow.missing ? (requestedRow.editable_reason || 'Read-only') : 'Not published']
+      ].filter(Boolean);
+      const diagnostics = `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${diagnosticRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`;
+      const actions = enabledActions.length
+        ? `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${enabledActions.map(action=>this.componentActionModelButton(action)).join('')}</div></div>`
+        : '';
+      const keyFacts = [
+        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
+        plannedTodayKwh !== null ? ['Planned today',fmtKwh(plannedTodayKwh)] : null,
+        requested !== null ? ['Power target',fmtKw(requested,'—')] : null,
+        nextAction ? ['Next action',nextAction] : null
+      ].filter(Boolean).slice(0,4);
+      return `<article class="flexLoadCard compactOperationalLoad">
+        <div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(load,{size:'sm',fallbackIcon:this.flexibleAssetIcon(load)})}<div><h3>${escapeHtml(load.display_name || human(id))}</h3><span>${escapeHtml(liveState)}${connection.label ? ` · ${escapeHtml(connection.label)}` : ''}</span></div></div><b>${escapeHtml(fmtKw(powerKw,'—'))}</b></div>
+        ${keyFacts.length ? `<div class="managedAssetFacts">${keyFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>` : ''}
+        ${actions}<div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div>
       </article>`;
     }
+
     energyAssetContext(rt, asset = {}) {
       const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
       const context = id && typeof readEnergyAssetContext === 'function'
