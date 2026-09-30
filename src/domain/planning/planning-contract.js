@@ -40,8 +40,8 @@
     });
     const buckets = planningRows(firstDefined(horizon.buckets, horizon.timeline, horizon.rows))
       .map((row,index)=>({ bucket_id:row?.bucket_id || row?.id || `bucket_${index+1}`, ...planningObject(row) }));
-    const planningObjects = planningRows(v2.layers?.planning_objects);
-    const planningAssets = planningObjects.filter(row => String(row.asset_id || row.target_asset_id || ''));
+    const planningAssets = planningRows(planning.assets)
+      .filter(row => String(row.asset_id || row.target_asset_id || ''));
     const planningAssetsById = Object.fromEntries(planningAssets.map(row => [String(row.asset_id || row.target_asset_id), planningObject(row)]));
     const d0 = planningObject(horizonsById.D0);
     const d1 = planningObject(horizonsById.D1);
