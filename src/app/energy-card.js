@@ -5365,32 +5365,35 @@
       const totalNeed = asNumber(canonicalTotals.flexible_required_kwh);
       const totalPlanned = asNumber(canonicalTotals.flexible_planned_kwh);
       const remainingNeed = asNumber(canonicalTotals.flexible_still_to_plan_kwh);
+      const displayNeed = vm.complete ? totalNeed : null;
+      const displayPlanned = vm.complete ? totalPlanned : null;
+      const displayRemaining = vm.complete ? remainingNeed : null;
       const planStatus = String(firstDefined(vm.currentActionIntent.action_state, vm.currentActionIntent.state, vm.summary.plan_status, vm.horizon.status, vm.horizon.state, vm.complete?'available':'unavailable'));
       const confidence = firstDefined(vm.quality.confidence, vm.horizon.confidence, 'Limited');
       const statusLabel = /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
       const plannedTotals = assetTotals.map(item => `<span class="planningFooterAsset">${this.assetVisual(item.asset,{size:'xs',fallbackIcon:this.planningAssetIcon(item.asset)})}<b>${escapeHtml(this.planningAssetName(item.asset))}</b> ${item.plannedEnergy===null?'—':item.plannedEnergy.toFixed(1)+' kWh'}</span>`).join('');
       const summaryItems = vm.horizonId === 'D1'
-        ? [['Need entering tomorrow',totalNeed],['Planned tomorrow',totalPlanned],['Still after tomorrow',remainingNeed]]
-        : [['Need entering today',totalNeed],['Planned today',totalPlanned],['Still after today',remainingNeed]];
+        ? [['Need entering tomorrow',displayNeed],['Planned tomorrow',displayPlanned],['Still after tomorrow',displayRemaining]]
+        : [['Need entering today',displayNeed],['Planned today',displayPlanned],['Still after today',displayRemaining]];
       const summaryTotals = `<div class="planningAggregateTotals">${summaryItems.map(([label,value])=>`<span><small>${label}</small><b>${value===null?'—':value.toFixed(1)+' kWh'}</b></span>`).join('')}</div>`;
       const disclosure = firstDefined(vm.rows.find(row=>row.disclosure)?.disclosure, vm.quality.basis ? `Planning basis: ${human(vm.quality.basis)}. Actual execution follows the current operational intent.` : 'Future buckets are advisory. Actual execution follows the current operational intent.');
       const balanceLabel = sourceTotal===null || useTotal===null ? 'Planning balance unavailable' : `${sourceTotal.toFixed(1)} kWh source · ${useTotal.toFixed(1)} kWh use${balanceDelta===null?'':` · Δ ${balanceDelta.toFixed(3)} kWh`}`;
-      const heroValue = totalPlanned===null ? '—' : totalPlanned.toFixed(1)+' kWh';
+      const heroValue = displayPlanned===null ? '—' : displayPlanned.toFixed(1)+' kWh';
       const planningHeader = {
         image:hbEnergyHeroAsset('solar-generation'),
         icon:'▣',
         eyebrow:'Tactical planning',
         title:`${horizonLabel} plan`,
         value:heroValue,
-        unit:totalNeed===null?'planned flexible energy':`of ${totalNeed.toFixed(1)} kWh flexible need`,
-        explanation:remainingNeed===null?'Remaining need is unavailable.':`${remainingNeed.toFixed(1)} kWh still needs a suitable opportunity.`,
+        unit:displayNeed===null?'planned flexible energy':`of ${displayNeed.toFixed(1)} kWh flexible need`,
+        explanation:displayRemaining===null?'Remaining need is unavailable.':`${displayRemaining.toFixed(1)} kWh still needs a suitable opportunity.`,
         tone:'purple',
         badgeText:vm.contractSupported ? statusLabel : 'Unavailable',
         badgeTone:vm.contractSupported && vm.complete ? 'ok' : 'attention',
         metrics:[
-          ['◎',vm.horizonId === 'D1' ? 'Need entering tomorrow' : 'Need entering today',fmtKwh(totalNeed,'—'),horizonLabel],
-          ['▣',vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today',fmtKwh(totalPlanned,'—'),horizonLabel],
-          ['◷',vm.horizonId === 'D1' ? 'Still after tomorrow' : 'Still after today',fmtKwh(remainingNeed,'—'),'Horizon-local residual'],
+          ['◎',vm.horizonId === 'D1' ? 'Need entering tomorrow' : 'Need entering today',fmtKwh(displayNeed,'—'),horizonLabel],
+          ['▣',vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today',fmtKwh(displayPlanned,'—'),horizonLabel],
+          ['◷',vm.horizonId === 'D1' ? 'Still after tomorrow' : 'Still after today',fmtKwh(displayRemaining,'—'),'Horizon-local residual'],
           ['✓','Confidence',this.productStateLabel(confidence,'Limited'),'Planning confidence']
         ]
       };
@@ -5399,12 +5402,19 @@
       const nextLines = assetTotals.map(item => this.assetIdentityChip(item.asset,fmtKw(firstDefined(item.asset.requested_power_kw,item.asset.requested_charge_power_kw,item.asset.requested_power_kw_effective),'—'))).join('');
       const planningLoadRows = assetTotals.map(item => {
         const canonical=item.canonical||{};
-        const priority=human(firstDefined(item.asset.energy_control_priority,item.asset.priority_label,'Normal'));
-        const next=String(firstDefined(canonical.what_text,canonical.next_action_label,canonical.next_action,canonical.today_label,'Wait'));
-        const why=String(firstDefined(canonical.why_text,canonical.reason_label,'No explanation published.'));
-        const eligibility = canonical.planning_eligible === true ? 'Planning ready' : String(firstDefined(canonical.user_status, item.asset.user_status, 'Not eligible'));
-        const planStatus = firstDefined(canonical.planning_status, canonical.plan_conformance_label, canonical.exception_label, canonical.risk_label, eligibility);
-        return `<article class="planningLoadRow"><div class="planningLoadIdentity">${this.assetVisual(item.asset,{size:'sm',fallbackIcon:this.planningAssetIcon(item.asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(item.asset))}</b><span class="priorityBadge">${escapeHtml(priority)}</span></div><small>${escapeHtml(eligibility)}</small></div></div><div><small>Next action</small><b class="nextActionBadge">${escapeHtml(next)}</b></div><div><small>Requested power</small><b>${fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')}</b></div><div><small>${vm.horizonId==='D1'?'Planned tomorrow':'Planned today'}</small><b>${fmtKwh(item.plannedEnergy,'—')}</b></div><div><small>Why / reason</small><b>${escapeHtml(why)}</b></div><div><small>Plan status</small><b class="planStatusBadge ${/at.?risk|blocked|failed|incomplete/i.test(String(planStatus))?'exception':'unknown'}">${escapeHtml(planStatus)}</b></div></article>`;
+        const nextRaw=String(firstDefined(canonical.what_text,canonical.next_action_label,canonical.next_action,canonical.today_label,'') || '').trim();
+        const next=nextRaw && !/^(wait|none)$/i.test(nextRaw) ? human(nextRaw) : '';
+        const whyRaw=String(firstDefined(canonical.why_text,canonical.reason_label,canonical.reason,'') || '').trim();
+        const why=whyRaw && !/^(none|no explanation available\.?|no explanation published\.?)$/i.test(whyRaw) ? humanReason(whyRaw,'') : '';
+        const eligibility = canonical.planning_eligible === true ? 'Planning ready' : String(firstDefined(canonical.user_status,item.asset.user_status,'Incomplete'));
+        const planStatus = firstDefined(canonical.planning_status,canonical.plan_conformance_label,canonical.exception_label,canonical.risk_label,eligibility);
+        const facts=[
+          ['Requested power',fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')],
+          [vm.horizonId==='D1'?'Planned tomorrow':'Planned today',fmtKwh(item.plannedEnergy,'—')],
+          next ? ['Next action',next] : null,
+          why ? ['Reason',why] : null
+        ].filter(Boolean);
+        return `<article class="planningLoadRow compactPlanningLoad"><div class="planningLoadIdentity">${this.assetVisual(item.asset,{size:'sm',fallbackIcon:this.planningAssetIcon(item.asset)})}<div><b>${escapeHtml(this.planningAssetName(item.asset))}</b><small>${escapeHtml(eligibility)}</small></div></div><div class="compactPlanningFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div><b class="planStatusBadge ${/at.?risk|blocked|failed|incomplete/i.test(String(planStatus))?'exception':'unknown'}">${escapeHtml(planStatus)}</b></article>`;
       }).join('');
       const incompletePlanningRows = asArray(vm.assets).filter(asset => asset && asset.planning_input_ready === false).map(asset => { const blockers=asArray(asset.planning_blockers); const userReason=blockers.includes('target_soc_not_configured')?'Set a target charge level.':blockers.includes('ready_by_not_configured')?'Set a ready-by time.':blockers.includes('charger_not_assigned')?'Assign a charger.':'Charging information is incomplete.'; return `<article class="planningLoadRow planningInputIncomplete"><div class="planningLoadIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.planningAssetIcon(asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(asset))}</b></div><small>${escapeHtml(userReason)}</small></div></div><div><small>Current charge</small><b>${fmtPct(asset.current_soc_pct)}</b></div><div><small>Target</small><b>${fmtPct(asset.target_soc_pct)}</b></div><div><small>Ready by</small><b>${escapeHtml(asset.ready_by || 'Not set')}</b></div><div><small>Charging power</small><b>${fmtKw(asset.max_power_kw,'—')}</b></div><div><small>Status</small><b class="planStatusBadge exception">Needs setup</b></div></article>`; }).join('');
       return `${this.tabExperienceHeader(rt,'planning',planningHeader)}
