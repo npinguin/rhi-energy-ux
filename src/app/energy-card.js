@@ -3640,13 +3640,27 @@
       const assignedArrayIds = new Set(inverters.flatMap(inverter => stringsForInverter(inverter).map(array=>String(firstDefined(array.asset_id,array.id,'')||''))));
       const unassignedArrays = arrays.filter(array => !assignedArrayIds.has(String(firstDefined(array.asset_id,array.id,'')||'')));
       const inverterSection = this.solarInverterSystem(rt,inverters,stringsForInverter,panelsFor,optimizersFor,unassignedArrays);
-      const productionBody = [
-        production.length ? `<div class="solarProductionLead">${this.solarProductionRepresentative(rt)}<div class="energyDeviceGrid solarProductionAggregate">${production.map(asset=>this.energyDeviceStatusCard(rt,asset,'Solar production')).join('')}</div></div>` : '',
-        inverterSection
-      ].join('');
+      const aggregate = production[0] || null;
+      let productionBody = inverterSection;
+      if (aggregate) {
+        const enriched = this.energyAssetContext(rt,aggregate);
+        const aggregateFacts = this.energyAssetFacts(rt,enriched,5).filter(row=>!/^(state|status)$/i.test(String(row.label || ''))).slice(0,4);
+        const aggregateStateFact = this.energyAssetFacts(rt,enriched,6).find(row=>/^(state|status)$/i.test(String(row.label || ''))) || null;
+        const aggregatePower = this.measuredAssetPower(enriched);
+        const aggregateState = aggregateStateFact?.value || (aggregatePower !== null ? (aggregatePower > 0.005 ? 'Producing' : 'Idle') : '');
+        const children = inverterSection
+          ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children · ${inverters.length}</summary><div class="energyAssetFoldBody energyAssetChildrenBody">${inverterSection}</div></details>`
+          : '';
+        productionBody = `<article class="solarProductionObject">
+          <div class="solarProductionRepresentativeWrap">${this.solarProductionRepresentative(rt)}</div>
+          <div class="solarProductionObjectBody"><div class="solarProductionObjectHead"><div><small>SOLAR PRODUCTION</small><h3>${escapeHtml(firstDefined(enriched.display_name,enriched.name,'Solar Production'))}</h3></div>${aggregateState ? `<b>${escapeHtml(aggregateState)}</b>` : ''}</div>
+          <div class="energyDeviceFacts">${aggregateFacts.map(row=>`<span><small>${escapeHtml(row.label)}</small><b>${escapeHtml(row.value)}</b></span>`).join('') || '<span><small>Production</small><b>Unavailable</b></span>'}</div>
+          <div class="energyAssetFoldStack">${this.energyAssetConfigurationDisclosure(rt,enriched)}${this.energyAssetDetailDisclosure(rt,enriched)}${this.energyAssetDiagnosticsDisclosure(rt,enriched)}${children}</div></div>
+        </article>`;
+      }
       const productionSection = productionBody ? this.solarHardwareSection(
         'Solar Production',
-        'Aggregate production followed by the physical inverter → string → optimizer/panel hierarchy.',
+        'Current production with the physical hierarchy available under Children.',
         productionBody,
         `${inverters.length} inverter${inverters.length===1?'':'s'}`,
         'solar-production-detail'
