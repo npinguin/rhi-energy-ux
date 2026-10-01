@@ -1,6 +1,6 @@
 # RHI Energy UX 4.3.22 — LITERAL_PRODUCT_UX_CLOSURE
 
-UX-only release on the unchanged Energy E0.15.86 product contract.
+UX-only release consuming the coordinated Energy E0.15.87 and Mobility M0.10.25 product-truth contracts.
 
 - enforce the compact object grammar: Visual → Key properties / Quick Actions → Configuration → Details → Diagnostics → Children;
 - keep Children last and remove technical/raw property dumps from Details;
