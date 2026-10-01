@@ -1,3 +1,12 @@
+## 4.3.22 — LITERAL_PRODUCT_UX_CLOSURE
+
+- enforce the shared compact object shell and fold order;
+- adopt UX Core 1.5.5 bounded appearance-picker behavior;
+- make Settings topic-first and Strategic Planning consequence-first;
+- keep Flow/Consumers/Planning asset-scoped and remove ambiguous global commands;
+- keep unknown measurements unknown and raw identifiers out of product copy;
+- fold Solar physical hierarchy under Children and separate product Details from Diagnostics.
+
 ## 4.3.21 — RELEASE_RECOVERY_INTEGRITY_CLOSURE
 
 - consume Energy E0.15.86 canonical planning participants instead of structural planning objects;

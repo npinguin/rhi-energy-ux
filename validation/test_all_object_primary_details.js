@@ -45,20 +45,22 @@ for (const phrase of [
 ]) assert.ok(app.includes(phrase), "missing primary fact "+phrase);
 
 assert.match(facts,/valueAtPath\(asset, path\)/, "primary facts must consume explicit published asset values when the indexed field is not materialized");
-assert.doesNotMatch(facts,/display_name|friendly_name|asset_id.*match|includes\(name/i, "primary fact resolution must not infer semantics from names");
+assert.doesNotMatch(facts,/friendly_name|asset_id.*match|includes\(name/i, "primary fact resolution must not infer semantics from names");
+assert.match(facts,/presentation\?\.role === 'key'/, "primary facts must prefer backend-owned key-property presentation role");
 
 const device = method("energyDeviceStatusCard");
 assert.match(device,/energyAssetAreaLabel/);
 assert.match(device,/Part of/);
-assert.match(device,/Telemetry not published/);
 assert.match(device,/energyAssetDetailDisclosure/);
+assert.match(device,/energyAssetDiagnosticsDisclosure/);
+assert.doesNotMatch(device,/Telemetry not published/,"telemetry availability belongs in Diagnostics, not primary object truth");
 assert.doesNotMatch(device,/Asset id.*energyDeviceFacts/);
 
 const consumer = method("consumerExplorerCard");
-for (const token of ["Energy needed","Planned today","Still to plan","Connected via","energyAssetAreaLabel"]) {
+for (const token of ["Energy needed","Planned today","Still to plan","Connection","energyAssetFoldStack","energyAssetDiagnostics"]) {
   assert.ok(consumer.includes(token), "managed asset primary grammar missing "+token);
 }
-assert.match(consumer,/energyAssetDetailDisclosure/);
+assert.doesNotMatch(consumer,/rt\.assetName\(chargerId\)/,"managed asset relationship must not fall back to raw charger id");
 
 const battery = method("battery");
 for (const token of ["Power now","Available energy","Capacity","Reserve","Health","energyAssetDetailDisclosure"]) {

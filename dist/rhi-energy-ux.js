@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.21';
+  const UX_VERSION = 'R4.3.22';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
@@ -1900,6 +1900,13 @@ function readEnergyCommandContract(gateway) {
       this._effectiveStrategies=[...byGroup.values()];
       return this._effectiveStrategies;
     }
+    strategyBehaviorTopics() {
+      const v2=this.publicV2();
+      return asArray(v2.configuration?.strategy?.behavior_topics)
+        .map(row=>objectFrom(row))
+        .filter(row=>row.topic_id)
+        .sort((a,b)=>(asNumber(a.display_order) ?? 999) - (asNumber(b.display_order) ?? 999));
+    }
     effectiveStrategyFor(assetId) {
       return this.effectiveStrategyRows().find(row => String(row.asset_id || '') === String(assetId || '')) || null;
     }
@@ -2547,10 +2554,10 @@ class FlexibleAssetDomainModel {
   }
 
   // ---- src/vendor/rhi-ux-core.js ----
-/* RHI UX Core 1.5.4 */
-// RHI UX Core 1.5.4 — build-time presentation primitives only.
+/* RHI UX Core 1.5.5 */
+// RHI UX Core 1.5.5 — build-time presentation primitives only.
 // No domain semantics or Home Assistant contract/entity knowledge belongs here.
-const RHI_UX_CORE_VERSION = "1.5.4";
+const RHI_UX_CORE_VERSION = "1.5.5";
 const RHI_UX_COMPANY_LOGO_SVG = "<svg viewBox=\"75 116 1624 688\" role=\"img\" aria-labelledby=\"title desc\">\n<title id=\"title\">Robotix.be</title>\n<desc id=\"desc\">DomotiX · Network · Security</desc>\n<path fill=\"#0B4C86\" fill-rule=\"evenodd\" d=\"M536,549 L516,554 L512,556 L501,558 L497,560 L497,609 L512,608 L513,607 L525,606 L537,603 L537,551ZM1698,698 L1696,696 L1692,695 L1678,695 L1677,694 L1658,694 L1657,693 L1638,693 L1637,692 L1618,692 L1617,691 L1573,690 L1572,689 L1552,689 L1551,688 L1524,688 L1523,687 L1494,687 L1493,686 L1447,685 L1446,684 L1441,684 L1440,683 L1441,682 L1440,679 L1440,636 L1419,633 L1418,632 L1397,630 L1396,629 L1381,628 L1380,627 L1364,625 L1362,623 L1362,542 L1360,539 L1334,531 L1327,530 L1313,525 L1310,525 L1293,519 L1262,511 L1255,508 L1245,506 L1211,495 L1201,493 L1175,484 L1172,484 L1148,476 L1145,476 L1122,468 L1115,467 L1092,459 L1085,458 L1076,454 L1059,450 L1049,446 L1036,443 L1033,441 L1030,441 L1013,435 L1006,434 L997,430 L987,428 L964,420 L957,419 L944,414 L941,414 L928,409 L925,409 L909,403 L906,403 L890,397 L887,397 L867,404 L857,406 L848,410 L832,414 L819,419 L809,421 L784,430 L781,430 L771,434 L761,436 L752,440 L749,440 L721,450 L714,451 L683,462 L680,462 L639,476 L623,480 L620,482 L614,483 L601,488 L598,488 L595,490 L583,493 L573,497 L563,496 L562,495 L554,495 L547,499 L538,508 L343,571 L342,572 L342,638 L338,640 L332,640 L321,643 L315,643 L314,644 L309,644 L301,646 L300,648 L300,683 L296,685 L252,686 L251,687 L231,687 L230,688 L210,688 L209,689 L191,689 L190,690 L170,690 L169,691 L152,691 L151,692 L135,692 L134,693 L82,695 L81,696 L77,696 L76,700 L78,701 L121,701 L122,702 L299,704 L300,705 L300,729 L302,732 L306,733 L315,733 L316,734 L334,735 L335,736 L360,738 L361,739 L371,739 L372,740 L380,740 L381,741 L400,742 L401,743 L408,743 L409,744 L417,744 L418,745 L427,745 L428,746 L436,746 L437,747 L453,748 L454,749 L472,750 L473,751 L489,752 L490,753 L514,755 L515,756 L522,756 L523,757 L558,760 L559,761 L591,764 L599,766 L607,766 L608,767 L625,768 L632,770 L657,772 L665,774 L691,776 L692,777 L698,777 L706,779 L713,779 L714,780 L721,780 L729,782 L752,784 L753,785 L765,786 L766,787 L781,788 L789,790 L812,792 L813,793 L819,793 L820,794 L826,794 L827,795 L833,795 L841,797 L848,797 L849,798 L855,798 L856,799 L862,799 L870,801 L884,802 L885,801 L906,799 L907,798 L913,798 L914,797 L920,797 L921,796 L927,796 L928,795 L934,795 L935,794 L941,794 L942,793 L948,793 L949,792 L955,792 L956,791 L962,791 L970,789 L985,788 L986,787 L992,787 L999,785 L1006,785 L1007,784 L1035,781 L1036,780 L1042,780 L1050,778 L1057,778 L1058,777 L1065,777 L1066,776 L1072,776 L1080,774 L1103,772 L1104,771 L1112,771 L1113,770 L1127,769 L1128,768 L1149,766 L1150,765 L1157,765 L1165,763 L1173,763 L1174,762 L1190,761 L1191,760 L1205,759 L1213,757 L1223,757 L1224,756 L1256,753 L1257,752 L1264,752 L1265,751 L1272,751 L1273,750 L1316,746 L1324,744 L1332,744 L1333,743 L1341,743 L1342,742 L1350,742 L1351,741 L1359,741 L1360,740 L1369,740 L1370,739 L1378,739 L1379,738 L1387,738 L1388,737 L1398,737 L1399,736 L1416,735 L1417,734 L1424,734 L1425,733 L1434,733 L1440,731 L1440,708 L1441,707 L1440,706 L1442,704 L1513,704 L1514,703 L1524,703 L1527,704 L1528,703 L1657,702 L1658,701 L1695,701ZM1408,720 L1404,722 L1400,721 L1400,652 L1399,651 L1384,649 L1383,648 L1377,648 L1376,647 L1369,647 L1368,646 L1349,644 L1349,726 L1348,727 L1341,727 L1340,728 L1333,728 L1332,729 L1314,730 L1313,729 L1313,640 L1307,638 L1278,635 L1277,634 L1271,634 L1263,632 L1224,628 L1224,738 L1222,740 L1189,743 L1188,744 L1180,744 L1179,745 L1171,745 L1170,746 L1163,746 L1162,747 L1139,749 L1138,750 L1131,750 L1130,751 L1122,751 L1121,752 L1114,752 L1113,753 L1096,754 L1095,753 L1095,611 L1071,608 L1070,607 L1048,605 L1047,604 L1040,604 L1039,603 L1033,603 L1032,602 L1026,602 L1025,601 L1019,601 L1011,599 L1003,599 L995,597 L972,595 L971,594 L959,593 L958,592 L954,592 L953,593 L953,772 L951,774 L937,775 L936,776 L908,779 L900,781 L893,781 L885,783 L877,783 L876,782 L862,781 L861,780 L855,780 L847,778 L840,778 L839,777 L817,775 L816,774 L807,774 L806,773 L800,773 L799,772 L793,772 L785,770 L778,770 L777,769 L770,769 L769,768 L762,768 L761,767 L739,765 L738,764 L730,764 L729,763 L729,606 L714,607 L706,609 L676,612 L675,613 L661,614 L660,615 L646,616 L645,617 L631,618 L630,619 L623,619 L622,620 L622,750 L621,751 L588,748 L587,747 L571,746 L570,745 L562,745 L561,744 L552,744 L551,743 L544,743 L537,741 L537,631 L536,630 L507,633 L506,634 L500,634 L499,635 L485,636 L484,637 L476,638 L476,735 L475,736 L466,736 L465,735 L465,644 L464,643 L464,639 L402,648 L402,729 L401,730 L364,727 L361,725 L361,661 L364,659 L370,659 L371,658 L377,658 L378,657 L394,655 L395,654 L395,650 L394,649 L362,653 L361,654 L355,654 L354,655 L340,656 L339,657 L327,658 L326,659 L318,659 L317,660 L313,660 L312,659 L312,655 L322,652 L342,650 L355,647 L393,643 L406,640 L413,640 L414,639 L420,639 L421,638 L434,637 L435,636 L441,636 L449,634 L456,634 L457,633 L463,633 L471,631 L479,631 L480,630 L492,629 L493,628 L509,627 L510,626 L530,624 L536,622 L552,621 L553,620 L576,618 L583,616 L607,614 L608,613 L615,613 L616,612 L624,612 L632,610 L640,610 L648,608 L671,606 L672,605 L701,602 L702,601 L709,601 L710,600 L716,600 L717,599 L723,599 L731,597 L739,597 L747,595 L755,595 L762,593 L770,593 L771,592 L792,590 L800,588 L832,585 L833,584 L861,581 L862,580 L879,579 L880,578 L887,578 L888,577 L898,577 L906,579 L915,579 L916,580 L923,580 L924,581 L956,584 L963,586 L979,587 L986,589 L1002,590 L1003,591 L1031,594 L1039,596 L1046,596 L1054,598 L1062,598 L1063,599 L1069,599 L1076,601 L1083,601 L1084,602 L1090,602 L1098,604 L1106,604 L1107,605 L1113,605 L1114,606 L1120,606 L1121,607 L1127,607 L1135,609 L1143,609 L1144,610 L1166,612 L1167,613 L1181,614 L1189,616 L1197,616 L1198,617 L1210,618 L1211,619 L1218,619 L1219,620 L1233,621 L1234,622 L1242,622 L1243,623 L1272,626 L1273,627 L1279,627 L1287,629 L1312,631 L1313,632 L1319,632 L1320,633 L1339,635 L1340,636 L1347,636 L1354,638 L1362,638 L1363,639 L1369,639 L1376,641 L1404,644 L1408,646ZM885,440 L886,441 L886,560 L883,562 L875,562 L869,564 L861,564 L853,566 L846,566 L845,567 L817,570 L816,569 L816,460 L819,458 L822,458 L826,456 L829,456 L833,454 L836,454 L840,452 L843,452 L847,450 L858,448 L875,442ZM1339,551 L1339,612 L1338,613 L1338,620 L1337,621 L1332,620 L1330,617 L1330,589 L1331,588 L1331,578 L1330,577 L1331,559 L1330,558 L1330,554 L1316,549 L1283,541 L1276,538 L1269,537 L1251,531 L1248,531 L1248,606 L1246,608 L1238,608 L1237,607 L1230,607 L1222,605 L1215,605 L1214,604 L1208,604 L1207,603 L1201,603 L1200,602 L1194,602 L1193,601 L1187,601 L1186,600 L1180,600 L1172,598 L1149,596 L1142,594 L1135,594 L1128,592 L1086,587 L1085,586 L1066,584 L1065,583 L1058,583 L1057,582 L1035,580 L1034,579 L1021,578 L1020,577 L1014,577 L1013,576 L1007,576 L999,574 L992,574 L991,573 L985,573 L977,571 L963,570 L959,568 L959,524 L958,523 L958,509 L959,508 L959,455 L958,454 L958,448 L955,448 L941,443 L920,438 L891,429 L885,429 L860,437 L843,441 L823,448 L820,448 L813,451 L799,454 L786,459 L779,460 L766,465 L749,469 L743,472 L743,579 L741,581 L709,585 L708,586 L702,586 L701,587 L695,587 L694,588 L688,588 L687,589 L666,591 L665,592 L657,592 L656,593 L650,593 L649,594 L643,594 L635,596 L620,597 L612,599 L604,599 L603,598 L603,583 L602,582 L602,578 L603,577 L603,546 L602,545 L603,543 L603,523 L602,522 L602,513 L600,513 L556,527 L553,527 L543,531 L526,535 L488,548 L485,548 L482,550 L482,564 L480,566 L444,575 L440,577 L429,579 L425,581 L421,581 L414,584 L411,584 L395,589 L395,625 L396,626 L404,624 L416,623 L417,622 L423,622 L424,621 L451,618 L458,616 L464,616 L470,614 L478,614 L479,613 L489,612 L490,611 L490,556 L493,554 L522,547 L543,540 L545,547 L545,599 L544,600 L545,607 L543,609 L525,611 L518,613 L504,614 L503,615 L497,615 L496,616 L477,618 L476,619 L464,620 L463,621 L456,621 L455,622 L429,625 L428,626 L422,626 L421,627 L389,631 L388,632 L376,633 L375,634 L369,634 L362,636 L358,635 L358,583 L360,581 L372,578 L391,571 L394,571 L429,559 L432,559 L435,557 L444,555 L466,547 L469,547 L491,539 L494,539 L506,534 L509,534 L542,523 L545,523 L551,520 L564,517 L577,512 L580,512 L587,509 L590,509 L597,506 L610,503 L616,500 L636,495 L665,485 L679,482 L689,478 L692,478 L728,466 L735,465 L778,451 L785,450 L798,445 L818,440 L828,436 L848,431 L861,426 L870,424 L873,422 L884,420 L887,418 L913,426 L916,426 L926,430 L933,431 L936,433 L957,438 L999,451 L1006,452 L1023,458 L1030,459 L1033,461 L1065,469 L1085,476 L1092,477 L1099,480 L1120,485 L1130,489 L1141,491 L1147,494 L1182,503 L1212,513 L1231,517 L1265,528 L1268,528 L1272,530 L1303,538 L1309,541 L1316,542 L1326,546 L1336,548ZM1248,241 L1248,281 L1249,282 L1295,282 L1296,281 L1296,241 L1295,240 L1249,240ZM1493,178 L1490,184 L1487,195 L1487,246 L1488,247 L1489,255 L1493,263 L1498,270 L1503,274 L1515,280 L1523,282 L1533,282 L1534,283 L1640,282 L1641,280 L1641,250 L1640,246 L1549,246 L1546,245 L1541,240 L1540,237 L1541,234 L1639,234 L1641,226 L1641,198 L1640,197 L1640,191 L1635,178 L1625,167 L1618,163 L1602,159 L1526,159 L1525,160 L1517,161 L1505,166ZM1540,201 L1548,193 L1581,193 L1584,194 L1589,199 L1590,206 L1589,207 L1582,207 L1581,208 L1545,208 L1540,206ZM998,159 L995,161 L995,281 L996,282 L1049,282 L1049,160 L1048,159ZM1059,159 L1059,162 L1114,221 L1105,232 L1062,276 L1059,280 L1059,282 L1126,282 L1150,257 L1160,266 L1174,282 L1241,282 L1241,280 L1190,226 L1187,221 L1243,163 L1244,161 L1243,159 L1178,159 L1151,187 L1125,159 L1119,159 L1118,158 L1117,159ZM865,177 L852,165 L842,161 L834,160 L833,159 L819,159 L818,158 L815,159 L749,159 L748,160 L740,161 L728,166 L715,179 L712,185 L709,196 L709,245 L713,258 L718,266 L725,273 L737,279 L749,282 L831,282 L832,281 L841,280 L853,275 L866,262 L870,254 L872,246 L873,203 L872,202 L871,190ZM765,202 L770,198 L775,196 L805,196 L806,197 L810,197 L816,202 L819,211 L819,231 L816,239 L813,242 L804,245 L777,245 L768,242 L763,236 L763,230 L762,229 L762,211ZM514,177 L508,170 L499,164 L482,159 L456,159 L455,158 L446,158 L445,159 L392,159 L375,164 L365,171 L359,178 L353,193 L353,199 L352,200 L352,240 L353,241 L354,252 L358,261 L372,275 L385,280 L395,281 L396,282 L476,282 L477,281 L483,281 L491,279 L505,272 L513,264 L517,257 L520,248 L520,242 L521,241 L521,197 L520,196 L519,188ZM408,204 L414,198 L420,196 L450,196 L457,198 L463,204 L465,209 L465,232 L463,237 L457,243 L449,245 L422,245 L414,243 L409,239 L406,231 L406,210ZM894,134 L894,158 L893,159 L877,159 L876,160 L876,196 L893,196 L894,197 L894,247 L895,248 L896,257 L901,268 L911,277 L924,282 L929,282 L930,283 L965,283 L966,282 L980,281 L982,279 L982,245 L981,244 L959,245 L954,243 L951,240 L949,234 L949,197 L950,196 L979,196 L979,160 L978,159 L950,159 L949,158 L949,122 L948,121 L924,127 L920,127 L912,130 L899,132ZM134,122 L134,281 L135,282 L191,282 L192,281 L192,230 L193,229 L223,229 L272,282 L345,282 L343,277 L338,273 L295,227 L312,223 L323,217 L333,206 L336,199 L338,191 L338,155 L336,147 L332,139 L324,130 L315,125 L306,122 L289,121 L288,120 L137,120ZM192,163 L193,162 L266,162 L271,164 L275,168 L277,173 L277,178 L275,183 L271,187 L266,189 L193,189 L192,188ZM1311,117 L1310,118 L1310,260 L1311,261 L1310,263 L1310,280 L1311,282 L1358,282 L1362,272 L1372,279 L1383,282 L1435,282 L1448,279 L1458,274 L1467,265 L1471,258 L1474,247 L1474,240 L1475,239 L1474,193 L1471,183 L1465,173 L1458,167 L1451,163 L1435,159 L1390,159 L1375,163 L1366,169 L1365,168 L1365,118 L1364,117ZM1366,200 L1373,196 L1407,196 L1413,198 L1418,203 L1420,209 L1420,232 L1419,233 L1419,237 L1415,242 L1407,245 L1373,245 L1368,243 L1365,239 L1365,202ZM995,118 L995,151 L1049,151 L1049,117 L996,117ZM533,118 L533,281 L534,282 L582,282 L583,276 L585,272 L591,277 L597,280 L605,281 L606,282 L658,282 L674,278 L684,272 L690,266 L697,251 L698,239 L699,238 L699,229 L698,228 L698,193 L697,192 L697,188 L692,177 L684,168 L673,162 L661,159 L613,159 L600,162 L589,169 L588,168 L588,118 L587,117 L534,117ZM593,197 L596,196 L630,196 L638,199 L643,206 L643,234 L641,239 L638,242 L629,245 L598,245 L591,243 L588,239 L588,203Z\"/>\n<path fill=\"#5B95C8\" fill-rule=\"evenodd\" d=\"M1143,328 L1137,334 L1136,337 L1137,342 L1140,346 L1144,348 L1150,348 L1156,343 L1157,340 L1156,333 L1150,328ZM594,328 L588,334 L588,341 L593,347 L601,348 L607,344 L609,338 L608,334 L602,328ZM1591,313 L1590,314 L1609,341 L1609,360 L1617,360 L1618,359 L1618,341 L1635,317 L1636,313 L1635,312 L1628,312 L1614,331 L1612,330 L1605,319 L1599,312 L1598,313ZM1539,312 L1537,314 L1538,321 L1551,321 L1552,322 L1552,358 L1553,360 L1561,360 L1562,359 L1562,322 L1563,321 L1576,321 L1577,320 L1577,313 L1576,312ZM1519,312 L1512,313 L1512,360 L1520,360 L1521,358 L1521,314ZM1453,312 L1452,313 L1452,360 L1460,360 L1461,359 L1461,343 L1462,342 L1469,342 L1483,360 L1492,360 L1493,359 L1481,343 L1482,341 L1487,339 L1490,336 L1492,331 L1492,324 L1489,318 L1484,314 L1477,312ZM1461,322 L1462,321 L1478,321 L1482,324 L1483,329 L1478,334 L1462,334 L1461,333ZM1391,313 L1391,347 L1394,354 L1398,358 L1405,361 L1418,361 L1424,359 L1428,356 L1432,348 L1432,313 L1431,312 L1425,312 L1423,314 L1423,346 L1419,351 L1414,353 L1408,353 L1402,349 L1400,344 L1400,313 L1399,312ZM1273,313 L1273,359 L1274,360 L1308,360 L1308,352 L1283,352 L1282,351 L1282,341 L1283,340 L1305,340 L1306,339 L1306,332 L1283,332 L1282,331 L1282,322 L1283,321 L1306,321 L1308,319 L1308,314 L1306,312 L1275,312ZM1040,313 L1040,359 L1041,360 L1048,360 L1049,359 L1049,345 L1054,341 L1071,360 L1082,360 L1081,357 L1061,335 L1081,313 L1079,312 L1071,312 L1051,331 L1049,330 L1049,313 L1048,312ZM982,312 L981,313 L981,325 L980,326 L980,345 L981,346 L981,356 L980,358 L981,360 L989,360 L990,343 L991,342 L992,343 L993,342 L998,343 L1012,360 L1021,360 L1020,356 L1010,343 L1011,341 L1017,338 L1020,333 L1021,326 L1019,320 L1013,314 L1006,312ZM989,325 L991,321 L1007,321 L1011,324 L1012,328 L1006,334 L991,334 L990,333ZM832,313 L834,322 L838,332 L838,335 L847,360 L854,360 L856,358 L865,330 L867,332 L876,359 L877,360 L884,360 L885,359 L899,315 L898,312 L891,312 L890,313 L885,327 L883,337 L880,343 L870,313 L863,312 L861,314 L854,337 L851,342 L848,336 L841,313 L839,312ZM781,312 L780,313 L780,320 L781,321 L794,321 L795,322 L795,358 L796,360 L804,360 L804,329 L805,328 L805,322 L806,321 L818,321 L820,319 L820,314 L818,312ZM731,312 L729,314 L729,355 L730,356 L730,360 L765,360 L765,353 L764,352 L740,352 L739,351 L739,341 L740,340 L762,340 L763,339 L763,333 L762,332 L740,332 L739,331 L739,322 L740,321 L763,321 L765,319 L764,313 L763,312ZM664,313 L664,359 L665,360 L672,360 L673,359 L673,330 L674,329 L698,360 L707,360 L707,313 L706,312 L698,313 L698,342 L697,343 L673,312 L666,312ZM493,312 L492,314 L508,336 L491,359 L492,360 L501,360 L510,348 L515,344 L527,360 L536,360 L537,358 L521,337 L521,334 L536,315 L536,313 L535,312 L527,312 L514,328 L501,312ZM466,312 L465,313 L465,359 L466,360 L474,360 L474,312ZM410,312 L409,313 L409,319 L413,321 L423,321 L424,322 L424,359 L425,360 L432,360 L433,359 L433,322 L435,320 L436,321 L448,320 L449,319 L449,314 L448,312ZM274,313 L274,323 L273,324 L273,358 L275,360 L282,360 L283,359 L283,336 L284,335 L288,341 L296,358 L302,358 L307,350 L311,340 L313,338 L313,336 L315,334 L316,335 L316,359 L317,360 L324,360 L325,359 L325,313 L324,312 L315,312 L303,338 L299,343 L283,312 L275,312ZM139,312 L138,313 L138,359 L139,360 L161,360 L162,359 L166,359 L172,356 L179,349 L182,343 L182,330 L179,322 L172,315 L164,312ZM148,320 L163,321 L170,326 L173,333 L173,338 L171,344 L165,350 L162,351 L148,351 L147,350 L147,321ZM1344,312 L1339,314 L1330,322 L1326,332 L1327,345 L1330,351 L1338,358 L1346,361 L1357,361 L1368,356 L1371,353 L1371,351 L1366,346 L1361,350 L1354,353 L1349,353 L1343,351 L1338,346 L1336,342 L1336,331 L1338,327 L1343,322 L1348,320 L1358,321 L1365,326 L1368,325 L1371,320 L1366,315 L1359,312 L1354,312 L1353,311ZM1237,311 L1224,313 L1220,315 L1215,322 L1215,330 L1221,337 L1230,340 L1239,341 L1244,345 L1244,348 L1240,352 L1237,353 L1230,353 L1223,350 L1220,347 L1218,347 L1214,352 L1214,354 L1227,361 L1243,360 L1247,358 L1251,354 L1253,350 L1253,341 L1247,335 L1243,333 L1227,330 L1224,327 L1224,324 L1229,320 L1237,320 L1244,323 L1246,325 L1249,323 L1251,318 L1249,316ZM929,312 L922,315 L913,325 L911,331 L911,342 L915,351 L920,356 L927,360 L931,361 L946,360 L952,357 L959,350 L962,344 L962,329 L961,326 L954,317 L947,313 L939,311ZM930,321 L933,320 L944,321 L950,326 L953,333 L952,343 L943,352 L939,353 L930,352 L923,346 L920,339 L921,330 L924,325ZM355,315 L350,320 L345,330 L346,345 L352,354 L360,359 L367,361 L379,360 L387,356 L393,350 L397,340 L397,332 L394,323 L385,314 L377,311 L364,311ZM361,322 L365,320 L376,320 L381,322 L385,326 L387,330 L387,341 L385,345 L380,350 L375,352 L366,352 L358,347 L355,342 L354,333 L357,326ZM215,313 L205,322 L202,329 L201,338 L204,348 L211,356 L219,360 L230,361 L242,357 L249,351 L253,342 L253,336 L254,335 L253,334 L253,328 L250,322 L243,315 L234,311 L221,311ZM218,322 L222,320 L233,320 L237,322 L242,327 L244,332 L244,339 L241,346 L237,350 L232,352 L223,352 L217,349 L213,345 L211,340 L211,332 L213,327Z\"/>\n</svg>";
 
 function rhiUxEscape(value) {
@@ -2666,6 +2673,25 @@ function rhiUxResolveDomainAssetNavigation(domain = "", assetId = "", storage = 
 }
 
 
+function rhiUxVisualPickerStyles() {
+  return `
+.rhiUxVisualPickerBackdrop{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.44);display:grid;place-items:center;padding:20px}
+.rhiUxVisualPickerPanel{width:min(920px,94vw);max-height:min(82vh,760px);overflow:hidden;background:#fff;border:1px solid var(--rhi-color-line,#e5ebf3);border-radius:20px;box-shadow:0 30px 80px rgba(15,23,42,.24);padding:16px;box-sizing:border-box;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto;gap:10px}
+.rhiUxVisualPickerHead{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;min-height:0}
+.rhiUxVisualPickerHead small{font-size:10px;font-weight:800;letter-spacing:.12em;color:#64748b}.rhiUxVisualPickerHead h3{margin:2px 0 0;font-size:20px}.rhiUxVisualPickerHead p{margin:3px 0 0;font-size:11px;color:#64748b}
+.rhiUxVisualPickerFilters{display:flex;gap:6px;flex-wrap:wrap;margin:0;min-height:0}
+.rhiUxVisualPickerFilters button{border:1px solid #dbe3ee;background:#fff;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer}.rhiUxVisualPickerFilters button.selected{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}
+.rhiUxVisualChoiceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:142px;gap:8px;margin:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 3px 4px 1px;align-content:start}
+.rhiUxVisualChoice{height:142px;min-height:142px;max-height:142px;display:grid;grid-template-rows:86px minmax(0,1fr);gap:6px;align-items:stretch;text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:12px;padding:8px;cursor:pointer;overflow:hidden}.rhiUxVisualChoice:hover{border-color:#93c5fd;background:#f8fbff}.rhiUxVisualChoice.selected{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12);background:#f8fbff}
+.rhiUxVisualChoiceImage{width:100%;height:86px;min-width:0;min-height:86px;max-width:none;max-height:86px;display:grid;place-items:center;overflow:hidden}.rhiUxVisualChoiceImage img{display:block;width:100%;height:100%;min-width:0;min-height:0;max-width:100%;max-height:100%;object-fit:contain;object-position:center}
+.rhiUxVisualChoiceCopy{min-width:0;align-self:end}.rhiUxVisualChoiceCopy small,.rhiUxVisualChoiceCopy b,.rhiUxVisualChoiceCopy em{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rhiUxVisualChoiceCopy small{font-size:8px;color:#64748b;text-transform:uppercase}.rhiUxVisualChoiceCopy b{font-size:11px;margin-top:1px}.rhiUxVisualChoiceCopy em{font-size:9px;color:#64748b;font-style:normal;margin-top:1px}
+.rhiUxVisualPickerRefine{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px;margin:0}.rhiUxVisualPickerRefine label span{display:block;font-size:8px;color:#64748b;margin-bottom:3px}.rhiUxVisualPickerRefine select{width:100%;height:34px;border:1px solid #dbe3ee;border-radius:8px;background:#fff;padding:0 8px}
+.rhiUxVisualPickerFooter{display:flex;align-items:center;gap:8px;margin:0;padding-top:9px;border-top:1px solid #edf1f6}.rhiUxVisualPickerSpacer{flex:1}.rhiUxVisualPickerFooter button{height:34px;border:1px solid #dbe3ee;border-radius:9px;background:#fff;padding:0 12px;font-size:10px;font-weight:700}.rhiUxVisualPickerFooter button.primary{background:#0b65ea;color:#fff;border-color:#0b65ea}.rhiUxVisualPickerFooter button:disabled{opacity:.45}
+@media(max-width:900px){.rhiUxVisualChoiceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.rhiUxVisualPickerBackdrop{padding:8px}.rhiUxVisualPickerPanel{width:96vw;max-height:88vh;padding:12px}.rhiUxVisualChoiceGrid{grid-template-columns:1fr;grid-auto-rows:116px}.rhiUxVisualChoice{height:116px;min-height:116px;max-height:116px;grid-template-columns:94px minmax(0,1fr);grid-template-rows:1fr}.rhiUxVisualChoiceImage{width:94px;height:86px;min-width:94px;max-width:94px}.rhiUxVisualChoiceCopy{align-self:center}.rhiUxVisualPickerRefine{grid-template-columns:1fr 1fr}.rhiUxVisualPickerFooter{flex-wrap:wrap}}
+`;
+}
+
 function rhiUxVisualPickerShell({
   eyebrow = "Appearance",
   title = "Choose appearance",
@@ -2704,7 +2730,7 @@ function rhiUxVisualSelect({ label = "", value = "", options = [], placeholder =
 }
 
 function rhiUxCoreStyles() {
-  return "/* RHI UX Core 1.5.4 */\n:host,.rhi-ux-root{\n  --rhi-color-primary:#1467F5;\n  --rhi-color-primary-soft:#EAF3FF;\n  --rhi-color-text:#0F172A;\n  --rhi-color-muted:#64748B;\n  --rhi-color-muted-soft:#758399;\n  --rhi-color-line:#DCE5EF;\n  --rhi-color-line-soft:#EAF0F6;\n  --rhi-color-surface:#FFFFFF;\n  --rhi-color-surface-soft:#F8FAFC;\n  --rhi-color-ok:#22C55E;\n  --rhi-color-attention:#F59E0B;\n  --rhi-color-error:#B42318;\n  --rhi-color-unknown:#94A3B8;\n\n  --rhi-font-family:var(--ha-font-family-body,Roboto,Noto,sans-serif);\n  --rhi-font-family-mono:var(--ha-font-family-code,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);\n  --rhi-font-display:clamp(29px,2.55vw,42px);\n  --rhi-font-section:clamp(18px,1.4vw,22px);\n  --rhi-font-card:15px;\n  --rhi-font-body:12.5px;\n  --rhi-font-small:11px;\n  --rhi-font-label:10px;\n  --rhi-weight-regular:400;\n  --rhi-weight-medium:500;\n  --rhi-weight-strong:600;\n  --rhi-line-height-tight:1.15;\n  --rhi-line-height-body:1.42;\n\n  --rhi-space-1:4px;\n  --rhi-space-2:7px;\n  --rhi-space-3:10px;\n  --rhi-space-4:14px;\n  --rhi-space-5:18px;\n  --rhi-space-6:24px;\n  --rhi-radius-sm:9px;\n  --rhi-radius-md:12px;\n  --rhi-radius-lg:16px;\n  --rhi-radius-xl:20px;\n  --rhi-shadow-sm:0 4px 14px rgba(21,61,115,.025);\n  --rhi-shadow-md:0 7px 20px rgba(15,35,80,.035);\n  --rhi-page-max:1640px;\n  --rhi-page-pad-x:24px;\n  --rhi-page-pad-y:14px;\n  --rhi-control-h:38px;\n  --rhi-icon-action:18px;\n  --rhi-icon-status:24px;\n  --rhi-break-phone:430px;\n  --rhi-break-tablet:760px;\n  --rhi-break-desktop:1024px;\n  --rhi-domain-accent:var(--rhi-color-primary);\n\n  color:var(--rhi-color-text);\n  font-family:var(--rhi-font-family);\n  font-size:var(--rhi-font-body);\n  font-weight:var(--rhi-weight-regular);\n  line-height:var(--rhi-line-height-body);\n}\n\n.rhiUxDomainShell{\n  --rhi-nav-active-bg:var(--rhi-color-primary-soft);\n  --rhi-nav-active-border:#CFDEF1;\n  --rhi-nav-active-text:#0F4CA4;\n  position:relative;display:grid;grid-template-columns:minmax(0,1fr) clamp(190px,23%,280px);\n  width:100%;margin:0 0 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-xl);\n  background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.91));box-shadow:var(--rhi-shadow-md);overflow:hidden;\n}\n.rhiUxProductArea{min-width:0;overflow:hidden}\n.rhiUxDomainShellTop{min-height:78px;display:grid;grid-template-columns:minmax(168px,.52fr) minmax(0,1.48fr);align-items:center;gap:14px;padding:10px 22px 9px}\n.rhiUxDomainIdentity{display:grid;align-content:center;gap:2px;min-width:0;min-height:56px;padding:2px 0 0 4px}\n.rhiUxDomainIdentity span{font-size:13px;line-height:1.15;font-weight:var(--rhi-weight-regular);color:#58708F;white-space:nowrap}\n.rhiUxDomainIdentity strong{font-size:21px;line-height:1.03;letter-spacing:.045em;font-weight:var(--rhi-weight-strong);color:#0B467F;white-space:nowrap}\n.rhiUxModuleTabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;min-width:0}\n.rhiUxModuleTab,.rhiUxDomainTab{appearance:none;border:0;background:transparent;font:inherit;color:#53647D;cursor:pointer;white-space:nowrap}\n.rhiUxModuleTab{min-height:46px;border-radius:13px;padding:8px;font-size:12px;font-weight:var(--rhi-weight-medium)}\n.rhiUxModuleTab.active{background:var(--rhi-nav-active-bg);color:var(--rhi-nav-active-text);box-shadow:inset 0 0 0 1px var(--rhi-nav-active-border),0 6px 16px rgba(15,23,42,.035)}\n.rhiUxDomainShellBottom{padding:7px 22px 9px;border-top:1px solid var(--rhi-color-line-soft);background:rgba(255,255,255,.52);min-height:52px;box-sizing:border-box}\n.rhiUxDomainTabs{display:flex;align-items:center;gap:10px;min-height:34px;overflow-x:auto;scrollbar-width:none}\n.rhiUxDomainTabs::-webkit-scrollbar{display:none}\n.rhiUxDomainTab{flex:0 0 auto;min-height:34px;border-radius:11px;padding:7px 12px;font-size:11.5px;font-weight:var(--rhi-weight-medium);color:#5F6D80}\n.rhiUxDomainTab.active{background:var(--rhi-nav-active-bg);color:var(--rhi-nav-active-text);box-shadow:inset 0 0 0 1px var(--rhi-nav-active-border)}\n.rhiUxCompanyBrand{min-width:0;border-left:1px solid var(--rhi-color-line-soft);display:grid;place-items:center;padding:10px 16px;background:linear-gradient(180deg,rgba(252,254,255,.78),rgba(247,250,253,.58))}\n.rhiUxCompanyLogo{display:block;width:min(100%,250px);max-height:116px;line-height:0;overflow:hidden}\n.rhiUxCompanyLogo svg{display:block;width:100%;height:auto;max-height:116px;object-fit:contain;object-position:center}\n\n/* Canonical page stack: visual order is invariant across domains. */\n.rhiUxPageStack{display:flex;flex-direction:column}\n.rhiUxPageStack>.rhiUxPageHero{order:1}\n.rhiUxPageStack>.rhiUxStatusGrid{order:2}\n.rhiUxPageStack>.rhiUxQuickActionBar{order:3}\n\n/* Canonical page hero: image is one background layer, never a split side panel. */\n.rhiUxPageHero{\n  position:relative;display:block;height:188px;min-height:188px;overflow:hidden;\n  border:0;border-radius:var(--rhi-radius-lg);background:#fff;box-shadow:none;margin:0;\n}\n.rhiUxPageHeroCopy{\n  position:relative;z-index:4;width:min(48%,650px);max-width:none;padding:28px 18px 24px 22px;box-sizing:border-box;\n}\n.rhiUxPageHeroCopy>small{display:none}\n.rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{\n  margin:4px 0 8px;font-size:var(--rhi-font-display);line-height:1.02;letter-spacing:-.038em;\n  color:#0B1739;font-weight:var(--rhi-weight-strong);\n}\n.rhiUxPageHeroCopy p{\n  margin:0;max-width:520px;font-size:clamp(12.5px,1.05vw,15px);line-height:var(--rhi-line-height-body);\n  color:#536781;font-weight:var(--rhi-weight-regular);\n}\n.rhiUxPageHeroArt{position:absolute;z-index:1;inset:0 0 0 28%;display:block;overflow:hidden;pointer-events:none}\n.rhiUxPageHeroArt:before{\n  content:\"\";display:block;position:absolute;z-index:2;inset:0;\n  background:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.95) 8%,rgba(255,255,255,.62) 19%,rgba(255,255,255,.10) 38%,rgba(255,255,255,0) 57%);\n}\n.rhiUxPageHeroArt img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 52%;transform:none}\n\n/* One canonical page status layer. */\n.rhiUxStatusGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:7px 0 0;padding:0;border:0;background:transparent;box-shadow:none}\n.rhiUxStatusItem{\n  min-width:0;min-height:82px;display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;\n  padding:10px 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:#fff;box-shadow:var(--rhi-shadow-md);\n}\n.rhiUxStatusIcon{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:#F0F5FC;color:#355D96;font-size:18px}\n.rhiUxStatusIcon ha-icon{--mdc-icon-size:var(--rhi-icon-status)}\n.rhiUxStatusCopy{min-width:0;display:block}\n.rhiUxStatusCopy small{display:block;margin:0 0 2px;color:#476487;font-size:var(--rhi-font-label);font-weight:var(--rhi-weight-medium);line-height:1.2}\n.rhiUxStatusCopy b{display:block;margin:0 0 2px;color:var(--rhi-color-text);font-size:clamp(14px,1.12vw,17px);font-weight:var(--rhi-weight-strong);line-height:1.12;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n.rhiUxStatusCopy em{display:block;margin-top:2px;color:var(--rhi-color-muted);font-size:var(--rhi-font-small);font-style:normal;font-weight:var(--rhi-weight-regular);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n\n/* Canonical page-level quick actions. */\n.rhiUxQuickActionBar,.rhiEnergyQuickActions,.rhi-top-actions{\n  min-height:48px;padding:5px 8px;margin:7px 0 0;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);\n  background:#fff;box-shadow:var(--rhi-shadow-sm);display:flex;align-items:center;gap:7px;flex-wrap:wrap;\n}\n.rhiUxQuickActionBar>small,.rhiEnergyQuickActions>small,.rhi-top-actions-title{\n  font-size:var(--rhi-font-label);letter-spacing:.10em;text-transform:uppercase;color:#476487;\n  font-weight:var(--rhi-weight-medium);margin-right:2px;white-space:nowrap;\n}\n.rhiUxQuickActions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0}\n.rhiUxQuickAction,.rhiUxQuickActionBar button,.rhiEnergyQuickActions .hiAction,.rhi-top-action{\n  height:36px;min-height:36px;border:1px solid #D6E0EB;border-radius:9px;background:#fff;color:#125DB7;\n  box-shadow:none;font:inherit;font-size:11.5px;font-weight:var(--rhi-weight-medium);padding:0 12px;\n  display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;white-space:nowrap;\n}\n.rhiUxQuickAction.primary,.rhiUxQuickActionBar button:first-of-type,.rhiEnergyQuickActions .hiAction:first-of-type,.rhi-top-action.primary{\n  background:var(--rhi-color-primary);border-color:var(--rhi-color-primary);color:#fff;\n}\n.rhiUxQuickAction:disabled,.rhiEnergyQuickActions .hiAction:disabled,.rhi-top-action:disabled{opacity:.46}\n\n/* Canonical body grammar. */\n.rhiUxDomainBody{font-family:var(--rhi-font-family);color:var(--rhi-color-text);font-size:var(--rhi-font-body);line-height:var(--rhi-line-height-body)}\n.rhiUxDomainBody button,.rhiUxDomainBody select,.rhiUxDomainBody input,.rhiUxDomainBody textarea{font-family:inherit}\n.rhiUxPanel,.rhiUxDomainBody .panel,.rhiUxDomainBody .info,.rhiUxDomainBody .summary,.rhiUxDomainBody .ov-panel{\n  border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm);\n}\n.rhiUxPanel{padding:14px 16px}\n.rhiUxDomainBody .panel h2,.rhiUxDomainBody .info h2,.rhiUxDomainBody .summary h2,.rhiUxDomainBody .ov-panel h2{\n  font-size:var(--rhi-font-section);font-weight:var(--rhi-weight-strong);line-height:var(--rhi-line-height-tight);letter-spacing:-.02em;color:var(--rhi-color-text);\n}\n.rhiUxDomainBody .panel h3,.rhiUxDomainBody .info h3,.rhiUxDomainBody .summary h3,.rhiUxDomainBody .ov-panel h3{\n  font-size:var(--rhi-font-card);font-weight:var(--rhi-weight-strong);line-height:1.2;color:var(--rhi-color-text);\n}\n.rhiUxDomainBody .panel p,.rhiUxDomainBody .info p,.rhiUxDomainBody .summary p,.rhiUxDomainBody .ov-panel p{\n  font-size:var(--rhi-font-body);font-weight:var(--rhi-weight-regular);line-height:var(--rhi-line-height-body);color:var(--rhi-color-muted);\n}\n.rhiUxDataList{display:grid;gap:6px}\n.rhiUxDataRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 10px;border:1px solid var(--rhi-color-line-soft);border-radius:var(--rhi-radius-sm);background:var(--rhi-color-surface-soft)}\n.rhiUxState{display:grid;gap:4px;padding:14px 16px;border:1px dashed var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface-soft);color:var(--rhi-color-muted)}\n.rhiUxState b{color:var(--rhi-color-text);font-size:13px}\n.rhiUxState[data-state=\"attention\"]{border-color:#F6D48C;background:#FFFBEB}\n.rhiUxState[data-state=\"error\"]{border-color:#F1B8B4;background:#FFF7F7}\n.rhiUxConclusion{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:linear-gradient(135deg,rgba(255,255,255,.98),rgba(247,250,252,.96))}\n.rhiUxConclusion small{font-size:var(--rhi-font-label);letter-spacing:.1em;text-transform:uppercase;color:var(--rhi-color-muted)}\n.rhiUxConclusion h2{font-size:var(--rhi-font-card);line-height:1.2;margin:1px 0 2px}\n.rhiUxConclusion p{font-size:var(--rhi-font-small);line-height:1.3;margin:0;color:var(--rhi-color-muted)}\n.rhiUxTechnicalFooter{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 9px;margin:6px 0 0;padding:3px 2px 0;border-top:1px solid rgba(148,163,184,.20);color:#94A3B8;font-size:9px;line-height:1.2}\n.rhiUxTechnicalFooter span+span:before{content:\"·\";margin-right:9px;color:#CBD5E1}\n.rhiUxTechnicalFooter [data-severity=\"warning\"]{color:#B7791F;font-weight:var(--rhi-weight-strong)}\n.rhiUxTechnicalFooter [data-severity=\"error\"]{color:var(--rhi-color-error);font-weight:var(--rhi-weight-strong)}\n\n@media(max-width:1180px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:18px}\n  .rhiUxPageHero{height:174px;min-height:174px}\n  .rhiUxPageHeroCopy{width:51%;padding:24px 14px 20px 18px}\n  .rhiUxPageHeroArt{inset:0 0 0 30%}\n  .rhiUxStatusItem{grid-template-columns:40px minmax(0,1fr);padding:9px 10px;min-height:78px}\n  .rhiUxStatusIcon{width:37px;height:37px}\n}\n@media(max-width:760px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:10px;--rhi-page-pad-y:9px;--rhi-font-body:12px;--rhi-font-small:10.75px}\n  .rhiUxDomainShell{grid-template-columns:1fr}.rhiUxCompanyBrand{display:none}.rhiUxDomainShellTop{grid-template-columns:1fr;padding:10px 12px}.rhiUxDomainIdentity{min-height:auto}.rhiUxDomainShellBottom{padding:7px 12px 9px}\n  .rhiUxPageHero{height:154px;min-height:154px;border-radius:14px}\n  .rhiUxPageHeroCopy{width:59%;padding:18px 9px 16px 13px}\n  .rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{font-size:27px;letter-spacing:-.032em}\n  .rhiUxPageHeroCopy p{font-size:11px;line-height:1.32;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}\n  .rhiUxPageHeroArt{inset:0 0 0 34%}\n  .rhiUxStatusGrid{grid-template-columns:repeat(2,minmax(0,1fr))}\n  .rhiUxStatusItem{min-height:74px;grid-template-columns:34px minmax(0,1fr);gap:7px;padding:8px}\n  .rhiUxStatusIcon{width:32px;height:32px;border-radius:9px}.rhiUxStatusIcon ha-icon{--mdc-icon-size:20px}\n  .rhiUxQuickActionBar,.rhiEnergyQuickActions,.rhi-top-actions{overflow-x:auto;flex-wrap:nowrap}\n  .rhiUxQuickActionBar>small,.rhiEnergyQuickActions>small,.rhi-top-actions-title,.rhiUxQuickAction,.rhiUxQuickActionBar button,.rhiEnergyQuickActions .hiAction,.rhi-top-action{flex:0 0 auto}\n  .rhiUxConclusion{grid-template-columns:1fr}\n}\n@media(max-width:430px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:8px;--rhi-page-pad-y:8px}\n  .rhiUxPageHero{height:146px;min-height:146px}\n  .rhiUxPageHeroCopy{width:64%;padding:16px 8px 14px 11px}\n  .rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{font-size:24px}\n  .rhiUxPageHeroCopy p{font-size:10.5px;-webkit-line-clamp:2}\n  .rhiUxPageHeroArt{inset:0 0 0 38%}\n  .rhiUxStatusGrid{grid-template-columns:1fr 1fr}\n}\n\n/* Optional body/section-scoped view and filter controls. */\n.rhiUxContextBar{\n  min-height:42px;padding:4px 7px;margin:0 0 8px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);\n  background:#fff;box-shadow:var(--rhi-shadow-sm);display:flex;align-items:center;gap:7px;flex-wrap:wrap;\n}\n.rhiUxContextBar>small{\n  font-size:var(--rhi-font-label);letter-spacing:.10em;text-transform:uppercase;color:#476487;font-weight:var(--rhi-weight-medium);white-space:nowrap;\n}\n.rhiUxContextControls{display:flex;align-items:center;gap:6px;flex-wrap:wrap}\n.rhiUxContextControl{\n  min-height:32px;border:1px solid #D6E0EB;border-radius:9px;background:#fff;color:#355D96;font:inherit;font-size:11.5px;font-weight:var(--rhi-weight-medium);padding:0 11px;cursor:pointer;white-space:nowrap;\n}\n.rhiUxContextControl.active,.rhiUxContextControl[aria-pressed=\"true\"]{background:var(--rhi-color-primary-soft);border-color:#CFDEF1;color:#0F4CA4}\n.rhiUxContextControl:disabled{opacity:.46}\n@media(max-width:760px){.rhiUxContextBar{overflow-x:auto;flex-wrap:nowrap}.rhiUxContextBar>small,.rhiUxContextControls,.rhiUxContextControl{flex:0 0 auto}}\n\n/* Canonical cross-domain appearance picker. Domains own catalogs and persistence. */\n.rhiUxVisualPickerBackdrop{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.44);display:grid;place-items:center;padding:20px}\n.rhiUxVisualPickerPanel{width:min(760px,94vw);max-height:86vh;overflow:auto;background:#fff;border:1px solid var(--rhi-color-line);border-radius:20px;box-shadow:0 30px 80px rgba(15,23,42,.24);padding:18px;box-sizing:border-box}\n.rhiUxVisualPickerHead{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}\n.rhiUxVisualPickerHead small{font-size:10px;font-weight:800;letter-spacing:.12em;color:#64748b}.rhiUxVisualPickerHead h3{margin:3px 0 0;font-size:20px}.rhiUxVisualPickerHead p{margin:4px 0 0;font-size:11px;color:#64748b}\n.rhiUxVisualPickerFilters{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}\n.rhiUxVisualPickerFilters button{border:1px solid #dbe3ee;background:#fff;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer}.rhiUxVisualPickerFilters button.selected{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}\n.rhiUxVisualChoiceGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}\n.rhiUxVisualChoice{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;align-items:center;text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:14px;padding:10px;cursor:pointer;overflow:hidden}.rhiUxVisualChoice:hover{border-color:#93c5fd;background:#f8fbff}.rhiUxVisualChoice.selected{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12);background:#f8fbff}\n.rhiUxVisualChoiceImage{width:104px;height:68px;min-width:104px;min-height:68px;max-width:104px;max-height:68px;display:grid;place-items:center;overflow:hidden}.rhiUxVisualChoiceImage img{display:block;width:100%;height:100%;min-width:0;min-height:0;max-width:100%;max-height:100%;object-fit:contain;object-position:center}.rhiUxVisualChoiceCopy small,.rhiUxVisualChoiceCopy b,.rhiUxVisualChoiceCopy em{display:block}.rhiUxVisualChoiceCopy small{font-size:8px;color:#64748b;text-transform:uppercase}.rhiUxVisualChoiceCopy b{font-size:11px;margin-top:2px}.rhiUxVisualChoiceCopy em{font-size:9px;color:#64748b;font-style:normal;margin-top:2px}\n.rhiUxVisualPickerRefine{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px;margin-top:12px}.rhiUxVisualPickerRefine label span{display:block;font-size:8px;color:#64748b;margin-bottom:4px}.rhiUxVisualPickerRefine select{width:100%;height:36px;border:1px solid #dbe3ee;border-radius:8px;background:#fff;padding:0 8px}\n.rhiUxVisualPickerFooter{display:flex;align-items:center;gap:8px;margin-top:16px;padding-top:13px;border-top:1px solid #edf1f6}.rhiUxVisualPickerSpacer{flex:1}.rhiUxVisualPickerFooter button{height:36px;border:1px solid #dbe3ee;border-radius:9px;background:#fff;padding:0 12px;font-size:10px;font-weight:700}.rhiUxVisualPickerFooter button.primary{background:#0b65ea;color:#fff;border-color:#0b65ea}.rhiUxVisualPickerFooter button:disabled{opacity:.45}\n@media(max-width:760px){.rhiUxVisualChoiceGrid{grid-template-columns:1fr}.rhiUxVisualChoice{grid-template-columns:96px minmax(0,1fr)}.rhiUxVisualChoiceImage{width:96px;min-width:96px;max-width:96px}.rhiUxVisualPickerRefine{grid-template-columns:1fr 1fr}.rhiUxVisualPickerPanel{padding:14px}.rhiUxVisualPickerFooter{flex-wrap:wrap}}\n";
+  return "/* RHI UX Core 1.5.5 */\n:host,.rhi-ux-root{\n  --rhi-color-primary:#1467F5;\n  --rhi-color-primary-soft:#EAF3FF;\n  --rhi-color-text:#0F172A;\n  --rhi-color-muted:#64748B;\n  --rhi-color-muted-soft:#758399;\n  --rhi-color-line:#DCE5EF;\n  --rhi-color-line-soft:#EAF0F6;\n  --rhi-color-surface:#FFFFFF;\n  --rhi-color-surface-soft:#F8FAFC;\n  --rhi-color-ok:#22C55E;\n  --rhi-color-attention:#F59E0B;\n  --rhi-color-error:#B42318;\n  --rhi-color-unknown:#94A3B8;\n\n  --rhi-font-family:var(--ha-font-family-body,Roboto,Noto,sans-serif);\n  --rhi-font-family-mono:var(--ha-font-family-code,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);\n  --rhi-font-display:clamp(29px,2.55vw,42px);\n  --rhi-font-section:clamp(18px,1.4vw,22px);\n  --rhi-font-card:15px;\n  --rhi-font-body:12.5px;\n  --rhi-font-small:11px;\n  --rhi-font-label:10px;\n  --rhi-weight-regular:400;\n  --rhi-weight-medium:500;\n  --rhi-weight-strong:600;\n  --rhi-line-height-tight:1.15;\n  --rhi-line-height-body:1.42;\n\n  --rhi-space-1:4px;\n  --rhi-space-2:7px;\n  --rhi-space-3:10px;\n  --rhi-space-4:14px;\n  --rhi-space-5:18px;\n  --rhi-space-6:24px;\n  --rhi-radius-sm:9px;\n  --rhi-radius-md:12px;\n  --rhi-radius-lg:16px;\n  --rhi-radius-xl:20px;\n  --rhi-shadow-sm:0 4px 14px rgba(21,61,115,.025);\n  --rhi-shadow-md:0 7px 20px rgba(15,35,80,.035);\n  --rhi-page-max:1640px;\n  --rhi-page-pad-x:24px;\n  --rhi-page-pad-y:14px;\n  --rhi-control-h:38px;\n  --rhi-icon-action:18px;\n  --rhi-icon-status:24px;\n  --rhi-break-phone:430px;\n  --rhi-break-tablet:760px;\n  --rhi-break-desktop:1024px;\n  --rhi-domain-accent:var(--rhi-color-primary);\n\n  color:var(--rhi-color-text);\n  font-family:var(--rhi-font-family);\n  font-size:var(--rhi-font-body);\n  font-weight:var(--rhi-weight-regular);\n  line-height:var(--rhi-line-height-body);\n}\n\n.rhiUxDomainShell{\n  --rhi-nav-active-bg:var(--rhi-color-primary-soft);\n  --rhi-nav-active-border:#CFDEF1;\n  --rhi-nav-active-text:#0F4CA4;\n  position:relative;display:grid;grid-template-columns:minmax(0,1fr) clamp(190px,23%,280px);\n  width:100%;margin:0 0 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-xl);\n  background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.91));box-shadow:var(--rhi-shadow-md);overflow:hidden;\n}\n.rhiUxProductArea{min-width:0;overflow:hidden}\n.rhiUxDomainShellTop{min-height:78px;display:grid;grid-template-columns:minmax(168px,.52fr) minmax(0,1.48fr);align-items:center;gap:14px;padding:10px 22px 9px}\n.rhiUxDomainIdentity{display:grid;align-content:center;gap:2px;min-width:0;min-height:56px;padding:2px 0 0 4px}\n.rhiUxDomainIdentity span{font-size:13px;line-height:1.15;font-weight:var(--rhi-weight-regular);color:#58708F;white-space:nowrap}\n.rhiUxDomainIdentity strong{font-size:21px;line-height:1.03;letter-spacing:.045em;font-weight:var(--rhi-weight-strong);color:#0B467F;white-space:nowrap}\n.rhiUxModuleTabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;min-width:0}\n.rhiUxModuleTab,.rhiUxDomainTab{appearance:none;border:0;background:transparent;font:inherit;color:#53647D;cursor:pointer;white-space:nowrap}\n.rhiUxModuleTab{min-height:46px;border-radius:13px;padding:8px;font-size:12px;font-weight:var(--rhi-weight-medium)}\n.rhiUxModuleTab.active{background:var(--rhi-nav-active-bg);color:var(--rhi-nav-active-text);box-shadow:inset 0 0 0 1px var(--rhi-nav-active-border),0 6px 16px rgba(15,23,42,.035)}\n.rhiUxDomainShellBottom{padding:7px 22px 9px;border-top:1px solid var(--rhi-color-line-soft);background:rgba(255,255,255,.52);min-height:52px;box-sizing:border-box}\n.rhiUxDomainTabs{display:flex;align-items:center;gap:10px;min-height:34px;overflow-x:auto;scrollbar-width:none}\n.rhiUxDomainTabs::-webkit-scrollbar{display:none}\n.rhiUxDomainTab{flex:0 0 auto;min-height:34px;border-radius:11px;padding:7px 12px;font-size:11.5px;font-weight:var(--rhi-weight-medium);color:#5F6D80}\n.rhiUxDomainTab.active{background:var(--rhi-nav-active-bg);color:var(--rhi-nav-active-text);box-shadow:inset 0 0 0 1px var(--rhi-nav-active-border)}\n.rhiUxCompanyBrand{min-width:0;border-left:1px solid var(--rhi-color-line-soft);display:grid;place-items:center;padding:10px 16px;background:linear-gradient(180deg,rgba(252,254,255,.78),rgba(247,250,253,.58))}\n.rhiUxCompanyLogo{display:block;width:min(100%,250px);max-height:116px;line-height:0;overflow:hidden}\n.rhiUxCompanyLogo svg{display:block;width:100%;height:auto;max-height:116px;object-fit:contain;object-position:center}\n\n/* Canonical page stack: visual order is invariant across domains. */\n.rhiUxPageStack{display:flex;flex-direction:column}\n.rhiUxPageStack>.rhiUxPageHero{order:1}\n.rhiUxPageStack>.rhiUxStatusGrid{order:2}\n.rhiUxPageStack>.rhiUxQuickActionBar{order:3}\n\n/* Canonical page hero: image is one background layer, never a split side panel. */\n.rhiUxPageHero{\n  position:relative;display:block;height:188px;min-height:188px;overflow:hidden;\n  border:0;border-radius:var(--rhi-radius-lg);background:#fff;box-shadow:none;margin:0;\n}\n.rhiUxPageHeroCopy{\n  position:relative;z-index:4;width:min(48%,650px);max-width:none;padding:28px 18px 24px 22px;box-sizing:border-box;\n}\n.rhiUxPageHeroCopy>small{display:none}\n.rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{\n  margin:4px 0 8px;font-size:var(--rhi-font-display);line-height:1.02;letter-spacing:-.038em;\n  color:#0B1739;font-weight:var(--rhi-weight-strong);\n}\n.rhiUxPageHeroCopy p{\n  margin:0;max-width:520px;font-size:clamp(12.5px,1.05vw,15px);line-height:var(--rhi-line-height-body);\n  color:#536781;font-weight:var(--rhi-weight-regular);\n}\n.rhiUxPageHeroArt{position:absolute;z-index:1;inset:0 0 0 28%;display:block;overflow:hidden;pointer-events:none}\n.rhiUxPageHeroArt:before{\n  content:\"\";display:block;position:absolute;z-index:2;inset:0;\n  background:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.95) 8%,rgba(255,255,255,.62) 19%,rgba(255,255,255,.10) 38%,rgba(255,255,255,0) 57%);\n}\n.rhiUxPageHeroArt img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 52%;transform:none}\n\n/* One canonical page status layer. */\n.rhiUxStatusGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:7px 0 0;padding:0;border:0;background:transparent;box-shadow:none}\n.rhiUxStatusItem{\n  min-width:0;min-height:82px;display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;\n  padding:10px 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:#fff;box-shadow:var(--rhi-shadow-md);\n}\n.rhiUxStatusIcon{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:#F0F5FC;color:#355D96;font-size:18px}\n.rhiUxStatusIcon ha-icon{--mdc-icon-size:var(--rhi-icon-status)}\n.rhiUxStatusCopy{min-width:0;display:block}\n.rhiUxStatusCopy small{display:block;margin:0 0 2px;color:#476487;font-size:var(--rhi-font-label);font-weight:var(--rhi-weight-medium);line-height:1.2}\n.rhiUxStatusCopy b{display:block;margin:0 0 2px;color:var(--rhi-color-text);font-size:clamp(14px,1.12vw,17px);font-weight:var(--rhi-weight-strong);line-height:1.12;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n.rhiUxStatusCopy em{display:block;margin-top:2px;color:var(--rhi-color-muted);font-size:var(--rhi-font-small);font-style:normal;font-weight:var(--rhi-weight-regular);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n\n/* Canonical page-level quick actions. */\n.rhiUxQuickActionBar,.rhiEnergyQuickActions,.rhi-top-actions{\n  min-height:48px;padding:5px 8px;margin:7px 0 0;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);\n  background:#fff;box-shadow:var(--rhi-shadow-sm);display:flex;align-items:center;gap:7px;flex-wrap:wrap;\n}\n.rhiUxQuickActionBar>small,.rhiEnergyQuickActions>small,.rhi-top-actions-title{\n  font-size:var(--rhi-font-label);letter-spacing:.10em;text-transform:uppercase;color:#476487;\n  font-weight:var(--rhi-weight-medium);margin-right:2px;white-space:nowrap;\n}\n.rhiUxQuickActions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0}\n.rhiUxQuickAction,.rhiUxQuickActionBar button,.rhiEnergyQuickActions .hiAction,.rhi-top-action{\n  height:36px;min-height:36px;border:1px solid #D6E0EB;border-radius:9px;background:#fff;color:#125DB7;\n  box-shadow:none;font:inherit;font-size:11.5px;font-weight:var(--rhi-weight-medium);padding:0 12px;\n  display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;white-space:nowrap;\n}\n.rhiUxQuickAction.primary,.rhiUxQuickActionBar button:first-of-type,.rhiEnergyQuickActions .hiAction:first-of-type,.rhi-top-action.primary{\n  background:var(--rhi-color-primary);border-color:var(--rhi-color-primary);color:#fff;\n}\n.rhiUxQuickAction:disabled,.rhiEnergyQuickActions .hiAction:disabled,.rhi-top-action:disabled{opacity:.46}\n\n/* Canonical body grammar. */\n.rhiUxDomainBody{font-family:var(--rhi-font-family);color:var(--rhi-color-text);font-size:var(--rhi-font-body);line-height:var(--rhi-line-height-body)}\n.rhiUxDomainBody button,.rhiUxDomainBody select,.rhiUxDomainBody input,.rhiUxDomainBody textarea{font-family:inherit}\n.rhiUxPanel,.rhiUxDomainBody .panel,.rhiUxDomainBody .info,.rhiUxDomainBody .summary,.rhiUxDomainBody .ov-panel{\n  border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm);\n}\n.rhiUxPanel{padding:14px 16px}\n.rhiUxDomainBody .panel h2,.rhiUxDomainBody .info h2,.rhiUxDomainBody .summary h2,.rhiUxDomainBody .ov-panel h2{\n  font-size:var(--rhi-font-section);font-weight:var(--rhi-weight-strong);line-height:var(--rhi-line-height-tight);letter-spacing:-.02em;color:var(--rhi-color-text);\n}\n.rhiUxDomainBody .panel h3,.rhiUxDomainBody .info h3,.rhiUxDomainBody .summary h3,.rhiUxDomainBody .ov-panel h3{\n  font-size:var(--rhi-font-card);font-weight:var(--rhi-weight-strong);line-height:1.2;color:var(--rhi-color-text);\n}\n.rhiUxDomainBody .panel p,.rhiUxDomainBody .info p,.rhiUxDomainBody .summary p,.rhiUxDomainBody .ov-panel p{\n  font-size:var(--rhi-font-body);font-weight:var(--rhi-weight-regular);line-height:var(--rhi-line-height-body);color:var(--rhi-color-muted);\n}\n.rhiUxDataList{display:grid;gap:6px}\n.rhiUxDataRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 10px;border:1px solid var(--rhi-color-line-soft);border-radius:var(--rhi-radius-sm);background:var(--rhi-color-surface-soft)}\n.rhiUxState{display:grid;gap:4px;padding:14px 16px;border:1px dashed var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface-soft);color:var(--rhi-color-muted)}\n.rhiUxState b{color:var(--rhi-color-text);font-size:13px}\n.rhiUxState[data-state=\"attention\"]{border-color:#F6D48C;background:#FFFBEB}\n.rhiUxState[data-state=\"error\"]{border-color:#F1B8B4;background:#FFF7F7}\n.rhiUxConclusion{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:linear-gradient(135deg,rgba(255,255,255,.98),rgba(247,250,252,.96))}\n.rhiUxConclusion small{font-size:var(--rhi-font-label);letter-spacing:.1em;text-transform:uppercase;color:var(--rhi-color-muted)}\n.rhiUxConclusion h2{font-size:var(--rhi-font-card);line-height:1.2;margin:1px 0 2px}\n.rhiUxConclusion p{font-size:var(--rhi-font-small);line-height:1.3;margin:0;color:var(--rhi-color-muted)}\n.rhiUxTechnicalFooter{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 9px;margin:6px 0 0;padding:3px 2px 0;border-top:1px solid rgba(148,163,184,.20);color:#94A3B8;font-size:9px;line-height:1.2}\n.rhiUxTechnicalFooter span+span:before{content:\"·\";margin-right:9px;color:#CBD5E1}\n.rhiUxTechnicalFooter [data-severity=\"warning\"]{color:#B7791F;font-weight:var(--rhi-weight-strong)}\n.rhiUxTechnicalFooter [data-severity=\"error\"]{color:var(--rhi-color-error);font-weight:var(--rhi-weight-strong)}\n\n@media(max-width:1180px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:18px}\n  .rhiUxPageHero{height:174px;min-height:174px}\n  .rhiUxPageHeroCopy{width:51%;padding:24px 14px 20px 18px}\n  .rhiUxPageHeroArt{inset:0 0 0 30%}\n  .rhiUxStatusItem{grid-template-columns:40px minmax(0,1fr);padding:9px 10px;min-height:78px}\n  .rhiUxStatusIcon{width:37px;height:37px}\n}\n@media(max-width:760px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:10px;--rhi-page-pad-y:9px;--rhi-font-body:12px;--rhi-font-small:10.75px}\n  .rhiUxDomainShell{grid-template-columns:1fr}.rhiUxCompanyBrand{display:none}.rhiUxDomainShellTop{grid-template-columns:1fr;padding:10px 12px}.rhiUxDomainIdentity{min-height:auto}.rhiUxDomainShellBottom{padding:7px 12px 9px}\n  .rhiUxPageHero{height:154px;min-height:154px;border-radius:14px}\n  .rhiUxPageHeroCopy{width:59%;padding:18px 9px 16px 13px}\n  .rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{font-size:27px;letter-spacing:-.032em}\n  .rhiUxPageHeroCopy p{font-size:11px;line-height:1.32;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}\n  .rhiUxPageHeroArt{inset:0 0 0 34%}\n  .rhiUxStatusGrid{grid-template-columns:repeat(2,minmax(0,1fr))}\n  .rhiUxStatusItem{min-height:74px;grid-template-columns:34px minmax(0,1fr);gap:7px;padding:8px}\n  .rhiUxStatusIcon{width:32px;height:32px;border-radius:9px}.rhiUxStatusIcon ha-icon{--mdc-icon-size:20px}\n  .rhiUxQuickActionBar,.rhiEnergyQuickActions,.rhi-top-actions{overflow-x:auto;flex-wrap:nowrap}\n  .rhiUxQuickActionBar>small,.rhiEnergyQuickActions>small,.rhi-top-actions-title,.rhiUxQuickAction,.rhiUxQuickActionBar button,.rhiEnergyQuickActions .hiAction,.rhi-top-action{flex:0 0 auto}\n  .rhiUxConclusion{grid-template-columns:1fr}\n}\n@media(max-width:430px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:8px;--rhi-page-pad-y:8px}\n  .rhiUxPageHero{height:146px;min-height:146px}\n  .rhiUxPageHeroCopy{width:64%;padding:16px 8px 14px 11px}\n  .rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{font-size:24px}\n  .rhiUxPageHeroCopy p{font-size:10.5px;-webkit-line-clamp:2}\n  .rhiUxPageHeroArt{inset:0 0 0 38%}\n  .rhiUxStatusGrid{grid-template-columns:1fr 1fr}\n}\n\n/* Optional body/section-scoped view and filter controls. */\n.rhiUxContextBar{\n  min-height:42px;padding:4px 7px;margin:0 0 8px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);\n  background:#fff;box-shadow:var(--rhi-shadow-sm);display:flex;align-items:center;gap:7px;flex-wrap:wrap;\n}\n.rhiUxContextBar>small{\n  font-size:var(--rhi-font-label);letter-spacing:.10em;text-transform:uppercase;color:#476487;font-weight:var(--rhi-weight-medium);white-space:nowrap;\n}\n.rhiUxContextControls{display:flex;align-items:center;gap:6px;flex-wrap:wrap}\n.rhiUxContextControl{\n  min-height:32px;border:1px solid #D6E0EB;border-radius:9px;background:#fff;color:#355D96;font:inherit;font-size:11.5px;font-weight:var(--rhi-weight-medium);padding:0 11px;cursor:pointer;white-space:nowrap;\n}\n.rhiUxContextControl.active,.rhiUxContextControl[aria-pressed=\"true\"]{background:var(--rhi-color-primary-soft);border-color:#CFDEF1;color:#0F4CA4}\n.rhiUxContextControl:disabled{opacity:.46}\n@media(max-width:760px){.rhiUxContextBar{overflow-x:auto;flex-wrap:nowrap}.rhiUxContextBar>small,.rhiUxContextControls,.rhiUxContextControl{flex:0 0 auto}}\n\n/* Canonical cross-domain appearance picker. Domains own catalogs and persistence. */\n.rhiUxVisualPickerBackdrop{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.44);display:grid;place-items:center;padding:20px}\n.rhiUxVisualPickerPanel{width:min(920px,94vw);max-height:min(82vh,760px);overflow:hidden;background:#fff;border:1px solid var(--rhi-color-line);border-radius:20px;box-shadow:0 30px 80px rgba(15,23,42,.24);padding:16px;box-sizing:border-box;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto;gap:10px}\n.rhiUxVisualPickerHead{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;min-height:0}\n.rhiUxVisualPickerHead small{font-size:10px;font-weight:800;letter-spacing:.12em;color:#64748b}.rhiUxVisualPickerHead h3{margin:2px 0 0;font-size:20px}.rhiUxVisualPickerHead p{margin:3px 0 0;font-size:11px;color:#64748b}\n.rhiUxVisualPickerFilters{display:flex;gap:6px;flex-wrap:wrap;margin:0;min-height:0}\n.rhiUxVisualPickerFilters button{border:1px solid #dbe3ee;background:#fff;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer}.rhiUxVisualPickerFilters button.selected{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}\n.rhiUxVisualChoiceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:142px;gap:8px;margin:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 3px 4px 1px;align-content:start}\n.rhiUxVisualChoice{height:142px;min-height:142px;max-height:142px;display:grid;grid-template-rows:86px minmax(0,1fr);gap:6px;align-items:stretch;text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:12px;padding:8px;cursor:pointer;overflow:hidden}.rhiUxVisualChoice:hover{border-color:#93c5fd;background:#f8fbff}.rhiUxVisualChoice.selected{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12);background:#f8fbff}\n.rhiUxVisualChoiceImage{width:100%;height:86px;min-width:0;min-height:86px;max-width:none;max-height:86px;display:grid;place-items:center;overflow:hidden}.rhiUxVisualChoiceImage img{display:block;width:100%;height:100%;min-width:0;min-height:0;max-width:100%;max-height:100%;object-fit:contain;object-position:center}\n.rhiUxVisualChoiceCopy{min-width:0;align-self:end}.rhiUxVisualChoiceCopy small,.rhiUxVisualChoiceCopy b,.rhiUxVisualChoiceCopy em{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rhiUxVisualChoiceCopy small{font-size:8px;color:#64748b;text-transform:uppercase}.rhiUxVisualChoiceCopy b{font-size:11px;margin-top:1px}.rhiUxVisualChoiceCopy em{font-size:9px;color:#64748b;font-style:normal;margin-top:1px}\n.rhiUxVisualPickerRefine{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px;margin:0}.rhiUxVisualPickerRefine label span{display:block;font-size:8px;color:#64748b;margin-bottom:3px}.rhiUxVisualPickerRefine select{width:100%;height:34px;border:1px solid #dbe3ee;border-radius:8px;background:#fff;padding:0 8px}\n.rhiUxVisualPickerFooter{display:flex;align-items:center;gap:8px;margin:0;padding-top:9px;border-top:1px solid #edf1f6}.rhiUxVisualPickerSpacer{flex:1}.rhiUxVisualPickerFooter button{height:34px;border:1px solid #dbe3ee;border-radius:9px;background:#fff;padding:0 12px;font-size:10px;font-weight:700}.rhiUxVisualPickerFooter button.primary{background:#0b65ea;color:#fff;border-color:#0b65ea}.rhiUxVisualPickerFooter button:disabled{opacity:.45}\n@media(max-width:900px){.rhiUxVisualChoiceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}\n@media(max-width:560px){.rhiUxVisualPickerBackdrop{padding:8px}.rhiUxVisualPickerPanel{width:96vw;max-height:88vh;padding:12px}.rhiUxVisualChoiceGrid{grid-template-columns:1fr;grid-auto-rows:116px}.rhiUxVisualChoice{height:116px;min-height:116px;max-height:116px;grid-template-columns:94px minmax(0,1fr);grid-template-rows:1fr}.rhiUxVisualChoiceImage{width:94px;height:86px;min-width:94px;max-width:94px}.rhiUxVisualChoiceCopy{align-self:center}.rhiUxVisualPickerRefine{grid-template-columns:1fr 1fr}.rhiUxVisualPickerFooter{flex-wrap:wrap}}\n";
 }
 
 // ---- src/app/presentation.js ----
@@ -3230,6 +3256,14 @@ function rhiEnergyVisualPickerStyles() {
           ) || ''
         );
         this.energyVisualPickerBrand = 'all';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const settingsTopic = event.target.closest('[data-settings-topic-profile]');
+      if (settingsTopic && !settingsTopic.disabled) {
+        this.selectedStrategyProfileId = settingsTopic.dataset.settingsTopicProfile || '';
+        this.persistInteractionContext();
         this._forceRender = true;
         this.render();
         return;
@@ -4304,6 +4338,8 @@ function rhiEnergyVisualPickerStyles() {
     }
 
     pageQuickActions(rt, tab) {
+      const assetScopedOnly = new Set(['flow','consumers','strategies','operational-planning','planning','strategic-planning']);
+      if (assetScopedOnly.has(tab)) return '';
       const typeSets = {
         overview:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer','solar_production','solar_array','solar_inverter','inverter']),
         flow:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer']),
@@ -4894,61 +4930,68 @@ function rhiEnergyVisualPickerStyles() {
     operationalLoadCard(rt, load, recommendation, targetId) {
       const id = load.asset_id;
       const actionModels = rt.commandActionModelsForAsset(id).filter(action => ['start','stop','pause','resume'].includes(action.role));
-      const actionByRole = role => actionModels.find(action => action.role === role) || null;
-      const startCommand = actionByRole('start')?.command || null;
-      const stopCommand = actionByRole('stop')?.command || null;
-      const pauseCommand = actionByRole('pause')?.command || null;
-      const resumeCommand = actionByRole('resume')?.command || null;
-      const actionButtons = actionModels.map(action => this.componentActionModelButton(action)).join('');
-      const charger = load.effective_charger ? rt.assetName(load.effective_charger) : (load.parent_asset_id ? rt.assetName(load.parent_asset_id) : human(load.flexible_role || load.energy_asset_role || 'Flexible load'));
-      const requestedRow = this.flexiblePropertyRow(rt, id, ['requested_charge_power_kw', 'requested_power_kw', 'energy_control_requested_power_kw', 'target_power_kw', 'setpoint_power_kw', 'charge_power_setpoint_kw']);
-      const requestedEffectiveRow = this.flexiblePropertyRow(rt, id, ['requested_power_kw_effective']);
-      const requested = rowValue(requestedRow, null) ?? rowValue(requestedEffectiveRow, null) ?? load.requested_charge_power_kw ?? load.requested_power_kw ?? load.requested_power_kw_effective ?? load.min_power_kw;
-      const planning = load.energy_planning || rt.planningOutcomeFor(id) || {};
-      if (this.isDisabledFlexibleAsset(rt, load, planning)) return this.disabledFlexibleAssetCard(rt, load, planning);
-      const powerKw = load.power_kw;
-      const energyNeed = load.energy_to_target_kwh ?? this.targetEnergyValue(rt, id, load);
-      const detailsId = `operational-load-${id}`;
-      const connection = this.flexibleConnectionLabel(rt, load, id);
-      const planningView = this.planningDisplayFor(rt, load, id, planning, powerKw, energyNeed);
-      const eta = this.etaDisplayFor(planning);
-      const automation = this.automationDisplayFor(rt, load, id);
-      const requestedControl = requestedRow && !requestedRow.missing
-        ? this.editablePropertyControl(requestedRow, { title:'Requested charge power', description:'Maximum charging power requested from this device.', type:'range', fallbackValue:requested, immediateWrite:true })
-        : '';
-      const priority = this.priorityControl(rt, load, id);
-      const whyHint = planningView.sub || human(planning.blocked_reason || load.availability_reason || '');
-      const showWhy = this.isMeaningfulPrimaryValue(planningView.why, { allowZero: true }) || this.isMeaningfulPrimaryValue(whyHint, { allowZero: true });
-      const showEta = this.isMeaningfulPrimaryValue(eta.main, { allowZero: true });
-      const showExpected = this.isMeaningfulPrimaryValue(planningView.expected, { allowZero: true });
-      const cardFlags = `${showWhy ? '' : ' noWhy'}${showEta ? '' : ' noEta'}${showExpected ? '' : ' noExpected'}`;
-      const infoBanner = connection.hint ? `<div class="loadNotice"><span>ⓘ</span><b>${escapeHtml(connection.label)}</b><em>${escapeHtml(connection.hint)}</em></div>` : '';
-      const publishedMaxPower = asNumber(requestedRow?.max ?? requestedRow?.maximum ?? this.validationMeta(requestedRow).max);
-      const maxPowerText = publishedMaxPower !== null ? fmtKw(publishedMaxPower) : '';
+      const enabledActions = actionModels.filter(action => action.visible && action.enabled);
+      const unavailableActions = actionModels.filter(action => action.visible && !action.enabled);
       const commandAvailability = actionModels
         .filter(action => action.visible && !action.enabled)
-        .map(action => `<span><b>${escapeHtml(action.label || human(action.role))}:</b> ${escapeHtml(humanReason(action.reason, 'Currently unavailable'))}</span>`)
+        .map(action => `<span><small>${escapeHtml(action.label || human(action.role))}</small><b>${escapeHtml(humanReason(action.reason, 'Currently unavailable'))}</b></span>`)
         .join('');
-      const powerAvailability = requestedControl && this.isWritableRow(requestedRow) ? '' : ((!requestedRow || requestedRow.missing) ? '<span>Requested charge power is not published.</span>' : `<span><b>Requested power:</b> ${escapeHtml(requestedRow.editable_reason || 'Requested charge power is currently read-only.')}</span>`);
-      const controlAvailability = commandAvailability || powerAvailability ? `<div class="controlAvailability">${commandAvailability}${powerAvailability}</div>` : '';
-      const plannedTodayKwh = asNumber(planning.planned_today_kwh);
-      const nextAction = String(firstDefined(planning.what_text, planning.next_action_label, planning.next_action, planningView.state, 'Wait'));
-      const canonicalWhy = String(firstDefined(planning.why_text, planning.user_reason_label, planning.reason_label, planningView.why, whyHint, 'No explanation published.'));
-      const liveState = human(firstDefined(load.operating_state, load.current_status, 'Unavailable'));
-      const priorityLabel = human(firstDefined(load.priority_label, load.energy_control_priority, 'Normal'));
-      const operationalStatus = this.canonicalOperationalStatus(rt, load, planning);
-      const exceptional = operationalStatus.exceptional === true;
-      const conformanceKnown = operationalStatus.exceptional !== null;
-      const sourceAssetPath = rt.sourceAssetNavigation(load);
-      const sourceAssetLink = sourceAssetPath
-        ? `<button type="button" class="action sourceAssetLink" data-source-asset-nav="${escapeHtml(sourceAssetPath)}">Open source asset</button>`
+      const requestedRow = this.flexiblePropertyRow(rt, id, ['requested_charge_power_kw','requested_power_kw','energy_control_requested_power_kw','target_power_kw','setpoint_power_kw','charge_power_setpoint_kw']);
+      const requestedEffectiveRow = this.flexiblePropertyRow(rt,id,['requested_power_kw_effective']);
+      const requested = rowValue(requestedRow,null) ?? rowValue(requestedEffectiveRow,null) ?? load.requested_charge_power_kw ?? load.requested_power_kw ?? load.requested_power_kw_effective ?? null;
+      const planning = load.energy_planning || rt.planningOutcomeFor(id) || {};
+      if (this.isDisabledFlexibleAsset(rt, load, planning)) return this.disabledFlexibleAssetCard(rt, load, planning);
+      const powerKw = asNumber(firstDefined(load.actual_power_kw,load.current_power_kw,load.power_kw,null));
+      const energyNeed = asNumber(load.energy_to_target_kwh ?? this.targetEnergyValue(rt,id,load));
+      const plannedTodayKwh = asNumber(firstDefined(planning.planned_today_kwh,planning.today_planned_kwh,null));
+      const connection = this.flexibleConnectionLabel(rt,load,id);
+      const planningView = this.planningDisplayFor(rt,load,id,planning,powerKw,energyNeed);
+      const explicitState = String(firstDefined(load.operating_state,load.current_status,'') || '');
+      const liveState = explicitState ? human(explicitState) : (powerKw === null ? 'Not measured' : powerKw > 0.05 ? 'Active' : 'Idle');
+      const nextActionRaw = String(firstDefined(planning.what_text,planning.next_action_label,planning.next_action,'') || '').trim();
+      const nextAction = nextActionRaw && !/^none$/i.test(nextActionRaw) ? human(nextActionRaw) : '';
+      const reasonRaw = String(firstDefined(planning.why_text,planning.user_reason_label,planning.reason_label,planning.reason,planning.reason_code,'') || '').trim();
+      const reason = reasonRaw && !/^(none|no explanation available\.?|no explanation published\.?)$/i.test(reasonRaw) ? humanReason(reasonRaw,'') : '';
+      const requestedControl = requestedRow && !requestedRow.missing && this.isWritableRow(requestedRow)
+        ? this.editablePropertyControl(requestedRow,{title:'Requested charge power',description:'Charging power requested from this asset.',type:'range',fallbackValue:requested,immediateWrite:true})
         : '';
-      return `<article class="flexLoadCard solarLoadRow ${exceptional?'exceptional':''}">
-        <div class="solarLoadSummary"><div class="solarLoadIdentity">${this.assetVisual(load,{size:'sm',fallbackIcon:this.flexibleAssetIcon(load)})}<div><div class="solarLoadName"><h3>${escapeHtml(load.display_name || human(id))}</h3><span class="priorityBadge">${escapeHtml(priorityLabel)}</span></div><small><i class="dot green"></i>${escapeHtml(connection.label)}</small></div></div>
-        <div class="solarLoadFact"><small>Now / live</small><b>${escapeHtml(liveState)}</b><span>${fmtKw(powerKw,'—')}</span></div><div class="solarLoadFact"><small>Next action</small><b class="nextActionBadge">${escapeHtml(nextAction)}</b></div><div class="solarLoadFact"><small>Power target</small><b>${fmtKw(requested,'—')}</b></div><div class="solarLoadFact"><small>Planned today</small><b>${fmtKwh(plannedTodayKwh,'—')}</b></div><div class="solarLoadFact solarLoadWhy"><small>Why / reason</small><b>${escapeHtml(canonicalWhy)}</b></div><div class="solarLoadFact"><small>Status</small><b class="planStatusBadge ${exceptional?'exception':(conformanceKnown?'ok':'unknown')}">${exceptional?'Exceptional !':(conformanceKnown?'No published exception':'Status unavailable')}</b></div></div>
-        <div class="solarLoadControls"><div class="requestedSlot"><small class="controlTitle">Requested charge power</small>${requestedControl || `<label class="sliderField unavailable"><div><span>Requested charge power</span><b>—</b></div><input type="range" disabled></label>`}${maxPowerText ? `<em class="maxPowerHint">${escapeHtml(maxPowerText)}</em>` : ''}</div>${actionButtons ? `<div class="loadActions decisionActions"><span>Manual intervention</span>${actionButtons}</div>` : ''}</div>${controlAvailability}${infoBanner}<div class="loadDetailsFull">${this.componentDetailsBlock(detailsId, 'Details', `${this.kv('Planning', human(planning.state || '—'))}${this.kv('Why', canonicalWhy)}${this.kv('Asset id', id)}${sourceAssetLink}`)}</div>
+      const priority = this.priorityControl(rt,load,id);
+      const configurationBody = [requestedControl,priority].filter(Boolean).join('');
+      const configuration = configurationBody
+        ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${configurationBody}</div></details>`
+        : '';
+      const detailsRows = [
+        ['Connection',connection.label || 'Unavailable'],
+        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
+        plannedTodayKwh !== null ? ['Planned today',fmtKwh(plannedTodayKwh)] : null,
+        nextAction ? ['Next action',nextAction] : null,
+        reason ? ['Reason',reason] : null
+      ].filter(Boolean);
+      const details = detailsRows.length
+        ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailsRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
+        : '';
+      const diagnosticRows = [
+        ['Asset id', id],
+        ...unavailableActions.map(action=>[`${action.label || human(action.role)} command`,humanReason(action.reason,'Unavailable')]),
+        requestedControl ? null : ['Requested charge power',requestedRow && !requestedRow.missing ? (requestedRow.editable_reason || 'Read-only') : 'Not published']
+      ].filter(Boolean);
+      const diagnostics = `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${commandAvailability}${diagnosticRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`;
+      const actions = enabledActions.length
+        ? `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${enabledActions.map(action=>this.componentActionModelButton(action)).join('')}</div></div>`
+        : '';
+      const keyFacts = [
+        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
+        plannedTodayKwh !== null ? ['Planned today',fmtKwh(plannedTodayKwh)] : null,
+        requested !== null ? ['Power target',fmtKw(requested,'—')] : null,
+        nextAction ? ['Next action',nextAction] : null
+      ].filter(Boolean).slice(0,4);
+      return `<article class="flexLoadCard compactOperationalLoad">
+        <div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(load,{size:'sm',fallbackIcon:this.flexibleAssetIcon(load)})}<div><h3>${escapeHtml(load.display_name || human(id))}</h3><span>${escapeHtml(liveState)}${connection.label ? ` · ${escapeHtml(connection.label)}` : ''}</span></div></div><b>${escapeHtml(fmtKw(powerKw,'—'))}</b></div>
+        ${keyFacts.length ? `<div class="managedAssetFacts">${keyFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>` : ''}
+        ${actions}<div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div>
       </article>`;
     }
+
     energyAssetContext(rt, asset = {}) {
       const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
       const context = id && typeof readEnergyAssetContext === 'function'
@@ -4965,6 +5008,25 @@ function rhiEnergyVisualPickerStyles() {
     energyAssetFacts(rt, asset = {}, limit = 4) {
       const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
       if (!id) return [];
+      const projection = rt.assetProjection(id) || {};
+      const publishedKeyFacts = (projection.properties || [])
+        .filter(row => row?.presentation?.role === 'key' && row?.projection?.resolved === true)
+        .map(row => {
+          const field = row.projection || {};
+          let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
+          if (field.unit && value !== '—' && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
+          return {
+            key:String(firstDefined(row.property_key,row.property_id,row.key,'') || ''),
+            keys:[String(firstDefined(row.property_key,row.property_id,row.key,'') || '')],
+            label:String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || ''),
+            value,
+            direct:[],
+            formatter:'published'
+          };
+        })
+        .filter(row => row.label && row.value !== '—')
+        .slice(0, limit);
+      if (publishedKeyFacts.length) return publishedKeyFacts;
       const type = this.energyAssetType(asset);
       const fact = (key, label, direct = [], formatter = '') => {
         const keys = Array.isArray(key) ? key : [key];
@@ -5175,42 +5237,94 @@ function rhiEnergyVisualPickerStyles() {
       return '';
     }
 
+    energyAssetConfigurationDisclosure(rt, asset = {}) {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      if (!id) return '';
+      const rows = rt.editablePropertyRows().filter(row => {
+        const key = String(firstDefined(row.property_id,row.property_key,row.key,'') || '');
+        const rowAsset = String(firstDefined(row.asset_id,row.target_asset_id,'') || '');
+        if (/^appearance:/.test(key)) return false;
+        const belongs = rowAsset === id || key.startsWith(`${id}.`);
+        return belongs && row?.presentation?.role === 'configuration';
+      });
+      if (!rows.length) return '';
+      const controls = rows.map(row => {
+        const label = firstDefined(row.display_name,row.label,human(row.field_key || row.property_key || row.key || 'Setting'));
+        const allowed = allowedValuesForRow(row);
+        const value = rowValue(row, null);
+        const valueType = String(firstDefined(row.value_type,row.type,typeof value) || '').toLowerCase();
+        const editorType = allowed.length ? 'select'
+          : valueType === 'boolean' ? 'toggle'
+          : (asNumber(firstDefined(row.min,row.minimum,null)) !== null || asNumber(firstDefined(row.max,row.maximum,null)) !== null) ? 'range'
+          : 'number';
+        return this.editablePropertyControl(row,{title:label,type:editorType,fallbackValue:value,fallbackOptions:allowed});
+      }).filter(Boolean).join('');
+      return controls ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${controls}</div></details>` : '';
+    }
+
     energyAssetDetailDisclosure(rt, asset = {}) {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       if (!id) return '';
       const profile = objectFrom(enriched.profile || {});
+      const projection = rt.assetProjection(id) || {};
+      const parentId = this.energyAssetParentId(enriched);
+      const parentName = parentId ? String(rt.assetName(parentId) || '').trim() : '';
+      const area = this.energyAssetAreaLabel(enriched);
+      const rows = [
+        area ? ['Area',area] : null,
+        parentName ? ['Part of',parentName] : null,
+        firstDefined(profile.display_name,profile.label,profile.name,'') ? ['Profile',firstDefined(profile.display_name,profile.label,profile.name,'')] : null
+      ].filter(Boolean);
+      const properties = (projection?.properties || [])
+        .filter(row => row?.presentation?.role === 'detail')
+        .map(row => {
+          const field = row?.projection || {};
+          if (!field.resolved) return null;
+          const label = String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || '');
+          if (!label) return null;
+          let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
+          if (value === '—') return null;
+          if (field.unit && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
+          return [label,value];
+        }).filter(Boolean);
+      const all = [...rows,...properties];
+      if (!all.length) return '';
+      return `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody"><small class="energyAssetPublishedLabel">Published properties</small><div class="energyAssetDetailGrid">${all.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></div></details>`;
+    }
+
+    energyAssetDiagnosticsDisclosure(rt, asset = {}) {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      if (!id) return '';
       const publication = objectFrom(enriched.publication || {});
       const projection = rt.assetProjection(id) || {};
       const lifecycle = objectFrom(projection.lifecycle || {});
-      const parentId = this.energyAssetParentId(enriched);
-      const area = this.energyAssetAreaLabel(enriched);
       const telemetry = publication.resolution_complete === false ? 'Incomplete'
         : publication.complete === false ? 'Partial'
         : publication.complete === true ? 'Complete' : 'Unknown';
-      const rows = [
-        ['Area', area || '—'],
-        ['Type', human(firstDefined(enriched.asset_type,enriched.object_class,'device'))],
-        ['Parent', parentId || '—'],
-        ['Profile', firstDefined(profile.display_name,profile.label,profile.name,enriched.profile_id,'—')],
-        ['Lifecycle', firstDefined(lifecycle.state,enriched.health,enriched.status,'—')],
-        ['Telemetry', telemetry],
-        ['Source', firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'—')],
-        ['Asset id', id]
-      ];
+      const source = firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'');
       const missing = Array.isArray(publication.missing) ? publication.missing : Array.isArray(publication.missing_fields) ? publication.missing_fields : [];
-      const publishedProperties = (projection?.properties || []).map(row => {
-        const field = row?.projection || {};
-        if (!field.resolved) return null;
-        const label = firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property'));
-        let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
-        if (field.unit && value !== '—' && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
-        return { label, value };
-      }).filter(Boolean);
-      const propertyHtml = publishedProperties.length
-        ? `<div class="energyAssetPropertyList"><small class="energyAssetPropertyTitle">Published properties</small><div class="energyAssetPropertyGrid">${publishedProperties.map(row=>`<span><small>${escapeHtml(row.label)}</small><b>${escapeHtml(row.value)}</b></span>`).join('')}</div></div>`
-        : '';
-      return `<details class="energyAssetDetails"><summary>Details</summary><div class="energyAssetDetailGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value ?? '—'))}</b></span>`).join('')}${missing.length ? `<span class="wide"><small>Missing publication fields</small><b>${escapeHtml(missing.join(' · '))}</b></span>` : ''}</div>${propertyHtml}</details>`;
+      const propertyRows = (projection?.properties || [])
+        .filter(row => row?.presentation?.role === 'diagnostics')
+        .map(row => {
+          const field = row?.projection || {};
+          const label = String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || '');
+          const value = field.resolved
+            ? (field.display && field.display !== '—' ? field.display : firstDefined(field.value,'—'))
+            : humanReason(firstDefined(field.reason,row.reason_code,row.resolution?.reason_code,'Unavailable'),'Unavailable');
+          return label ? [label,String(value)] : null;
+        }).filter(Boolean);
+      const rows = [
+        ['Asset id',id],
+        source ? ['Source', source] : null,
+        ['Lifecycle',firstDefined(lifecycle.state,enriched.health,enriched.status,'Unknown')],
+        ['Telemetry', telemetry],
+        missing.length ? ['Missing publication fields',missing.join(' · ')] : null,
+        ...propertyRows
+      ].filter(Boolean);
+      return `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
     }
 
     energyAppearanceAction(rt, asset = {}) {
@@ -5225,30 +5339,37 @@ function rhiEnergyVisualPickerStyles() {
       return `<button type="button" class="energyAppearanceAction" data-energy-visual-open="${escapeHtml(id)}">Appearance</button>`;
     }
 
-    energyDeviceStatusCard(rt, asset = {}, roleLabel = '') {
+    energyDeviceStatusCard(rt, asset = {}, roleLabel = '', childrenHtml = '') {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
       const type = String(firstDefined(enriched.asset_type,enriched.object_class,'device') || 'device');
       const facts = this.energyAssetFacts(rt,enriched,5);
-      const projection = id ? rt.assetProjection(id) : null;
-      const lifecycle = String(firstDefined(projection?.lifecycle?.state, enriched.health, enriched.status, '') || '');
-      const availability = String(firstDefined(enriched.availability_state,enriched.connection_state,'') || '');
-      const unavailable = /unavailable|offline|disconnected|failed/i.test(`${availability} ${lifecycle}`);
-      const degraded = /degraded|warning|attention|incomplete/i.test(lifecycle);
-      const statusLabel = unavailable ? 'Unavailable' : degraded ? 'Needs attention' : lifecycle && !/unknown/i.test(lifecycle) ? human(lifecycle) : 'Available';
+      const stateFact = facts.find(row => /^(state|status|direction)$/i.test(String(row.label || ''))) || null;
+      const measuredPower = this.measuredAssetPower(enriched);
+      const solarLike = /solar|inverter|panel|optimizer/.test(type);
+      const primaryState = stateFact?.value
+        || (solarLike && measuredPower !== null ? (measuredPower > 0.005 ? 'Producing' : 'Idle') : '')
+        || '';
       const area = this.energyAssetAreaLabel(enriched);
       const parentId = this.energyAssetParentId(enriched);
       const parentName = parentId ? String(rt.assetName(parentId) || '').trim() : '';
       const relation = parentName ? `<span class="energyDeviceRelation"><small>Part of</small><b>${escapeHtml(parentName)}</b></span>` : '';
       const actions = this.assetQuickActions(rt,id,3);
-      const details = facts.length
-        ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
-        : `<span><small>Operational data</small><b>Telemetry not published</b></span>`;
+      const keyFacts = facts.filter(row => !/^(state|status)$/i.test(String(row.label || ''))).slice(0,4);
+      const keyProperties = keyFacts.length
+        ? keyFacts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
+        : `<span><small>Energy state</small><b>${escapeHtml(primaryState || 'Unavailable')}</b></span>`;
+      const configuration = this.energyAssetConfigurationDisclosure(rt,enriched);
+      const details = this.energyAssetDetailDisclosure(rt,enriched);
+      const diagnostics = this.energyAssetDiagnosticsDisclosure(rt,enriched);
+      const children = childrenHtml
+        ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children</summary><div class="energyAssetFoldBody energyAssetChildrenBody">${childrenHtml}</div></details>`
+        : '';
       return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
         <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
-        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div><div class="energyDeviceTopActions"><span class="energyDeviceState">${escapeHtml(statusLabel)}</span>${this.energyAppearanceAction(rt,enriched)}</div></div>
-        <div class="energyDeviceFacts">${details}${relation}</div>${actions}${this.energyAssetDetailDisclosure(rt,enriched)}</div>
+        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div>${primaryState ? `<div class="energyDeviceTopActions"><span class="energyDeviceState">${escapeHtml(primaryState)}</span></div>` : ''}</div>
+        <div class="energyDeviceFacts">${keyProperties}${relation}</div>${actions}<div class="energyAssetFoldStack">${configuration}${details}${diagnostics}${children}</div></div>
       </article>`;
     }
 
@@ -5336,40 +5457,32 @@ function rhiEnergyVisualPickerStyles() {
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id),'Solar string');
       const facts = this.energyAssetFacts(rt,enriched,8);
-      const power = facts.find(fact => /^Power now$/i.test(String(fact.label || ''))) || null;
-      const childCount = firstDefined(
-        facts.find(fact => /^Child count$/i.test(String(fact.label || '')))?.value,
-        childOptimizers.length || childPanels.length || null
-      );
+      const power = facts.find(fact => /^(Power now|Production now)$/i.test(String(fact.label || ''))) || null;
       const panelById = new Map(childPanels.map(panel => [String(firstDefined(panel.asset_id,panel.id,'') || ''),panel]));
       const optimizerCards = childOptimizers.map(optimizer => {
         const linkedPanel = panelById.get(this.energyAssetParentId(optimizer)) || null;
         return this.solarOptimizerPrimaryCard(rt,optimizer,linkedPanel);
       }).join('');
-      const panelOnlyCards = childPanels
+      const solarPanelOnlyGrid = childPanels
         .filter(panel => !childOptimizers.some(optimizer => this.energyAssetParentId(optimizer) === String(firstDefined(panel.asset_id,panel.id,'') || '')))
         .map(panel => this.solarModuleCard(rt,panel,[]))
         .join('');
-      const technicalDetails = this.energyAssetDetailDisclosure(rt,enriched);
+      const children = optimizerCards || solarPanelOnlyGrid
+        ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children · ${childOptimizers.length + childPanels.length}</summary><div class="energyAssetFoldBody solarModuleGrid">${optimizerCards}${solarPanelOnlyGrid}</div></details>`
+        : '';
       return `<article class="solarStringLink" data-solar-string="${escapeHtml(id)}">
         <div class="solarStringSummary">
           <div class="solarStringVisual">${this.assetVisual(enriched,{size:'sm',fallbackIcon:'☀',decorative:false})}</div>
           <span><small>SOLAR ZONE / STRING</small><b>${escapeHtml(name)}</b></span>
-          ${power ? `<span><small>Production now</small><b>${escapeHtml(power.value)}</b></span>` : ''}
-          ${childCount !== null ? `<span><small>Modules</small><b>${escapeHtml(childCount)}</b></span>` : ''}
+          ${power ? `<span><small>Producing</small><b>${escapeHtml(power.value)}</b></span>` : ''}
         </div>
-        ${optimizerCards ? `<div class="solarModuleGrid">${optimizerCards}</div>` : ''}
-        ${panelOnlyCards ? `<div class="solarModuleGrid solarPanelOnlyGrid">${panelOnlyCards}</div>` : ''}
-        ${technicalDetails}
+        <div class="energyAssetFoldStack">${this.energyAssetConfigurationDisclosure(rt,enriched)}${this.energyAssetDetailDisclosure(rt,enriched)}${this.energyAssetDiagnosticsDisclosure(rt,enriched)}${children}</div>
       </article>`;
     }
     solarInverterCard(rt, inverter, strings = [], panelsFor = () => [], optimizersFor = () => []) {
       const inverterId = String(firstDefined(inverter.asset_id,inverter.id,'') || '');
       const children = strings.map(string => this.solarStringLink(rt,string,panelsFor(string),optimizersFor(string,panelsFor(string)))).join('');
-      return `<div class="solarInverterCard" data-solar-inverter="${escapeHtml(inverterId)}">
-        ${this.energyDeviceStatusCard(rt,inverter,'Solar inverter')}
-        ${children ? `<div class="solarInverterStrings"><div class="solarInverterStringsHead"><small>STRINGS</small><b>${strings.length}</b></div>${children}</div>` : ''}
-      </div>`;
+      return `<div class="solarInverterCard" data-solar-inverter="${escapeHtml(inverterId)}">${this.energyDeviceStatusCard(rt,inverter,'Solar inverter',children)}</div>`;
     }
     solarInverterSystem(rt, inverters = [], stringsForInverter = () => [], panelsFor = () => [], optimizersFor = () => [], unresolvedStrings = []) {
       if (!inverters.length && !unresolvedStrings.length) return '';
@@ -5442,10 +5555,24 @@ function rhiEnergyVisualPickerStyles() {
       const assignedArrayIds = new Set(inverters.flatMap(inverter => stringsForInverter(inverter).map(array=>String(firstDefined(array.asset_id,array.id,'')||''))));
       const unassignedArrays = arrays.filter(array => !assignedArrayIds.has(String(firstDefined(array.asset_id,array.id,'')||'')));
       const inverterSection = this.solarInverterSystem(rt,inverters,stringsForInverter,panelsFor,optimizersFor,unassignedArrays);
-      const productionBody = [
-        production.length ? `<div class="solarProductionLead">${this.solarProductionRepresentative(rt)}<div class="energyDeviceGrid solarProductionAggregate">${production.map(asset=>this.energyDeviceStatusCard(rt,asset,'Solar production')).join('')}</div></div>` : '',
-        inverterSection
-      ].join('');
+      const aggregate = production[0] || null;
+      let productionBody = inverterSection;
+      if (aggregate) {
+        const enriched = this.energyAssetContext(rt,aggregate);
+        const aggregateFacts = this.energyAssetFacts(rt,enriched,5).filter(row=>!/^(state|status)$/i.test(String(row.label || ''))).slice(0,4);
+        const aggregateStateFact = this.energyAssetFacts(rt,enriched,6).find(row=>/^(state|status)$/i.test(String(row.label || ''))) || null;
+        const aggregatePower = this.measuredAssetPower(enriched);
+        const aggregateState = aggregateStateFact?.value || (aggregatePower !== null ? (aggregatePower > 0.005 ? 'Producing' : 'Idle') : '');
+        const children = inverterSection
+          ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children · ${inverters.length}</summary><div class="energyAssetFoldBody energyAssetChildrenBody">${inverterSection}</div></details>`
+          : '';
+        productionBody = `<article class="solarProductionObject">
+          <div class="solarProductionRepresentativeWrap">${this.solarProductionRepresentative(rt)}</div>
+          <div class="solarProductionObjectBody"><div class="solarProductionObjectHead"><div><small>SOLAR PRODUCTION</small><h3>${escapeHtml(firstDefined(enriched.display_name,enriched.name,'Solar Production'))}</h3></div>${aggregateState ? `<b>${escapeHtml(aggregateState)}</b>` : ''}</div>
+          <div class="energyDeviceFacts">${aggregateFacts.map(row=>`<span><small>${escapeHtml(row.label)}</small><b>${escapeHtml(row.value)}</b></span>`).join('') || '<span><small>Production</small><b>Unavailable</b></span>'}</div>
+          <div class="energyAssetFoldStack">${this.energyAssetConfigurationDisclosure(rt,enriched)}${this.energyAssetDetailDisclosure(rt,enriched)}${this.energyAssetDiagnosticsDisclosure(rt,enriched)}${children}</div></div>
+        </article>`;
+      }
       const productionSection = productionBody ? this.solarHardwareSection(
         'Solar Production',
         'Aggregate production followed by the physical inverter → string → optimizer/panel hierarchy.',
@@ -5625,11 +5752,10 @@ function rhiEnergyVisualPickerStyles() {
       const operatingState = String(charger.operating_state || '');
       const power = asNumber(charger.physical_power_kw);
       const powerText = power === null ? '—' : fmtKw(power);
-      const context = [
-        connectionState ? human(connectionState) : '',
-        consumerId ? (rt.assetName(consumerId) || human(consumerId)) : '',
-        operatingState ? human(operatingState) : ''
-      ].filter(Boolean).join(' · ');
+      const consumerName = consumerId ? String(rt.assetName(consumerId) || '').trim() : '';
+      const relationLabel = consumerName || (consumerId ? 'Connected vehicle' : 'No vehicle connected');
+      const statusLabel = operatingState ? human(operatingState) : connectionState && !/asset[_\s-]?connected/i.test(connectionState) ? human(connectionState) : '';
+      const context = [relationLabel, statusLabel].filter(Boolean).join(' · ');
       const visual = rt.resolveVisualRef(charger.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
       return `<div class="flowConnectionCard">${art}<div><b>${escapeHtml(charger.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(context || 'Connection state unavailable')}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
@@ -5657,9 +5783,18 @@ function rhiEnergyVisualPickerStyles() {
       );
       const requested = asNumber(firstDefined(consumer.requested_power_kw_effective, consumer.requested_power_kw));
       const state = charging ? 'Charging' : active || (power !== null && power > 0.05) ? 'Active' : connected ? 'Connected' : available ? 'Available' : 'Unavailable';
+      const chargerDisplay = String(firstDefined(
+        consumer.effective_charger_display_name,
+        consumer.charger_display_name,
+        consumer.connection_display_name,
+        consumer.physical_connection_display_name,
+        charger ? rt.assetName(charger) : '',
+        ''
+      ) || '').trim();
+      const relation = charger ? (chargerDisplay || 'Charger unavailable') : '';
       const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
-      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(state)}${charger ? ` · ${escapeHtml(rt.assetName(charger) || human(charger))}` : ''}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(relation ? `${relation} · ${state}` : state)}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
     flowConsumers(rt, connectionSnapshot = { rows:[] }) {
       const domain = this.flexibleAssetDomain(rt);
@@ -5898,7 +6033,7 @@ function rhiEnergyVisualPickerStyles() {
             <div class="flowColumn sinks">
               <h3>Consumers</h3>
               ${this.flowNode('⌂','Home Consumption',fmtKw(homeConsumption,'—'),'household consumption excluding Flexible Loads','homeNode')}
-              ${this.flowNode('🚘','Flexible Loads',fmtKw(flexibleLoadsPower,'—'),`${consumers.length} published contributor${consumers.length === 1 ? '' : 's'}`,'consumerNode')}
+              ${this.flowNode('🚘','Flexible Loads',fmtKw(flexibleLoadsPower,'—'),`${consumers.length} managed consumer${consumers.length === 1 ? '' : 's'}`,'consumerNode')}
             </div>
           </div>
         </section>
@@ -5933,6 +6068,10 @@ function rhiEnergyVisualPickerStyles() {
     }
     profileKind(profile = {}) {
       return String(profile.profile_id || profile.strategy_profile_id || profile.profile_type || profile.asset_type || '').toLowerCase();
+    }
+    profileSettingsTopic(profile = {}) {
+      return String(firstDefined(profile.topic_label, profile.display_name, profile.profile_label, '') || '').trim()
+        || this.profileUserLabel(profile);
     }
     profileUserLabel(profile = {}) {
       const explicit = firstDefined(profile.user_label, profile.profile_user_label, profile.display_label, profile.profile_label, profile.display_name, profile.name, profile.label, '');
@@ -6205,64 +6344,61 @@ function rhiEnergyVisualPickerStyles() {
     consumerExplorerCard(rt, row = {}) {
       const id = row.asset_id || row.consumer_id || row.id || 'consumer';
       const vm = this.flexibleAssetDomain(rt).byId(id);
-      if (vm?.isDisabled) return this.disabledFlexibleAssetCard(rt, vm.raw || row, vm.planning || {});
+      if (vm?.isDisabled) return this.disabledFlexibleAssetCard(rt,vm.raw || row,vm.planning || {});
       const planning = vm?.planning || rt.planningOutcomeFor(id) || {};
       const raw = vm?.raw || row;
-      const asset = this.energyAssetContext(rt, { ...raw, ...row, visual_ref:firstDefined(raw.visual_ref,row.visual_ref,'') });
-      const status = this.canonicalOperationalStatus(rt, asset, planning);
-      const commands = rt.commandsForAsset(id);
-      const startCommand = commands.find(c => rt.commandRole(c) === 'start');
-      const stop = commands.find(c => rt.commandRole(c) === 'stop');
-      const pause = commands.find(c => rt.commandRole(c) === 'pause');
-      const resume = commands.find(c => rt.commandRole(c) === 'resume');
-      const stateRaw = firstDefined(planning.product_state, planning.status, planning.state, row.status, planning.active ? 'active' : planning.waiting ? 'waiting' : planning.planned ? 'planned' : asset.operating_state, 'available');
+      const asset = this.energyAssetContext(rt,{...raw,...row,visual_ref:firstDefined(raw.visual_ref,row.visual_ref,'')});
+      const stateRaw = firstDefined(planning.product_state,planning.status,planning.state,asset.operating_state,'available');
       const state = this.userStateText(stateRaw);
-      const availability = String(firstDefined(asset.availability_state, status.unavailable ? 'unavailable' : 'available') || '').toLowerCase();
-      const healthRaw = firstDefined(asset.health, asset.lifecycle_state, asset.status, '');
-      const health = status.unavailable ? 'Unavailable' : healthRaw ? human(healthRaw) : 'Available';
-      const chargerId = String(firstDefined(asset.effective_charger, asset.charger_asset_id, asset.connection_asset_id, asset.execution_target_asset_id, '') || '');
-      const relation = chargerId ? `${rt.assetName(chargerId) || human(chargerId)} · ${human(firstDefined(asset.connection_state,'linked'))}` : '';
-      const reason = humanReason(firstDefined(planning.user_reason_label, planning.waiting_reason, planning.waiting_reason_code, planning.reason, planning.reason_code, row.reason), state === 'Ready' ? 'Ready when you need it.' : 'Home Intelligence is monitoring this asset.');
-      const paused = /paused|hold/.test(String(stateRaw || '').toLowerCase()) || rt.commandEnabled(resume);
-      const executionPolicy = this.automationExecutionPolicy(rt);
-      let recommendation = 'Home Intelligence will keep monitoring this asset.';
-      if (/waiting/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
-        ? 'Home Intelligence may act automatically when the planned conditions are available.'
-        : executionPolicy.configuredMode === 'advice'
-          ? 'Home Intelligence will keep the recommendation ready and wait for your approval.'
-          : 'Planning remains visible, but managed execution is disabled.';
-      if (/planned|scheduled/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
-        ? 'Home Intelligence has included this asset in the executable current plan.'
-        : 'Home Intelligence has included this asset in the advisory plan.';
-      if (/active|charging|running/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
-        ? 'Let Home Intelligence continue unless you want to stop or pause control.'
-        : 'Current physical execution is shown separately from advisory planning.';
-      if (paused) recommendation = 'Resume managed participation when you want Home Intelligence to include this asset again.';
-      const actions = [
-        paused ? this.componentActionButton(resume, 'Resume managed control', id) : this.componentActionButton(pause, 'Pause managed control', id),
-        /active|charging|running/.test(String(stateRaw || '').toLowerCase()) ? this.componentActionButton(stop, 'Stop now', id) : this.componentActionButton(startCommand, 'Start now', id)
-      ].join('');
-      const currentPower = asNumber(firstDefined(row.current_power_kw, row.actual_power_kw, row.power_kw, raw.current_power_kw, raw.actual_power_kw, raw.power_kw));
-      const requestedPower = asNumber(firstDefined(row.requested_power_kw, raw.requested_power_kw));
+      const currentPower = asNumber(firstDefined(row.current_power_kw,row.actual_power_kw,row.power_kw,raw.current_power_kw,raw.actual_power_kw,raw.power_kw,null));
       const energyNeed = asNumber(firstDefined(
-        planning.energy_to_target_kwh, planning.energy_needed_kwh, planning.remaining_energy_kwh, planning.energy_need_kwh,
-        row.energy_to_target_kwh, row.energy_needed_kwh, row.remaining_energy_kwh, row.energy_need_kwh,
-        raw.energy_to_target_kwh, raw.energy_needed_kwh, raw.remaining_energy_kwh, raw.energy_need_kwh
+        planning.energy_to_target_kwh,planning.energy_needed_kwh,planning.remaining_energy_kwh,planning.energy_need_kwh,
+        row.energy_to_target_kwh,row.energy_needed_kwh,row.remaining_energy_kwh,row.energy_need_kwh,
+        raw.energy_to_target_kwh,raw.energy_needed_kwh,raw.remaining_energy_kwh,raw.energy_need_kwh
       ));
-      const plannedToday = asNumber(firstDefined(planning.planned_today_kwh, row.planned_today_kwh, raw.planned_today_kwh));
-      const plannedTomorrow = asNumber(firstDefined(planning.planned_tomorrow_kwh, row.planned_tomorrow_kwh, raw.planned_tomorrow_kwh));
-      const stillToPlan = asNumber(firstDefined(planning.still_to_plan_kwh, planning.remaining_need_kwh, planning.unresolved_horizon_kwh, row.still_to_plan_kwh, raw.still_to_plan_kwh));
-      const planningLabel = firstDefined(planning.user_state_label, planning.product_state, planning.status, planning.state, '');
-      const area = this.energyAssetAreaLabel(asset);
-      const facts = [
-        ['Power now', fmtKw(currentPower,'0.0 kW')],
-        energyNeed !== null ? ['Required', fmtKwh(energyNeed)] : null,
-        plannedToday !== null ? ['Planned today', fmtKwh(plannedToday)] : null,
-        stillToPlan !== null ? ['Still to plan', fmtKwh(stillToPlan)] : null,
-        planningLabel ? ['Plan', human(planningLabel)] : null
-      ].filter(Boolean).slice(0,5);
-      const details = `${this.kv('Availability', human(availability))}${this.kv('Health', health)}${this.kv('Current power', fmtKw(currentPower, '0.0 kW'))}${this.kv('Requested power', fmtKw(requestedPower, '—'))}${energyNeed !== null ? this.kv('Energy needed',fmtKwh(energyNeed)) : ''}${plannedToday !== null ? this.kv('Planned today',fmtKwh(plannedToday)) : ''}${plannedTomorrow !== null ? this.kv('Planned tomorrow',fmtKwh(plannedTomorrow)) : ''}${stillToPlan !== null ? this.kv('Still to plan',fmtKwh(stillToPlan)) : ''}${this.kv('Automation', human(firstDefined(row.automation_mode, raw.automation_mode, 'Advice')))}${relation ? this.kv('Relationship', relation) : ''}${this.energyAssetDetailDisclosure(rt,asset)}`;
-      return `<article class="managedAssetCard"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${area ? `${escapeHtml(area)} · ` : ''}${escapeHtml(state)} · ${escapeHtml(health)}</span></div></div><b>${fmtKw(currentPower, '0.0 kW')}</b></div><div class="managedAssetFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>${relation ? `<div class="managedAssetRelationship"><small>Connected via</small><b>${escapeHtml(relation)}</b></div>` : ''}<div class="managedAssetStory"><p>${escapeHtml(reason)}</p><div><small>What Home Intelligence will do</small><b>${escapeHtml(recommendation)}</b></div></div>${actions ? `<div class="managedAssetActions">${actions}</div>` : ''}${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}</article>`;
+      const plannedToday = asNumber(firstDefined(planning.planned_today_kwh,row.planned_today_kwh,raw.planned_today_kwh,null));
+      const stillToPlan = asNumber(firstDefined(planning.still_to_plan_kwh,planning.remaining_need_kwh,row.still_to_plan_kwh,raw.still_to_plan_kwh,null));
+      const readyBy = String(firstDefined(planning.ready_by,planning.deadline_time,row.ready_by,raw.ready_by,'') || '').trim();
+      const chargerId = String(firstDefined(asset.effective_charger,asset.charger_asset_id,asset.connection_asset_id,asset.execution_target_asset_id,'') || '');
+      const chargerDisplay = String(firstDefined(
+        asset.effective_charger_display_name,
+        asset.charger_display_name,
+        asset.connection_display_name,
+        asset.physical_connection_display_name,
+        ''
+      ) || '').trim();
+      const relation = chargerId ? (chargerDisplay || 'Charger unavailable') : '';
+      const requestedRow = this.flexiblePropertyRow(rt,id,['requested_charge_power_kw','requested_power_kw','energy_control_requested_power_kw','target_power_kw','setpoint_power_kw','charge_power_setpoint_kw']);
+      const requested = rowValue(requestedRow,null) ?? row.requested_power_kw ?? raw.requested_power_kw ?? null;
+      const requestedControl = requestedRow && !requestedRow.missing && this.isWritableRow(requestedRow)
+        ? this.editablePropertyControl(requestedRow,{title:'Requested charge power',description:'Charging power requested from this asset.',type:'range',fallbackValue:requested,immediateWrite:true})
+        : '';
+      const actions = rt.commandActionModelsForAsset(id).filter(action=>['start','stop','pause','resume'].includes(action.role) && action.visible && action.enabled);
+      const keyFacts = [
+        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
+        readyBy ? ['Ready by',human(readyBy)] : null,
+        plannedToday !== null ? ['Planned today',fmtKwh(plannedToday)] : null,
+        stillToPlan !== null ? ['Still to plan',fmtKwh(stillToPlan)] : null
+      ].filter(Boolean).slice(0,4);
+      const configuration = requestedControl
+        ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${requestedControl}</div></details>`
+        : '';
+      const detailRows = [
+        relation ? ['Connection',relation] : null,
+        requested !== null ? ['Requested power',fmtKw(requested,'—')] : null,
+        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
+        plannedToday !== null ? ['Planned today',fmtKwh(plannedToday)] : null,
+        stillToPlan !== null ? ['Still to plan',fmtKwh(stillToPlan)] : null
+      ].filter(Boolean);
+      const details = detailRows.length
+        ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
+        : '';
+      const diagnostics = `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid"><span><small>Asset id</small><b>${escapeHtml(id)}</b></span><span><small>Health</small><b>${escapeHtml(human(firstDefined(asset.health,asset.lifecycle_state,asset.status,'Unknown')))}</b></span>${requestedControl ? '' : `<span><small>Requested charge power</small><b>${escapeHtml(requestedRow && !requestedRow.missing ? (requestedRow.editable_reason || 'Read-only') : 'Not published')}</b></span>`}</div></details>`;
+      return `<article class="managedAssetCard compactManagedAsset"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${escapeHtml(state)}${relation ? ` · ${escapeHtml(relation)}` : ''}</span></div></div><b>${escapeHtml(fmtKw(currentPower,'—'))}</b></div>
+        ${keyFacts.length ? `<div class="managedAssetFacts">${keyFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>` : ''}
+        ${actions.length ? `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${actions.map(action=>this.componentActionModelButton(action)).join('')}</div></div>` : ''}
+        <div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div>
+      </article>`;
     }
 
     filterAndSortConsumers(rows = []) {
@@ -6337,27 +6473,37 @@ function rhiEnergyVisualPickerStyles() {
       const d = rt.decision();
       const profiles = rt.strategyProfileRows();
       const effectiveStrategies = rt.effectiveStrategyRows();
-      const planningRows = this.flexibleAssetDomain(rt).planningRows();
-      const visibleCommands = rt.visibleCommands().filter(c => rt.commandVisible(c));
       const fallbackProfile = profiles[0] || null;
-      const selected = this.selectedStrategyProfileId
+      let selected = this.selectedStrategyProfileId
         ? (rt.strategyProfileFor(this.selectedStrategyProfileId) || null)
         : fallbackProfile;
-      if (selected && !this.selectedStrategyProfileId) this.selectedStrategyProfileId = selected.profile_id;
+      if (!selected && fallbackProfile) selected = fallbackProfile;
+      if (selected && this.selectedStrategyProfileId !== selected.profile_id) this.selectedStrategyProfileId = selected.profile_id;
       const selectedId = selected?.profile_id || '';
-      const unavailableSelectedProfile = this.selectedStrategyProfileId && !selected
-        ? `<option value="${escapeHtml(this.selectedStrategyProfileId)}" selected disabled>Selected profile temporarily unavailable</option>`
+      const selectedTopic = selected ? this.profileSettingsTopic(selected) : '';
+
+      const topicGroups = new Map();
+      profiles.forEach(profile => {
+        const topic = this.profileSettingsTopic(profile);
+        if (!topicGroups.has(topic)) topicGroups.set(topic, []);
+        topicGroups.get(topic).push(profile);
+      });
+      const topicOrder = ['Home & priorities','Battery','EV charging','Solar','Grid & tariffs','Home & resilience'];
+      const topics = [...topicGroups.entries()].sort(([left],[right]) => {
+        const li=topicOrder.indexOf(left), ri=topicOrder.indexOf(right);
+        if(li>=0 || ri>=0) return (li<0?99:li)-(ri<0?99:ri);
+        return left.localeCompare(right);
+      });
+      const topicButtons = topics.map(([topic,rows]) => {
+        const target = rows[0];
+        const active = topic === selectedTopic;
+        return `<button type="button" class="settingsTopicButton${active?' active':''}" data-settings-topic-profile="${escapeHtml(target.profile_id || '')}" aria-pressed="${active?'true':'false'}"><b>${escapeHtml(topic)}</b><span>${escapeHtml(this.profileUserDescription(target))}</span></button>`;
+      }).join('');
+      const selectedGroup = selectedTopic ? (topicGroups.get(selectedTopic) || []) : [];
+      const variantSelect = selectedGroup.length > 1
+        ? `<label class="settingsVariantSelect"><span>Policy set</span><select data-strategy-profile-select>${selectedGroup.map(profile=>`<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id)===String(selectedId)?' selected':''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>`
         : '';
-      const profilePicker = profiles.length ? `<section class="panel strategyProfilePicker compact"><div><h2>Settings profile</h2><p>Choose the domain policy set you want to review or adjust.</p></div><label class="strategyProfileSelect"><span>Profile</span><select data-strategy-profile-select>${unavailableSelectedProfile}${profiles.map(profile => `<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>${selected ? `<small>${escapeHtml(this.profileUserDescription(selected))}</small>` : `<small>The selected profile is temporarily unavailable. Your selection is preserved.</small>`}</section>` : '';
-      const effectiveRowsForProfile = selectedId
-        ? effectiveStrategies.filter(strategy => {
-            const text = `${strategy.profile_id || ''} ${strategy.strategy_profile_id || ''} ${strategy.profile_type || ''} ${strategy.asset_type || ''} ${strategy.policy_profile || ''}`.toLowerCase();
-            const wanted = String(selectedId).toLowerCase();
-            return text.includes(wanted) || text.includes(String(selected.profile_type || '').toLowerCase()) || text.includes(String(selected.asset_type || '').toLowerCase());
-          })
-        : effectiveStrategies;
-      const effectiveRows = (effectiveRowsForProfile.length ? effectiveRowsForProfile : effectiveStrategies).map(strategy => this.effectivePolicyPreviewCard(rt, strategy)).join('');
-      const diagnostics = `${this.kv('Editable strategy source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy')}${this.kv('Effective context source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy.effective_properties')}${this.kv('Planning outcome source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning')}${this.kv('Explanation source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.intelligence')}${this.kv('Action source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.commands')}${this.kv('Selected profile', selectedId || 'None')}`;
+
       const automationRow = rt.editableProperty('energy.automation_mode') || rt.row('energy.automation_mode');
       const automationMode = rowValue(automationRow, this.energyAutomationMode(rt,d) || 'advice');
       const automationOptions = allowedValuesForRow(automationRow).length
@@ -6366,16 +6512,29 @@ function rhiEnergyVisualPickerStyles() {
       const automationControl = this.isWritableRow(automationRow)
         ? this.componentSegmentedControl(automationOptions, automationMode, 'automationModeControl')
         : `<div class="profileNoControls">Automation mode is not writable in the current public contract.</div>`;
-      return `${this.tabExperienceHeader(rt,'strategies',pageVm)}<div class="strategiesPage strategyProfilesPage strategyProfileUx">
-        <section class="panel strategyAutomationMode"><div><h2>Automation mode</h2><p>Choose how Home Intelligence may act. Domain ownership stays in the backend; changes are confirmed by authoritative readback.</p></div>${automationControl}${this.editablePropertyFeedback(automationRow)}</section>
-        ${profilePicker || `<section class="panel"><h2>No settings profiles published</h2><p>Waiting for canonical domain settings.</p></section>`}
-        <div class="profileEditorColumn">${selected ? this.strategyProfileCard(rt, selected) : ''}</div>
-        <section class="panel effectivePolicyPreview"><h2>Current policy effect${selected ? ` · ${escapeHtml(this.profileUserLabel(selected))}` : ''}</h2><p>Configured, effective and influencing policy state.</p><div class="effectivePolicyList">${effectiveRows || `<div class="empty"><b>No effective strategy published</b><span>Waiting for canonical V2 effective strategy.</span></div>`}</div></section>
-        <section class="panel strategyParticipation"><h2>Participating assets</h2><p>Physical control and planning structure published by Energy.</p><div class="settingsParticipationTree">${rt.settingsParticipationRows().map(parent=>{
-          const parentAsset=rt.asset(parent.asset_id) || parent;
-          const children=asArray(parent.children);
-          return `<article class="settingsParticipationRoot"><div class="settingsParticipationRootHead">${this.assetVisual(parentAsset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(parentAsset)})}<div><b>${escapeHtml(parent.display_name || rt.assetName(parent.asset_id) || human(parent.asset_id))}</b><span>${escapeHtml(human(parent.participation_role || parent.asset_type || 'Participating'))}</span></div></div><div class="settingsParticipationChildren">${children.map(child=>{const childAsset=rt.asset(child.asset_id)||child;return `<div class="settingsParticipationChild">${this.assetVisual(childAsset,{size:'xs',fallbackIcon:this.flexibleAssetIcon(childAsset)})}<div><b>${escapeHtml(child.display_name || rt.assetName(child.asset_id) || human(child.asset_id))}</b><span>${escapeHtml(human(child.relationship_type || child.asset_type || 'Member'))}</span></div>${child.planning_eligible===undefined?'':`<strong>${child.planning_eligible?'Planning ready':'Not planning ready'}</strong>`}</div>`;}).join('') || '<div class="settingsParticipationEmpty">No related assets published</div>'}</div></article>`;
-        }).join('') || `<div class="empty"><b>No participating structure published</b><span>Energy has not published a control/planning hierarchy.</span></div>`}</div></section>
+
+      const effectiveRowsForProfile = selectedId
+        ? effectiveStrategies.filter(strategy => {
+            const text = `${strategy.profile_id || ''} ${strategy.strategy_profile_id || ''} ${strategy.profile_type || ''} ${strategy.asset_type || ''} ${strategy.policy_profile || ''}`.toLowerCase();
+            const wanted = String(selectedId).toLowerCase();
+            return text.includes(wanted) || text.includes(String(selected?.profile_type || '').toLowerCase()) || text.includes(String(selected?.asset_type || '').toLowerCase());
+          })
+        : effectiveStrategies;
+      const effectiveRows = (effectiveRowsForProfile.length ? effectiveRowsForProfile : effectiveStrategies).map(strategy => this.effectivePolicyPreviewCard(rt,strategy)).join('');
+      const participation = rt.settingsParticipationRows().map(parent => {
+        const parentAsset=rt.asset(parent.asset_id) || parent;
+        const children=asArray(parent.children);
+        return `<article class="settingsParticipationRoot"><div class="settingsParticipationRootHead">${this.assetVisual(parentAsset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(parentAsset)})}<div><b>${escapeHtml(parent.display_name || rt.assetName(parent.asset_id) || human(parent.asset_id))}</b><span>${escapeHtml(human(parent.participation_role || parent.asset_type || 'Participating'))}</span></div></div><div class="settingsParticipationChildren">${children.map(child=>{const childAsset=rt.asset(child.asset_id)||child;return `<div class="settingsParticipationChild">${this.assetVisual(childAsset,{size:'xs',fallbackIcon:this.flexibleAssetIcon(childAsset)})}<div><b>${escapeHtml(child.display_name || rt.assetName(child.asset_id) || human(child.asset_id))}</b><span>${escapeHtml(human(child.relationship_type || child.asset_type || 'Member'))}</span></div></div>`;}).join('')}</div></article>`;
+      }).join('');
+
+      return `${this.tabExperienceHeader(rt,'strategies',pageVm)}<div class="strategiesPage settingsTopicPage">
+        <section class="panel strategyAutomationMode compactSettingsBlock"><div><h2>Automation</h2><p>Choose how much Home Intelligence may act for you.</p></div>${automationControl}${this.editablePropertyFeedback(automationRow)}</section>
+        <section class="panel settingsTopicChooser"><div class="settingsTopicHead"><h2>What do you want to adjust?</h2><p>Settings are grouped by the part of your energy system you want to influence.</p></div><div class="settingsTopicGrid">${topicButtons || '<div class="empty"><b>No settings topics available</b><span>No editable Energy policy profiles are currently published.</span></div>'}</div></section>
+        ${selected ? `<section class="settingsSelectedTopic"><div class="settingsSelectedTopicHead"><div><small>SETTINGS</small><h2>${escapeHtml(selectedTopic)}</h2></div>${variantSelect}</div>${this.strategyProfileCard(rt,selected)}</section>` : ''}
+        <details class="panel settingsAdvancedDisclosure"><summary>Advanced</summary><div class="settingsAdvancedBody">
+          <section><h3>Effective behavior</h3><div class="effectivePolicyList">${effectiveRows || '<div class="empty compact"><b>No effective behavior published</b></div>'}</div></section>
+          ${participation ? `<section><h3>Participating assets</h3><div class="settingsParticipationTree">${participation}</div></section>` : ''}
+        </div></details>
       </div>`;
     }
 
@@ -7103,32 +7262,35 @@ function rhiEnergyVisualPickerStyles() {
       const totalNeed = asNumber(canonicalTotals.flexible_required_kwh);
       const totalPlanned = asNumber(canonicalTotals.flexible_planned_kwh);
       const remainingNeed = asNumber(canonicalTotals.flexible_still_to_plan_kwh);
+      const displayNeed = vm.complete ? totalNeed : null;
+      const displayPlanned = vm.complete ? totalPlanned : null;
+      const displayRemaining = vm.complete ? remainingNeed : null;
       const planStatus = String(firstDefined(vm.currentActionIntent.action_state, vm.currentActionIntent.state, vm.summary.plan_status, vm.horizon.status, vm.horizon.state, vm.complete?'available':'unavailable'));
       const confidence = firstDefined(vm.quality.confidence, vm.horizon.confidence, 'Limited');
       const statusLabel = /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
       const plannedTotals = assetTotals.map(item => `<span class="planningFooterAsset">${this.assetVisual(item.asset,{size:'xs',fallbackIcon:this.planningAssetIcon(item.asset)})}<b>${escapeHtml(this.planningAssetName(item.asset))}</b> ${item.plannedEnergy===null?'—':item.plannedEnergy.toFixed(1)+' kWh'}</span>`).join('');
       const summaryItems = vm.horizonId === 'D1'
-        ? [['Need entering tomorrow',totalNeed],['Planned tomorrow',totalPlanned],['Still after tomorrow',remainingNeed]]
-        : [['Need entering today',totalNeed],['Planned today',totalPlanned],['Still after today',remainingNeed]];
+        ? [['Need entering tomorrow',displayNeed],['Planned tomorrow',displayPlanned],['Still after tomorrow',displayRemaining]]
+        : [['Need entering today',displayNeed],['Planned today',displayPlanned],['Still after today',displayRemaining]];
       const summaryTotals = `<div class="planningAggregateTotals">${summaryItems.map(([label,value])=>`<span><small>${label}</small><b>${value===null?'—':value.toFixed(1)+' kWh'}</b></span>`).join('')}</div>`;
       const disclosure = firstDefined(vm.rows.find(row=>row.disclosure)?.disclosure, vm.quality.basis ? `Planning basis: ${human(vm.quality.basis)}. Actual execution follows the current operational intent.` : 'Future buckets are advisory. Actual execution follows the current operational intent.');
       const balanceLabel = sourceTotal===null || useTotal===null ? 'Planning balance unavailable' : `${sourceTotal.toFixed(1)} kWh source · ${useTotal.toFixed(1)} kWh use${balanceDelta===null?'':` · Δ ${balanceDelta.toFixed(3)} kWh`}`;
-      const heroValue = totalPlanned===null ? '—' : totalPlanned.toFixed(1)+' kWh';
+      const heroValue = displayPlanned===null ? '—' : displayPlanned.toFixed(1)+' kWh';
       const planningHeader = {
         image:hbEnergyHeroAsset('solar-generation'),
         icon:'▣',
         eyebrow:'Tactical planning',
         title:`${horizonLabel} plan`,
         value:heroValue,
-        unit:totalNeed===null?'planned flexible energy':`of ${totalNeed.toFixed(1)} kWh flexible need`,
-        explanation:remainingNeed===null?'Remaining need is unavailable.':`${remainingNeed.toFixed(1)} kWh still needs a suitable opportunity.`,
+        unit:displayNeed===null?'planned flexible energy':`of ${displayNeed.toFixed(1)} kWh flexible need`,
+        explanation:displayRemaining===null?'Remaining need is unavailable.':`${displayRemaining.toFixed(1)} kWh still needs a suitable opportunity.`,
         tone:'purple',
         badgeText:vm.contractSupported ? statusLabel : 'Unavailable',
         badgeTone:vm.contractSupported && vm.complete ? 'ok' : 'attention',
         metrics:[
-          ['◎',vm.horizonId === 'D1' ? 'Need entering tomorrow' : 'Need entering today',fmtKwh(totalNeed,'—'),horizonLabel],
-          ['▣',vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today',fmtKwh(totalPlanned,'—'),horizonLabel],
-          ['◷',vm.horizonId === 'D1' ? 'Still after tomorrow' : 'Still after today',fmtKwh(remainingNeed,'—'),'Horizon-local residual'],
+          ['◎',vm.horizonId === 'D1' ? 'Need entering tomorrow' : 'Need entering today',fmtKwh(displayNeed,'—'),horizonLabel],
+          ['▣',vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today',fmtKwh(displayPlanned,'—'),horizonLabel],
+          ['◷',vm.horizonId === 'D1' ? 'Still after tomorrow' : 'Still after today',fmtKwh(displayRemaining,'—'),'Horizon-local residual'],
           ['✓','Confidence',this.productStateLabel(confidence,'Limited'),'Planning confidence']
         ]
       };
@@ -7137,12 +7299,19 @@ function rhiEnergyVisualPickerStyles() {
       const nextLines = assetTotals.map(item => this.assetIdentityChip(item.asset,fmtKw(firstDefined(item.asset.requested_power_kw,item.asset.requested_charge_power_kw,item.asset.requested_power_kw_effective),'—'))).join('');
       const planningLoadRows = assetTotals.map(item => {
         const canonical=item.canonical||{};
-        const priority=human(firstDefined(item.asset.energy_control_priority,item.asset.priority_label,'Normal'));
-        const next=String(firstDefined(canonical.what_text,canonical.next_action_label,canonical.next_action,canonical.today_label,'Wait'));
-        const why=String(firstDefined(canonical.why_text,canonical.reason_label,'No explanation published.'));
-        const eligibility = canonical.planning_eligible === true ? 'Planning ready' : String(firstDefined(canonical.user_status, item.asset.user_status, 'Not eligible'));
-        const planStatus = firstDefined(canonical.planning_status, canonical.plan_conformance_label, canonical.exception_label, canonical.risk_label, eligibility);
-        return `<article class="planningLoadRow"><div class="planningLoadIdentity">${this.assetVisual(item.asset,{size:'sm',fallbackIcon:this.planningAssetIcon(item.asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(item.asset))}</b><span class="priorityBadge">${escapeHtml(priority)}</span></div><small>${escapeHtml(eligibility)}</small></div></div><div><small>Next action</small><b class="nextActionBadge">${escapeHtml(next)}</b></div><div><small>Requested power</small><b>${fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')}</b></div><div><small>${vm.horizonId==='D1'?'Planned tomorrow':'Planned today'}</small><b>${fmtKwh(item.plannedEnergy,'—')}</b></div><div><small>Why / reason</small><b>${escapeHtml(why)}</b></div><div><small>Plan status</small><b class="planStatusBadge ${/at.?risk|blocked|failed|incomplete/i.test(String(planStatus))?'exception':'unknown'}">${escapeHtml(planStatus)}</b></div></article>`;
+        const nextRaw=String(firstDefined(canonical.what_text,canonical.next_action_label,canonical.next_action,canonical.today_label,'') || '').trim();
+        const next=nextRaw && !/^(wait|none)$/i.test(nextRaw) ? human(nextRaw) : '';
+        const whyRaw=String(firstDefined(canonical.why_text,canonical.reason_label,canonical.reason,'') || '').trim();
+        const why=whyRaw && !/^(none|no explanation available\.?|no explanation published\.?)$/i.test(whyRaw) ? humanReason(whyRaw,'') : '';
+        const eligibility = canonical.planning_eligible === true ? 'Planning ready' : String(firstDefined(canonical.user_status,item.asset.user_status,'Incomplete'));
+        const planStatus = firstDefined(canonical.planning_status,canonical.plan_conformance_label,canonical.exception_label,canonical.risk_label,eligibility);
+        const facts=[
+          ['Requested power',fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')],
+          [vm.horizonId==='D1'?'Planned tomorrow':'Planned today',fmtKwh(item.plannedEnergy,'—')],
+          next ? ['Next action',next] : null,
+          why ? ['Reason',why] : null
+        ].filter(Boolean);
+        return `<article class="planningLoadRow compactPlanningLoad"><div class="planningLoadIdentity">${this.assetVisual(item.asset,{size:'sm',fallbackIcon:this.planningAssetIcon(item.asset)})}<div><b>${escapeHtml(this.planningAssetName(item.asset))}</b><small>${escapeHtml(eligibility)}</small></div></div><div class="compactPlanningFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div><b class="planStatusBadge ${/at.?risk|blocked|failed|incomplete/i.test(String(planStatus))?'exception':'unknown'}">${escapeHtml(planStatus)}</b></article>`;
       }).join('');
       const incompletePlanningRows = asArray(vm.assets).filter(asset => asset && asset.planning_input_ready === false).map(asset => { const blockers=asArray(asset.planning_blockers); const userReason=blockers.includes('target_soc_not_configured')?'Set a target charge level.':blockers.includes('ready_by_not_configured')?'Set a ready-by time.':blockers.includes('charger_not_assigned')?'Assign a charger.':'Charging information is incomplete.'; return `<article class="planningLoadRow planningInputIncomplete"><div class="planningLoadIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.planningAssetIcon(asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(asset))}</b></div><small>${escapeHtml(userReason)}</small></div></div><div><small>Current charge</small><b>${fmtPct(asset.current_soc_pct)}</b></div><div><small>Target</small><b>${fmtPct(asset.target_soc_pct)}</b></div><div><small>Ready by</small><b>${escapeHtml(asset.ready_by || 'Not set')}</b></div><div><small>Charging power</small><b>${fmtKw(asset.max_power_kw,'—')}</b></div><div><small>Status</small><b class="planStatusBadge exception">Needs setup</b></div></article>`; }).join('');
       return `${this.tabExperienceHeader(rt,'planning',planningHeader)}
@@ -7152,49 +7321,42 @@ function rhiEnergyVisualPickerStyles() {
 
     strategicPlanning(rt) {
       const base = this.buildPageViewModel(rt, 'strategies');
-      const profiles = asArray(rt.strategyProfileRows());
-      const effective = asArray(rt.effectiveStrategyRows());
-      const configured = profiles.flatMap(profile => {
-        const rows = asArray(firstDefined(profile.editable_field_rows, profile.properties, profile.fields, []));
-        return rows.map(row => ({ ...objectFrom(row), profile_id:firstDefined(row.profile_id, profile.profile_id, '') }));
-      });
-      const byKey = new Map();
-      [...configured, ...effective].forEach(row => {
-        const key = String(firstDefined(row.property_key,row.property_id,row.key,row.setting_id,row.id,'') || '');
-        if (!key) return;
-        byKey.set(key, { ...(byKey.get(key) || {}), ...objectFrom(row), property_key:key });
-      });
-      const rows = [...byKey.values()];
-      const objectiveRows = rows.filter(row => /objective|goal|mode|solar_policy|grid_policy|battery_policy/i.test(row.property_key));
-      const constraintRows = rows.filter(row => /reserve|minimum|maximum|limit|deadline|priority|resilience|threshold/i.test(row.property_key));
-      const optimisationRows = rows.filter(row => !objectiveRows.includes(row) && !constraintRows.includes(row));
+      const topics = rt.strategyBehaviorTopics();
       const valueText = row => {
         const value = firstDefined(row.effective_value,row.value,row.configured_value,row.selected_value,row.current_value,null);
-        if (value === null) return 'Not published';
+        if (value === null || value === undefined || value === '') return 'Not published';
         return this.genericValueWithUnit(value, firstDefined(row.unit,row.native_unit,''));
       };
-      const rowMarkup = row => `<div class="planningTransparencyRow"><div><b>${escapeHtml(human(row.label || row.name || row.property_key))}</b><span>${escapeHtml(row.profile_id ? human(row.profile_id) : 'Effective strategy')}</span></div><strong>${escapeHtml(valueText(row))}</strong></div>`;
-      const section = (title, description, items) => `<section class="panel"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p><div class="effectivePolicyList">${items.length ? items.map(rowMarkup).join('') : '<div class="empty"><b>No values published</b><span>The canonical strategy contract does not currently publish values for this section.</span></div>'}</div></section>`;
+      const topicCards = topics.map(topic => {
+        const properties = asArray(topic.properties);
+        const lines = properties.slice(0,8).map(row => {
+          const label = this.profileFieldLabel(row);
+          return `<div class="strategicBehaviorRow"><span>${escapeHtml(label)}</span><b>${escapeHtml(valueText(row))}</b></div>`;
+        }).join('');
+        return `<section class="panel strategicBehaviorCard"><h2>${escapeHtml(topic.topic_label || human(topic.topic_id))}</h2><div class="strategicBehaviorRows">${lines || '<div class="empty compact"><span>No effective values published.</span></div>'}</div></section>`;
+      }).join('');
+
+      const allProperties = topics.flatMap(topic => asArray(topic.properties));
+      const automationRow = allProperties.find(row => String(firstDefined(row.property_id,row.property_key,row.key,'') || '') === 'energy.automation_mode') || null;
+      const objectiveRow = allProperties.find(row => ['home.primary_objective','strategy.home.primary_objective'].includes(String(firstDefined(row.property_id,row.property_key,row.key,'') || ''))) || null;
+      const mode = automationRow ? valueText(automationRow) : this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'),'Advice');
+      const objective = objectiveRow ? valueText(objectiveRow) : '';
+      const posture = [mode,objective].filter(value=>value && value!=='Not published').join(' · ');
       const model = {
         ...base,
         image:hbEnergyHeroAsset('strategic-planning'),
         title:'Strategic Planning',
-        explanation:'Longer-term goals, constraints and optimisation policy.',
+        explanation:'What your current Energy settings mean for longer-term behavior.',
         metrics:[
-          ['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'),'Automatic'),'Current control mode'],
-          ['◇','Objectives',String(objectiveRows.length),'Published strategic goals and policies'],
-          ['◫','Constraints',String(constraintRows.length),'Published limits and resilience constraints'],
-          ['↗','Tactical horizon','D0 / D1','Scheduling remains owned by Tactical Planning']
+          ['◎','Strategy',posture || 'Not published','Current longer-term posture'],
+          ['◇','Topics',String(topics.length),'Backend-owned policy areas influencing strategy'],
+          ['↗','Tactical horizon','D0 / D1','Today and tomorrow remain in Tactical Planning']
         ]
       };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}
-        <div class="strategicPlanningPage">
-          <section class="panel strategicPlanningIntro"><h2>Strategic posture</h2><p>Strategy configuration is the authority for longer-term intent. This view is read-only: edit intent in Settings; Tactical Planning owns today/tomorrow scheduling and Operational Planning owns execution.</p></section>
-          <div class="strategyGrid">
-            ${section('Goals & policy','What Home Intelligence is trying to optimise over time.',objectiveRows)}
-            ${section('Constraints & resilience','Boundaries that planning must respect.',constraintRows)}
-          </div>
-          ${optimisationRows.length ? section('Other effective policy','Additional effective strategy values currently influencing planning.',optimisationRows) : ''}
+        <div class="strategicPlanningPage strategicBehaviorPage">
+          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not published')}</h2><p>Strategy configuration is the authority for longer-term intent. This read-only view explains the effective meaning of your current Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
+          <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No strategic behavior published</b><span>The backend has not published effective behavior topics yet.</span></div></section>'}</div>
         </div>`;
     }
 
@@ -7340,7 +7502,7 @@ function rhiEnergyVisualPickerStyles() {
         console.error(`[HomeBrain Energy ${UX_VERSION}] ${this.view} render failed`, error);
         content = this.renderError(this.view, error);
       }
-      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${this.energyHardwareStyles()}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
+      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${this.energyHardwareStyles()}${typeof rhiUxVisualPickerStyles === 'function' ? rhiUxVisualPickerStyles() : ''}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
 
       /* R3.62.0 canonical component framework and adaptive convergence */
       :host{--hi-space-1:4px;--hi-space-2:8px;--hi-space-3:12px;--hi-space-4:16px;--hi-radius-sm:8px;--hi-radius-md:12px;--hi-break-tablet:980px;--hi-break-phone:700px}
@@ -7593,6 +7755,29 @@ function rhiEnergyVisualPickerStyles() {
 
 
       }
+
+
+      /* 4.3.22 UX-only literal product grammar: compact, predictable, no whitespace-led hierarchy. */
+      .energyAssetFoldStack{display:grid;gap:0;margin-top:6px;border-top:1px solid #edf1f5}
+      .energyAssetDisclosure{margin:0;border:0;border-bottom:1px solid #edf1f5;background:transparent;border-radius:0}
+      .energyAssetDisclosure:last-child{border-bottom:0}
+      .energyAssetDisclosure>summary{min-height:42px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;padding:8px 4px;cursor:pointer;list-style:none;font-size:11px;font-weight:700;color:#42526a}
+      .energyAssetDisclosure>summary::-webkit-details-marker{display:none}.energyAssetDisclosure>summary:after{content:"›";font-size:17px;color:#94a3b8;transform:rotate(0deg)}.energyAssetDisclosure[open]>summary:after{transform:rotate(90deg)}
+      .energyAssetFoldBody{padding:2px 4px 9px}.energyAssetDetailGrid,.energyAssetDiagnosticGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+      .energyAssetDetailGrid>span,.energyAssetDiagnosticGrid>span{min-height:34px;padding:6px 8px;border-radius:8px;background:#f8fafc;box-sizing:border-box}.energyAssetDetailGrid small,.energyAssetDiagnosticGrid small{display:block;font-size:8px;color:#64748b}.energyAssetDetailGrid b,.energyAssetDiagnosticGrid b{display:block;margin-top:1px;font-size:10px;line-height:1.25;overflow-wrap:anywhere}
+      .energyAssetChildrenBody{padding-top:4px}.energyAssetQuickActions{display:flex;align-items:center;gap:8px;margin:5px 0}.energyAssetQuickActions>small{font-size:8px;font-weight:750;letter-spacing:.08em;text-transform:uppercase;color:#64748b}.energyAssetQuickActions>div{display:flex;gap:6px;flex-wrap:wrap}
+      .energyDeviceCard{grid-template-columns:112px minmax(0,1fr);gap:10px;padding:10px;border-radius:13px}.energyDeviceVisual{height:106px}.energyDeviceTop h3{font-size:16px;margin:1px 0}.energyDeviceTop small{font-size:8px}.energyDeviceState{padding:3px 7px;font-size:9px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:5px 0}.energyDeviceFacts>span{min-height:36px;padding:6px 8px;border-radius:8px}.energyDeviceFacts small{font-size:8px}.energyDeviceFacts b{font-size:10.5px;margin-top:1px}
+      .solarProductionObject{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;padding:10px;border:1px solid #e3eaf2;border-radius:13px;background:#fff}.solarProductionRepresentativeWrap{display:grid;place-items:center;min-height:112px}.solarProductionRepresentative{width:100%;height:112px}.solarProductionRepresentative img{width:100%;height:100%;object-fit:contain}.solarProductionObjectHead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.solarProductionObjectHead h3{margin:1px 0;font-size:17px}.solarProductionObjectHead small{font-size:8px;color:#64748b}.solarProductionObjectHead>b{font-size:10px;padding:4px 8px;border-radius:999px;background:#eef9f2;color:#237346}
+      .solarStringLink{padding:9px;border-radius:11px}.solarStringSummary{gap:8px}.solarModuleGrid{gap:7px}.solarInverterGrid{gap:8px}.solarInverterStrings{margin:0;padding:0;border:0}
+      .compactManagedAsset,.compactOperationalLoad{padding:9px 11px;border-radius:12px;margin:0;border:1px solid #e4eaf2;background:#fff}.managedAssetHeader{display:flex;justify-content:space-between;align-items:center;gap:10px}.managedAssetIdentity{display:flex;align-items:center;gap:9px;min-width:0}.managedAssetIdentity h3{margin:0;font-size:13px}.managedAssetIdentity span{display:block;margin-top:2px;font-size:9.5px;color:#64748b}.managedAssetHeader>b{font-size:13px;white-space:nowrap}.managedAssetFacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:6px 0}.managedAssetFacts>span{padding:5px 7px;border-radius:8px;background:#f8fafc}.managedAssetFacts small{display:block;font-size:8px;color:#64748b}.managedAssetFacts b{display:block;font-size:10px;margin-top:1px}.consumerExplorerList,.flexLoadList{display:grid;gap:7px}
+      .operationalPlanningPage .productStory{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 12px;margin-bottom:7px}.operationalPlanningPage .productStoryCopy>small{font-size:8px}.operationalPlanningPage .productStoryCopy h2{font-size:14px;margin:1px 0}.operationalPlanningPage .productStoryCopy p{font-size:10px;margin:2px 0}.operationalPlanningPage .productStoryRecommendation{display:none}.operationalPlanningPage .productStoryActions{align-self:center}
+      .settingsTopicPage{display:grid;gap:8px}.compactSettingsBlock{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:11px 14px}.compactSettingsBlock h2{font-size:16px;margin:0}.compactSettingsBlock p{font-size:10px;margin:2px 0 0}.settingsTopicChooser{padding:12px 14px}.settingsTopicHead h2{font-size:16px;margin:0}.settingsTopicHead p{font-size:10px;margin:2px 0 8px}.settingsTopicGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.settingsTopicButton{min-height:62px;text-align:left;padding:9px 10px;border:1px solid #dfe7f0;border-radius:10px;background:#fff;color:#23324a}.settingsTopicButton.active{border-color:#93c5fd;background:#f5f9ff;box-shadow:inset 0 0 0 1px #bfdbfe}.settingsTopicButton b{display:block;font-size:11px}.settingsTopicButton span{display:block;margin-top:3px;font-size:8.5px;line-height:1.25;color:#64748b;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+      .settingsSelectedTopicHead{display:flex;align-items:end;justify-content:space-between;gap:10px;padding:3px 2px}.settingsSelectedTopicHead small{font-size:8px;color:#64748b}.settingsSelectedTopicHead h2{font-size:17px;margin:1px 0}.settingsVariantSelect{display:flex;align-items:center;gap:6px}.settingsVariantSelect span{font-size:9px;color:#64748b}.settingsVariantSelect select{height:34px;border:1px solid #dbe3ee;border-radius:8px;background:#fff;padding:0 8px}.settingsSelectedTopic .strategyTablePanel{margin:0;padding:11px 14px;border-radius:12px}.settingsSelectedTopic .strategyTableHead h2{font-size:15px}.settingsSelectedTopic .strategyTableHead p{font-size:9.5px;margin:2px 0}.settingsSelectedTopic .strategyTableRow{padding:7px 0}.settingsSelectedTopic .strategyColumnHead{display:none}.settingsAdvancedDisclosure{padding:0 12px;margin:0}.settingsAdvancedDisclosure>summary{height:42px;display:flex;align-items:center;font-size:11px;font-weight:700;cursor:pointer}.settingsAdvancedBody{display:grid;gap:8px;padding:0 0 10px}.settingsAdvancedBody h3{font-size:12px;margin:0 0 5px}
+      .strategicBehaviorPage{display:grid;gap:8px}.compactStrategicIntro{padding:11px 14px}.compactStrategicIntro small{font-size:8px;color:#64748b}.compactStrategicIntro h2{font-size:16px;margin:2px 0}.compactStrategicIntro p{font-size:10px;line-height:1.35;margin:2px 0}.strategicBehaviorGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.strategicBehaviorCard{padding:11px 13px}.strategicBehaviorCard h2{font-size:14px;margin:0 0 5px}.strategicBehaviorRows{display:grid}.strategicBehaviorRow{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:32px;border-top:1px solid #edf1f5}.strategicBehaviorRow:first-child{border-top:0}.strategicBehaviorRow span{font-size:9.5px;color:#52637a}.strategicBehaviorRow b{font-size:10px;text-align:right}
+      .compactPlanningLoad{grid-template-columns:minmax(190px,1.15fr) minmax(0,2fr) auto;padding:8px 10px;gap:9px}.compactPlanningFacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}.compactPlanningFacts>span{min-width:0}.compactPlanningFacts small{display:block;font-size:8px;color:#64748b}.compactPlanningFacts b{display:block;font-size:10px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      @media(max-width:900px){.energyAssetDetailGrid,.energyAssetDiagnosticGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.energyDeviceFacts,.managedAssetFacts,.compactPlanningFacts{grid-template-columns:repeat(2,minmax(0,1fr))}.settingsTopicGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.compactPlanningLoad{grid-template-columns:1fr auto}.compactPlanningFacts{grid-column:1/-1}}
+      @media(max-width:620px){.energyDeviceCard,.solarProductionObject{grid-template-columns:88px minmax(0,1fr)}.energyDeviceVisual,.solarProductionRepresentative{height:78px}.solarProductionRepresentativeWrap{min-height:78px}.energyAssetDetailGrid,.energyAssetDiagnosticGrid{grid-template-columns:1fr 1fr}.settingsTopicGrid,.strategicBehaviorGrid{grid-template-columns:1fr}.compactSettingsBlock{grid-template-columns:1fr}.managedAssetFacts{grid-template-columns:1fr 1fr}}
+
 </style><style>
 .navigationShell{--nav-active-bg:#edf5ff;--nav-active-border:#cfdef1;--nav-active-text:#0f4ca4;--rhi-company-area-min:250px;--rhi-company-area-max:320px;--rhi-company-logo-max-width:286px;--rhi-company-logo-max-height:116px;--rhi-company-logo-padding:10px 16px;--rhi-company-divider:rgba(226,232,240,.82);position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(var(--rhi-company-area-min),var(--rhi-company-area-max));gap:0;margin:0 0 12px;background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.91));border:1px solid rgba(207,217,230,.86);border-radius:22px;box-shadow:0 12px 30px rgba(15,23,42,.045);overflow:hidden;backdrop-filter:blur(16px)}.navigationShell.nav-intelligence{--nav-active-bg:#f1edff;--nav-active-border:#dfd5fb;--nav-active-text:#5a38b3}.navigationShell.nav-insights{--nav-active-bg:#e7f7f4;--nav-active-border:#cdebe6;--nav-active-text:#176e67}
 .navProductArea{min-width:0}.navPrimaryRow{min-height:78px;display:grid;grid-template-columns:minmax(270px,.72fr) minmax(430px,1.28fr);align-items:center;gap:24px;padding:10px 22px 9px}.navBrand{display:flex;align-items:center;min-width:0;min-height:56px;padding:2px 0 0 4px}.navBrandCopy{display:grid;align-content:center;gap:2px;min-width:0}.navBrandCopy b{font-size:15px;line-height:1.1;font-weight:520;letter-spacing:-.01em;color:#58708f;white-space:nowrap}.navBrandCopy small{font-size:24px;line-height:1.02;letter-spacing:.055em;font-weight:790;color:#0b467f;white-space:nowrap}

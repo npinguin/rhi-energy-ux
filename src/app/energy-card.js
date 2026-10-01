@@ -853,6 +853,13 @@
       this._effectiveStrategies=[...byGroup.values()];
       return this._effectiveStrategies;
     }
+    strategyBehaviorTopics() {
+      const v2=this.publicV2();
+      return asArray(v2.configuration?.strategy?.behavior_topics)
+        .map(row=>objectFrom(row))
+        .filter(row=>row.topic_id)
+        .sort((a,b)=>(asNumber(a.display_order) ?? 999) - (asNumber(b.display_order) ?? 999));
+    }
     effectiveStrategyFor(assetId) {
       return this.effectiveStrategyRows().find(row => String(row.asset_id || '') === String(assetId || '')) || null;
     }
@@ -1385,6 +1392,14 @@
           ) || ''
         );
         this.energyVisualPickerBrand = 'all';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
+      const settingsTopic = event.target.closest('[data-settings-topic-profile]');
+      if (settingsTopic && !settingsTopic.disabled) {
+        this.selectedStrategyProfileId = settingsTopic.dataset.settingsTopicProfile || '';
+        this.persistInteractionContext();
         this._forceRender = true;
         this.render();
         return;
@@ -2459,6 +2474,8 @@
     }
 
     pageQuickActions(rt, tab) {
+      const assetScopedOnly = new Set(['flow','consumers','strategies','operational-planning','planning','strategic-planning']);
+      if (assetScopedOnly.has(tab)) return '';
       const typeSets = {
         overview:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer','solar_production','solar_array','solar_inverter','inverter']),
         flow:new Set(['battery_system','battery','flexible_load','flexible_asset','consumer']),
@@ -3049,61 +3066,68 @@
     operationalLoadCard(rt, load, recommendation, targetId) {
       const id = load.asset_id;
       const actionModels = rt.commandActionModelsForAsset(id).filter(action => ['start','stop','pause','resume'].includes(action.role));
-      const actionByRole = role => actionModels.find(action => action.role === role) || null;
-      const startCommand = actionByRole('start')?.command || null;
-      const stopCommand = actionByRole('stop')?.command || null;
-      const pauseCommand = actionByRole('pause')?.command || null;
-      const resumeCommand = actionByRole('resume')?.command || null;
-      const actionButtons = actionModels.map(action => this.componentActionModelButton(action)).join('');
-      const charger = load.effective_charger ? rt.assetName(load.effective_charger) : (load.parent_asset_id ? rt.assetName(load.parent_asset_id) : human(load.flexible_role || load.energy_asset_role || 'Flexible load'));
-      const requestedRow = this.flexiblePropertyRow(rt, id, ['requested_charge_power_kw', 'requested_power_kw', 'energy_control_requested_power_kw', 'target_power_kw', 'setpoint_power_kw', 'charge_power_setpoint_kw']);
-      const requestedEffectiveRow = this.flexiblePropertyRow(rt, id, ['requested_power_kw_effective']);
-      const requested = rowValue(requestedRow, null) ?? rowValue(requestedEffectiveRow, null) ?? load.requested_charge_power_kw ?? load.requested_power_kw ?? load.requested_power_kw_effective ?? load.min_power_kw;
-      const planning = load.energy_planning || rt.planningOutcomeFor(id) || {};
-      if (this.isDisabledFlexibleAsset(rt, load, planning)) return this.disabledFlexibleAssetCard(rt, load, planning);
-      const powerKw = load.power_kw;
-      const energyNeed = load.energy_to_target_kwh ?? this.targetEnergyValue(rt, id, load);
-      const detailsId = `operational-load-${id}`;
-      const connection = this.flexibleConnectionLabel(rt, load, id);
-      const planningView = this.planningDisplayFor(rt, load, id, planning, powerKw, energyNeed);
-      const eta = this.etaDisplayFor(planning);
-      const automation = this.automationDisplayFor(rt, load, id);
-      const requestedControl = requestedRow && !requestedRow.missing
-        ? this.editablePropertyControl(requestedRow, { title:'Requested charge power', description:'Maximum charging power requested from this device.', type:'range', fallbackValue:requested, immediateWrite:true })
-        : '';
-      const priority = this.priorityControl(rt, load, id);
-      const whyHint = planningView.sub || human(planning.blocked_reason || load.availability_reason || '');
-      const showWhy = this.isMeaningfulPrimaryValue(planningView.why, { allowZero: true }) || this.isMeaningfulPrimaryValue(whyHint, { allowZero: true });
-      const showEta = this.isMeaningfulPrimaryValue(eta.main, { allowZero: true });
-      const showExpected = this.isMeaningfulPrimaryValue(planningView.expected, { allowZero: true });
-      const cardFlags = `${showWhy ? '' : ' noWhy'}${showEta ? '' : ' noEta'}${showExpected ? '' : ' noExpected'}`;
-      const infoBanner = connection.hint ? `<div class="loadNotice"><span>ⓘ</span><b>${escapeHtml(connection.label)}</b><em>${escapeHtml(connection.hint)}</em></div>` : '';
-      const publishedMaxPower = asNumber(requestedRow?.max ?? requestedRow?.maximum ?? this.validationMeta(requestedRow).max);
-      const maxPowerText = publishedMaxPower !== null ? fmtKw(publishedMaxPower) : '';
+      const enabledActions = actionModels.filter(action => action.visible && action.enabled);
+      const unavailableActions = actionModels.filter(action => action.visible && !action.enabled);
       const commandAvailability = actionModels
         .filter(action => action.visible && !action.enabled)
-        .map(action => `<span><b>${escapeHtml(action.label || human(action.role))}:</b> ${escapeHtml(humanReason(action.reason, 'Currently unavailable'))}</span>`)
+        .map(action => `<span><small>${escapeHtml(action.label || human(action.role))}</small><b>${escapeHtml(humanReason(action.reason, 'Currently unavailable'))}</b></span>`)
         .join('');
-      const powerAvailability = requestedControl && this.isWritableRow(requestedRow) ? '' : ((!requestedRow || requestedRow.missing) ? '<span>Requested charge power is not published.</span>' : `<span><b>Requested power:</b> ${escapeHtml(requestedRow.editable_reason || 'Requested charge power is currently read-only.')}</span>`);
-      const controlAvailability = commandAvailability || powerAvailability ? `<div class="controlAvailability">${commandAvailability}${powerAvailability}</div>` : '';
-      const plannedTodayKwh = asNumber(planning.planned_today_kwh);
-      const nextAction = String(firstDefined(planning.what_text, planning.next_action_label, planning.next_action, planningView.state, 'Wait'));
-      const canonicalWhy = String(firstDefined(planning.why_text, planning.user_reason_label, planning.reason_label, planningView.why, whyHint, 'No explanation published.'));
-      const liveState = human(firstDefined(load.operating_state, load.current_status, 'Unavailable'));
-      const priorityLabel = human(firstDefined(load.priority_label, load.energy_control_priority, 'Normal'));
-      const operationalStatus = this.canonicalOperationalStatus(rt, load, planning);
-      const exceptional = operationalStatus.exceptional === true;
-      const conformanceKnown = operationalStatus.exceptional !== null;
-      const sourceAssetPath = rt.sourceAssetNavigation(load);
-      const sourceAssetLink = sourceAssetPath
-        ? `<button type="button" class="action sourceAssetLink" data-source-asset-nav="${escapeHtml(sourceAssetPath)}">Open source asset</button>`
+      const requestedRow = this.flexiblePropertyRow(rt, id, ['requested_charge_power_kw','requested_power_kw','energy_control_requested_power_kw','target_power_kw','setpoint_power_kw','charge_power_setpoint_kw']);
+      const requestedEffectiveRow = this.flexiblePropertyRow(rt,id,['requested_power_kw_effective']);
+      const requested = rowValue(requestedRow,null) ?? rowValue(requestedEffectiveRow,null) ?? load.requested_charge_power_kw ?? load.requested_power_kw ?? load.requested_power_kw_effective ?? null;
+      const planning = load.energy_planning || rt.planningOutcomeFor(id) || {};
+      if (this.isDisabledFlexibleAsset(rt, load, planning)) return this.disabledFlexibleAssetCard(rt, load, planning);
+      const powerKw = asNumber(firstDefined(load.actual_power_kw,load.current_power_kw,load.power_kw,null));
+      const energyNeed = asNumber(load.energy_to_target_kwh ?? this.targetEnergyValue(rt,id,load));
+      const plannedTodayKwh = asNumber(firstDefined(planning.planned_today_kwh,planning.today_planned_kwh,null));
+      const connection = this.flexibleConnectionLabel(rt,load,id);
+      const planningView = this.planningDisplayFor(rt,load,id,planning,powerKw,energyNeed);
+      const explicitState = String(firstDefined(load.operating_state,load.current_status,'') || '');
+      const liveState = explicitState ? human(explicitState) : (powerKw === null ? 'Not measured' : powerKw > 0.05 ? 'Active' : 'Idle');
+      const nextActionRaw = String(firstDefined(planning.what_text,planning.next_action_label,planning.next_action,'') || '').trim();
+      const nextAction = nextActionRaw && !/^none$/i.test(nextActionRaw) ? human(nextActionRaw) : '';
+      const reasonRaw = String(firstDefined(planning.why_text,planning.user_reason_label,planning.reason_label,planning.reason,planning.reason_code,'') || '').trim();
+      const reason = reasonRaw && !/^(none|no explanation available\.?|no explanation published\.?)$/i.test(reasonRaw) ? humanReason(reasonRaw,'') : '';
+      const requestedControl = requestedRow && !requestedRow.missing && this.isWritableRow(requestedRow)
+        ? this.editablePropertyControl(requestedRow,{title:'Requested charge power',description:'Charging power requested from this asset.',type:'range',fallbackValue:requested,immediateWrite:true})
         : '';
-      return `<article class="flexLoadCard solarLoadRow ${exceptional?'exceptional':''}">
-        <div class="solarLoadSummary"><div class="solarLoadIdentity">${this.assetVisual(load,{size:'sm',fallbackIcon:this.flexibleAssetIcon(load)})}<div><div class="solarLoadName"><h3>${escapeHtml(load.display_name || human(id))}</h3><span class="priorityBadge">${escapeHtml(priorityLabel)}</span></div><small><i class="dot green"></i>${escapeHtml(connection.label)}</small></div></div>
-        <div class="solarLoadFact"><small>Now / live</small><b>${escapeHtml(liveState)}</b><span>${fmtKw(powerKw,'—')}</span></div><div class="solarLoadFact"><small>Next action</small><b class="nextActionBadge">${escapeHtml(nextAction)}</b></div><div class="solarLoadFact"><small>Power target</small><b>${fmtKw(requested,'—')}</b></div><div class="solarLoadFact"><small>Planned today</small><b>${fmtKwh(plannedTodayKwh,'—')}</b></div><div class="solarLoadFact solarLoadWhy"><small>Why / reason</small><b>${escapeHtml(canonicalWhy)}</b></div><div class="solarLoadFact"><small>Status</small><b class="planStatusBadge ${exceptional?'exception':(conformanceKnown?'ok':'unknown')}">${exceptional?'Exceptional !':(conformanceKnown?'No published exception':'Status unavailable')}</b></div></div>
-        <div class="solarLoadControls"><div class="requestedSlot"><small class="controlTitle">Requested charge power</small>${requestedControl || `<label class="sliderField unavailable"><div><span>Requested charge power</span><b>—</b></div><input type="range" disabled></label>`}${maxPowerText ? `<em class="maxPowerHint">${escapeHtml(maxPowerText)}</em>` : ''}</div>${actionButtons ? `<div class="loadActions decisionActions"><span>Manual intervention</span>${actionButtons}</div>` : ''}</div>${controlAvailability}${infoBanner}<div class="loadDetailsFull">${this.componentDetailsBlock(detailsId, 'Details', `${this.kv('Planning', human(planning.state || '—'))}${this.kv('Why', canonicalWhy)}${this.kv('Asset id', id)}${sourceAssetLink}`)}</div>
+      const priority = this.priorityControl(rt,load,id);
+      const configurationBody = [requestedControl,priority].filter(Boolean).join('');
+      const configuration = configurationBody
+        ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${configurationBody}</div></details>`
+        : '';
+      const detailsRows = [
+        ['Connection',connection.label || 'Unavailable'],
+        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
+        plannedTodayKwh !== null ? ['Planned today',fmtKwh(plannedTodayKwh)] : null,
+        nextAction ? ['Next action',nextAction] : null,
+        reason ? ['Reason',reason] : null
+      ].filter(Boolean);
+      const details = detailsRows.length
+        ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailsRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
+        : '';
+      const diagnosticRows = [
+        ['Asset id', id],
+        ...unavailableActions.map(action=>[`${action.label || human(action.role)} command`,humanReason(action.reason,'Unavailable')]),
+        requestedControl ? null : ['Requested charge power',requestedRow && !requestedRow.missing ? (requestedRow.editable_reason || 'Read-only') : 'Not published']
+      ].filter(Boolean);
+      const diagnostics = `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${commandAvailability}${diagnosticRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`;
+      const actions = enabledActions.length
+        ? `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${enabledActions.map(action=>this.componentActionModelButton(action)).join('')}</div></div>`
+        : '';
+      const keyFacts = [
+        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
+        plannedTodayKwh !== null ? ['Planned today',fmtKwh(plannedTodayKwh)] : null,
+        requested !== null ? ['Power target',fmtKw(requested,'—')] : null,
+        nextAction ? ['Next action',nextAction] : null
+      ].filter(Boolean).slice(0,4);
+      return `<article class="flexLoadCard compactOperationalLoad">
+        <div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(load,{size:'sm',fallbackIcon:this.flexibleAssetIcon(load)})}<div><h3>${escapeHtml(load.display_name || human(id))}</h3><span>${escapeHtml(liveState)}${connection.label ? ` · ${escapeHtml(connection.label)}` : ''}</span></div></div><b>${escapeHtml(fmtKw(powerKw,'—'))}</b></div>
+        ${keyFacts.length ? `<div class="managedAssetFacts">${keyFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>` : ''}
+        ${actions}<div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div>
       </article>`;
     }
+
     energyAssetContext(rt, asset = {}) {
       const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
       const context = id && typeof readEnergyAssetContext === 'function'
@@ -3120,6 +3144,25 @@
     energyAssetFacts(rt, asset = {}, limit = 4) {
       const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
       if (!id) return [];
+      const projection = rt.assetProjection(id) || {};
+      const publishedKeyFacts = (projection.properties || [])
+        .filter(row => row?.presentation?.role === 'key' && row?.projection?.resolved === true)
+        .map(row => {
+          const field = row.projection || {};
+          let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
+          if (field.unit && value !== '—' && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
+          return {
+            key:String(firstDefined(row.property_key,row.property_id,row.key,'') || ''),
+            keys:[String(firstDefined(row.property_key,row.property_id,row.key,'') || '')],
+            label:String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || ''),
+            value,
+            direct:[],
+            formatter:'published'
+          };
+        })
+        .filter(row => row.label && row.value !== '—')
+        .slice(0, limit);
+      if (publishedKeyFacts.length) return publishedKeyFacts;
       const type = this.energyAssetType(asset);
       const fact = (key, label, direct = [], formatter = '') => {
         const keys = Array.isArray(key) ? key : [key];
@@ -3330,42 +3373,94 @@
       return '';
     }
 
+    energyAssetConfigurationDisclosure(rt, asset = {}) {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      if (!id) return '';
+      const rows = rt.editablePropertyRows().filter(row => {
+        const key = String(firstDefined(row.property_id,row.property_key,row.key,'') || '');
+        const rowAsset = String(firstDefined(row.asset_id,row.target_asset_id,'') || '');
+        if (/^appearance:/.test(key)) return false;
+        const belongs = rowAsset === id || key.startsWith(`${id}.`);
+        return belongs && row?.presentation?.role === 'configuration';
+      });
+      if (!rows.length) return '';
+      const controls = rows.map(row => {
+        const label = firstDefined(row.display_name,row.label,human(row.field_key || row.property_key || row.key || 'Setting'));
+        const allowed = allowedValuesForRow(row);
+        const value = rowValue(row, null);
+        const valueType = String(firstDefined(row.value_type,row.type,typeof value) || '').toLowerCase();
+        const editorType = allowed.length ? 'select'
+          : valueType === 'boolean' ? 'toggle'
+          : (asNumber(firstDefined(row.min,row.minimum,null)) !== null || asNumber(firstDefined(row.max,row.maximum,null)) !== null) ? 'range'
+          : 'number';
+        return this.editablePropertyControl(row,{title:label,type:editorType,fallbackValue:value,fallbackOptions:allowed});
+      }).filter(Boolean).join('');
+      return controls ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${controls}</div></details>` : '';
+    }
+
     energyAssetDetailDisclosure(rt, asset = {}) {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       if (!id) return '';
       const profile = objectFrom(enriched.profile || {});
+      const projection = rt.assetProjection(id) || {};
+      const parentId = this.energyAssetParentId(enriched);
+      const parentName = parentId ? String(rt.assetName(parentId) || '').trim() : '';
+      const area = this.energyAssetAreaLabel(enriched);
+      const rows = [
+        area ? ['Area',area] : null,
+        parentName ? ['Part of',parentName] : null,
+        firstDefined(profile.display_name,profile.label,profile.name,'') ? ['Profile',firstDefined(profile.display_name,profile.label,profile.name,'')] : null
+      ].filter(Boolean);
+      const properties = (projection?.properties || [])
+        .filter(row => row?.presentation?.role === 'detail')
+        .map(row => {
+          const field = row?.projection || {};
+          if (!field.resolved) return null;
+          const label = String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || '');
+          if (!label) return null;
+          let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
+          if (value === '—') return null;
+          if (field.unit && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
+          return [label,value];
+        }).filter(Boolean);
+      const all = [...rows,...properties];
+      if (!all.length) return '';
+      return `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody"><small class="energyAssetPublishedLabel">Published properties</small><div class="energyAssetDetailGrid">${all.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></div></details>`;
+    }
+
+    energyAssetDiagnosticsDisclosure(rt, asset = {}) {
+      const enriched = this.energyAssetContext(rt, asset);
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
+      if (!id) return '';
       const publication = objectFrom(enriched.publication || {});
       const projection = rt.assetProjection(id) || {};
       const lifecycle = objectFrom(projection.lifecycle || {});
-      const parentId = this.energyAssetParentId(enriched);
-      const area = this.energyAssetAreaLabel(enriched);
       const telemetry = publication.resolution_complete === false ? 'Incomplete'
         : publication.complete === false ? 'Partial'
         : publication.complete === true ? 'Complete' : 'Unknown';
-      const rows = [
-        ['Area', area || '—'],
-        ['Type', human(firstDefined(enriched.asset_type,enriched.object_class,'device'))],
-        ['Parent', parentId || '—'],
-        ['Profile', firstDefined(profile.display_name,profile.label,profile.name,enriched.profile_id,'—')],
-        ['Lifecycle', firstDefined(lifecycle.state,enriched.health,enriched.status,'—')],
-        ['Telemetry', telemetry],
-        ['Source', firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'—')],
-        ['Asset id', id]
-      ];
+      const source = firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'');
       const missing = Array.isArray(publication.missing) ? publication.missing : Array.isArray(publication.missing_fields) ? publication.missing_fields : [];
-      const publishedProperties = (projection?.properties || []).map(row => {
-        const field = row?.projection || {};
-        if (!field.resolved) return null;
-        const label = firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property'));
-        let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
-        if (field.unit && value !== '—' && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
-        return { label, value };
-      }).filter(Boolean);
-      const propertyHtml = publishedProperties.length
-        ? `<div class="energyAssetPropertyList"><small class="energyAssetPropertyTitle">Published properties</small><div class="energyAssetPropertyGrid">${publishedProperties.map(row=>`<span><small>${escapeHtml(row.label)}</small><b>${escapeHtml(row.value)}</b></span>`).join('')}</div></div>`
-        : '';
-      return `<details class="energyAssetDetails"><summary>Details</summary><div class="energyAssetDetailGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value ?? '—'))}</b></span>`).join('')}${missing.length ? `<span class="wide"><small>Missing publication fields</small><b>${escapeHtml(missing.join(' · '))}</b></span>` : ''}</div>${propertyHtml}</details>`;
+      const propertyRows = (projection?.properties || [])
+        .filter(row => row?.presentation?.role === 'diagnostics')
+        .map(row => {
+          const field = row?.projection || {};
+          const label = String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || '');
+          const value = field.resolved
+            ? (field.display && field.display !== '—' ? field.display : firstDefined(field.value,'—'))
+            : humanReason(firstDefined(field.reason,row.reason_code,row.resolution?.reason_code,'Unavailable'),'Unavailable');
+          return label ? [label,String(value)] : null;
+        }).filter(Boolean);
+      const rows = [
+        ['Asset id',id],
+        source ? ['Source', source] : null,
+        ['Lifecycle',firstDefined(lifecycle.state,enriched.health,enriched.status,'Unknown')],
+        ['Telemetry', telemetry],
+        missing.length ? ['Missing publication fields',missing.join(' · ')] : null,
+        ...propertyRows
+      ].filter(Boolean);
+      return `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
     }
 
     energyAppearanceAction(rt, asset = {}) {
@@ -3380,30 +3475,37 @@
       return `<button type="button" class="energyAppearanceAction" data-energy-visual-open="${escapeHtml(id)}">Appearance</button>`;
     }
 
-    energyDeviceStatusCard(rt, asset = {}, roleLabel = '') {
+    energyDeviceStatusCard(rt, asset = {}, roleLabel = '', childrenHtml = '') {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
       const type = String(firstDefined(enriched.asset_type,enriched.object_class,'device') || 'device');
       const facts = this.energyAssetFacts(rt,enriched,5);
-      const projection = id ? rt.assetProjection(id) : null;
-      const lifecycle = String(firstDefined(projection?.lifecycle?.state, enriched.health, enriched.status, '') || '');
-      const availability = String(firstDefined(enriched.availability_state,enriched.connection_state,'') || '');
-      const unavailable = /unavailable|offline|disconnected|failed/i.test(`${availability} ${lifecycle}`);
-      const degraded = /degraded|warning|attention|incomplete/i.test(lifecycle);
-      const statusLabel = unavailable ? 'Unavailable' : degraded ? 'Needs attention' : lifecycle && !/unknown/i.test(lifecycle) ? human(lifecycle) : 'Available';
+      const stateFact = facts.find(row => /^(state|status|direction)$/i.test(String(row.label || ''))) || null;
+      const measuredPower = this.measuredAssetPower(enriched);
+      const solarLike = /solar|inverter|panel|optimizer/.test(type);
+      const primaryState = stateFact?.value
+        || (solarLike && measuredPower !== null ? (measuredPower > 0.005 ? 'Producing' : 'Idle') : '')
+        || '';
       const area = this.energyAssetAreaLabel(enriched);
       const parentId = this.energyAssetParentId(enriched);
       const parentName = parentId ? String(rt.assetName(parentId) || '').trim() : '';
       const relation = parentName ? `<span class="energyDeviceRelation"><small>Part of</small><b>${escapeHtml(parentName)}</b></span>` : '';
       const actions = this.assetQuickActions(rt,id,3);
-      const details = facts.length
-        ? facts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
-        : `<span><small>Operational data</small><b>Telemetry not published</b></span>`;
+      const keyFacts = facts.filter(row => !/^(state|status)$/i.test(String(row.label || ''))).slice(0,4);
+      const keyProperties = keyFacts.length
+        ? keyFacts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
+        : `<span><small>Energy state</small><b>${escapeHtml(primaryState || 'Unavailable')}</b></span>`;
+      const configuration = this.energyAssetConfigurationDisclosure(rt,enriched);
+      const details = this.energyAssetDetailDisclosure(rt,enriched);
+      const diagnostics = this.energyAssetDiagnosticsDisclosure(rt,enriched);
+      const children = childrenHtml
+        ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children</summary><div class="energyAssetFoldBody energyAssetChildrenBody">${childrenHtml}</div></details>`
+        : '';
       return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
         <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
-        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div><div class="energyDeviceTopActions"><span class="energyDeviceState">${escapeHtml(statusLabel)}</span>${this.energyAppearanceAction(rt,enriched)}</div></div>
-        <div class="energyDeviceFacts">${details}${relation}</div>${actions}${this.energyAssetDetailDisclosure(rt,enriched)}</div>
+        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div>${primaryState ? `<div class="energyDeviceTopActions"><span class="energyDeviceState">${escapeHtml(primaryState)}</span></div>` : ''}</div>
+        <div class="energyDeviceFacts">${keyProperties}${relation}</div>${actions}<div class="energyAssetFoldStack">${configuration}${details}${diagnostics}${children}</div></div>
       </article>`;
     }
 
@@ -3491,40 +3593,32 @@
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id),'Solar string');
       const facts = this.energyAssetFacts(rt,enriched,8);
-      const power = facts.find(fact => /^Power now$/i.test(String(fact.label || ''))) || null;
-      const childCount = firstDefined(
-        facts.find(fact => /^Child count$/i.test(String(fact.label || '')))?.value,
-        childOptimizers.length || childPanels.length || null
-      );
+      const power = facts.find(fact => /^(Power now|Production now)$/i.test(String(fact.label || ''))) || null;
       const panelById = new Map(childPanels.map(panel => [String(firstDefined(panel.asset_id,panel.id,'') || ''),panel]));
       const optimizerCards = childOptimizers.map(optimizer => {
         const linkedPanel = panelById.get(this.energyAssetParentId(optimizer)) || null;
         return this.solarOptimizerPrimaryCard(rt,optimizer,linkedPanel);
       }).join('');
-      const panelOnlyCards = childPanels
+      const solarPanelOnlyGrid = childPanels
         .filter(panel => !childOptimizers.some(optimizer => this.energyAssetParentId(optimizer) === String(firstDefined(panel.asset_id,panel.id,'') || '')))
         .map(panel => this.solarModuleCard(rt,panel,[]))
         .join('');
-      const technicalDetails = this.energyAssetDetailDisclosure(rt,enriched);
+      const children = optimizerCards || solarPanelOnlyGrid
+        ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children · ${childOptimizers.length + childPanels.length}</summary><div class="energyAssetFoldBody solarModuleGrid">${optimizerCards}${solarPanelOnlyGrid}</div></details>`
+        : '';
       return `<article class="solarStringLink" data-solar-string="${escapeHtml(id)}">
         <div class="solarStringSummary">
           <div class="solarStringVisual">${this.assetVisual(enriched,{size:'sm',fallbackIcon:'☀',decorative:false})}</div>
           <span><small>SOLAR ZONE / STRING</small><b>${escapeHtml(name)}</b></span>
-          ${power ? `<span><small>Production now</small><b>${escapeHtml(power.value)}</b></span>` : ''}
-          ${childCount !== null ? `<span><small>Modules</small><b>${escapeHtml(childCount)}</b></span>` : ''}
+          ${power ? `<span><small>Producing</small><b>${escapeHtml(power.value)}</b></span>` : ''}
         </div>
-        ${optimizerCards ? `<div class="solarModuleGrid">${optimizerCards}</div>` : ''}
-        ${panelOnlyCards ? `<div class="solarModuleGrid solarPanelOnlyGrid">${panelOnlyCards}</div>` : ''}
-        ${technicalDetails}
+        <div class="energyAssetFoldStack">${this.energyAssetConfigurationDisclosure(rt,enriched)}${this.energyAssetDetailDisclosure(rt,enriched)}${this.energyAssetDiagnosticsDisclosure(rt,enriched)}${children}</div>
       </article>`;
     }
     solarInverterCard(rt, inverter, strings = [], panelsFor = () => [], optimizersFor = () => []) {
       const inverterId = String(firstDefined(inverter.asset_id,inverter.id,'') || '');
       const children = strings.map(string => this.solarStringLink(rt,string,panelsFor(string),optimizersFor(string,panelsFor(string)))).join('');
-      return `<div class="solarInverterCard" data-solar-inverter="${escapeHtml(inverterId)}">
-        ${this.energyDeviceStatusCard(rt,inverter,'Solar inverter')}
-        ${children ? `<div class="solarInverterStrings"><div class="solarInverterStringsHead"><small>STRINGS</small><b>${strings.length}</b></div>${children}</div>` : ''}
-      </div>`;
+      return `<div class="solarInverterCard" data-solar-inverter="${escapeHtml(inverterId)}">${this.energyDeviceStatusCard(rt,inverter,'Solar inverter',children)}</div>`;
     }
     solarInverterSystem(rt, inverters = [], stringsForInverter = () => [], panelsFor = () => [], optimizersFor = () => [], unresolvedStrings = []) {
       if (!inverters.length && !unresolvedStrings.length) return '';
@@ -3597,10 +3691,24 @@
       const assignedArrayIds = new Set(inverters.flatMap(inverter => stringsForInverter(inverter).map(array=>String(firstDefined(array.asset_id,array.id,'')||''))));
       const unassignedArrays = arrays.filter(array => !assignedArrayIds.has(String(firstDefined(array.asset_id,array.id,'')||'')));
       const inverterSection = this.solarInverterSystem(rt,inverters,stringsForInverter,panelsFor,optimizersFor,unassignedArrays);
-      const productionBody = [
-        production.length ? `<div class="solarProductionLead">${this.solarProductionRepresentative(rt)}<div class="energyDeviceGrid solarProductionAggregate">${production.map(asset=>this.energyDeviceStatusCard(rt,asset,'Solar production')).join('')}</div></div>` : '',
-        inverterSection
-      ].join('');
+      const aggregate = production[0] || null;
+      let productionBody = inverterSection;
+      if (aggregate) {
+        const enriched = this.energyAssetContext(rt,aggregate);
+        const aggregateFacts = this.energyAssetFacts(rt,enriched,5).filter(row=>!/^(state|status)$/i.test(String(row.label || ''))).slice(0,4);
+        const aggregateStateFact = this.energyAssetFacts(rt,enriched,6).find(row=>/^(state|status)$/i.test(String(row.label || ''))) || null;
+        const aggregatePower = this.measuredAssetPower(enriched);
+        const aggregateState = aggregateStateFact?.value || (aggregatePower !== null ? (aggregatePower > 0.005 ? 'Producing' : 'Idle') : '');
+        const children = inverterSection
+          ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children · ${inverters.length}</summary><div class="energyAssetFoldBody energyAssetChildrenBody">${inverterSection}</div></details>`
+          : '';
+        productionBody = `<article class="solarProductionObject">
+          <div class="solarProductionRepresentativeWrap">${this.solarProductionRepresentative(rt)}</div>
+          <div class="solarProductionObjectBody"><div class="solarProductionObjectHead"><div><small>SOLAR PRODUCTION</small><h3>${escapeHtml(firstDefined(enriched.display_name,enriched.name,'Solar Production'))}</h3></div>${aggregateState ? `<b>${escapeHtml(aggregateState)}</b>` : ''}</div>
+          <div class="energyDeviceFacts">${aggregateFacts.map(row=>`<span><small>${escapeHtml(row.label)}</small><b>${escapeHtml(row.value)}</b></span>`).join('') || '<span><small>Production</small><b>Unavailable</b></span>'}</div>
+          <div class="energyAssetFoldStack">${this.energyAssetConfigurationDisclosure(rt,enriched)}${this.energyAssetDetailDisclosure(rt,enriched)}${this.energyAssetDiagnosticsDisclosure(rt,enriched)}${children}</div></div>
+        </article>`;
+      }
       const productionSection = productionBody ? this.solarHardwareSection(
         'Solar Production',
         'Aggregate production followed by the physical inverter → string → optimizer/panel hierarchy.',
@@ -3780,11 +3888,10 @@
       const operatingState = String(charger.operating_state || '');
       const power = asNumber(charger.physical_power_kw);
       const powerText = power === null ? '—' : fmtKw(power);
-      const context = [
-        connectionState ? human(connectionState) : '',
-        consumerId ? (rt.assetName(consumerId) || human(consumerId)) : '',
-        operatingState ? human(operatingState) : ''
-      ].filter(Boolean).join(' · ');
+      const consumerName = consumerId ? String(rt.assetName(consumerId) || '').trim() : '';
+      const relationLabel = consumerName || (consumerId ? 'Connected vehicle' : 'No vehicle connected');
+      const statusLabel = operatingState ? human(operatingState) : connectionState && !/asset[_\s-]?connected/i.test(connectionState) ? human(connectionState) : '';
+      const context = [relationLabel, statusLabel].filter(Boolean).join(' · ');
       const visual = rt.resolveVisualRef(charger.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
       return `<div class="flowConnectionCard">${art}<div><b>${escapeHtml(charger.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(context || 'Connection state unavailable')}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
@@ -3812,9 +3919,18 @@
       );
       const requested = asNumber(firstDefined(consumer.requested_power_kw_effective, consumer.requested_power_kw));
       const state = charging ? 'Charging' : active || (power !== null && power > 0.05) ? 'Active' : connected ? 'Connected' : available ? 'Available' : 'Unavailable';
+      const chargerDisplay = String(firstDefined(
+        consumer.effective_charger_display_name,
+        consumer.charger_display_name,
+        consumer.connection_display_name,
+        consumer.physical_connection_display_name,
+        charger ? rt.assetName(charger) : '',
+        ''
+      ) || '').trim();
+      const relation = charger ? (chargerDisplay || 'Charger unavailable') : '';
       const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
-      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(state)}${charger ? ` · ${escapeHtml(rt.assetName(charger) || human(charger))}` : ''}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(relation ? `${relation} · ${state}` : state)}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
     flowConsumers(rt, connectionSnapshot = { rows:[] }) {
       const domain = this.flexibleAssetDomain(rt);
@@ -4053,7 +4169,7 @@
             <div class="flowColumn sinks">
               <h3>Consumers</h3>
               ${this.flowNode('⌂','Home Consumption',fmtKw(homeConsumption,'—'),'household consumption excluding Flexible Loads','homeNode')}
-              ${this.flowNode('🚘','Flexible Loads',fmtKw(flexibleLoadsPower,'—'),`${consumers.length} published contributor${consumers.length === 1 ? '' : 's'}`,'consumerNode')}
+              ${this.flowNode('🚘','Flexible Loads',fmtKw(flexibleLoadsPower,'—'),`${consumers.length} managed consumer${consumers.length === 1 ? '' : 's'}`,'consumerNode')}
             </div>
           </div>
         </section>
@@ -4088,6 +4204,10 @@
     }
     profileKind(profile = {}) {
       return String(profile.profile_id || profile.strategy_profile_id || profile.profile_type || profile.asset_type || '').toLowerCase();
+    }
+    profileSettingsTopic(profile = {}) {
+      return String(firstDefined(profile.topic_label, profile.display_name, profile.profile_label, '') || '').trim()
+        || this.profileUserLabel(profile);
     }
     profileUserLabel(profile = {}) {
       const explicit = firstDefined(profile.user_label, profile.profile_user_label, profile.display_label, profile.profile_label, profile.display_name, profile.name, profile.label, '');
@@ -4360,64 +4480,61 @@
     consumerExplorerCard(rt, row = {}) {
       const id = row.asset_id || row.consumer_id || row.id || 'consumer';
       const vm = this.flexibleAssetDomain(rt).byId(id);
-      if (vm?.isDisabled) return this.disabledFlexibleAssetCard(rt, vm.raw || row, vm.planning || {});
+      if (vm?.isDisabled) return this.disabledFlexibleAssetCard(rt,vm.raw || row,vm.planning || {});
       const planning = vm?.planning || rt.planningOutcomeFor(id) || {};
       const raw = vm?.raw || row;
-      const asset = this.energyAssetContext(rt, { ...raw, ...row, visual_ref:firstDefined(raw.visual_ref,row.visual_ref,'') });
-      const status = this.canonicalOperationalStatus(rt, asset, planning);
-      const commands = rt.commandsForAsset(id);
-      const startCommand = commands.find(c => rt.commandRole(c) === 'start');
-      const stop = commands.find(c => rt.commandRole(c) === 'stop');
-      const pause = commands.find(c => rt.commandRole(c) === 'pause');
-      const resume = commands.find(c => rt.commandRole(c) === 'resume');
-      const stateRaw = firstDefined(planning.product_state, planning.status, planning.state, row.status, planning.active ? 'active' : planning.waiting ? 'waiting' : planning.planned ? 'planned' : asset.operating_state, 'available');
+      const asset = this.energyAssetContext(rt,{...raw,...row,visual_ref:firstDefined(raw.visual_ref,row.visual_ref,'')});
+      const stateRaw = firstDefined(planning.product_state,planning.status,planning.state,asset.operating_state,'available');
       const state = this.userStateText(stateRaw);
-      const availability = String(firstDefined(asset.availability_state, status.unavailable ? 'unavailable' : 'available') || '').toLowerCase();
-      const healthRaw = firstDefined(asset.health, asset.lifecycle_state, asset.status, '');
-      const health = status.unavailable ? 'Unavailable' : healthRaw ? human(healthRaw) : 'Available';
-      const chargerId = String(firstDefined(asset.effective_charger, asset.charger_asset_id, asset.connection_asset_id, asset.execution_target_asset_id, '') || '');
-      const relation = chargerId ? `${rt.assetName(chargerId) || human(chargerId)} · ${human(firstDefined(asset.connection_state,'linked'))}` : '';
-      const reason = humanReason(firstDefined(planning.user_reason_label, planning.waiting_reason, planning.waiting_reason_code, planning.reason, planning.reason_code, row.reason), state === 'Ready' ? 'Ready when you need it.' : 'Home Intelligence is monitoring this asset.');
-      const paused = /paused|hold/.test(String(stateRaw || '').toLowerCase()) || rt.commandEnabled(resume);
-      const executionPolicy = this.automationExecutionPolicy(rt);
-      let recommendation = 'Home Intelligence will keep monitoring this asset.';
-      if (/waiting/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
-        ? 'Home Intelligence may act automatically when the planned conditions are available.'
-        : executionPolicy.configuredMode === 'advice'
-          ? 'Home Intelligence will keep the recommendation ready and wait for your approval.'
-          : 'Planning remains visible, but managed execution is disabled.';
-      if (/planned|scheduled/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
-        ? 'Home Intelligence has included this asset in the executable current plan.'
-        : 'Home Intelligence has included this asset in the advisory plan.';
-      if (/active|charging|running/.test(String(stateRaw || '').toLowerCase())) recommendation = executionPolicy.configuredMode === 'automatic'
-        ? 'Let Home Intelligence continue unless you want to stop or pause control.'
-        : 'Current physical execution is shown separately from advisory planning.';
-      if (paused) recommendation = 'Resume managed participation when you want Home Intelligence to include this asset again.';
-      const actions = [
-        paused ? this.componentActionButton(resume, 'Resume managed control', id) : this.componentActionButton(pause, 'Pause managed control', id),
-        /active|charging|running/.test(String(stateRaw || '').toLowerCase()) ? this.componentActionButton(stop, 'Stop now', id) : this.componentActionButton(startCommand, 'Start now', id)
-      ].join('');
-      const currentPower = asNumber(firstDefined(row.current_power_kw, row.actual_power_kw, row.power_kw, raw.current_power_kw, raw.actual_power_kw, raw.power_kw));
-      const requestedPower = asNumber(firstDefined(row.requested_power_kw, raw.requested_power_kw));
+      const currentPower = asNumber(firstDefined(row.current_power_kw,row.actual_power_kw,row.power_kw,raw.current_power_kw,raw.actual_power_kw,raw.power_kw,null));
       const energyNeed = asNumber(firstDefined(
-        planning.energy_to_target_kwh, planning.energy_needed_kwh, planning.remaining_energy_kwh, planning.energy_need_kwh,
-        row.energy_to_target_kwh, row.energy_needed_kwh, row.remaining_energy_kwh, row.energy_need_kwh,
-        raw.energy_to_target_kwh, raw.energy_needed_kwh, raw.remaining_energy_kwh, raw.energy_need_kwh
+        planning.energy_to_target_kwh,planning.energy_needed_kwh,planning.remaining_energy_kwh,planning.energy_need_kwh,
+        row.energy_to_target_kwh,row.energy_needed_kwh,row.remaining_energy_kwh,row.energy_need_kwh,
+        raw.energy_to_target_kwh,raw.energy_needed_kwh,raw.remaining_energy_kwh,raw.energy_need_kwh
       ));
-      const plannedToday = asNumber(firstDefined(planning.planned_today_kwh, row.planned_today_kwh, raw.planned_today_kwh));
-      const plannedTomorrow = asNumber(firstDefined(planning.planned_tomorrow_kwh, row.planned_tomorrow_kwh, raw.planned_tomorrow_kwh));
-      const stillToPlan = asNumber(firstDefined(planning.still_to_plan_kwh, planning.remaining_need_kwh, planning.unresolved_horizon_kwh, row.still_to_plan_kwh, raw.still_to_plan_kwh));
-      const planningLabel = firstDefined(planning.user_state_label, planning.product_state, planning.status, planning.state, '');
-      const area = this.energyAssetAreaLabel(asset);
-      const facts = [
-        ['Power now', fmtKw(currentPower,'0.0 kW')],
-        energyNeed !== null ? ['Required', fmtKwh(energyNeed)] : null,
-        plannedToday !== null ? ['Planned today', fmtKwh(plannedToday)] : null,
-        stillToPlan !== null ? ['Still to plan', fmtKwh(stillToPlan)] : null,
-        planningLabel ? ['Plan', human(planningLabel)] : null
-      ].filter(Boolean).slice(0,5);
-      const details = `${this.kv('Availability', human(availability))}${this.kv('Health', health)}${this.kv('Current power', fmtKw(currentPower, '0.0 kW'))}${this.kv('Requested power', fmtKw(requestedPower, '—'))}${energyNeed !== null ? this.kv('Energy needed',fmtKwh(energyNeed)) : ''}${plannedToday !== null ? this.kv('Planned today',fmtKwh(plannedToday)) : ''}${plannedTomorrow !== null ? this.kv('Planned tomorrow',fmtKwh(plannedTomorrow)) : ''}${stillToPlan !== null ? this.kv('Still to plan',fmtKwh(stillToPlan)) : ''}${this.kv('Automation', human(firstDefined(row.automation_mode, raw.automation_mode, 'Advice')))}${relation ? this.kv('Relationship', relation) : ''}${this.energyAssetDetailDisclosure(rt,asset)}`;
-      return `<article class="managedAssetCard"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${area ? `${escapeHtml(area)} · ` : ''}${escapeHtml(state)} · ${escapeHtml(health)}</span></div></div><b>${fmtKw(currentPower, '0.0 kW')}</b></div><div class="managedAssetFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>${relation ? `<div class="managedAssetRelationship"><small>Connected via</small><b>${escapeHtml(relation)}</b></div>` : ''}<div class="managedAssetStory"><p>${escapeHtml(reason)}</p><div><small>What Home Intelligence will do</small><b>${escapeHtml(recommendation)}</b></div></div>${actions ? `<div class="managedAssetActions">${actions}</div>` : ''}${this.componentDetailsBlock(`consumer-${id}`, 'Details', details)}</article>`;
+      const plannedToday = asNumber(firstDefined(planning.planned_today_kwh,row.planned_today_kwh,raw.planned_today_kwh,null));
+      const stillToPlan = asNumber(firstDefined(planning.still_to_plan_kwh,planning.remaining_need_kwh,row.still_to_plan_kwh,raw.still_to_plan_kwh,null));
+      const readyBy = String(firstDefined(planning.ready_by,planning.deadline_time,row.ready_by,raw.ready_by,'') || '').trim();
+      const chargerId = String(firstDefined(asset.effective_charger,asset.charger_asset_id,asset.connection_asset_id,asset.execution_target_asset_id,'') || '');
+      const chargerDisplay = String(firstDefined(
+        asset.effective_charger_display_name,
+        asset.charger_display_name,
+        asset.connection_display_name,
+        asset.physical_connection_display_name,
+        ''
+      ) || '').trim();
+      const relation = chargerId ? (chargerDisplay || 'Charger unavailable') : '';
+      const requestedRow = this.flexiblePropertyRow(rt,id,['requested_charge_power_kw','requested_power_kw','energy_control_requested_power_kw','target_power_kw','setpoint_power_kw','charge_power_setpoint_kw']);
+      const requested = rowValue(requestedRow,null) ?? row.requested_power_kw ?? raw.requested_power_kw ?? null;
+      const requestedControl = requestedRow && !requestedRow.missing && this.isWritableRow(requestedRow)
+        ? this.editablePropertyControl(requestedRow,{title:'Requested charge power',description:'Charging power requested from this asset.',type:'range',fallbackValue:requested,immediateWrite:true})
+        : '';
+      const actions = rt.commandActionModelsForAsset(id).filter(action=>['start','stop','pause','resume'].includes(action.role) && action.visible && action.enabled);
+      const keyFacts = [
+        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
+        readyBy ? ['Ready by',human(readyBy)] : null,
+        plannedToday !== null ? ['Planned today',fmtKwh(plannedToday)] : null,
+        stillToPlan !== null ? ['Still to plan',fmtKwh(stillToPlan)] : null
+      ].filter(Boolean).slice(0,4);
+      const configuration = requestedControl
+        ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${requestedControl}</div></details>`
+        : '';
+      const detailRows = [
+        relation ? ['Connection',relation] : null,
+        requested !== null ? ['Requested power',fmtKw(requested,'—')] : null,
+        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
+        plannedToday !== null ? ['Planned today',fmtKwh(plannedToday)] : null,
+        stillToPlan !== null ? ['Still to plan',fmtKwh(stillToPlan)] : null
+      ].filter(Boolean);
+      const details = detailRows.length
+        ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
+        : '';
+      const diagnostics = `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid"><span><small>Asset id</small><b>${escapeHtml(id)}</b></span><span><small>Health</small><b>${escapeHtml(human(firstDefined(asset.health,asset.lifecycle_state,asset.status,'Unknown')))}</b></span>${requestedControl ? '' : `<span><small>Requested charge power</small><b>${escapeHtml(requestedRow && !requestedRow.missing ? (requestedRow.editable_reason || 'Read-only') : 'Not published')}</b></span>`}</div></details>`;
+      return `<article class="managedAssetCard compactManagedAsset"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${escapeHtml(state)}${relation ? ` · ${escapeHtml(relation)}` : ''}</span></div></div><b>${escapeHtml(fmtKw(currentPower,'—'))}</b></div>
+        ${keyFacts.length ? `<div class="managedAssetFacts">${keyFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>` : ''}
+        ${actions.length ? `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${actions.map(action=>this.componentActionModelButton(action)).join('')}</div></div>` : ''}
+        <div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div>
+      </article>`;
     }
 
     filterAndSortConsumers(rows = []) {
@@ -4492,27 +4609,37 @@
       const d = rt.decision();
       const profiles = rt.strategyProfileRows();
       const effectiveStrategies = rt.effectiveStrategyRows();
-      const planningRows = this.flexibleAssetDomain(rt).planningRows();
-      const visibleCommands = rt.visibleCommands().filter(c => rt.commandVisible(c));
       const fallbackProfile = profiles[0] || null;
-      const selected = this.selectedStrategyProfileId
+      let selected = this.selectedStrategyProfileId
         ? (rt.strategyProfileFor(this.selectedStrategyProfileId) || null)
         : fallbackProfile;
-      if (selected && !this.selectedStrategyProfileId) this.selectedStrategyProfileId = selected.profile_id;
+      if (!selected && fallbackProfile) selected = fallbackProfile;
+      if (selected && this.selectedStrategyProfileId !== selected.profile_id) this.selectedStrategyProfileId = selected.profile_id;
       const selectedId = selected?.profile_id || '';
-      const unavailableSelectedProfile = this.selectedStrategyProfileId && !selected
-        ? `<option value="${escapeHtml(this.selectedStrategyProfileId)}" selected disabled>Selected profile temporarily unavailable</option>`
+      const selectedTopic = selected ? this.profileSettingsTopic(selected) : '';
+
+      const topicGroups = new Map();
+      profiles.forEach(profile => {
+        const topic = this.profileSettingsTopic(profile);
+        if (!topicGroups.has(topic)) topicGroups.set(topic, []);
+        topicGroups.get(topic).push(profile);
+      });
+      const topicOrder = ['Home & priorities','Battery','EV charging','Solar','Grid & tariffs','Home & resilience'];
+      const topics = [...topicGroups.entries()].sort(([left],[right]) => {
+        const li=topicOrder.indexOf(left), ri=topicOrder.indexOf(right);
+        if(li>=0 || ri>=0) return (li<0?99:li)-(ri<0?99:ri);
+        return left.localeCompare(right);
+      });
+      const topicButtons = topics.map(([topic,rows]) => {
+        const target = rows[0];
+        const active = topic === selectedTopic;
+        return `<button type="button" class="settingsTopicButton${active?' active':''}" data-settings-topic-profile="${escapeHtml(target.profile_id || '')}" aria-pressed="${active?'true':'false'}"><b>${escapeHtml(topic)}</b><span>${escapeHtml(this.profileUserDescription(target))}</span></button>`;
+      }).join('');
+      const selectedGroup = selectedTopic ? (topicGroups.get(selectedTopic) || []) : [];
+      const variantSelect = selectedGroup.length > 1
+        ? `<label class="settingsVariantSelect"><span>Policy set</span><select data-strategy-profile-select>${selectedGroup.map(profile=>`<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id)===String(selectedId)?' selected':''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>`
         : '';
-      const profilePicker = profiles.length ? `<section class="panel strategyProfilePicker compact"><div><h2>Settings profile</h2><p>Choose the domain policy set you want to review or adjust.</p></div><label class="strategyProfileSelect"><span>Profile</span><select data-strategy-profile-select>${unavailableSelectedProfile}${profiles.map(profile => `<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>${selected ? `<small>${escapeHtml(this.profileUserDescription(selected))}</small>` : `<small>The selected profile is temporarily unavailable. Your selection is preserved.</small>`}</section>` : '';
-      const effectiveRowsForProfile = selectedId
-        ? effectiveStrategies.filter(strategy => {
-            const text = `${strategy.profile_id || ''} ${strategy.strategy_profile_id || ''} ${strategy.profile_type || ''} ${strategy.asset_type || ''} ${strategy.policy_profile || ''}`.toLowerCase();
-            const wanted = String(selectedId).toLowerCase();
-            return text.includes(wanted) || text.includes(String(selected.profile_type || '').toLowerCase()) || text.includes(String(selected.asset_type || '').toLowerCase());
-          })
-        : effectiveStrategies;
-      const effectiveRows = (effectiveRowsForProfile.length ? effectiveRowsForProfile : effectiveStrategies).map(strategy => this.effectivePolicyPreviewCard(rt, strategy)).join('');
-      const diagnostics = `${this.kv('Editable strategy source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy')}${this.kv('Effective context source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy.effective_properties')}${this.kv('Planning outcome source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning')}${this.kv('Explanation source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.intelligence')}${this.kv('Action source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.commands')}${this.kv('Selected profile', selectedId || 'None')}`;
+
       const automationRow = rt.editableProperty('energy.automation_mode') || rt.row('energy.automation_mode');
       const automationMode = rowValue(automationRow, this.energyAutomationMode(rt,d) || 'advice');
       const automationOptions = allowedValuesForRow(automationRow).length
@@ -4521,16 +4648,29 @@
       const automationControl = this.isWritableRow(automationRow)
         ? this.componentSegmentedControl(automationOptions, automationMode, 'automationModeControl')
         : `<div class="profileNoControls">Automation mode is not writable in the current public contract.</div>`;
-      return `${this.tabExperienceHeader(rt,'strategies',pageVm)}<div class="strategiesPage strategyProfilesPage strategyProfileUx">
-        <section class="panel strategyAutomationMode"><div><h2>Automation mode</h2><p>Choose how Home Intelligence may act. Domain ownership stays in the backend; changes are confirmed by authoritative readback.</p></div>${automationControl}${this.editablePropertyFeedback(automationRow)}</section>
-        ${profilePicker || `<section class="panel"><h2>No settings profiles published</h2><p>Waiting for canonical domain settings.</p></section>`}
-        <div class="profileEditorColumn">${selected ? this.strategyProfileCard(rt, selected) : ''}</div>
-        <section class="panel effectivePolicyPreview"><h2>Current policy effect${selected ? ` · ${escapeHtml(this.profileUserLabel(selected))}` : ''}</h2><p>Configured, effective and influencing policy state.</p><div class="effectivePolicyList">${effectiveRows || `<div class="empty"><b>No effective strategy published</b><span>Waiting for canonical V2 effective strategy.</span></div>`}</div></section>
-        <section class="panel strategyParticipation"><h2>Participating assets</h2><p>Physical control and planning structure published by Energy.</p><div class="settingsParticipationTree">${rt.settingsParticipationRows().map(parent=>{
-          const parentAsset=rt.asset(parent.asset_id) || parent;
-          const children=asArray(parent.children);
-          return `<article class="settingsParticipationRoot"><div class="settingsParticipationRootHead">${this.assetVisual(parentAsset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(parentAsset)})}<div><b>${escapeHtml(parent.display_name || rt.assetName(parent.asset_id) || human(parent.asset_id))}</b><span>${escapeHtml(human(parent.participation_role || parent.asset_type || 'Participating'))}</span></div></div><div class="settingsParticipationChildren">${children.map(child=>{const childAsset=rt.asset(child.asset_id)||child;return `<div class="settingsParticipationChild">${this.assetVisual(childAsset,{size:'xs',fallbackIcon:this.flexibleAssetIcon(childAsset)})}<div><b>${escapeHtml(child.display_name || rt.assetName(child.asset_id) || human(child.asset_id))}</b><span>${escapeHtml(human(child.relationship_type || child.asset_type || 'Member'))}</span></div>${child.planning_eligible===undefined?'':`<strong>${child.planning_eligible?'Planning ready':'Not planning ready'}</strong>`}</div>`;}).join('') || '<div class="settingsParticipationEmpty">No related assets published</div>'}</div></article>`;
-        }).join('') || `<div class="empty"><b>No participating structure published</b><span>Energy has not published a control/planning hierarchy.</span></div>`}</div></section>
+
+      const effectiveRowsForProfile = selectedId
+        ? effectiveStrategies.filter(strategy => {
+            const text = `${strategy.profile_id || ''} ${strategy.strategy_profile_id || ''} ${strategy.profile_type || ''} ${strategy.asset_type || ''} ${strategy.policy_profile || ''}`.toLowerCase();
+            const wanted = String(selectedId).toLowerCase();
+            return text.includes(wanted) || text.includes(String(selected?.profile_type || '').toLowerCase()) || text.includes(String(selected?.asset_type || '').toLowerCase());
+          })
+        : effectiveStrategies;
+      const effectiveRows = (effectiveRowsForProfile.length ? effectiveRowsForProfile : effectiveStrategies).map(strategy => this.effectivePolicyPreviewCard(rt,strategy)).join('');
+      const participation = rt.settingsParticipationRows().map(parent => {
+        const parentAsset=rt.asset(parent.asset_id) || parent;
+        const children=asArray(parent.children);
+        return `<article class="settingsParticipationRoot"><div class="settingsParticipationRootHead">${this.assetVisual(parentAsset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(parentAsset)})}<div><b>${escapeHtml(parent.display_name || rt.assetName(parent.asset_id) || human(parent.asset_id))}</b><span>${escapeHtml(human(parent.participation_role || parent.asset_type || 'Participating'))}</span></div></div><div class="settingsParticipationChildren">${children.map(child=>{const childAsset=rt.asset(child.asset_id)||child;return `<div class="settingsParticipationChild">${this.assetVisual(childAsset,{size:'xs',fallbackIcon:this.flexibleAssetIcon(childAsset)})}<div><b>${escapeHtml(child.display_name || rt.assetName(child.asset_id) || human(child.asset_id))}</b><span>${escapeHtml(human(child.relationship_type || child.asset_type || 'Member'))}</span></div></div>`;}).join('')}</div></article>`;
+      }).join('');
+
+      return `${this.tabExperienceHeader(rt,'strategies',pageVm)}<div class="strategiesPage settingsTopicPage">
+        <section class="panel strategyAutomationMode compactSettingsBlock"><div><h2>Automation</h2><p>Choose how much Home Intelligence may act for you.</p></div>${automationControl}${this.editablePropertyFeedback(automationRow)}</section>
+        <section class="panel settingsTopicChooser"><div class="settingsTopicHead"><h2>What do you want to adjust?</h2><p>Settings are grouped by the part of your energy system you want to influence.</p></div><div class="settingsTopicGrid">${topicButtons || '<div class="empty"><b>No settings topics available</b><span>No editable Energy policy profiles are currently published.</span></div>'}</div></section>
+        ${selected ? `<section class="settingsSelectedTopic"><div class="settingsSelectedTopicHead"><div><small>SETTINGS</small><h2>${escapeHtml(selectedTopic)}</h2></div>${variantSelect}</div>${this.strategyProfileCard(rt,selected)}</section>` : ''}
+        <details class="panel settingsAdvancedDisclosure"><summary>Advanced</summary><div class="settingsAdvancedBody">
+          <section><h3>Effective behavior</h3><div class="effectivePolicyList">${effectiveRows || '<div class="empty compact"><b>No effective behavior published</b></div>'}</div></section>
+          ${participation ? `<section><h3>Participating assets</h3><div class="settingsParticipationTree">${participation}</div></section>` : ''}
+        </div></details>
       </div>`;
     }
 
@@ -5258,32 +5398,35 @@
       const totalNeed = asNumber(canonicalTotals.flexible_required_kwh);
       const totalPlanned = asNumber(canonicalTotals.flexible_planned_kwh);
       const remainingNeed = asNumber(canonicalTotals.flexible_still_to_plan_kwh);
+      const displayNeed = vm.complete ? totalNeed : null;
+      const displayPlanned = vm.complete ? totalPlanned : null;
+      const displayRemaining = vm.complete ? remainingNeed : null;
       const planStatus = String(firstDefined(vm.currentActionIntent.action_state, vm.currentActionIntent.state, vm.summary.plan_status, vm.horizon.status, vm.horizon.state, vm.complete?'available':'unavailable'));
       const confidence = firstDefined(vm.quality.confidence, vm.horizon.confidence, 'Limited');
       const statusLabel = /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
       const plannedTotals = assetTotals.map(item => `<span class="planningFooterAsset">${this.assetVisual(item.asset,{size:'xs',fallbackIcon:this.planningAssetIcon(item.asset)})}<b>${escapeHtml(this.planningAssetName(item.asset))}</b> ${item.plannedEnergy===null?'—':item.plannedEnergy.toFixed(1)+' kWh'}</span>`).join('');
       const summaryItems = vm.horizonId === 'D1'
-        ? [['Need entering tomorrow',totalNeed],['Planned tomorrow',totalPlanned],['Still after tomorrow',remainingNeed]]
-        : [['Need entering today',totalNeed],['Planned today',totalPlanned],['Still after today',remainingNeed]];
+        ? [['Need entering tomorrow',displayNeed],['Planned tomorrow',displayPlanned],['Still after tomorrow',displayRemaining]]
+        : [['Need entering today',displayNeed],['Planned today',displayPlanned],['Still after today',displayRemaining]];
       const summaryTotals = `<div class="planningAggregateTotals">${summaryItems.map(([label,value])=>`<span><small>${label}</small><b>${value===null?'—':value.toFixed(1)+' kWh'}</b></span>`).join('')}</div>`;
       const disclosure = firstDefined(vm.rows.find(row=>row.disclosure)?.disclosure, vm.quality.basis ? `Planning basis: ${human(vm.quality.basis)}. Actual execution follows the current operational intent.` : 'Future buckets are advisory. Actual execution follows the current operational intent.');
       const balanceLabel = sourceTotal===null || useTotal===null ? 'Planning balance unavailable' : `${sourceTotal.toFixed(1)} kWh source · ${useTotal.toFixed(1)} kWh use${balanceDelta===null?'':` · Δ ${balanceDelta.toFixed(3)} kWh`}`;
-      const heroValue = totalPlanned===null ? '—' : totalPlanned.toFixed(1)+' kWh';
+      const heroValue = displayPlanned===null ? '—' : displayPlanned.toFixed(1)+' kWh';
       const planningHeader = {
         image:hbEnergyHeroAsset('solar-generation'),
         icon:'▣',
         eyebrow:'Tactical planning',
         title:`${horizonLabel} plan`,
         value:heroValue,
-        unit:totalNeed===null?'planned flexible energy':`of ${totalNeed.toFixed(1)} kWh flexible need`,
-        explanation:remainingNeed===null?'Remaining need is unavailable.':`${remainingNeed.toFixed(1)} kWh still needs a suitable opportunity.`,
+        unit:displayNeed===null?'planned flexible energy':`of ${displayNeed.toFixed(1)} kWh flexible need`,
+        explanation:displayRemaining===null?'Remaining need is unavailable.':`${displayRemaining.toFixed(1)} kWh still needs a suitable opportunity.`,
         tone:'purple',
         badgeText:vm.contractSupported ? statusLabel : 'Unavailable',
         badgeTone:vm.contractSupported && vm.complete ? 'ok' : 'attention',
         metrics:[
-          ['◎',vm.horizonId === 'D1' ? 'Need entering tomorrow' : 'Need entering today',fmtKwh(totalNeed,'—'),horizonLabel],
-          ['▣',vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today',fmtKwh(totalPlanned,'—'),horizonLabel],
-          ['◷',vm.horizonId === 'D1' ? 'Still after tomorrow' : 'Still after today',fmtKwh(remainingNeed,'—'),'Horizon-local residual'],
+          ['◎',vm.horizonId === 'D1' ? 'Need entering tomorrow' : 'Need entering today',fmtKwh(displayNeed,'—'),horizonLabel],
+          ['▣',vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today',fmtKwh(displayPlanned,'—'),horizonLabel],
+          ['◷',vm.horizonId === 'D1' ? 'Still after tomorrow' : 'Still after today',fmtKwh(displayRemaining,'—'),'Horizon-local residual'],
           ['✓','Confidence',this.productStateLabel(confidence,'Limited'),'Planning confidence']
         ]
       };
@@ -5292,12 +5435,19 @@
       const nextLines = assetTotals.map(item => this.assetIdentityChip(item.asset,fmtKw(firstDefined(item.asset.requested_power_kw,item.asset.requested_charge_power_kw,item.asset.requested_power_kw_effective),'—'))).join('');
       const planningLoadRows = assetTotals.map(item => {
         const canonical=item.canonical||{};
-        const priority=human(firstDefined(item.asset.energy_control_priority,item.asset.priority_label,'Normal'));
-        const next=String(firstDefined(canonical.what_text,canonical.next_action_label,canonical.next_action,canonical.today_label,'Wait'));
-        const why=String(firstDefined(canonical.why_text,canonical.reason_label,'No explanation published.'));
-        const eligibility = canonical.planning_eligible === true ? 'Planning ready' : String(firstDefined(canonical.user_status, item.asset.user_status, 'Not eligible'));
-        const planStatus = firstDefined(canonical.planning_status, canonical.plan_conformance_label, canonical.exception_label, canonical.risk_label, eligibility);
-        return `<article class="planningLoadRow"><div class="planningLoadIdentity">${this.assetVisual(item.asset,{size:'sm',fallbackIcon:this.planningAssetIcon(item.asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(item.asset))}</b><span class="priorityBadge">${escapeHtml(priority)}</span></div><small>${escapeHtml(eligibility)}</small></div></div><div><small>Next action</small><b class="nextActionBadge">${escapeHtml(next)}</b></div><div><small>Requested power</small><b>${fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')}</b></div><div><small>${vm.horizonId==='D1'?'Planned tomorrow':'Planned today'}</small><b>${fmtKwh(item.plannedEnergy,'—')}</b></div><div><small>Why / reason</small><b>${escapeHtml(why)}</b></div><div><small>Plan status</small><b class="planStatusBadge ${/at.?risk|blocked|failed|incomplete/i.test(String(planStatus))?'exception':'unknown'}">${escapeHtml(planStatus)}</b></div></article>`;
+        const nextRaw=String(firstDefined(canonical.what_text,canonical.next_action_label,canonical.next_action,canonical.today_label,'') || '').trim();
+        const next=nextRaw && !/^(wait|none)$/i.test(nextRaw) ? human(nextRaw) : '';
+        const whyRaw=String(firstDefined(canonical.why_text,canonical.reason_label,canonical.reason,'') || '').trim();
+        const why=whyRaw && !/^(none|no explanation available\.?|no explanation published\.?)$/i.test(whyRaw) ? humanReason(whyRaw,'') : '';
+        const eligibility = canonical.planning_eligible === true ? 'Planning ready' : String(firstDefined(canonical.user_status,item.asset.user_status,'Incomplete'));
+        const planStatus = firstDefined(canonical.planning_status,canonical.plan_conformance_label,canonical.exception_label,canonical.risk_label,eligibility);
+        const facts=[
+          ['Requested power',fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')],
+          [vm.horizonId==='D1'?'Planned tomorrow':'Planned today',fmtKwh(item.plannedEnergy,'—')],
+          next ? ['Next action',next] : null,
+          why ? ['Reason',why] : null
+        ].filter(Boolean);
+        return `<article class="planningLoadRow compactPlanningLoad"><div class="planningLoadIdentity">${this.assetVisual(item.asset,{size:'sm',fallbackIcon:this.planningAssetIcon(item.asset)})}<div><b>${escapeHtml(this.planningAssetName(item.asset))}</b><small>${escapeHtml(eligibility)}</small></div></div><div class="compactPlanningFacts">${facts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div><b class="planStatusBadge ${/at.?risk|blocked|failed|incomplete/i.test(String(planStatus))?'exception':'unknown'}">${escapeHtml(planStatus)}</b></article>`;
       }).join('');
       const incompletePlanningRows = asArray(vm.assets).filter(asset => asset && asset.planning_input_ready === false).map(asset => { const blockers=asArray(asset.planning_blockers); const userReason=blockers.includes('target_soc_not_configured')?'Set a target charge level.':blockers.includes('ready_by_not_configured')?'Set a ready-by time.':blockers.includes('charger_not_assigned')?'Assign a charger.':'Charging information is incomplete.'; return `<article class="planningLoadRow planningInputIncomplete"><div class="planningLoadIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.planningAssetIcon(asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(asset))}</b></div><small>${escapeHtml(userReason)}</small></div></div><div><small>Current charge</small><b>${fmtPct(asset.current_soc_pct)}</b></div><div><small>Target</small><b>${fmtPct(asset.target_soc_pct)}</b></div><div><small>Ready by</small><b>${escapeHtml(asset.ready_by || 'Not set')}</b></div><div><small>Charging power</small><b>${fmtKw(asset.max_power_kw,'—')}</b></div><div><small>Status</small><b class="planStatusBadge exception">Needs setup</b></div></article>`; }).join('');
       return `${this.tabExperienceHeader(rt,'planning',planningHeader)}
@@ -5307,49 +5457,42 @@
 
     strategicPlanning(rt) {
       const base = this.buildPageViewModel(rt, 'strategies');
-      const profiles = asArray(rt.strategyProfileRows());
-      const effective = asArray(rt.effectiveStrategyRows());
-      const configured = profiles.flatMap(profile => {
-        const rows = asArray(firstDefined(profile.editable_field_rows, profile.properties, profile.fields, []));
-        return rows.map(row => ({ ...objectFrom(row), profile_id:firstDefined(row.profile_id, profile.profile_id, '') }));
-      });
-      const byKey = new Map();
-      [...configured, ...effective].forEach(row => {
-        const key = String(firstDefined(row.property_key,row.property_id,row.key,row.setting_id,row.id,'') || '');
-        if (!key) return;
-        byKey.set(key, { ...(byKey.get(key) || {}), ...objectFrom(row), property_key:key });
-      });
-      const rows = [...byKey.values()];
-      const objectiveRows = rows.filter(row => /objective|goal|mode|solar_policy|grid_policy|battery_policy/i.test(row.property_key));
-      const constraintRows = rows.filter(row => /reserve|minimum|maximum|limit|deadline|priority|resilience|threshold/i.test(row.property_key));
-      const optimisationRows = rows.filter(row => !objectiveRows.includes(row) && !constraintRows.includes(row));
+      const topics = rt.strategyBehaviorTopics();
       const valueText = row => {
         const value = firstDefined(row.effective_value,row.value,row.configured_value,row.selected_value,row.current_value,null);
-        if (value === null) return 'Not published';
+        if (value === null || value === undefined || value === '') return 'Not published';
         return this.genericValueWithUnit(value, firstDefined(row.unit,row.native_unit,''));
       };
-      const rowMarkup = row => `<div class="planningTransparencyRow"><div><b>${escapeHtml(human(row.label || row.name || row.property_key))}</b><span>${escapeHtml(row.profile_id ? human(row.profile_id) : 'Effective strategy')}</span></div><strong>${escapeHtml(valueText(row))}</strong></div>`;
-      const section = (title, description, items) => `<section class="panel"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p><div class="effectivePolicyList">${items.length ? items.map(rowMarkup).join('') : '<div class="empty"><b>No values published</b><span>The canonical strategy contract does not currently publish values for this section.</span></div>'}</div></section>`;
+      const topicCards = topics.map(topic => {
+        const properties = asArray(topic.properties);
+        const lines = properties.slice(0,8).map(row => {
+          const label = this.profileFieldLabel(row);
+          return `<div class="strategicBehaviorRow"><span>${escapeHtml(label)}</span><b>${escapeHtml(valueText(row))}</b></div>`;
+        }).join('');
+        return `<section class="panel strategicBehaviorCard"><h2>${escapeHtml(topic.topic_label || human(topic.topic_id))}</h2><div class="strategicBehaviorRows">${lines || '<div class="empty compact"><span>No effective values published.</span></div>'}</div></section>`;
+      }).join('');
+
+      const allProperties = topics.flatMap(topic => asArray(topic.properties));
+      const automationRow = allProperties.find(row => String(firstDefined(row.property_id,row.property_key,row.key,'') || '') === 'energy.automation_mode') || null;
+      const objectiveRow = allProperties.find(row => ['home.primary_objective','strategy.home.primary_objective'].includes(String(firstDefined(row.property_id,row.property_key,row.key,'') || ''))) || null;
+      const mode = automationRow ? valueText(automationRow) : this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'),'Advice');
+      const objective = objectiveRow ? valueText(objectiveRow) : '';
+      const posture = [mode,objective].filter(value=>value && value!=='Not published').join(' · ');
       const model = {
         ...base,
         image:hbEnergyHeroAsset('strategic-planning'),
         title:'Strategic Planning',
-        explanation:'Longer-term goals, constraints and optimisation policy.',
+        explanation:'What your current Energy settings mean for longer-term behavior.',
         metrics:[
-          ['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'),'Automatic'),'Current control mode'],
-          ['◇','Objectives',String(objectiveRows.length),'Published strategic goals and policies'],
-          ['◫','Constraints',String(constraintRows.length),'Published limits and resilience constraints'],
-          ['↗','Tactical horizon','D0 / D1','Scheduling remains owned by Tactical Planning']
+          ['◎','Strategy',posture || 'Not published','Current longer-term posture'],
+          ['◇','Topics',String(topics.length),'Backend-owned policy areas influencing strategy'],
+          ['↗','Tactical horizon','D0 / D1','Today and tomorrow remain in Tactical Planning']
         ]
       };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}
-        <div class="strategicPlanningPage">
-          <section class="panel strategicPlanningIntro"><h2>Strategic posture</h2><p>Strategy configuration is the authority for longer-term intent. This view is read-only: edit intent in Settings; Tactical Planning owns today/tomorrow scheduling and Operational Planning owns execution.</p></section>
-          <div class="strategyGrid">
-            ${section('Goals & policy','What Home Intelligence is trying to optimise over time.',objectiveRows)}
-            ${section('Constraints & resilience','Boundaries that planning must respect.',constraintRows)}
-          </div>
-          ${optimisationRows.length ? section('Other effective policy','Additional effective strategy values currently influencing planning.',optimisationRows) : ''}
+        <div class="strategicPlanningPage strategicBehaviorPage">
+          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not published')}</h2><p>Strategy configuration is the authority for longer-term intent. This read-only view explains the effective meaning of your current Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
+          <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No strategic behavior published</b><span>The backend has not published effective behavior topics yet.</span></div></section>'}</div>
         </div>`;
     }
 
@@ -5495,7 +5638,7 @@
         console.error(`[HomeBrain Energy ${UX_VERSION}] ${this.view} render failed`, error);
         content = this.renderError(this.view, error);
       }
-      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${this.energyHardwareStyles()}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
+      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${this.energyHardwareStyles()}${typeof rhiUxVisualPickerStyles === 'function' ? rhiUxVisualPickerStyles() : ''}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
 
       /* R3.62.0 canonical component framework and adaptive convergence */
       :host{--hi-space-1:4px;--hi-space-2:8px;--hi-space-3:12px;--hi-space-4:16px;--hi-radius-sm:8px;--hi-radius-md:12px;--hi-break-tablet:980px;--hi-break-phone:700px}
@@ -5748,6 +5891,29 @@
 
 
       }
+
+
+      /* 4.3.22 UX-only literal product grammar: compact, predictable, no whitespace-led hierarchy. */
+      .energyAssetFoldStack{display:grid;gap:0;margin-top:6px;border-top:1px solid #edf1f5}
+      .energyAssetDisclosure{margin:0;border:0;border-bottom:1px solid #edf1f5;background:transparent;border-radius:0}
+      .energyAssetDisclosure:last-child{border-bottom:0}
+      .energyAssetDisclosure>summary{min-height:42px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;padding:8px 4px;cursor:pointer;list-style:none;font-size:11px;font-weight:700;color:#42526a}
+      .energyAssetDisclosure>summary::-webkit-details-marker{display:none}.energyAssetDisclosure>summary:after{content:"›";font-size:17px;color:#94a3b8;transform:rotate(0deg)}.energyAssetDisclosure[open]>summary:after{transform:rotate(90deg)}
+      .energyAssetFoldBody{padding:2px 4px 9px}.energyAssetDetailGrid,.energyAssetDiagnosticGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+      .energyAssetDetailGrid>span,.energyAssetDiagnosticGrid>span{min-height:34px;padding:6px 8px;border-radius:8px;background:#f8fafc;box-sizing:border-box}.energyAssetDetailGrid small,.energyAssetDiagnosticGrid small{display:block;font-size:8px;color:#64748b}.energyAssetDetailGrid b,.energyAssetDiagnosticGrid b{display:block;margin-top:1px;font-size:10px;line-height:1.25;overflow-wrap:anywhere}
+      .energyAssetChildrenBody{padding-top:4px}.energyAssetQuickActions{display:flex;align-items:center;gap:8px;margin:5px 0}.energyAssetQuickActions>small{font-size:8px;font-weight:750;letter-spacing:.08em;text-transform:uppercase;color:#64748b}.energyAssetQuickActions>div{display:flex;gap:6px;flex-wrap:wrap}
+      .energyDeviceCard{grid-template-columns:112px minmax(0,1fr);gap:10px;padding:10px;border-radius:13px}.energyDeviceVisual{height:106px}.energyDeviceTop h3{font-size:16px;margin:1px 0}.energyDeviceTop small{font-size:8px}.energyDeviceState{padding:3px 7px;font-size:9px}.energyDeviceFacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:5px 0}.energyDeviceFacts>span{min-height:36px;padding:6px 8px;border-radius:8px}.energyDeviceFacts small{font-size:8px}.energyDeviceFacts b{font-size:10.5px;margin-top:1px}
+      .solarProductionObject{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;padding:10px;border:1px solid #e3eaf2;border-radius:13px;background:#fff}.solarProductionRepresentativeWrap{display:grid;place-items:center;min-height:112px}.solarProductionRepresentative{width:100%;height:112px}.solarProductionRepresentative img{width:100%;height:100%;object-fit:contain}.solarProductionObjectHead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.solarProductionObjectHead h3{margin:1px 0;font-size:17px}.solarProductionObjectHead small{font-size:8px;color:#64748b}.solarProductionObjectHead>b{font-size:10px;padding:4px 8px;border-radius:999px;background:#eef9f2;color:#237346}
+      .solarStringLink{padding:9px;border-radius:11px}.solarStringSummary{gap:8px}.solarModuleGrid{gap:7px}.solarInverterGrid{gap:8px}.solarInverterStrings{margin:0;padding:0;border:0}
+      .compactManagedAsset,.compactOperationalLoad{padding:9px 11px;border-radius:12px;margin:0;border:1px solid #e4eaf2;background:#fff}.managedAssetHeader{display:flex;justify-content:space-between;align-items:center;gap:10px}.managedAssetIdentity{display:flex;align-items:center;gap:9px;min-width:0}.managedAssetIdentity h3{margin:0;font-size:13px}.managedAssetIdentity span{display:block;margin-top:2px;font-size:9.5px;color:#64748b}.managedAssetHeader>b{font-size:13px;white-space:nowrap}.managedAssetFacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:6px 0}.managedAssetFacts>span{padding:5px 7px;border-radius:8px;background:#f8fafc}.managedAssetFacts small{display:block;font-size:8px;color:#64748b}.managedAssetFacts b{display:block;font-size:10px;margin-top:1px}.consumerExplorerList,.flexLoadList{display:grid;gap:7px}
+      .operationalPlanningPage .productStory{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px 12px;margin-bottom:7px}.operationalPlanningPage .productStoryCopy>small{font-size:8px}.operationalPlanningPage .productStoryCopy h2{font-size:14px;margin:1px 0}.operationalPlanningPage .productStoryCopy p{font-size:10px;margin:2px 0}.operationalPlanningPage .productStoryRecommendation{display:none}.operationalPlanningPage .productStoryActions{align-self:center}
+      .settingsTopicPage{display:grid;gap:8px}.compactSettingsBlock{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:11px 14px}.compactSettingsBlock h2{font-size:16px;margin:0}.compactSettingsBlock p{font-size:10px;margin:2px 0 0}.settingsTopicChooser{padding:12px 14px}.settingsTopicHead h2{font-size:16px;margin:0}.settingsTopicHead p{font-size:10px;margin:2px 0 8px}.settingsTopicGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.settingsTopicButton{min-height:62px;text-align:left;padding:9px 10px;border:1px solid #dfe7f0;border-radius:10px;background:#fff;color:#23324a}.settingsTopicButton.active{border-color:#93c5fd;background:#f5f9ff;box-shadow:inset 0 0 0 1px #bfdbfe}.settingsTopicButton b{display:block;font-size:11px}.settingsTopicButton span{display:block;margin-top:3px;font-size:8.5px;line-height:1.25;color:#64748b;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+      .settingsSelectedTopicHead{display:flex;align-items:end;justify-content:space-between;gap:10px;padding:3px 2px}.settingsSelectedTopicHead small{font-size:8px;color:#64748b}.settingsSelectedTopicHead h2{font-size:17px;margin:1px 0}.settingsVariantSelect{display:flex;align-items:center;gap:6px}.settingsVariantSelect span{font-size:9px;color:#64748b}.settingsVariantSelect select{height:34px;border:1px solid #dbe3ee;border-radius:8px;background:#fff;padding:0 8px}.settingsSelectedTopic .strategyTablePanel{margin:0;padding:11px 14px;border-radius:12px}.settingsSelectedTopic .strategyTableHead h2{font-size:15px}.settingsSelectedTopic .strategyTableHead p{font-size:9.5px;margin:2px 0}.settingsSelectedTopic .strategyTableRow{padding:7px 0}.settingsSelectedTopic .strategyColumnHead{display:none}.settingsAdvancedDisclosure{padding:0 12px;margin:0}.settingsAdvancedDisclosure>summary{height:42px;display:flex;align-items:center;font-size:11px;font-weight:700;cursor:pointer}.settingsAdvancedBody{display:grid;gap:8px;padding:0 0 10px}.settingsAdvancedBody h3{font-size:12px;margin:0 0 5px}
+      .strategicBehaviorPage{display:grid;gap:8px}.compactStrategicIntro{padding:11px 14px}.compactStrategicIntro small{font-size:8px;color:#64748b}.compactStrategicIntro h2{font-size:16px;margin:2px 0}.compactStrategicIntro p{font-size:10px;line-height:1.35;margin:2px 0}.strategicBehaviorGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.strategicBehaviorCard{padding:11px 13px}.strategicBehaviorCard h2{font-size:14px;margin:0 0 5px}.strategicBehaviorRows{display:grid}.strategicBehaviorRow{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:32px;border-top:1px solid #edf1f5}.strategicBehaviorRow:first-child{border-top:0}.strategicBehaviorRow span{font-size:9.5px;color:#52637a}.strategicBehaviorRow b{font-size:10px;text-align:right}
+      .compactPlanningLoad{grid-template-columns:minmax(190px,1.15fr) minmax(0,2fr) auto;padding:8px 10px;gap:9px}.compactPlanningFacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}.compactPlanningFacts>span{min-width:0}.compactPlanningFacts small{display:block;font-size:8px;color:#64748b}.compactPlanningFacts b{display:block;font-size:10px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      @media(max-width:900px){.energyAssetDetailGrid,.energyAssetDiagnosticGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.energyDeviceFacts,.managedAssetFacts,.compactPlanningFacts{grid-template-columns:repeat(2,minmax(0,1fr))}.settingsTopicGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.compactPlanningLoad{grid-template-columns:1fr auto}.compactPlanningFacts{grid-column:1/-1}}
+      @media(max-width:620px){.energyDeviceCard,.solarProductionObject{grid-template-columns:88px minmax(0,1fr)}.energyDeviceVisual,.solarProductionRepresentative{height:78px}.solarProductionRepresentativeWrap{min-height:78px}.energyAssetDetailGrid,.energyAssetDiagnosticGrid{grid-template-columns:1fr 1fr}.settingsTopicGrid,.strategicBehaviorGrid{grid-template-columns:1fr}.compactSettingsBlock{grid-template-columns:1fr}.managedAssetFacts{grid-template-columns:1fr 1fr}}
+
 </style><style>
 .navigationShell{--nav-active-bg:#edf5ff;--nav-active-border:#cfdef1;--nav-active-text:#0f4ca4;--rhi-company-area-min:250px;--rhi-company-area-max:320px;--rhi-company-logo-max-width:286px;--rhi-company-logo-max-height:116px;--rhi-company-logo-padding:10px 16px;--rhi-company-divider:rgba(226,232,240,.82);position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(var(--rhi-company-area-min),var(--rhi-company-area-max));gap:0;margin:0 0 12px;background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.91));border:1px solid rgba(207,217,230,.86);border-radius:22px;box-shadow:0 12px 30px rgba(15,23,42,.045);overflow:hidden;backdrop-filter:blur(16px)}.navigationShell.nav-intelligence{--nav-active-bg:#f1edff;--nav-active-border:#dfd5fb;--nav-active-text:#5a38b3}.navigationShell.nav-insights{--nav-active-bg:#e7f7f4;--nav-active-border:#cdebe6;--nav-active-text:#176e67}
 .navProductArea{min-width:0}.navPrimaryRow{min-height:78px;display:grid;grid-template-columns:minmax(270px,.72fr) minmax(430px,1.28fr);align-items:center;gap:24px;padding:10px 22px 9px}.navBrand{display:flex;align-items:center;min-width:0;min-height:56px;padding:2px 0 0 4px}.navBrandCopy{display:grid;align-content:center;gap:2px;min-width:0}.navBrandCopy b{font-size:15px;line-height:1.1;font-weight:520;letter-spacing:-.01em;color:#58708f;white-space:nowrap}.navBrandCopy small{font-size:24px;line-height:1.02;letter-spacing:.055em;font-weight:790;color:#0b467f;white-space:nowrap}

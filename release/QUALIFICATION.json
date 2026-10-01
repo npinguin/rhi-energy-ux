@@ -1,8 +1,8 @@
 {
-  "version": "4.3.21",
-  "candidate_tag": "v4.3.21",
-  "candidate_sha": "272d5eea6479db31ec3c4d149f2316b0c2e75572",
-  "previous_release": "4.3.20",
+  "version": "4.3.22",
+  "candidate_tag": "v4.3.22",
+  "candidate_sha": "pending",
+  "previous_release": "4.3.21",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -78,5 +78,11 @@
   "absent_pricing_value_hidden": "NOT_EXECUTED",
   "configured_unavailable_capability_visible": "NOT_EXECUTED",
   "overview_optional_participants": "NOT_EXECUTED",
-  "presence_reload_restart_stability": "NOT_EXECUTED"
+  "presence_reload_restart_stability": "NOT_EXECUTED",
+  "backend_property_presentation_depth": "NOT_EXECUTED",
+  "backend_settings_topics": "NOT_EXECUTED",
+  "backend_strategic_behavior_topics": "NOT_EXECUTED",
+  "mobility_exact_producer_invocation": "NOT_EXECUTED",
+  "planning_incomplete_reason_truth": "NOT_EXECUTED",
+  "planning_unknown_totals_fail_closed": "NOT_EXECUTED"
 }
