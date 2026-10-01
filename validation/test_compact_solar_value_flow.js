@@ -32,7 +32,7 @@ for (const required of [
   assert.ok(story.includes(required), 'compact solar value flow missing: ' + required);
 }
 assert.ok(app.includes('solarProductionObject'), 'solar production root object remains available');
-assert.ok(app.includes('solarRootObject'), 'solar production is the hierarchy root');
+assert.ok(app.includes("solarHardwareSection(\n            'Solar Production'"), 'solar production uses the same top-level section shell as Home Battery');
 assert.ok(!story.includes('data-scroll-target="solar-inverter-detail"'), 'inverter must not be a primary flow node');
 const solarAt = story.indexOf('<small>Solar</small>');
 const batteryAt = story.indexOf('<small>Battery</small>');
@@ -40,7 +40,7 @@ const homeAt = story.indexOf('<small>Home</small>');
 const gridAt = story.indexOf('<small>Grid</small>');
 assert.ok(solarAt < batteryAt && batteryAt < homeAt && homeAt < gridAt, 'primary flow order must be Solar > Battery > Home <> Grid');
 assert.ok(app.includes("solarHardwareSection(\n        'Home Battery'"), 'battery detail remains available');
-assert.ok(app.includes('id="solar-production-detail"'), 'solar production root has scroll target');
+assert.ok(app.includes("'solar-production-detail'"), 'solar production top-level section has scroll target');
 assert.ok(app.includes('id="solar-inverter-detail"'), 'nested inverter hierarchy has diagnostic anchor');
 assert.ok(app.includes("'solar-battery-detail'"), 'battery system has scroll target');
 
