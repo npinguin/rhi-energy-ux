@@ -13,7 +13,10 @@ const required=[
   "energyAssetFoldStack",
   "energyAssetChildren",
   "Charger unavailable",
-  "fmtKw(currentPower,'—')"
+  "fmtKw(currentPower,'—')",
+  "presentation?.role",
+  "behavior_topics",
+  "Published properties"
 ];
 for(const token of required){
   if(!source.includes(token)) throw new Error("literal UX contract missing: "+token);
@@ -22,7 +25,6 @@ for(const token of required){
 for(const forbidden of [
   "Available Properties",
   "Available properties",
-  "Published properties",
   "No explanation published.",
   "No explanation Available.",
   "fmtKw(currentPower,'0.0 kW')",
