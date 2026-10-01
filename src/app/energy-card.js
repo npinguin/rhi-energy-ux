@@ -3133,6 +3133,25 @@
     energyAssetFacts(rt, asset = {}, limit = 4) {
       const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
       if (!id) return [];
+      const projection = rt.assetProjection(id) || {};
+      const publishedKeyFacts = (projection.properties || [])
+        .filter(row => row?.presentation?.role === 'key' && row?.projection?.resolved === true)
+        .map(row => {
+          const field = row.projection || {};
+          let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
+          if (field.unit && value !== '—' && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
+          return {
+            key:String(firstDefined(row.property_key,row.property_id,row.key,'') || ''),
+            keys:[String(firstDefined(row.property_key,row.property_id,row.key,'') || '')],
+            label:String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || ''),
+            value,
+            direct:[],
+            formatter:'published'
+          };
+        })
+        .filter(row => row.label && row.value !== '—')
+        .slice(0, limit);
+      if (publishedKeyFacts.length) return publishedKeyFacts;
       const type = this.energyAssetType(asset);
       const fact = (key, label, direct = [], formatter = '') => {
         const keys = Array.isArray(key) ? key : [key];
@@ -3351,7 +3370,8 @@
         const key = String(firstDefined(row.property_id,row.property_key,row.key,'') || '');
         const rowAsset = String(firstDefined(row.asset_id,row.target_asset_id,'') || '');
         if (/^appearance:/.test(key)) return false;
-        return rowAsset === id || key.startsWith(`${id}.`);
+        const belongs = rowAsset === id || key.startsWith(`${id}.`);
+        return belongs && row?.presentation?.role === 'configuration';
       });
       if (!rows.length) return '';
       const controls = rows.map(row => {
@@ -3377,26 +3397,26 @@
       const parentId = this.energyAssetParentId(enriched);
       const parentName = parentId ? String(rt.assetName(parentId) || '').trim() : '';
       const area = this.energyAssetAreaLabel(enriched);
-      const primaryLabels = new Set(this.energyAssetFacts(rt,enriched,8).map(row=>String(row.label || '').toLowerCase()));
       const rows = [
         area ? ['Area',area] : null,
         parentName ? ['Part of',parentName] : null,
         firstDefined(profile.display_name,profile.label,profile.name,'') ? ['Profile',firstDefined(profile.display_name,profile.label,profile.name,'')] : null
       ].filter(Boolean);
-      const technical = /(^|\s)(source|asset id|lifecycle|telemetry|health|raw status|timestamp|last update)(\s|$)/i;
-      const properties = (projection?.properties || []).map(row => {
-        const field = row?.projection || {};
-        if (!field.resolved) return null;
-        const label = String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || '');
-        if (!label || technical.test(label) || primaryLabels.has(label.toLowerCase())) return null;
-        let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
-        if (value === '—') return null;
-        if (field.unit && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
-        return [label,value];
-      }).filter(Boolean);
+      const properties = (projection?.properties || [])
+        .filter(row => row?.presentation?.role === 'detail')
+        .map(row => {
+          const field = row?.projection || {};
+          if (!field.resolved) return null;
+          const label = String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || '');
+          if (!label) return null;
+          let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
+          if (value === '—') return null;
+          if (field.unit && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
+          return [label,value];
+        }).filter(Boolean);
       const all = [...rows,...properties];
       if (!all.length) return '';
-      return `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${all.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
+      return `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody"><small class="energyAssetPublishedLabel">Published properties</small><div class="energyAssetDetailGrid">${all.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></div></details>`;
     }
 
     energyAssetDiagnosticsDisclosure(rt, asset = {}) {
@@ -3410,15 +3430,24 @@
         : publication.complete === false ? 'Partial'
         : publication.complete === true ? 'Complete' : 'Unknown';
       const source = firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'');
-      const rawStatus = firstDefined(enriched.raw_status,enriched.status_code,enriched.vendor_status,'');
       const missing = Array.isArray(publication.missing) ? publication.missing : Array.isArray(publication.missing_fields) ? publication.missing_fields : [];
+      const propertyRows = (projection?.properties || [])
+        .filter(row => row?.presentation?.role === 'diagnostics')
+        .map(row => {
+          const field = row?.projection || {};
+          const label = String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || '');
+          const value = field.resolved
+            ? (field.display && field.display !== '—' ? field.display : firstDefined(field.value,'—'))
+            : humanReason(firstDefined(field.reason,row.reason_code,row.resolution?.reason_code,'Unavailable'),'Unavailable');
+          return label ? [label,String(value)] : null;
+        }).filter(Boolean);
       const rows = [
         ['Asset id',id],
         source ? ['Source',source] : null,
         ['Lifecycle',firstDefined(lifecycle.state,enriched.health,enriched.status,'Unknown')],
         ['Telemetry',telemetry],
-        rawStatus ? ['Raw status',rawStatus] : null,
-        missing.length ? ['Missing publication fields',missing.join(' · ')] : null
+        missing.length ? ['Missing publication fields',missing.join(' · ')] : null,
+        ...propertyRows
       ].filter(Boolean);
       return `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
     }
@@ -4166,14 +4195,8 @@
       return String(profile.profile_id || profile.strategy_profile_id || profile.profile_type || profile.asset_type || '').toLowerCase();
     }
     profileSettingsTopic(profile = {}) {
-      const key = `${this.profileKind(profile)} ${profile.display_name || ''} ${profile.label || ''}`.toLowerCase();
-      if (/vehicle|ev|charging/.test(key)) return 'EV charging';
-      if (/battery|storage/.test(key)) return 'Battery';
-      if (/solar|surplus/.test(key)) return 'Solar';
-      if (/grid|tariff|price|pricing/.test(key)) return 'Grid & tariffs';
-      if (/resilience/.test(key)) return 'Home & resilience';
-      if (/home|generic|flexible/.test(key)) return 'Home & priorities';
-      return this.profileUserLabel(profile);
+      return String(firstDefined(profile.topic_label, profile.display_name, profile.profile_label, '') || '').trim()
+        || this.profileUserLabel(profile);
     }
     profileUserLabel(profile = {}) {
       const explicit = firstDefined(profile.user_label, profile.profile_user_label, profile.display_label, profile.profile_label, profile.display_name, profile.name, profile.label, '');
