@@ -93,9 +93,9 @@ assert.match(app,/energyAppearanceAction/);
 assert.match(app,/data-energy-visual-open/);
 
 assert.doesNotMatch(app,/solarHardwareSection\(\n\s*'Inverter system'/);
-assert.match(app,/solarRootObject/);
-assert.doesNotMatch(hardware,/this\.solarHardwareSection\(\s*'Solar Production'/);
-assert.match(hardware,/<section class="solarRootObject" id="solar-production-detail">/);
+assert.match(app,/solarProductionNode/);
+assert.match(hardware,/this\.solarHardwareSection\(\s*'Solar Production'/);
+assert.doesNotMatch(hardware,/<section class="solarRootObject"/);
 
 
 assert.match(app,/solarProductionRepresentative/);
