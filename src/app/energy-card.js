@@ -3107,7 +3107,7 @@
         ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailsRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
         : '';
       const diagnosticRows = [
-        ['Asset id',id],
+        ['Asset id', id],
         ...unavailableActions.map(action=>[`${action.label || human(action.role)} command`,humanReason(action.reason,'Unavailable')]),
         requestedControl ? null : ['Requested charge power',requestedRow && !requestedRow.missing ? (requestedRow.editable_reason || 'Read-only') : 'Not published']
       ].filter(Boolean);
@@ -3454,9 +3454,9 @@
         }).filter(Boolean);
       const rows = [
         ['Asset id',id],
-        source ? ['Source',source] : null,
+        source ? ['Source', source] : null,
         ['Lifecycle',firstDefined(lifecycle.state,enriched.health,enriched.status,'Unknown')],
-        ['Telemetry',telemetry],
+        ['Telemetry', telemetry],
         missing.length ? ['Missing publication fields',missing.join(' · ')] : null,
         ...propertyRows
       ].filter(Boolean);
@@ -5492,7 +5492,7 @@
       };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}
         <div class="strategicPlanningPage strategicBehaviorPage">
-          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not published')}</h2><p>This is the read-only meaning of your current Settings. Change intent in Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
+          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not published')}</h2><p>Strategy configuration is the authority for longer-term intent. This read-only view explains the effective meaning of your current Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
           <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No strategic behavior published</b><span>The backend has not published effective behavior topics yet.</span></div></section>'}</div>
         </div>`;
     }
