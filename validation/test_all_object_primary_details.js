@@ -55,10 +55,10 @@ assert.match(device,/energyAssetDetailDisclosure/);
 assert.doesNotMatch(device,/Asset id.*energyDeviceFacts/);
 
 const consumer = method("consumerExplorerCard");
-for (const token of ["Energy needed","Planned today","Still to plan","Connected via","energyAssetAreaLabel"]) {
+for (const token of ["Energy needed","Planned today","Still to plan","Connection","energyAssetFoldStack","energyAssetDiagnostics"]) {
   assert.ok(consumer.includes(token), "managed asset primary grammar missing "+token);
 }
-assert.match(consumer,/energyAssetDetailDisclosure/);
+assert.doesNotMatch(consumer,/rt\.assetName\(chargerId\)/,"managed asset relationship must not fall back to raw charger id");
 
 const battery = method("battery");
 for (const token of ["Power now","Available energy","Capacity","Reserve","Health","energyAssetDetailDisclosure"]) {
