@@ -51,8 +51,9 @@ assert.match(facts,/presentation\?\.role === 'key'/, "primary facts must prefer 
 const device = method("energyDeviceStatusCard");
 assert.match(device,/energyAssetAreaLabel/);
 assert.match(device,/Part of/);
-assert.match(device,/Telemetry not published/);
 assert.match(device,/energyAssetDetailDisclosure/);
+assert.match(device,/energyAssetDiagnosticsDisclosure/);
+assert.doesNotMatch(device,/Telemetry not published/,"telemetry availability belongs in Diagnostics, not primary object truth");
 assert.doesNotMatch(device,/Asset id.*energyDeviceFacts/);
 
 const consumer = method("consumerExplorerCard");
