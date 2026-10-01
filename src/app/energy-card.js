@@ -3068,6 +3068,10 @@
       const actionModels = rt.commandActionModelsForAsset(id).filter(action => ['start','stop','pause','resume'].includes(action.role));
       const enabledActions = actionModels.filter(action => action.visible && action.enabled);
       const unavailableActions = actionModels.filter(action => action.visible && !action.enabled);
+      const commandAvailability = actionModels
+        .filter(action => action.visible && !action.enabled)
+        .map(action => `<span><small>${escapeHtml(action.label || human(action.role))}</small><b>${escapeHtml(humanReason(action.reason, 'Currently unavailable'))}</b></span>`)
+        .join('');
       const requestedRow = this.flexiblePropertyRow(rt, id, ['requested_charge_power_kw','requested_power_kw','energy_control_requested_power_kw','target_power_kw','setpoint_power_kw','charge_power_setpoint_kw']);
       const requestedEffectiveRow = this.flexiblePropertyRow(rt,id,['requested_power_kw_effective']);
       const requested = rowValue(requestedRow,null) ?? rowValue(requestedEffectiveRow,null) ?? load.requested_charge_power_kw ?? load.requested_power_kw ?? load.requested_power_kw_effective ?? null;
@@ -3107,7 +3111,7 @@
         ...unavailableActions.map(action=>[`${action.label || human(action.role)} command`,humanReason(action.reason,'Unavailable')]),
         requestedControl ? null : ['Requested charge power',requestedRow && !requestedRow.missing ? (requestedRow.editable_reason || 'Read-only') : 'Not published']
       ].filter(Boolean);
-      const diagnostics = `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${diagnosticRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`;
+      const diagnostics = `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${commandAvailability}${diagnosticRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`;
       const actions = enabledActions.length
         ? `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${enabledActions.map(action=>this.componentActionModelButton(action)).join('')}</div></div>`
         : '';
