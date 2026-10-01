@@ -16,7 +16,10 @@ for(const token of [
 if(source.includes("energyAssetFoldStack${configuration}${details}${diagnostics}${children}")){
   throw new Error("Children must not be nested inside the parent fold stack");
 }
-if(source.includes("solarProductionHierarchyHead")){
+const systemStart=source.indexOf("solarInverterSystem(rt");
+const systemEnd=source.indexOf("solarBatterySystem(rt",systemStart);
+const system=source.slice(systemStart,systemEnd);
+if(system.includes("solarProductionHierarchyHead") || system.includes("<small>INVERTERS</small>")){
   throw new Error("Solar children must not add a redundant INVERTERS hierarchy wrapper");
 }
 
