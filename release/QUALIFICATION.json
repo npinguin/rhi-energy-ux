@@ -78,5 +78,11 @@
   "absent_pricing_value_hidden": "NOT_EXECUTED",
   "configured_unavailable_capability_visible": "NOT_EXECUTED",
   "overview_optional_participants": "NOT_EXECUTED",
-  "presence_reload_restart_stability": "NOT_EXECUTED"
+  "presence_reload_restart_stability": "NOT_EXECUTED",
+  "backend_property_presentation_depth": "NOT_EXECUTED",
+  "backend_settings_topics": "NOT_EXECUTED",
+  "backend_strategic_behavior_topics": "NOT_EXECUTED",
+  "mobility_exact_producer_invocation": "NOT_EXECUTED",
+  "planning_incomplete_reason_truth": "NOT_EXECUTED",
+  "planning_unknown_totals_fail_closed": "NOT_EXECUTED"
 }
