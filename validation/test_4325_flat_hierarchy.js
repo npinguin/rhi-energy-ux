@@ -46,10 +46,11 @@ for(const required of [
   if(!css.includes(required)) throw new Error("Flat full-width hierarchy CSS missing: "+required);
 }
 
-const aggregateChildren = hardware.indexOf('class="energyAssetChildrenSibling solarProductionChildrenDisclosure"');
-const aggregateFold = hardware.indexOf('class="energyAssetFoldStack"');
-if(aggregateChildren < 0 || aggregateFold < 0 || aggregateChildren < aggregateFold){
-  throw new Error("Solar Production Children must render after the aggregate object's own fold stack");
+if(!hardware.includes('</article>${children}</div>')){
+  throw new Error("Solar Production Children must render as sibling content after the aggregate article");
+}
+if(hardware.includes('energyAssetFoldStack">${this.energyAssetConfigurationDisclosure(rt,enriched)}${this.energyAssetDetailDisclosure(rt,enriched)}${this.energyAssetDiagnosticsDisclosure(rt,enriched)}${children}')){
+  throw new Error("Solar Production Children must not be embedded in the aggregate fold stack");
 }
 
 console.log("PASS 4.3.25 flat solar hierarchy and section parity");
