@@ -3599,12 +3599,12 @@
         const linkedPanel = panelById.get(this.energyAssetParentId(optimizer)) || null;
         return this.solarOptimizerPrimaryCard(rt,optimizer,linkedPanel);
       }).join('');
-      const panelOnlyCards = childPanels
+      const solarPanelOnlyGrid = childPanels
         .filter(panel => !childOptimizers.some(optimizer => this.energyAssetParentId(optimizer) === String(firstDefined(panel.asset_id,panel.id,'') || '')))
         .map(panel => this.solarModuleCard(rt,panel,[]))
         .join('');
-      const children = optimizerCards || panelOnlyCards
-        ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children · ${childOptimizers.length + childPanels.length}</summary><div class="energyAssetFoldBody solarModuleGrid">${optimizerCards}${panelOnlyCards}</div></details>`
+      const children = optimizerCards || solarPanelOnlyGrid
+        ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children · ${childOptimizers.length + childPanels.length}</summary><div class="energyAssetFoldBody solarModuleGrid">${optimizerCards}${solarPanelOnlyGrid}</div></details>`
         : '';
       return `<article class="solarStringLink" data-solar-string="${escapeHtml(id)}">
         <div class="solarStringSummary">
