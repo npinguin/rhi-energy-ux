@@ -40,7 +40,7 @@ const homeAt = story.indexOf('<small>Home</small>');
 const gridAt = story.indexOf('<small>Grid</small>');
 assert.ok(solarAt < batteryAt && batteryAt < homeAt && homeAt < gridAt, 'primary flow order must be Solar > Battery > Home <> Grid');
 assert.ok(app.includes("solarHardwareSection(\n        'Home Battery'"), 'battery detail remains available');
-assert.ok(app.includes('id="solar-production-detail"'), 'solar production root has scroll target');
+assert.ok(app.includes("'solar-production-detail'"), 'solar production top-level section has scroll target');
 assert.ok(app.includes('id="solar-inverter-detail"'), 'nested inverter hierarchy has diagnostic anchor');
 assert.ok(app.includes("'solar-battery-detail'"), 'battery system has scroll target');
 
