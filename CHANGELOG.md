@@ -1,3 +1,10 @@
+## 4.3.24 — Bordered Hierarchy Groups
+
+- render Solar Production as the root hierarchy object instead of wrapping it in a duplicate Solar Production section;
+- render Children directly below their parent at full width;
+- express hierarchy with one compact bordered child group instead of recursive horizontal indentation;
+- keep child cards full-width and vertically stacked to avoid progressive width loss.
+
 ## 4.3.23 — HIERARCHY_AND_PRODUCER_VISUAL_CLOSURE
 
 - render Children as full-width sibling stacks instead of recursively inset cards;
