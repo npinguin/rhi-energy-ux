@@ -7783,6 +7783,8 @@ function rhiEnergyVisualPickerStyles() {
       @media(max-width:900px){.energyAssetDetailGrid,.energyAssetDiagnosticGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.energyDeviceFacts,.managedAssetFacts,.compactPlanningFacts{grid-template-columns:repeat(2,minmax(0,1fr))}.settingsTopicGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.compactPlanningLoad{grid-template-columns:1fr auto}.compactPlanningFacts{grid-column:1/-1}}
       @media(max-width:620px){.energyDeviceCard,.solarProductionObject{grid-template-columns:88px minmax(0,1fr)}.energyDeviceVisual,.solarProductionRepresentative{height:78px}.solarProductionRepresentativeWrap{min-height:78px}.energyAssetDetailGrid,.energyAssetDiagnosticGrid{grid-template-columns:1fr 1fr}.settingsTopicGrid,.strategicBehaviorGrid{grid-template-columns:1fr}.compactSettingsBlock{grid-template-columns:1fr}.managedAssetFacts{grid-template-columns:1fr 1fr}}
 
+
+
       /* 4.3.23: hierarchy children are full-width siblings, never recursively inset cards. */
       .energyAssetNode{display:grid;gap:0;min-width:0;width:100%}
       .energyAssetChildrenSibling{margin:0;border:0;border-top:1px solid #edf1f5;background:transparent;width:100%;min-width:0}
@@ -7799,7 +7801,6 @@ function rhiEnergyVisualPickerStyles() {
       .solarStringLink{width:100%;min-width:0;box-sizing:border-box}
       .solarModuleGrid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));width:100%;min-width:0}
       .compactManagedAsset .assetVisual img{width:100%;height:100%;object-fit:contain}
-
 </style><style>
 .navigationShell{--nav-active-bg:#edf5ff;--nav-active-border:#cfdef1;--nav-active-text:#0f4ca4;--rhi-company-area-min:250px;--rhi-company-area-max:320px;--rhi-company-logo-max-width:286px;--rhi-company-logo-max-height:116px;--rhi-company-logo-padding:10px 16px;--rhi-company-divider:rgba(226,232,240,.82);position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(var(--rhi-company-area-min),var(--rhi-company-area-max));gap:0;margin:0 0 12px;background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.91));border:1px solid rgba(207,217,230,.86);border-radius:22px;box-shadow:0 12px 30px rgba(15,23,42,.045);overflow:hidden;backdrop-filter:blur(16px)}.navigationShell.nav-intelligence{--nav-active-bg:#f1edff;--nav-active-border:#dfd5fb;--nav-active-text:#5a38b3}.navigationShell.nav-insights{--nav-active-bg:#e7f7f4;--nav-active-border:#cdebe6;--nav-active-text:#176e67}
 .navProductArea{min-width:0}.navPrimaryRow{min-height:78px;display:grid;grid-template-columns:minmax(270px,.72fr) minmax(430px,1.28fr);align-items:center;gap:24px;padding:10px 22px 9px}.navBrand{display:flex;align-items:center;min-width:0;min-height:56px;padding:2px 0 0 4px}.navBrandCopy{display:grid;align-content:center;gap:2px;min-width:0}.navBrandCopy b{font-size:15px;line-height:1.1;font-weight:520;letter-spacing:-.01em;color:#58708f;white-space:nowrap}.navBrandCopy small{font-size:24px;line-height:1.02;letter-spacing:.055em;font-weight:790;color:#0b467f;white-space:nowrap}
