@@ -4501,7 +4501,6 @@
         asset.charger_display_name,
         asset.connection_display_name,
         asset.physical_connection_display_name,
-        chargerId ? rt.assetName(chargerId) : '',
         ''
       ) || '').trim();
       const relation = chargerId ? (chargerDisplay || 'Charger unavailable') : '';
