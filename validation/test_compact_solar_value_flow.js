@@ -32,7 +32,7 @@ for (const required of [
   assert.ok(story.includes(required), 'compact solar value flow missing: ' + required);
 }
 assert.ok(app.includes('solarProductionObject'), 'solar production root object remains available');
-assert.ok(app.includes('solarRootObject'), 'solar production is the hierarchy root');
+assert.ok(app.includes("solarHardwareSection(\n            'Solar Production'"), 'solar production uses the same top-level section shell as Home Battery');
 assert.ok(!story.includes('data-scroll-target="solar-inverter-detail"'), 'inverter must not be a primary flow node');
 const solarAt = story.indexOf('<small>Solar</small>');
 const batteryAt = story.indexOf('<small>Battery</small>');
