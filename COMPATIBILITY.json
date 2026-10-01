@@ -3,9 +3,9 @@
   "ux_version": "4.3.22",
   "energy_contract": {
     "minimum": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-    "minimum_backend": "E0.15.86",
+    "minimum_backend": "E0.15.87",
     "tested_backend_releases": [
-      "E0.15.86"
+      "E0.15.87"
     ],
     "required_contracts": [
       "RHI_ENERGY_PUBLIC_CONTRACT_V2",
@@ -21,7 +21,7 @@
   "ux_core": {
     "package": "rhi-ux-core",
     "version": "1.5.5",
-    "source_commit": "55e122d7749f0010ec6de5f4a152f103c35c58d4",
+    "source_commit": "655cfbd0840a2459e93287cad9a9ad8daa1cf691",
     "runtime_dependency": false,
     "branding_owner": "rhi-ux-core"
   },
@@ -31,6 +31,6 @@
     "minimum_contract_version": "1.1.0"
   },
   "mobility": {
-    "minimum_release_for_cross_domain_visuals": "M0.10.24"
+    "minimum_release_for_cross_domain_visuals": "M0.10.25"
   }
 }
