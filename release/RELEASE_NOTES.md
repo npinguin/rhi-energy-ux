@@ -17,8 +17,8 @@ UX-only release on the unchanged Energy E0.15.86 product contract.
 ## Candidate baseline
 
 - Foundation **F1.8.35**
-- Mobility **M0.10.24**
-- Energy **E0.15.86**
+- Mobility **M0.10.25**
+- Energy **E0.15.87**
 - UX Core **1.5.5**
 - Energy UX **4.3.22**
 
@@ -26,3 +26,6 @@ Rollback: **v4.3.21**.
 Known accepted technical debt: **0**.  
 Known accepted feature debt: **0**.  
 Target Home Assistant qualification remains required before stable promotion.
+
+- Consume backend-owned property presentation depth for Key properties, Configuration, Details and Diagnostics.
+- Consume backend-owned Settings topics and read-only Strategic behavior topics; no frontend grouping inference.
