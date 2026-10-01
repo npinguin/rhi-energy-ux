@@ -16,4 +16,4 @@ Rollback: **v4.3.24**.
 Known accepted technical debt: **0**.  
 Known accepted feature debt: **0**.
 
-Target Home Assistant visual qualification remains required before stable promotion.
+This candidate supersedes the 4.3.24 bordered-child hierarchy presentation.\n\nTarget Home Assistant visual qualification remains required before stable promotion.
