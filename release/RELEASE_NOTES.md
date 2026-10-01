@@ -1,31 +1,16 @@
-# RHI Energy UX 4.3.22 — LITERAL_PRODUCT_UX_CLOSURE
+# RHI Energy UX 4.3.23 — HIERARCHY_AND_PRODUCER_VISUAL_CLOSURE
 
-UX-only release consuming the coordinated Energy E0.15.87 and Mobility M0.10.25 product-truth contracts.
+UX-only hotfix on the coordinated backend baseline **Foundation F1.8.35 / Mobility M0.10.25 / Energy E0.15.87 / UX Core 1.5.5**.
 
-- enforce the compact object grammar: Visual → Key properties / Quick Actions → Configuration → Details → Diagnostics → Children;
-- keep Children last and remove technical/raw property dumps from Details;
-- consume UX Core 1.5.5 bounded appearance-picker geometry with fixed image viewport, internal scrolling and brand filtering;
-- remove ambiguous page-level Quick Actions from Flow, Consumers, Settings and Planning surfaces;
-- keep unknown measurements unknown instead of projecting missing consumer/planning values as zero;
-- render Flow charger/vehicle relationships with published display identity and never humanise raw charger ids into product copy;
-- make Consumers and Operational Planning compact, asset-scoped and visual-first;
-- move requested charge power and other writable controls into Configuration;
-- make Settings topic-first instead of profile-first;
-- render Strategic Planning as the read-only longer-term meaning of Settings instead of mirroring policy tables;
-- render Solar Production once, keep physical inverter/string/optimizer/panel hierarchy under Children and separate Details from Diagnostics.
+This release contains exactly two product fixes:
 
-## Candidate baseline
+- **Hierarchy:** Children render as full-width sibling stacks below the parent object instead of recursively nesting cards inside cards. Inverter → string → optimizer/panel therefore keeps usable width at every level, and the redundant INVERTERS wrapper is removed.
+- **Consumers visual identity:** managed vehicle cards preserve the producer-published Mobility `visual_ref` through Energy object enrichment. The selected/published vehicle image is used when registered; the generic fallback is used only when no producer visual can be resolved.
 
-- Foundation **F1.8.35**
-- Mobility **M0.10.25**
-- Energy **E0.15.87**
-- UX Core **1.5.5**
-- Energy UX **4.3.22**
+No backend semantics, planning rules, command authority or Energy/Mobility contracts change in this release.
 
-Rollback: **v4.3.21**.  
+Rollback: **v4.3.22**.  
 Known accepted technical debt: **0**.  
-Known accepted feature debt: **0**.  
-Target Home Assistant qualification remains required before stable promotion.
+Known accepted feature debt: **0**.
 
-- Consume backend-owned property presentation depth for Key properties, Configuration, Details and Diagnostics.
-- Consume backend-owned Settings topics and read-only Strategic behavior topics; no frontend grouping inference.
+Target Home Assistant visual qualification remains required before stable promotion.
