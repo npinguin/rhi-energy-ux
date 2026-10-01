@@ -1,8 +1,8 @@
 {
-  "version": "4.3.24",
-  "candidate_tag": "v4.3.24",
+  "version": "4.3.25",
+  "candidate_tag": "v4.3.25",
   "candidate_sha": "pending",
-  "previous_release": "4.3.23",
+  "previous_release": "4.3.24",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -87,7 +87,9 @@
   "planning_unknown_totals_fail_closed": "NOT_EXECUTED",
   "solar_children_full_width_sibling_stack": "NOT_EXECUTED",
   "consumer_published_vehicle_visual": "NOT_EXECUTED",
-  "solar_children_bordered_group": "NOT_EXECUTED",
+  "solar_children_bordered_group": "SUPERSEDED_BY_FLAT_HIERARCHY",
   "solar_zero_recursive_indent": "NOT_EXECUTED",
-  "solar_production_root_level": "NOT_EXECUTED"
+  "solar_production_root_level": "NOT_EXECUTED",
+  "solar_children_flat_vertical_stack": "NOT_EXECUTED",
+  "solar_top_level_section_parity": "NOT_EXECUTED"
 }
