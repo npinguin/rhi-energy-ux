@@ -1,3 +1,10 @@
+## 4.3.23 — HIERARCHY_AND_PRODUCER_VISUAL_CLOSURE
+
+- render Children as full-width sibling stacks instead of recursively inset cards;
+- remove the redundant Solar INVERTERS hierarchy wrapper;
+- preserve Mobility producer-published vehicle visuals on Consumers cards;
+- keep generic visual fallback only for genuinely unresolved producer visuals.
+
 ## 4.3.22 — LITERAL_PRODUCT_UX_CLOSURE
 
 - enforce the shared compact object shell and fold order;
