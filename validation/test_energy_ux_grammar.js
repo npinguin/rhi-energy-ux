@@ -40,7 +40,7 @@ for(const nav of ["Energy flow","Strategy","Tactical planning","Solar plan","Fle
 assert.ok(!app.includes("data:image/webp;base64"), "binary presentation images must be packaged assets");
 
 assert.match(app,/publishedById = new Map/);
-assert.match(app,/visual_ref:firstDefined\(raw\.visual_ref/);
+assert.match(app,/visual_ref:firstDefined\(vm\.visualRef, raw\.visual_ref, published\.visual_ref/);
 assert.match(app,/energyAssetDetailDisclosure/);
 assert.match(app,/energyDeviceState/);
 assert.match(app,/\['Telemetry', telemetry\]/);
