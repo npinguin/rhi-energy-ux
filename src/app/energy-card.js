@@ -3136,6 +3136,10 @@
       return {
         ...asset,
         ...objectFrom(context.asset || {}),
+        // A producer-published visual_ref supplied by the caller is authoritative.
+        // Energy object context may enrich the asset, but must never replace
+        // Mobility's chosen vehicle/charger appearance with an Energy fallback.
+        visual_ref:firstDefined(asset.visual_ref, asset.visualRef, context.asset?.visual_ref, ''),
         profile_id:firstDefined(context.asset?.profile_id, asset.profile_id, ''),
         profile:objectFrom(context.profile || {}),
         publication:objectFrom(context.publication || {})
@@ -3500,13 +3504,13 @@
       const details = this.energyAssetDetailDisclosure(rt,enriched);
       const diagnostics = this.energyAssetDiagnosticsDisclosure(rt,enriched);
       const children = childrenHtml
-        ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children</summary><div class="energyAssetFoldBody energyAssetChildrenBody">${childrenHtml}</div></details>`
+        ? `<details class="energyAssetChildrenSibling"><summary>Children</summary><div class="energyAssetChildrenStack">${childrenHtml}</div></details>`
         : '';
-      return `<article class="energyDeviceCard" data-energy-device-type="${escapeHtml(type)}">
+      return `<div class="energyAssetNode" data-energy-device-type="${escapeHtml(type)}"><article class="energyDeviceCard">
         <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
         <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div>${primaryState ? `<div class="energyDeviceTopActions"><span class="energyDeviceState">${escapeHtml(primaryState)}</span></div>` : ''}</div>
-        <div class="energyDeviceFacts">${keyProperties}${relation}</div>${actions}<div class="energyAssetFoldStack">${configuration}${details}${diagnostics}${children}</div></div>
-      </article>`;
+        <div class="energyDeviceFacts">${keyProperties}${relation}</div>${actions}<div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div></div>
+      </article>${children}</div>`;
     }
 
     energyAssetType(asset = {}) {
@@ -3604,16 +3608,16 @@
         .map(panel => this.solarModuleCard(rt,panel,[]))
         .join('');
       const children = optimizerCards || solarPanelOnlyGrid
-        ? `<details class="energyAssetDisclosure energyAssetChildren"><summary>Children · ${childOptimizers.length + childPanels.length}</summary><div class="energyAssetFoldBody solarModuleGrid">${optimizerCards}${solarPanelOnlyGrid}</div></details>`
+        ? `<details class="energyAssetChildrenSibling"><summary>Children · ${childOptimizers.length + childPanels.length}</summary><div class="energyAssetChildrenStack solarModuleGrid">${optimizerCards}${solarPanelOnlyGrid}</div></details>`
         : '';
-      return `<article class="solarStringLink" data-solar-string="${escapeHtml(id)}">
+      return `<div class="energyAssetNode solarStringNode" data-solar-string="${escapeHtml(id)}"><article class="solarStringLink">
         <div class="solarStringSummary">
           <div class="solarStringVisual">${this.assetVisual(enriched,{size:'sm',fallbackIcon:'☀',decorative:false})}</div>
           <span><small>SOLAR ZONE / STRING</small><b>${escapeHtml(name)}</b></span>
           ${power ? `<span><small>Producing</small><b>${escapeHtml(power.value)}</b></span>` : ''}
         </div>
-        <div class="energyAssetFoldStack">${this.energyAssetConfigurationDisclosure(rt,enriched)}${this.energyAssetDetailDisclosure(rt,enriched)}${this.energyAssetDiagnosticsDisclosure(rt,enriched)}${children}</div>
-      </article>`;
+        <div class="energyAssetFoldStack">${this.energyAssetConfigurationDisclosure(rt,enriched)}${this.energyAssetDetailDisclosure(rt,enriched)}${this.energyAssetDiagnosticsDisclosure(rt,enriched)}</div>
+      </article>${children}</div>`;
     }
     solarInverterCard(rt, inverter, strings = [], panelsFor = () => [], optimizersFor = () => []) {
       const inverterId = String(firstDefined(inverter.asset_id,inverter.id,'') || '');
@@ -3628,7 +3632,7 @@
       const unresolved = unresolvedStrings.length
         ? `<details class="solarTopologyDiagnostics"><summary>Topology diagnostics · ${unresolvedStrings.length} unresolved string${unresolvedStrings.length===1?'':'s'}</summary><p>The backend has not yet published an authoritative inverter parent for these strings. Home Intelligence does not guess the relationship.</p><div class="solarStringList">${unresolvedStrings.map(array=>this.solarStringLink(rt,array,panelsFor(array),optimizersFor(array,panelsFor(array)))).join('')}</div></details>`
         : '';
-      return `<div class="solarProductionHierarchy" id="solar-inverter-detail"><div class="solarProductionHierarchyHead"><small>INVERTERS</small><b>${inverters.length}</b></div>${inverterCards}${unresolved}</div>`;
+      return `<div class="solarProductionChildren" id="solar-inverter-detail">${inverterCards}${unresolved}</div>`;
     }
     solarBatterySystem(rt, systems = [], batteries = []) {
       if (!systems.length && !batteries.length) return '';
