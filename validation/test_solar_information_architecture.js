@@ -93,8 +93,9 @@ assert.match(app,/energyAppearanceAction/);
 assert.match(app,/data-energy-visual-open/);
 
 assert.doesNotMatch(app,/solarHardwareSection\(\n\s*'Inverter system'/);
-assert.match(app,/solarProductionHierarchy/);
-assert.match(app,/Aggregate production followed by the physical inverter → string → optimizer\/panel hierarchy/);
+assert.match(app,/solarRootObject/);
+assert.doesNotMatch(hardware,/this\.solarHardwareSection\(\s*'Solar Production'/);
+assert.match(hardware,/<section class="solarRootObject" id="solar-production-detail">/);
 
 
 assert.match(app,/solarProductionRepresentative/);

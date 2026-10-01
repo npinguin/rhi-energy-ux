@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.23';
+  const UX_VERSION = 'R4.3.24';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
@@ -5577,13 +5577,9 @@ function rhiEnergyVisualPickerStyles() {
           <div class="energyAssetFoldStack">${this.energyAssetConfigurationDisclosure(rt,enriched)}${this.energyAssetDetailDisclosure(rt,enriched)}${this.energyAssetDiagnosticsDisclosure(rt,enriched)}${children}</div></div>
         </article>`;
       }
-      const productionSection = productionBody ? this.solarHardwareSection(
-        'Solar Production',
-        'Aggregate production followed by the physical inverter → string → optimizer/panel hierarchy.',
-        productionBody,
-        `${inverters.length} inverter${inverters.length===1?'':'s'}`,
-        'solar-production-detail'
-      ) : '';
+      const productionSection = productionBody
+        ? `<section class="solarRootObject" id="solar-production-detail">${productionBody}</section>`
+        : '';
       const batterySection = this.solarBatterySystem(rt,systems,batteries);
       return `<div class="solarHardwareExperience">${batterySection}${productionSection}</div>`;
     }
@@ -7785,21 +7781,25 @@ function rhiEnergyVisualPickerStyles() {
 
 
 
-      /* 4.3.23: hierarchy children are full-width siblings, never recursively inset cards. */
+      /* 4.3.24: hierarchy is expressed by compact bordered groups, never recursive indentation. */
       .energyAssetNode{display:grid;gap:0;min-width:0;width:100%}
-      .energyAssetChildrenSibling{margin:0;border:0;border-top:1px solid #edf1f5;background:transparent;width:100%;min-width:0}
-      .energyAssetChildrenSibling>summary{min-height:42px;display:flex;align-items:center;justify-content:space-between;padding:8px 4px;box-sizing:border-box;cursor:pointer;list-style:none;font-size:11px;font-weight:700;color:#42526a}
+      .energyAssetChildrenSibling{margin:6px 0 0;border:1px solid #e3eaf2;border-radius:11px;background:#fbfdff;width:100%;min-width:0;overflow:hidden}
+      .energyAssetChildrenSibling>summary{min-height:40px;display:flex;align-items:center;justify-content:space-between;padding:7px 10px;box-sizing:border-box;cursor:pointer;list-style:none;font-size:10px;font-weight:750;color:#42526a;background:#f8fafc}
       .energyAssetChildrenSibling>summary::-webkit-details-marker{display:none}
-      .energyAssetChildrenSibling>summary:after{content:"›";font-size:17px;color:#94a3b8}
+      .energyAssetChildrenSibling>summary:after{content:"›";font-size:16px;color:#94a3b8}
+      .energyAssetChildrenSibling[open]>summary{border-bottom:1px solid #edf1f5}
       .energyAssetChildrenSibling[open]>summary:after{transform:rotate(90deg)}
-      .energyAssetChildrenStack{display:grid;gap:8px;padding:6px 0 0;width:100%;min-width:0}
-      .energyAssetChildrenStack>.solarInverterCard,.energyAssetChildrenStack>.energyAssetNode,.solarProductionChildren,.solarInverterGrid{width:100%;min-width:0}
-      .solarProductionChildren{display:grid;gap:8px}
-      .solarInverterGrid{display:grid;grid-template-columns:1fr;gap:8px}
+      .energyAssetChildrenStack{display:grid;gap:7px;padding:7px;width:100%;min-width:0;box-sizing:border-box}
+      .energyAssetChildrenStack>.solarInverterCard,.energyAssetChildrenStack>.energyAssetNode,.solarProductionChildren,.solarInverterGrid{width:100%;min-width:0;margin:0}
+      .energyAssetChildrenStack .energyAssetChildrenSibling{margin-top:6px}
+      .solarProductionChildren{display:grid;gap:7px}
+      .solarInverterGrid{display:grid;grid-template-columns:1fr;gap:7px}
       .solarInverterCard{margin:0;padding:0;border:0;background:transparent;min-width:0}
       .solarStringNode{width:100%;min-width:0}
       .solarStringLink{width:100%;min-width:0;box-sizing:border-box}
       .solarModuleGrid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));width:100%;min-width:0}
+      .solarRootObject{margin:12px 0;padding:0;border:0;background:transparent}
+      .solarRootObject>.solarProductionObject{margin:0}
       .compactManagedAsset .assetVisual img{width:100%;height:100%;object-fit:contain}
 </style><style>
 .navigationShell{--nav-active-bg:#edf5ff;--nav-active-border:#cfdef1;--nav-active-text:#0f4ca4;--rhi-company-area-min:250px;--rhi-company-area-max:320px;--rhi-company-logo-max-width:286px;--rhi-company-logo-max-height:116px;--rhi-company-logo-padding:10px 16px;--rhi-company-divider:rgba(226,232,240,.82);position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(var(--rhi-company-area-min),var(--rhi-company-area-max));gap:0;margin:0 0 12px;background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.91));border:1px solid rgba(207,217,230,.86);border-radius:22px;box-shadow:0 12px 30px rgba(15,23,42,.045);overflow:hidden;backdrop-filter:blur(16px)}.navigationShell.nav-intelligence{--nav-active-bg:#f1edff;--nav-active-border:#dfd5fb;--nav-active-text:#5a38b3}.navigationShell.nav-insights{--nav-active-bg:#e7f7f4;--nav-active-border:#cdebe6;--nav-active-text:#176e67}
