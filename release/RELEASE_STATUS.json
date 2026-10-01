@@ -7,13 +7,13 @@
   "github_release_prerelease": false,
   "hacs_visibility": "normal_release_visible_without_beta_toggle",
   "contract": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-  "minimum_backend": "E0.15.86",
+  "minimum_backend": "E0.15.87",
   "static_validation": "required_before_publication",
   "hacs_validation": "required_before_publication",
   "target_runtime_proof": "see release/QUALIFICATION.json",
   "rollback": "immutable GitHub/HACS version selection",
   "stable_promotion": "blocked_until_qualification_pass",
-  "tested_backend": "E0.15.86",
+  "tested_backend": "E0.15.87",
   "required_contracts": [
     "RHI_ENERGY_PUBLIC_CONTRACT_V2",
     "RHI_ENERGY_CORE_V1",
@@ -27,5 +27,5 @@
     "branding_owner": "rhi-ux-core"
   },
   "minimum_foundation": "F1.8.35",
-  "minimum_mobility_for_cross_domain_visuals": "M0.10.24"
+  "minimum_mobility_for_cross_domain_visuals": "M0.10.25"
 }
