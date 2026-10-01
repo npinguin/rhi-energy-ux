@@ -1,3 +1,10 @@
+## 4.3.25 — Flat Hierarchy Section Parity
+
+- restore Solar Production to the same top-level section level as Home Battery;
+- render Children below their parent in one full-width vertical content column;
+- remove recursive bordered child containers that visually nested each level;
+- preserve semantic parent/child truth through labels and fold behavior without progressive width loss.
+
 ## 4.3.24 — Bordered Hierarchy Groups
 
 - render Solar Production as the root hierarchy object instead of wrapping it in a duplicate Solar Production section;
