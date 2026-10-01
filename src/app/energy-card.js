@@ -3711,7 +3711,7 @@
       }
       const productionSection = productionBody ? this.solarHardwareSection(
         'Solar Production',
-        'Current production with the physical hierarchy available under Children.',
+        'Aggregate production followed by the physical inverter → string → optimizer/panel hierarchy.',
         productionBody,
         `${inverters.length} inverter${inverters.length===1?'':'s'}`,
         'solar-production-detail'
