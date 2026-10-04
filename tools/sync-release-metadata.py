@@ -36,8 +36,8 @@ compat["ux_core"] = {
 compat["foundation"] = {
     **dict(compat.get("foundation") or {}),
     "minimum_release": product.get("minimum_foundation"),
-    "visual_registry_contract": "RHI_VISUAL_ASSET_REGISTRY_V1",
-    "minimum_contract_version": "1.1.0",
+    "visual_registry_contract": "RHI_VISUAL_ASSET_REGISTRY_V2",
+    "minimum_contract_version": "2.0.0",
 }
 compat["mobility"] = {
     **dict(compat.get("mobility") or {}),
