@@ -3,7 +3,7 @@
 const RHI_ENERGY_TRANSLATIONS = Object.freeze({
   en:Object.freeze({
     "nav.energy":"Energy","nav.overview":"Overview","nav.flow":"Flow","nav.solar":"Solar","nav.battery":"Home Battery","nav.consumption":"Consumption","nav.gas":"Gas",
-    "nav.intelligence":"Intelligence","nav.plan":"Plan","nav.settings":"Settings","nav.insights":"Insights","nav.performance":"Performance","nav.value":"Value","nav.retrospective":"Retrospective",
+    "nav.intelligence":"Intelligence","nav.plan":"Plan","nav.operational_plan":"Now","nav.tactical_plan":"Today & Tomorrow","nav.strategic_plan":"Long term","nav.settings":"Settings","nav.insights":"Insights","nav.performance":"Performance","nav.value":"Value","nav.retrospective":"Retrospective",
     "hero.overview.title":"Energy Overview","hero.overview.description":"See what your home is producing, using, storing and exchanging right now.",
     "hero.flow.title":"Energy Flow","hero.flow.description":"See where energy is coming from and where it is going right now.",
     "hero.solar.title":"Solar","hero.solar.description":"See current solar production and the equipment contributing to it.",
@@ -22,7 +22,7 @@ const RHI_ENERGY_TRANSLATIONS = Object.freeze({
   }),
   nl:Object.freeze({
     "nav.energy":"Energie","nav.overview":"Overzicht","nav.flow":"Stromen","nav.solar":"Zonne-energie","nav.battery":"Thuisbatterij","nav.consumption":"Verbruik","nav.gas":"Gas",
-    "nav.intelligence":"Intelligentie","nav.plan":"Planning","nav.settings":"Instellingen","nav.insights":"Inzichten","nav.performance":"Prestaties","nav.value":"Waarde","nav.retrospective":"Terugblik",
+    "nav.intelligence":"Intelligentie","nav.plan":"Planning","nav.operational_plan":"Nu","nav.tactical_plan":"Vandaag & morgen","nav.strategic_plan":"Lange termijn","nav.settings":"Instellingen","nav.insights":"Inzichten","nav.performance":"Prestaties","nav.value":"Waarde","nav.retrospective":"Terugblik",
     "hero.overview.title":"Energieoverzicht","hero.overview.description":"Zie wat je woning nu produceert, verbruikt, opslaat en uitwisselt.",
     "hero.flow.title":"Energiestromen","hero.flow.description":"Zie waar energie nu vandaan komt en waar ze naartoe gaat.",
     "hero.solar.title":"Zonne-energie","hero.solar.description":"Zie de huidige zonneproductie en welke installatieonderdelen daaraan bijdragen.",
@@ -41,7 +41,7 @@ const RHI_ENERGY_TRANSLATIONS = Object.freeze({
   }),
   fr:Object.freeze({
     "nav.energy":"Énergie","nav.overview":"Vue d’ensemble","nav.flow":"Flux","nav.solar":"Solaire","nav.battery":"Batterie domestique","nav.consumption":"Consommation","nav.gas":"Gaz",
-    "nav.intelligence":"Intelligence","nav.plan":"Planification","nav.settings":"Réglages","nav.insights":"Analyses","nav.performance":"Performance","nav.value":"Valeur","nav.retrospective":"Bilan",
+    "nav.intelligence":"Intelligence","nav.plan":"Planification","nav.operational_plan":"Maintenant","nav.tactical_plan":"Aujourd’hui & demain","nav.strategic_plan":"Long terme","nav.settings":"Réglages","nav.insights":"Analyses","nav.performance":"Performance","nav.value":"Valeur","nav.retrospective":"Bilan",
     "hero.overview.title":"Vue d’ensemble de l’énergie","hero.overview.description":"Voyez ce que votre habitation produit, consomme, stocke et échange en ce moment.",
     "hero.flow.title":"Flux d’énergie","hero.flow.description":"Voyez d’où vient l’énergie et où elle va en ce moment.",
     "hero.solar.title":"Solaire","hero.solar.description":"Voyez la production solaire actuelle et les équipements qui y contribuent.",
