@@ -7,13 +7,17 @@ const presentation = fs.readFileSync("src/app/presentation.js","utf8");
 const catalog = fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
 const core = fs.readFileSync("src/vendor/rhi-ux-core.js","utf8");
 
-for (const token of [
-  'id:"overview", label:"Overview"', 'id:"flow", label:"Flow"', 'id:"solar", label:"Solar"',
-  'id:"battery", label:"Home Battery"', 'id:"consumers", label:"Consumers"', 'id:"gas", label:"Gas"',
-  'id:"settings", label:"Settings"', 'id:"operational-planning", label:"Operational Planning"',
-  'id:"tactical-planning", label:"Tactical Planning"', 'id:"strategic-planning", label:"Strategic Planning"',
-  'id:"metering", label:"Metering"', 'id:"value", label:"Value"', 'id:"retrospective", label:"Retrospective"'
-]) assert.ok(presentation.includes(token), "missing existing tab "+token);
+for (const [id,labelKey] of [
+  ["overview","nav.overview"],["flow","nav.flow"],["solar","nav.solar"],["battery","nav.battery"],
+  ["consumers","nav.consumption"],["gas","nav.gas"],["settings","nav.settings"],
+  ["operational-planning","nav.operational_plan"],["tactical-planning","nav.tactical_plan"],
+  ["strategic-planning","nav.strategic_plan"],["metering","nav.performance"],
+  ["value","nav.value"],["retrospective","nav.retrospective"]
+]) {
+  assert.ok(presentation.includes(`id:"${id}"`) && presentation.includes(`labelKey:"${labelKey}"`), "missing localized navigation definition "+id);
+}
+assert.match(presentation,/function hbEnergyNavigation\(hass = null\)/);
+assert.match(presentation,/label:rhiEnergyT\(hass,section\.labelKey/);
 
 assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v3.webp"'), "Gas page must use immutable photographic hero v3");
 assert.ok(!presentation.includes('gas: "heroes/gas-hero.webp"'), "legacy Gas page hero mapping must not return");
@@ -74,7 +78,7 @@ for (const logicalType of ["flexible_asset","consumer","solar_array","inverter",
   assert.ok(!catalog.includes(`asset_type:"${logicalType}"`), "logical/non-canonical visual fallback returned "+logicalType);
 }
 
-assert.match(core,/RHI UX Core 1\.5\.5/);
+assert.match(core,/RHI UX Core 1\\.6\\.0/);
 assert.match(core,/function rhiUxContextBar/);
 assert.match(core,/function rhiUxResolveDomainAssetNavigation/);
 assert.ok(core.includes("{asset_id}"), "runtime-safe Core navigation token missing");
@@ -91,7 +95,7 @@ assert.doesNotMatch(presentation,/\.rhiUxStatusGrid\s*\{/);
 assert.doesNotMatch(presentation,/\.rhiUxQuickActionBar\s*\{/);
 assert.match(app,/object-fit:contain/);
 assert.ok(app.includes('rhiUxDomainShell({'));
-assert.match(app,/domain:'ENERGIE'/);
+assert.match(app,/domain:rhiEnergyT\(this\._hass,'nav\.energy',\{\},'Energy'\)\.toUpperCase\(\)/);
 assert.ok(app.includes('strategicPlanning(rt)'), "Strategic Planning must be a real contract-backed surface");
 assert.ok(app.includes('Strategy configuration is the authority for longer-term intent'), "Strategic Planning must explain its contract authority");
 assert.ok(!app.includes('Strategic planning content follows in the next screen pass'), "Strategic Planning placeholder must not return");
