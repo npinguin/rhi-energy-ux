@@ -3467,7 +3467,7 @@
         .map(row => {
           const field = row?.projection || {};
           if (!field.resolved) return null;
-          const label = String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || '');
+          const label = String(firstDefined(row.display_name,row.label,'') || '').trim();
           if (!label) return null;
           let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
           if (value === '—') return null;
