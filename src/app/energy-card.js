@@ -1929,6 +1929,27 @@
     productStoryCard({ eyebrow = 'Current situation', title = '', why = '', recommendation = '', actions = '', details = '', tone = 'blue' } = {}) {
       return `<section class="panel productStory ${escapeHtml(tone)}"><div class="productStoryCopy"><small>${escapeHtml(eyebrow)}</small><h2>${escapeHtml(title)}</h2>${why ? `<p>${escapeHtml(why)}</p>` : ''}${recommendation ? `<div class="productStoryRecommendation"><span>Home Intelligence recommendation</span><b>${escapeHtml(recommendation)}</b></div>` : ''}</div>${actions ? `<div class="productStoryActions">${actions}</div>` : ''}${details ? this.componentDetailsBlock(`story-${Math.abs(String(title).split('').reduce((a,c)=>a+c.charCodeAt(0),0))}`, 'Details', details) : ''}</section>`;
     }
+    userSafeProductText(value, fallback = '') {
+      const raw = String(value ?? '').trim();
+      if (!raw) return fallback;
+      if (/\b(?:RHI_[A-Z0-9_]+|sensor\.|script\.|property[_ ]?key|entity[_ ]?id|asset[_ ]?id|command[_ ]?id|contract(?:_id)?|canonical contract|public write route|backend)\b/i.test(raw)) return fallback;
+      if (/^[a-z0-9]+(?:[_.:-][a-z0-9]+)+$/i.test(raw)) return fallback;
+      return raw;
+    }
+    userSafeReason(value, fallback = 'This information is not available yet.') {
+      const raw = String(value ?? '').trim();
+      const key = raw.toLowerCase().replace(/[\s.-]+/g,'_');
+      const known = {
+        not_published:'reason.not_published', not_available:'reason.not_available',
+        unavailable:'reason.not_available', disabled:'reason.disabled',
+        automation_disabled:'reason.automation_disabled', intelligence_off:'reason.intelligence_off',
+        verification_required:'reason.verification_required', reset_pending:'reason.reset_pending',
+        confirmation_needed:'reason.confirmation_needed', not_configured:'reason.not_configured',
+        configuration_required:'reason.not_configured'
+      };
+      if (known[key]) return rhiEnergyT(this._hass,known[key],{},fallback);
+      return this.userSafeProductText(raw,fallback);
+    }
     productStateLabel(value, fallback = 'Not available') {
       const key = String(value ?? '').trim().toLowerCase().replace(/[\s.-]+/g, '_');
       const map = {
@@ -2012,7 +2033,12 @@
       return items.length ? `<div class="warningChips">${items.map(item => `<span>${escapeHtml(item)}</span>`).join('')}</div>` : '';
     }
     contractGap(title, body, details = '') {
-      return `<section class="panel wide"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(body)}</p>${details ? this.componentDetailsBlock('contract-gap-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-'), 'Details', details) : ''}</section>`;
+      const safeTitle = this.userSafeProductText(title, rhiEnergyT(this._hass,'common.not_available',{},'Not available'));
+      const safeBody = this.userSafeProductText(body, rhiEnergyT(this._hass,'common.information_missing',{},'This information is not available yet.'));
+      const diagnostics = this.config?.show_diagnostics === true && details
+        ? this.componentDetailsBlock('diagnostics-' + String(title || 'information').toLowerCase().replace(/[^a-z0-9]+/g, '-'), rhiEnergyT(this._hass,'common.diagnostics',{},'Diagnostics'), details)
+        : '';
+      return `<section class="panel wide"><h2>${escapeHtml(safeTitle)}</h2><p>${escapeHtml(safeBody)}</p>${diagnostics}</section>`;
     }
     rowStatus(row) {
       if (!row || row.missing) return 'missing';
@@ -2656,18 +2682,19 @@
       const max = meta.max !== undefined ? ` max="${escapeHtml(meta.max)}"` : '';
       const step = meta.step !== undefined ? ` step="${escapeHtml(meta.step)}"` : ' step="0.1"';
       const editor = `<label class="editField"><input type="number" inputmode="decimal" value="${escapeHtml(value ?? '')}" ${min}${max}${step} ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}"><em>${escapeHtml(row.unit || '')}</em></label>`;
-      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'numberProperty' });
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Current: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'numberProperty' });
     }
     editablePropertyFeedback(row) {
       const fb = this.writeFeedbackFor(row);
       if (!fb) return '';
       const labels = { pending:'Changing…', verifying:'Confirming…', accepted:'Updated', rejected:'Change failed' };
       const label = labels[String(fb.state || '').toLowerCase()] || this.productStateLabel(fb.state, 'Updating');
-      return `<small class="writeState ${escapeHtml(fb.state || '')}">${escapeHtml(label)}${fb.reason ? ` · ${escapeHtml(fb.reason)}` : ''}</small>`;
+      const reason = fb.reason ? this.userSafeReason(fb.reason,'') : '';
+      return `<small class="writeState ${escapeHtml(fb.state || '')}">${escapeHtml(label)}${reason ? ` · ${escapeHtml(reason)}` : ''}</small>`;
     }
     editablePropertyShell({ row, title, description = '', editor = '', readback = '', className = '' } = {}) {
       const writable = this.isWritableRow(row);
-      const disabledReason = writable ? '' : (row?.editable_reason || 'This setting is not currently editable.');
+      const disabledReason = writable ? '' : this.userSafeReason(row?.editable_reason,'This setting is not currently editable.');
       return `<div class="editableProperty ${escapeHtml(className)} ${writable ? 'writable' : 'readonly'}"><div class="editablePropertyCopy"><span>${escapeHtml(title || row?.display_name || 'Setting')}</span>${description ? `<small>${escapeHtml(description)}</small>` : ''}</div><div class="editablePropertyEditor">${editor}${readback ? `<em class="editablePropertyReadback">${escapeHtml(readback)}</em>` : ''}${this.editablePropertyFeedback(row)}${disabledReason ? `<small class="editablePropertyDisabled">${escapeHtml(disabledReason)}</small>` : ''}</div></div>`;
     }
     editablePropertyControl(row, { title = '', description = '', type = 'number', fallbackValue = null, fallbackOptions = [], immediateWrite = false } = {}) {
@@ -2686,24 +2713,24 @@
       const min = meta.min ?? asNumber(row.min) ?? asNumber(row.minimum) ?? 0;
       const max = meta.max ?? asNumber(row.max) ?? asNumber(row.maximum) ?? Math.max(10, Number(value || 0));
       const step = meta.step ?? asNumber(row.step) ?? 0.1;
-      const title = writable ? 'Editable profile setting' : (row.editable_reason || 'Read-only public property');
+      const title = writable ? 'Adjustable setting' : this.userSafeReason(row.editable_reason,'This setting is read-only');
       const unit = row.unit || '';
       const editor = `<label class="sliderField"><div><b data-live-range-value="true">${escapeHtml(this.editValueLabel(row, value, '—'))}</b></div><input type="range" value="${escapeHtml(value ?? '')}" min="${escapeHtml(min)}" max="${escapeHtml(max)}" step="${escapeHtml(step)}" ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(row.key || row.property_key || '')}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}" data-property-immediate-write="${immediateWrite ? 'true' : 'false'}" data-range-unit="${escapeHtml(unit)}" title="${escapeHtml(title)}"></label>`;
-      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'rangeProperty' });
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Current: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'rangeProperty' });
     }
     editableTimeControl(row, label, description = '') {
       if (!row || row.missing) return '';
       const value = this.draftValueForRow(row, '');
       const writable = this.isWritableRow(row);
       const editor = `<label class="editField"><input type="time" value="${escapeHtml(value ?? '')}" ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}"></label>`;
-      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'timeProperty' });
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Current: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'timeProperty' });
     }
     editableToggleControl(row, label, description = '') {
       if (!row || row.missing) return '';
       const value = asBool(this.draftValueForRow(row, false), false);
       const writable = this.isWritableRow(row);
       const editor = `<label class="toggleField"><input type="checkbox" ${value ? 'checked' : ''} ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}"><b>${escapeHtml(value ? 'On' : 'Off')}</b></label>`;
-      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${value ? 'On' : 'Off'}`, className:'toggleProperty' });
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Current: ${value ? 'On' : 'Off'}`, className:'toggleProperty' });
     }
     editableSelectControl(row, label, fallbackValue = '', fallbackOptions = [], description = '') {
       if (!row || row.missing) return '';
@@ -2718,7 +2745,7 @@
         const options = opts.map(option => { const optValue=(option&&typeof option==='object')?(option.value??option.id??option.key??option.label):option; const optLabel=(option&&typeof option==='object')?(option.label??option.name??this.productStateLabel(optValue,human(optValue))):this.productStateLabel(optValue,human(optValue)); const selected=String(optValue).toLowerCase()===String(value??'').toLowerCase()?' selected':''; return `<option value="${escapeHtml(optValue)}"${selected}>${escapeHtml(optLabel)}</option>`; }).join('');
         editor = `<label class="selectField"><select ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}">${options}</select></label>`;
       }
-      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${this.productStateLabel(rowValue(row, value), human(rowValue(row, value), '—'))}`, className:'selectProperty' });
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Current: ${this.productStateLabel(rowValue(row, value), human(rowValue(row, value), '—'))}`, className:'selectProperty' });
     }
     flexiblePropertyRow(rt, assetId, names) {
       for (const name of names) {
@@ -2961,9 +2988,9 @@
         const total = Math.round(explicitMinutes);
         const h = Math.floor(total / 60);
         const m = total % 60;
-        return { main: h > 0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m`, sub: explicitAt ? `≈ ${human(explicitAt)}` : 'backend ETA' };
+        return { main: h > 0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m`, sub: explicitAt ? `≈ ${human(explicitAt)}` : 'Estimated' };
       }
-      if (explicitAt) return { main: human(explicitAt), sub: 'backend ready time' };
+      if (explicitAt) return { main: human(explicitAt), sub: 'Ready by' };
       return { main: '—', sub: '' };
     }
     automationDisplayFor(rt, load, id) {
@@ -3437,7 +3464,7 @@
         }).filter(Boolean);
       const all = [...rows,...properties];
       if (!all.length) return '';
-      return `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody"><small class="energyAssetPublishedLabel">Published properties</small><div class="energyAssetDetailGrid">${all.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></div></details>`;
+      return `<details class="energyAssetDisclosure energyAssetDetails"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.details',{},'Details'))}</summary><div class="energyAssetFoldBody"><small class="energyAssetPublishedLabel">More information</small><div class="energyAssetDetailGrid">${all.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></div></details>`;
     }
 
     energyAssetDiagnosticsDisclosure(rt, asset = {}) {
@@ -4196,12 +4223,14 @@
       const title = label || row.display_name || human(row.key || row.property_key || row.asset_id || 'Property');
       const value = formatter ? formatter(rowValue(row, null), row) : rowDisplayValue(row);
       const state = rowState(row);
-      return `<div class="propertyRow ${escapeHtml(state)}"><div><b>${escapeHtml(title)}</b><span>${escapeHtml(row.key || row.property_key || '')}</span></div><strong>${escapeHtml(value)}</strong><small class="qs ${escapeHtml(state)}">${escapeHtml(rowStatusLabel(row))}</small></div>`;
+      return `<div class="propertyRow ${escapeHtml(state)}"><div><b>${escapeHtml(title)}</b></div><strong>${escapeHtml(value)}</strong><small class="qs ${escapeHtml(state)}">${escapeHtml(rowStatusLabel(row))}</small></div>`;
     }
     commandRow(rt, command) {
       const state = rt.commandState(command);
       const reason = rt.commandReasonObject(command);
-      return `<div class="commandRow ${escapeHtml(state)}"><div><b>${escapeHtml(human(command.role || command.command_id))}</b><span>${escapeHtml(command.command_id || '')}</span></div><strong>${escapeHtml(human(state))}</strong><small>${escapeHtml(reason.message || reason.code || 'Command is available')}</small></div>`;
+      const label = this.userSafeProductText(command.label || human(command.role || ''),'Action');
+      const message = this.userSafeReason(reason.message || reason.code,'Action is available');
+      return `<div class="commandRow ${escapeHtml(state)}"><div><b>${escapeHtml(label)}</b></div><strong>${escapeHtml(this.productStateLabel(state,human(state)))}</strong><small>${escapeHtml(message)}</small></div>`;
     }
     visibleProfileValue(...values) {
       const value = firstDefined(...values);
@@ -5388,7 +5417,7 @@
       const incompletePlanningRows = asArray(vm.assets).filter(asset => asset && asset.planning_input_ready === false).map(asset => { const blockers=asArray(asset.planning_blockers); const userReason=blockers.includes('target_soc_not_configured')?'Set a target charge level.':blockers.includes('ready_by_not_configured')?'Set a ready-by time.':blockers.includes('charger_not_assigned')?'Assign a charger.':'Charging information is incomplete.'; return `<article class="planningLoadRow planningInputIncomplete"><div class="planningLoadIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.planningAssetIcon(asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(asset))}</b></div><small>${escapeHtml(userReason)}</small></div></div><div><small>Current charge</small><b>${fmtPct(asset.current_soc_pct)}</b></div><div><small>Target</small><b>${fmtPct(asset.target_soc_pct)}</b></div><div><small>Ready by</small><b>${escapeHtml(asset.ready_by || 'Not set')}</b></div><div><small>Charging power</small><b>${fmtKw(asset.max_power_kw,'—')}</b></div><div><small>Status</small><b class="planStatusBadge exception">Needs setup</b></div></article>`; }).join('');
       return `${this.tabExperienceHeader(rt,'planning',planningHeader)}
       ${this.bodyContextBar(rt,'planning','planning-body')}
-      <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>${vm.buckets.length} published bucket${vm.buckets.length===1?'':'s'} · backend timestamps preserved · no interpolation · zero values hidden · Grid out fixed at table end</p></div><span>All primary values are kWh per bucket</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>published by Planning</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Canonical Tactical plan projected without frontend recalculation.</p></div></div><div class="planningLoadList">${planningLoadRows || incompletePlanningRows || '<div class="empty"><b>No flexible loads currently need planning</b></div>'}</div></section>`;
+      <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>Hourly view of expected production, consumption, storage and grid exchange.</p></div><span>Energy per hour (kWh)</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>for this period</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Loads Home Intelligence is currently planning for this period.</p></div></div><div class="planningLoadList">${planningLoadRows || incompletePlanningRows || '<div class="empty"><b>No flexible loads currently need planning</b></div>'}</div></section>`;
     }
 
     strategicPlanning(rt) {
@@ -5427,7 +5456,7 @@
       };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}
         <div class="strategicPlanningPage strategicBehaviorPage">
-          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not available')}</h2><p>Strategy configuration is the authority for longer-term intent. This read-only view explains the effective meaning of your current Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
+          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not available')}</h2><p>This view explains how your current settings influence longer-term energy behavior. Today and tomorrow remain visible in Planning.</p></section>
           <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No long-term strategy available</b><span>Long-term strategy details are not available yet.</span></div></section>'}</div>
         </div>`;
     }
@@ -5500,7 +5529,10 @@
     renderError(view, error) {
       const message = error && error.message ? error.message : String(error || 'Unknown render error');
       const stack = error && error.stack ? String(error.stack).split('\n').slice(0, 4).join('\n') : '';
-      return `<section class="panel"><h2>${escapeHtml(human(view))} unavailable</h2><p>The screen failed to render. This is a frontend defect guard; other Energy tabs remain available.</p><div class="softBox"><b>Error</b><span>${escapeHtml(message)}</span></div>${stack ? `<pre class="decisionDump">${escapeHtml(stack)}</pre>` : ''}</section>`;
+      const diagnostics = this.config?.show_diagnostics === true
+        ? `<div class="softBox"><b>Error</b><span>${escapeHtml(message)}</span></div>${stack ? `<pre class="decisionDump">${escapeHtml(stack)}</pre>` : ''}`
+        : '';
+      return `<section class="panel"><h2>${escapeHtml(human(view))} unavailable</h2><p>${escapeHtml(rhiEnergyT(this._hass,'common.information_missing',{},'This information is not available yet.'))}</p>${diagnostics}</section>`;
     }
     viewContent(rt) {
       const body = this.view === 'overview' ? this.overview(rt) : this.view === 'outlook' ? this.outlook(rt) : this.view === 'flow' ? this.flow(rt) : this.view === 'solar' ? this.solar(rt) : this.view === 'operational-planning' ? this.operationalPlanning(rt) : this.view === 'battery' ? this.battery(rt) : this.view === 'consumers' ? this.consumers(rt) : this.view === 'gas' ? this.gas(rt) : this.view === 'strategies' ? this.strategies(rt) : this.view === 'metering' ? this.metering(rt) : this.view === 'intelligence' ? this.intelligence(rt) : this.view === 'retrospective' ? this.retrospective(rt) : this.view === 'value' ? this.value(rt) : this.view === 'planning' ? this.planning(rt) : this.view === 'strategic-planning' ? this.strategicPlanning(rt) : this.placeholder(rt);
