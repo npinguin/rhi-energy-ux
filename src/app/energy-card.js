@@ -3906,8 +3906,14 @@
       const statusLabel = operatingState ? human(operatingState) : connectionState && !/asset[_\s-]?connected/i.test(connectionState) ? human(connectionState) : '';
       const context = [relationLabel, statusLabel].filter(Boolean).join(' · ');
       const visual = rt.resolveVisualRef(charger.visual_ref, 'card');
-      const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
-      return `<div class="flowConnectionCard">${art}<div><b>${escapeHtml(charger.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(context || 'Connection state unavailable')}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+      const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="">` : ''}</div>`;
+      const identity = rhiUxAssetIdentity({
+        title:charger.display_name || rt.assetName(id) || human(id),
+        subtitle:context || 'Connection state unavailable',
+        visual:art
+      });
+      const facts = rhiUxAssetFactGrid([{ label:'Power now', value:powerText }]);
+      return rhiUxAssetCardShell({ identity, facts, className:'energyFlowAssetCard flowConnectionCard' });
     }
     consumerCard(rt, consumer) {
       const id = consumer.asset_id;
@@ -3942,8 +3948,14 @@
       ) || '').trim();
       const relation = charger ? (chargerDisplay || 'Charger unavailable') : '';
       const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
-      const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
-      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(relation ? `${relation} · ${state}` : state)}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+      const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="">` : ''}</div>`;
+      const identity = rhiUxAssetIdentity({
+        title:consumer.display_name || rt.assetName(id) || human(id),
+        subtitle:relation ? `${relation} · ${state}` : state,
+        visual:art
+      });
+      const facts = rhiUxAssetFactGrid([{ label:'Power now', value:powerText }]);
+      return rhiUxAssetCardShell({ identity, facts, className:'energyFlowAssetCard flowPhysicalConsumerCard' });
     }
     flowConsumers(rt, connectionSnapshot = { rows:[] }) {
       const domain = this.flexibleAssetDomain(rt);
@@ -6008,7 +6020,7 @@
 .overviewSupportFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
 .chargingConnectionGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.chargingConnectionGrid>.empty{grid-column:1/-1}
 .flowDetailsGrid.flowDetailsGridTwoUp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}.flowDetailsGrid.flowDetailsGridTwoUp>.panel{min-width:0;height:100%}
-.flowConnectionCard,.flowPhysicalConsumerCard{display:grid;grid-template-columns:auto minmax(0,1fr) 76px;align-items:center;gap:10px;min-height:64px;padding:9px 10px;margin:6px 0;border:1px solid var(--line);border-radius:10px;background:#fff;box-sizing:border-box}.flowAssetVisual{width:54px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#f5f7fa;overflow:hidden}.flowAssetVisual img{display:block;max-width:50px;max-height:42px;object-fit:contain}.flowConnectionCard>div,.flowPhysicalConsumerCard>div{min-width:0}.flowConnectionCard b,.flowPhysicalConsumerCard b{display:block;font-size:12.5px;line-height:1.2;font-weight:600}.flowConnectionCard span,.flowPhysicalConsumerCard span{display:block;margin-top:3px;font-size:10.5px;line-height:1.25;color:var(--muted);white-space:normal}.flowConnectionCard strong,.flowPhysicalConsumerCard strong{min-width:76px;text-align:right;font-size:12.5px;line-height:1.2;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.flowConnectionCard small{display:block;margin-top:4px;font-size:9.5px;color:var(--muted)}
+.energyFlowAssetCard{margin:6px 0}.energyFlowAssetCard .rhiUxAssetFactGrid{grid-template-columns:minmax(110px,160px)}.flowAssetVisual{width:54px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#f5f7fa;overflow:hidden}.flowAssetVisual img{display:block;width:100%;height:100%;max-width:50px;max-height:42px;object-fit:contain}
 .batteryContributorList{display:grid;gap:10px}.batteryContributorCard{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:stretch;min-height:148px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#fff,#fbfcfe);overflow:hidden}.batteryContributorVisual{display:flex;align-items:center;justify-content:center;padding:10px;background:linear-gradient(180deg,#f7f9fb,#eef2f5);overflow:hidden}.batteryContributorVisual .assetVisual{width:88px;height:108px;max-width:88px;max-height:108px;padding:5px;box-sizing:border-box;border:0;background:transparent;overflow:hidden}.batteryContributorVisual .assetVisual img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center center}.batteryContributorBody{min-width:0;padding:13px 14px;display:flex;flex-direction:column;justify-content:center;gap:7px}.batteryContributorHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.batteryContributorHeader>div{min-width:0}.batteryContributorHeader b{display:block;font-size:14px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}.batteryContributorHeader strong{flex:0 0 auto;font-size:22px;line-height:1;font-variant-numeric:tabular-nums}.batteryHealth{display:inline-flex;margin-top:5px;padding:3px 7px;border-radius:999px;background:#eef8f2;color:#2f6d4b;font-size:10px;font-weight:700}.batteryContributorMeta{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#526178}.batteryContributorMeta b{font-size:12px;color:#172033;font-variant-numeric:tabular-nums}.batteryContributorFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.batteryContributorFacts span{min-width:0;padding:6px 7px;border-radius:8px;background:#f8fafc}.batteryContributorFacts small,.batteryContributorFacts b{display:block}.batteryContributorFacts small{font-size:8px;color:#64748b}.batteryContributorFacts b{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.batteryContributorState{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;min-width:0}.batteryContributorState span{font-size:10.5px;font-weight:700;color:#265c3b;white-space:nowrap}.batteryContributorState small{min-width:0;font-size:10px;line-height:1.25;color:var(--muted);white-space:normal}.batteryContributorCard .bar{margin-top:2px}
 @media(max-width:1050px){.overviewCoreGrid{grid-template-columns:1fr 1fr}.overviewDecisionPanel{grid-column:1/-1;grid-row:1}.chargingConnectionGrid{grid-template-columns:1fr}.batteryContributorCard{grid-template-columns:104px minmax(0,1fr)}.batteryContributorVisual .assetVisual{width:80px;height:102px;max-width:80px;max-height:102px}.batteryContributorFacts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.overviewCoreGrid,.overviewSupportFacts{grid-template-columns:1fr}.overviewDecisionPanel{grid-column:auto;grid-row:auto}.overviewHouseHero{height:220px;min-height:220px}.overviewEnergyRow{grid-template-columns:28px minmax(0,1fr) 76px}.overviewEnergyRow>strong{min-width:76px}.overviewEnergyRow.child{margin-left:12px}.batteryContributorCard{grid-template-columns:88px minmax(0,1fr);min-height:126px}.batteryContributorVisual{padding:7px}.batteryContributorVisual .assetVisual{width:68px;height:88px;max-width:68px;max-height:88px;padding:3px}.batteryContributorBody{padding:11px 12px}.batteryContributorHeader b{font-size:13px}.batteryContributorHeader strong{font-size:20px}.batteryContributorState{grid-template-columns:1fr}.batteryContributorState small{font-size:9.5px}.batteryContributorFacts{grid-template-columns:repeat(2,minmax(0,1fr))}.batteryContributorFacts span:last-child:nth-child(odd){grid-column:1/-1}}
