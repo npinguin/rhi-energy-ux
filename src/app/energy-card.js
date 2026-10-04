@@ -1261,10 +1261,10 @@
       if (bySection && byItem) return { section:bySection.id, item:byItem.id, view:byItem.view };
       const legacy = {
         overview:['energy','overview'], flow:['energy','flow'], battery:['energy','battery'], consumers:['energy','consumers'], gas:['energy','gas'],
-        strategies:['intelligence','settings'], intelligence:['intelligence','settings'], solar:['energy','solar'], 'operational-planning':['intelligence','operational-planning'],
-        planning:['intelligence','tactical-planning'], outlook:['intelligence','tactical-planning'],
+        strategies:['intelligence','settings'], intelligence:['intelligence','settings'], solar:['energy','solar'], 'operational-planning':['intelligence','plan'],
+        planning:['intelligence','plan'], outlook:['intelligence','plan'],
         metering:['insights','metering'], value:['insights','value'], retrospective:['insights','retrospective'],
-        'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','strategic-planning']
+        'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','plan']
       };
       const [fallbackSection,fallbackItem] = legacy[String(legacyView || '')] || ['energy','overview'];
       const section = sections.find(row => row.id === fallbackSection) || sections[0];
@@ -1296,7 +1296,15 @@
     }
     navigateToView(view) {
       const target = this.resolveNavigation('', '', view);
-      this.selectNavigation(target.section, target.item);
+      const requested = String(view || target.view || '');
+      const planningViews = new Set(['operational-planning','planning','outlook','strategic-planning']);
+      this.navSection = target.section;
+      this.navItem = target.item;
+      this.view = planningViews.has(requested) ? requested : target.view;
+      this.navSelectionBySection = { ...(this.navSelectionBySection || {}), [target.section]:target.item };
+      this.persistView();
+      this._forceRender = true;
+      this.render();
     }
     title() { return this.activeNavigationItem().title || rhiEnergyT(this._hass,'nav.energy',{},'Energy'); }
     subtitle() { return this.activeNavigationItem().description || ''; }
@@ -2130,7 +2138,17 @@
       if (tab === 'outlook') return this.componentHorizonSelector('outlook', rt.outlookHorizons(), this.selectedOutlookHorizonId);
       if (tab === 'consumers') return `<label class="hiQuickSelect"><span>Group</span><select data-consumer-filter-select>${this.consumerFilterOptions().map(([id,label])=>`<option value="${id}"${this.consumerFilter===id?' selected':''}>${label}</option>`).join('')}</select></label><label class="hiQuickSelect"><span>Sort</span><select data-consumer-sort-select>${this.consumerSortOptions().map(([id,label])=>`<option value="${id}"${this.consumerSort===id?' selected':''}>${label}</option>`).join('')}</select></label>`;
       if (tab === 'metering') return this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId) + this.componentMeteringSort();
-      if (tab === 'planning') return `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">Today</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">Tomorrow</button></div>`;
+      if (['operational-planning','planning','strategic-planning'].includes(tab)) {
+        const selector = this.componentSegmentedControl([
+          { value:'operational-planning', label:rhiEnergyT(this._hass,'nav.operational_plan',{},'Now'), attrs:{'data-tab-target':'operational-planning'} },
+          { value:'planning', label:rhiEnergyT(this._hass,'nav.tactical_plan',{},'Today & Tomorrow'), attrs:{'data-tab-target':'planning'} },
+          { value:'strategic-planning', label:rhiEnergyT(this._hass,'nav.strategic_plan',{},'Long term'), attrs:{'data-tab-target':'strategic-planning'} }
+        ], tab, 'planningViewSelector');
+        const horizon = tab === 'planning'
+          ? `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">Today</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">Tomorrow</button></div>`
+          : '';
+        return selector + horizon;
+      }
       if (tab === 'value') return this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId, 'value');
       return '';
     }
@@ -3882,7 +3900,7 @@
         actions:executeAction,
         tone:executionPolicy.configuredMode === 'automatic' ? 'green' : executionPolicy.configuredMode === 'advice' ? 'blue' : 'orange'
       });
-      return `${this.tabExperienceHeader(rt,'operational-planning',pageVm)}<div class="operationalPlanningPage">${authorityCard}
+      return `${this.tabExperienceHeader(rt,'operational-planning',pageVm)}${this.bodyContextBar(rt,'operational-planning','operational-planning-body')}<div id="operational-planning-body" class="operationalPlanningPage">${authorityCard}
         <section class="panel operationalPlanningLoads"><div class="energySectionHead"><div><h2>Flexible loads</h2><p>Current execution, next action, requested power and operational reason. Hardware configuration is not shown here.</p></div></div><div class="flexLoadList">${cards || '<div class="empty"><b>No participating flexible loads</b><span>No controllable load currently participates in operational planning.</span></div>'}</div></section>
         ${disabledCards ? `<details class="panel compactDisclosure"><summary>Other assets (${disabled.length})</summary><p>These assets are excluded from operational planning.</p><div class="disabledAssetList">${disabledCards}</div></details>` : ''}
       </div>`;
@@ -5467,7 +5485,8 @@
         ]
       };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}
-        <div class="strategicPlanningPage strategicBehaviorPage">
+        ${this.bodyContextBar(rt,'strategic-planning','strategic-planning-body')}
+        <div id="strategic-planning-body" class="strategicPlanningPage strategicBehaviorPage">
           <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not available')}</h2><p>This view explains how your current settings influence longer-term energy behavior. Today and tomorrow remain visible in Planning.</p></section>
           <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No long-term strategy available</b><span>Long-term strategy details are not available yet.</span></div></section>'}</div>
         </div>`;
