@@ -100,8 +100,8 @@ function hbEnergyPresentationStyles() {
       --rhi-shadow:var(--rhi-shadow-md);
       --rhi-card-gap:var(--rhi-space-2);
     }
-    .rhiEnergyNav-intelligence .rhiUxDomainShell{--rhi-nav-active-bg:#F1EDFF;--rhi-nav-active-border:#DFD5FB;--rhi-nav-active-text:#5A38B3}
-    .rhiEnergyNav-insights .rhiUxDomainShell{--rhi-nav-active-bg:#E7F7F4;--rhi-nav-active-border:#CDEBE6;--rhi-nav-active-text:#176E67}
+    .rhiEnergyNav-intelligence{--rhi-nav-active-bg:#F1EDFF;--rhi-nav-active-border:#DFD5FB;--rhi-nav-active-text:#5A38B3}
+    .rhiEnergyNav-insights{--rhi-nav-active-bg:#E7F7F4;--rhi-nav-active-border:#CDEBE6;--rhi-nav-active-text:#176E67}
     .rhiEnergyPageHeader{display:block;margin:0 0 10px}
     @media(max-width:760px){
     }
