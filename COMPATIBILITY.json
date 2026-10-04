@@ -9,8 +9,7 @@
     ],
     "required_contracts": [
       "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-      "RHI_ENERGY_CORE_V1",
-      "RHI_VISUAL_ASSET_REGISTRY_V1"
+      "RHI_VISUAL_ASSET_REGISTRY_V2"
     ]
   },
   "deployment": {
@@ -26,9 +25,9 @@
     "branding_owner": "rhi-ux-core"
   },
   "foundation": {
-    "minimum_release": "F1.8.35",
+    "minimum_release": "F1.8.38",
     "visual_registry_contract": "RHI_VISUAL_ASSET_REGISTRY_V1",
-    "minimum_contract_version": "1.1.0"
+    "minimum_contract_version": "2.0.0"
   },
   "mobility": {
     "minimum_release_for_cross_domain_visuals": "M0.10.25"
