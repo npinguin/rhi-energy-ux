@@ -1194,7 +1194,7 @@
       };
       const keys = ['release', ...(byView[this.view] || [])];
       const registryEntity = Object.entries(this._hass?.states || {}).find(([,state]) =>
-        String(state?.attributes?.contract_id || '') === 'RHI_VISUAL_ASSET_REGISTRY_V1'
+        String(state?.attributes?.contract_id || '') === 'RHI_VISUAL_ASSET_REGISTRY_V2'
       )?.[0] || '';
       return [...new Set([...keys.map(key => UX_INTERFACES[key]).filter(Boolean), registryEntity].filter(Boolean))];
     }
