@@ -9,7 +9,7 @@ presentation=(ROOT/"src/app/presentation.js").read_text(encoding="utf-8")
 header=(ROOT/"src/ui/components/page-header.js").read_text(encoding="utf-8")
 card=(ROOT/"src/app/energy-card.js").read_text(encoding="utf-8")
 
-if meta.get("version")!="1.6.0" or meta.get("source_commit")!="e9bcd600bd19d107c1d8be12a7fcfb65d2846aa2":
+if meta.get("version")!="1.6.0" or meta.get("source_commit")!="c27858bf04f8912971f045918cbfff0f0da277f2":
     raise SystemExit("unexpected RHI UX Core pin")
 if meta.get("runtime_dependency") is not False or meta.get("branding_owner")!="rhi-ux-core":
     raise SystemExit("RHI UX Core ownership metadata drift")
