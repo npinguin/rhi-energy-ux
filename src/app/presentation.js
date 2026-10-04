@@ -17,9 +17,7 @@ const HB_ENERGY_NAVIGATION_SPEC = Object.freeze([
   {
     id:"intelligence", labelKey:"nav.intelligence", fallback:"Intelligence",
     items:[
-      { id:"operational-planning", labelKey:"nav.operational_plan", fallback:"Now", view:"operational-planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
-      { id:"tactical-planning", labelKey:"nav.tactical_plan", fallback:"Today & Tomorrow", view:"planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
-      { id:"strategic-planning", labelKey:"nav.strategic_plan", fallback:"Long term", view:"strategic-planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
+      { id:"plan", labelKey:"nav.plan", fallback:"Plan", view:"planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
       { id:"settings", labelKey:"nav.settings", fallback:"Settings", view:"strategies", titleKey:"hero.settings.title", descriptionKey:"hero.settings.description" }
     ]
   },
