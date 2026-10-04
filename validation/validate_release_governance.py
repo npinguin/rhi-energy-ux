@@ -37,7 +37,7 @@ expected = {
     "ux_core.compatibility": compat.get("ux_core",{}).get("version") == product.get("ux_core",{}).get("version") and compat.get("ux_core",{}).get("runtime_dependency") is False,
     "ux_core.manifest": manifest.get("ux_core",{}).get("source_commit") == product.get("ux_core",{}).get("source_commit") and manifest.get("ux_core",{}).get("runtime_dependency") is False,
     "ux_core.status": status.get("ux_core",{}).get("version") == product.get("ux_core",{}).get("version") and status.get("ux_core",{}).get("runtime_dependency") is False,
-    "foundation.compatibility": compat.get("foundation",{}).get("minimum_release") == product.get("minimum_foundation") and compat.get("foundation",{}).get("visual_registry_contract") == "RHI_VISUAL_ASSET_REGISTRY_V1" and compat.get("foundation",{}).get("minimum_contract_version") == "1.1.0",
+    "foundation.compatibility": compat.get("foundation",{}).get("minimum_release") == product.get("minimum_foundation") and compat.get("foundation",{}).get("visual_registry_contract") == "RHI_VISUAL_ASSET_REGISTRY_V2" and compat.get("foundation",{}).get("minimum_contract_version") == "2.0.0",
     "foundation.manifest": manifest.get("minimum_foundation") == product.get("minimum_foundation"),
     "foundation.status": status.get("minimum_foundation") == product.get("minimum_foundation"),
     "mobility_visual_dependency.compatibility": compat.get("mobility",{}).get("minimum_release_for_cross_domain_visuals") == product.get("minimum_mobility_for_cross_domain_visuals"),
