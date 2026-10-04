@@ -111,7 +111,7 @@ if (recreated.resolveNavigation('', '', 'planning').item !== 'tactical-planning'
 if (recreated.resolveNavigation('', '', 'intelligence').item !== 'settings') throw new Error('legacy Intelligence must migrate to Settings');
 const navMarkup = recreated.nav();
 if (!/rhiUxModuleTabs/.test(navMarkup) || !/rhiUxDomainTabs/.test(navMarkup)) throw new Error('shared Core two-level navigation not rendered');
-if (!/rhiUxDomainIdentity/.test(navMarkup) || !/Home Intelligence/.test(navMarkup) || !/ENERGIE/.test(navMarkup)) throw new Error('shared Core domain identity not rendered');
+if (!/rhiUxDomainIdentity/.test(navMarkup) || !/Home Intelligence/.test(navMarkup) || !/ENERGY/.test(navMarkup)) throw new Error('shared Core domain identity not rendered in default locale');
 if (!/rhiUxCompanyBrand/.test(navMarkup)) throw new Error('shared Core company brand not rendered');
 if (!/data-rhi-module/.test(navMarkup) || !/data-rhi-item/.test(navMarkup)) throw new Error('shared Core navigation routing hooks missing');
 
