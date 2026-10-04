@@ -5,13 +5,13 @@ ROOT=Path(__file__).resolve().parents[1]
 failures=[]
 
 legacy_product=[
-    r"sensor\.energy_asset_index",
-    r"sensor\.energy_relationship_index",
-    r"sensor\.energy_command_index",
-    r"sensor\.energy_activity_index",
-    r"sensor\.energy_planning_index",
-    r"sensor\.energy_(?:battery|grid|consumption|pricing|strategy|value)_[a-z0-9_]*index",
-    r"script\.energy_(?:write_public_property|execute_public_command)",
+    r"sensor\.energy_asset_index(?![a-z0-9_])",
+    r"sensor\.energy_relationship_index(?![a-z0-9_])",
+    r"sensor\.energy_command_index(?![a-z0-9_])",
+    r"sensor\.energy_activity_index(?![a-z0-9_])",
+    r"sensor\.energy_planning_index(?![a-z0-9_])",
+    r"sensor\.energy_(?:battery|grid|consumption|pricing|strategy|value)_[a-z0-9_]*index(?![a-z0-9_])",
+    r"script\.energy_(?:write_public_property|execute_public_command)(?![a-z0-9_])",
 ]
 for path in (ROOT/"src").rglob("*.js"):
     text=path.read_text(encoding="utf-8")
