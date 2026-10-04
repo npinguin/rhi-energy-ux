@@ -24,7 +24,7 @@ const gateway = {
       attributes:{
         contract_id:"RHI_ENERGY_PUBLIC_CONTRACT_V2",
         contract_version:"2",
-        core:{ contract_id:"RHI_ENERGY_CORE_V1" },
+        core:{ contract_id:"RHI_ENERGY_PUBLIC_CONTRACT_V2" },
         objects:[
           {
             asset_id:"battery_1",
@@ -107,7 +107,9 @@ for (const objectType of [
 assert.match(app,/for \(const key of spec\.keys \|\| \[spec\.key\]\)/);
 assert.match(app,/home_consumption\.power_kw/);
 assert.match(app,/solar_zone\.power_w/);
-assert.match(app,/Published properties/);
+assert.match(app,/More information/);
+assert.match(app,/rhiUxAssetIdentity\(/);
+assert.match(app,/rhiUxAssetFactGrid\(/);
 assert.match(app,/projection\?\.properties/);
 assert.match(app,/\['solar_array','solar_zone'\]/);
 assert.match(app,/productionSection/);
