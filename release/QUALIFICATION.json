@@ -1,7 +1,7 @@
 {
   "version": "4.3.26",
   "candidate_tag": "v4.3.26",
-  "candidate_sha": "pending",
+  "candidate_sha": "c211b5176d59bf02da219a19bf80527b1b554f21",
   "previous_release": "4.3.25",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
@@ -21,7 +21,7 @@
   "rollback_to_previous": "NOT_EXECUTED",
   "runtime_proof": "NOT_EXECUTED",
   "rollback_proof": "NOT_EXECUTED",
-  "release_decision": "BLOCKED",
+  "release_decision": "BLOCKED_RUNTIME_QUALIFICATION",
   "foundation_visual_registry": "NOT_EXECUTED",
   "cross_domain_visuals": "NOT_EXECUTED",
   "asset_visual_runtime_scope": "NOT_EXECUTED",
@@ -92,9 +92,10 @@
   "solar_production_root_level": "NOT_EXECUTED",
   "solar_children_flat_vertical_stack": "NOT_EXECUTED",
   "solar_top_level_section_parity": "NOT_EXECUTED",
-  "v1_product_api_decommissioned": "NOT_EXECUTED",
-  "zero_presentation_debt": "NOT_EXECUTED",
-  "multilingual_en_nl_fr": "NOT_EXECUTED",
-  "user_safe_copy": "NOT_EXECUTED",
-  "core_1_6_0_provenance": "NOT_EXECUTED"
+  "v1_product_api_decommissioned": "STATIC_PASS",
+  "zero_presentation_debt": "STATIC_PASS",
+  "multilingual_en_nl_fr": "STATIC_PASS",
+  "user_safe_copy": "STATIC_PASS",
+  "core_1_6_0_provenance": "STATIC_PASS",
+  "static_validation": "PASS"
 }
