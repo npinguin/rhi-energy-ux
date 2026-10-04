@@ -1256,20 +1256,27 @@
     }
     resolveNavigation(sectionId = '', itemId = '', legacyView = '') {
       const sections = this.navigationModel();
+      const requestedView = String(legacyView || '');
       const bySection = sections.find(section => section.id === String(sectionId || ''));
       const byItem = bySection?.items.find(item => item.id === String(itemId || ''));
-      if (bySection && byItem) return { section:bySection.id, item:byItem.id, view:byItem.view };
-      const legacy = {
-        overview:['energy','overview'], flow:['energy','flow'], battery:['energy','battery'], consumers:['energy','consumers'], gas:['energy','gas'],
-        strategies:['intelligence','settings'], intelligence:['intelligence','settings'], solar:['energy','solar'], 'operational-planning':['intelligence','operational-planning'],
-        planning:['intelligence','tactical-planning'], outlook:['intelligence','tactical-planning'],
-        metering:['insights','metering'], value:['insights','value'], retrospective:['insights','retrospective'],
-        'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','strategic-planning']
+      if (bySection && byItem) {
+        const owner = hbEnergySubviewOwner(requestedView);
+        const view = owner && owner.section === bySection.id && owner.item === byItem.id ? requestedView : byItem.view;
+        return { section:bySection.id, item:byItem.id, view };
+      }
+      const direct = {
+        overview:['energy','overview'], battery:['energy','battery'], consumers:['energy','consumers'],
+        strategies:['intelligence','settings'], intelligence:['intelligence','settings'], solar:['energy','solar'],
+        planning:['intelligence','plan'], metering:['insights','performance'], value:['insights','value'],
+        'solar-generation':['energy','solar']
       };
-      const [fallbackSection,fallbackItem] = legacy[String(legacyView || '')] || ['energy','overview'];
+      const owner = hbEnergySubviewOwner(requestedView);
+      const [fallbackSection,fallbackItem] = owner
+        ? [owner.section,owner.item]
+        : (direct[requestedView] || ['energy','overview']);
       const section = sections.find(row => row.id === fallbackSection) || sections[0];
       const item = section.items.find(row => row.id === fallbackItem) || section.items[0];
-      return { section:section.id, item:item.id, view:item.view };
+      return { section:section.id, item:item.id, view:owner ? requestedView : item.view };
     }
     activeNavigation() {
       return this.resolveNavigation(this.navSection, this.navItem, this.view);
@@ -1296,7 +1303,23 @@
     }
     navigateToView(view) {
       const target = this.resolveNavigation('', '', view);
-      this.selectNavigation(target.section, target.item);
+      this.navSection = target.section;
+      this.navItem = target.item;
+      this.view = target.view;
+      this.navSelectionBySection = { ...(this.navSelectionBySection || {}), [target.section]:target.item };
+      this.persistView();
+      this._forceRender = true;
+      this.render();
+    }
+    selectSubview(view) {
+      const target = this.resolveNavigation('', '', view);
+      this.navSection = target.section;
+      this.navItem = target.item;
+      this.view = target.view;
+      this.navSelectionBySection = { ...(this.navSelectionBySection || {}), [target.section]:target.item };
+      this.persistView();
+      this._forceRender = true;
+      this.render();
     }
     title() { return this.activeNavigationItem().title || rhiEnergyT(this._hass,'nav.energy',{},'Energy'); }
     subtitle() { return this.activeNavigationItem().description || ''; }
@@ -1317,6 +1340,11 @@
       })}</div>`;
     }
     onClick(event) {
+      const subview = event.target.closest('[data-energy-subview]');
+      if (subview) {
+        this.selectSubview(subview.dataset.energySubview || 'overview');
+        return;
+      }
       const coreModule = event.target.closest('[data-rhi-module]');
       if (coreModule) {
         this.selectNavigation(coreModule.dataset.rhiModule || 'energy', '');
@@ -2101,12 +2129,23 @@
 
 
     pageContextControls(rt, tab) {
-      if (tab === 'outlook') return this.componentHorizonSelector('outlook', rt.outlookHorizons(), this.selectedOutlookHorizonId);
-      if (tab === 'consumers') return `<label class="hiQuickSelect"><span>Group</span><select data-consumer-filter-select>${this.consumerFilterOptions().map(([id,label])=>`<option value="${id}"${this.consumerFilter===id?' selected':''}>${label}</option>`).join('')}</select></label><label class="hiQuickSelect"><span>Sort</span><select data-consumer-sort-select>${this.consumerSortOptions().map(([id,label])=>`<option value="${id}"${this.consumerSort===id?' selected':''}>${label}</option>`).join('')}</select></label>`;
-      if (tab === 'metering') return this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId) + this.componentMeteringSort();
-      if (tab === 'planning') return `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">Today</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">Tomorrow</button></div>`;
-      if (tab === 'value') return this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId, 'value');
-      return '';
+      const choice = (view,key,fallback) => `<button type="button" class="rhiUxContextControl ${this.view===view?'active':''}" data-energy-subview="${view}" aria-pressed="${this.view===view?'true':'false'}">${escapeHtml(rhiEnergyT(this._hass,key,{},fallback))}</button>`;
+      const subviews = ['overview','flow'].includes(tab)
+        ? choice('overview','nav.overview','Overview') + choice('flow','nav.flow','Flow')
+        : ['consumers','gas'].includes(tab)
+          ? choice('consumers','nav.consumption','Consumption') + (this.runtime().experiencePresence().gas === true ? choice('gas','nav.gas','Gas') : '')
+          : ['operational-planning','planning','outlook','strategic-planning'].includes(tab)
+            ? choice('operational-planning','nav.operational_plan','Now') + choice('planning','nav.tactical_plan','Today & Tomorrow') + choice('strategic-planning','nav.strategic_plan','Long term')
+            : ['metering','retrospective'].includes(tab)
+              ? choice('metering','nav.performance','Performance') + choice('retrospective','nav.retrospective','Review')
+              : '';
+      let local = '';
+      if (tab === 'outlook') local = this.componentHorizonSelector('outlook', rt.outlookHorizons(), this.selectedOutlookHorizonId);
+      if (tab === 'consumers') local = `<label class="hiQuickSelect"><span>${escapeHtml(rhiEnergyT(this._hass,'common.group',{},'Group'))}</span><select data-consumer-filter-select>${this.consumerFilterOptions().map(([id,label])=>`<option value="${id}"${this.consumerFilter===id?' selected':''}>${label}</option>`).join('')}</select></label><label class="hiQuickSelect"><span>${escapeHtml(rhiEnergyT(this._hass,'common.sort',{},'Sort'))}</span><select data-consumer-sort-select>${this.consumerSortOptions().map(([id,label])=>`<option value="${id}"${this.consumerSort===id?' selected':''}>${label}</option>`).join('')}</select></label>`;
+      if (tab === 'metering') local = this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId) + this.componentMeteringSort();
+      if (tab === 'planning') local = `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">${escapeHtml(rhiEnergyT(this._hass,'common.today',{},'Today'))}</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">${escapeHtml(rhiEnergyT(this._hass,'common.tomorrow',{},'Tomorrow'))}</button></div>`;
+      if (tab === 'value') local = this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId, 'value');
+      return [subviews,local].filter(Boolean).join('');
     }
 
     bodyContextBar(rt, tab, controlsId = '') {
