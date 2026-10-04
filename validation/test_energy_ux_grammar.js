@@ -97,7 +97,7 @@ assert.match(app,/object-fit:contain/);
 assert.ok(app.includes('rhiUxDomainShell({'));
 assert.match(app,/domain:rhiEnergyT\(this\._hass,'nav\.energy',\{\},'Energy'\)\.toUpperCase\(\)/);
 assert.ok(app.includes('strategicPlanning(rt)'), "Strategic Planning must be a real contract-backed surface");
-assert.ok(app.includes('Strategy configuration is the authority for longer-term intent'), "Strategic Planning must explain its contract authority");
+assert.ok(app.includes('This view explains how your current settings influence longer-term energy behavior.'), "Strategic Planning must explain longer-term behavior in user language");
 assert.ok(!app.includes('Strategic planning content follows in the next screen pass'), "Strategic Planning placeholder must not return");
 
 console.log("PASS Energy 4.3 canonical page/body controls, asset grammar, visuals and responsive ownership");
