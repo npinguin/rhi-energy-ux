@@ -21,10 +21,10 @@ assert.match(app,/days_to_show:\(\{week:7,month:30,quarter:90,year:365\}/);
 assert.match(app,/data-gas-horizon/);
 for (const horizon of ["week","month","quarter","year"]) assert.ok(app.includes(`['${horizon}'`) || app.includes(`'${horizon}'`), "missing Gas horizon "+horizon);
 assert.match(app,/Gas usage history/);
-assert.match(app,/Home Assistant long-term statistics/);
+assert.match(app,/Home Assistant history/);
 assert.match(app,/No measured gas history yet/);
 assert.match(app,/Connect your gas meter/);
-assert.match(app,/The UX never estimates missing consumption/);
+assert.match(app,/Missing consumption is never estimated/);
 
 assert.match(app,/energyDeviceStatusCard\(rt, gas\.asset, 'Gas meter'\)/);
 assert.match(app,/gas: \{ image:hbEnergyHeroAsset\('gas'\)/);
