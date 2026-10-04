@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "owner": "rhi-energy-ux",
+  "policy": "Frontend never reconstructs missing backend truth. Required unmapped semantics are blocking backend gaps.",
+  "gaps": [
+    {
+      "gap_id": "ENERGY-UX-FOUNDATION-VISUAL-REGISTRY-V2",
+      "surface": "cross-domain visual identity",
+      "requested_semantic": "canonical producer-owned visual registry without V1 dependency",
+      "owning_domain": "rhi_foundation",
+      "severity": "P0",
+      "blocking": true,
+      "backend_issue": "https://github.com/npinguin/rhi-foundation/issues/89",
+      "backend_pr": "https://github.com/npinguin/rhi-foundation/pull/90",
+      "status": "backend_in_progress",
+      "frontend_behavior": "consume RHI_VISUAL_ASSET_REGISTRY_V2 only; fail closed when unavailable"
+    }
+  ]
+}
