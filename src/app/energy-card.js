@@ -131,7 +131,13 @@
       disabled: rhiEnergyT(null,'reason.disabled',{},'Disabled'),
       not_available: rhiEnergyT(null,'reason.not_available',{},'Not available'),
       not_published: rhiEnergyT(null,'reason.not_published',{},'Information is not available yet'),
-      no_battery_policy_reason_published: 'No battery policy reason published'
+      no_battery_policy_reason_published: rhiEnergyT(null,'reason.no_battery_policy',{},'Battery policy information is not available yet'),
+      data_incomplete: rhiEnergyT(null,'reason.data_incomplete',{},'Some details are unavailable'),
+      trust_state: rhiEnergyT(null,'reason.verification_required',{},'Verification is needed'),
+      baseline_untrusted: rhiEnergyT(null,'reason.verification_required',{},'Verification is needed'),
+      reset_pending: rhiEnergyT(null,'reason.reset_pending',{},'Reset in progress'),
+      approval_required: rhiEnergyT(null,'reason.confirmation_needed',{},'Confirmation needed'),
+      configuration_required: rhiEnergyT(null,'reason.not_configured',{},'Setup needed')
     };
     return labels[normalized] || human(key, fallback);
   };
