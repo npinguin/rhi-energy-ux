@@ -3528,22 +3528,34 @@
       const area = this.energyAssetAreaLabel(enriched);
       const parentId = this.energyAssetParentId(enriched);
       const parentName = parentId ? String(rt.assetName(parentId) || '').trim() : '';
-      const relation = parentName ? `<span class="energyDeviceRelation"><small>Part of</small><b>${escapeHtml(parentName)}</b></span>` : '';
       const actions = this.assetQuickActions(rt,id,3);
       const keyFacts = facts.filter(row => !/^(state|status)$/i.test(String(row.label || ''))).slice(0,4);
-      const keyProperties = keyFacts.length
-        ? keyFacts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
-        : `<span><small>Energy state</small><b>${escapeHtml(primaryState || 'Unavailable')}</b></span>`;
+      const identity = rhiUxAssetIdentity({
+        eyebrow:roleLabel || human(type),
+        title:name,
+        subtitle:[area,primaryState].filter(Boolean).join(' · '),
+        visual:this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})
+      });
+      const factGrid = rhiUxAssetFactGrid(
+        keyFacts.length
+          ? keyFacts.map(row=>({label:row.label,value:row.value}))
+          : [{label:'Energy state',value:primaryState || rhiEnergyT(this._hass,'common.not_available',{},'Not available')}]
+      );
+      const relationship = parentName
+        ? rhiUxAssetRelationship({label:'Part of',value:parentName})
+        : '';
       const configuration = this.energyAssetConfigurationDisclosure(rt,enriched);
       const details = this.energyAssetDetailDisclosure(rt,enriched);
       const diagnostics = this.energyAssetDiagnosticsDisclosure(rt,enriched);
       const children = childrenHtml
         ? `<details class="energyAssetChildrenSibling"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.children',{},'Children'))}</summary><div class="energyAssetChildrenStack">${childrenHtml}</div></details>`
         : '';
-      return `<div class="energyAssetNode" data-energy-device-type="${escapeHtml(type)}"><article class="energyDeviceCard">
-        <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
-        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div>${primaryState ? `<div class="energyDeviceTopActions"><span class="energyDeviceState">${escapeHtml(primaryState)}</span></div>` : ''}</div>
-        <div class="energyDeviceFacts">${keyProperties}${relation}</div>${actions}<div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div></div>
+      return `<div class="energyAssetNode" data-energy-device-type="${escapeHtml(type)}"><article class="energyDeviceCard rhiEnergyCoreAssetCard">
+        ${identity}
+        ${factGrid}
+        ${relationship}
+        ${actions}
+        <div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div>
       </article>${children}</div>`;
     }
 
