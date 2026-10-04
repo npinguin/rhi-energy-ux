@@ -18,7 +18,7 @@ assert.doesNotMatch(device,/>Config</);
 assert.doesNotMatch(device,/>Telemetry</);
 
 const detailsStart = app.indexOf("\n    energyAssetDetailDisclosure(");
-const detailsEnd = app.indexOf("\n    energyDeviceStatusCard(", detailsStart);
+const detailsEnd = app.indexOf("\n    energyAssetDiagnosticsDisclosure(", detailsStart);
 const details = app.slice(detailsStart, detailsEnd);
 assert.match(details,/\['Area'/);
 assert.match(details,/\['Profile'/);
