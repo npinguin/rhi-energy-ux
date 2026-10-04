@@ -24,8 +24,7 @@
   "release_asset_policy": "none",
   "required_contracts": [
     "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-    "RHI_ENERGY_CORE_V1",
-    "RHI_VISUAL_ASSET_REGISTRY_V1"
+    "RHI_VISUAL_ASSET_REGISTRY_V2"
   ],
   "ux_core": {
     "package": "rhi-ux-core",
@@ -34,7 +33,7 @@
     "runtime_dependency": false,
     "branding_owner": "rhi-ux-core"
   },
-  "minimum_foundation": "F1.8.35",
+  "minimum_foundation": "F1.8.38",
   "minimum_mobility_for_cross_domain_visuals": "M0.10.25",
   "tested_backend_baseline": "E0.15.87"
 }
