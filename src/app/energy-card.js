@@ -5420,15 +5420,15 @@
         title:'Strategic Planning',
         explanation:'What your current Energy settings mean for longer-term behavior.',
         metrics:[
-          ['◎','Strategy',posture || 'Not published','Current longer-term posture'],
-          ['◇','Topics',String(topics.length),'Backend-owned policy areas influencing strategy'],
+          ['◎','Strategy',posture || 'Not available','Current longer-term posture'],
+          ['◇','Topics',String(topics.length),'Policy areas influencing your strategy'],
           ['↗','Tactical horizon','D0 / D1','Today and tomorrow remain in Tactical Planning']
         ]
       };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}
         <div class="strategicPlanningPage strategicBehaviorPage">
-          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not published')}</h2><p>Strategy configuration is the authority for longer-term intent. This read-only view explains the effective meaning of your current Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
-          <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No strategic behavior published</b><span>The backend has not published effective behavior topics yet.</span></div></section>'}</div>
+          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not available')}</h2><p>Strategy configuration is the authority for longer-term intent. This read-only view explains the effective meaning of your current Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
+          <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No long-term strategy available</b><span>Long-term strategy details are not available yet.</span></div></section>'}</div>
         </div>`;
     }
 
@@ -5436,7 +5436,7 @@
       if (view === 'solar-generation') {
         const p = this.buildPageViewModel(rt, 'solar');
         const model = { ...p, title:'Solar generation', badgeText:'Structure ready', badgeTone:'neutral' };
-        return `${this.tabExperienceHeader(rt,'solar-generation',model)}<section class="panel navigationPlaceholder"><small>ENERGY DOMAIN</small><h2>Solar generation content follows in the next screen pass</h2><p>The navigation and premium header are now in their final structural location. Inverter, panel and storage-link content is intentionally not moved into this release.</p></section>`;
+        return `${this.tabExperienceHeader(rt,'solar-generation',model)}<section class="panel navigationPlaceholder"><small>ENERGY DOMAIN</small><h2>Solar generation details are not available yet</h2><p>This information is not available yet.</p></section>`;
       }
       return `<section class="panel navigationPlaceholder"><h2>${escapeHtml(human(view))}</h2><p>This navigation target has no dedicated renderer.</p></section>`;
     }
