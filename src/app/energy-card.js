@@ -1803,7 +1803,7 @@
         const profileRow = runtime.strategyProfileEditableRowByKey(propertyKey);
         const effectiveRow = catalogRow || profileRow || (row && !row.missing ? row : null);
         if (!this.isWritableRow(effectiveRow)) {
-          this.writeFeedback[propertyKey] = { state: 'rejected', reason: effectiveRow?.editable_reason || 'No public write route published', updated: Date.now() };
+          this.writeFeedback[propertyKey] = { state: 'rejected', reason: effectiveRow?.editable_reason || 'Editing is unavailable', updated: Date.now() };
           return;
         }
         const control = this.shadowRoot.querySelector(`[data-property-key="${CSS.escape(propertyKey)}"]`);
@@ -2114,7 +2114,7 @@
       const normalized = String(state || '').trim().toLowerCase();
       if (['complete','ok','ready'].includes(normalized)) return 'Complete';
       if (['incomplete','partial'].includes(normalized)) return 'Partial result';
-      if (['not_configured','configuration_required','not ready','not_ready'].includes(normalized)) return 'Configuration required';
+      if (['not_configured','configuration_required','not ready','not_ready'].includes(normalized)) return 'Setup needed';
       if (['reset_pending','pending','baseline_reset_required'].includes(normalized)) return 'Awaiting reset';
       return 'Unavailable';
     }
@@ -2707,7 +2707,7 @@
       const opts = allowed.length ? allowed.map(v => ({ value:v, label:this.productStateLabel(v, human(v)) })) : fallbackOptions;
       let editor = '';
       if (!opts.length) {
-        editor = `<label class="selectField noOptions"><select disabled data-property-key="${escapeHtml(this.propertyKeyFor(row))}"><option>${escapeHtml(value ? this.productStateLabel(value, human(value)) : 'Options not published')}</option></select></label>`;
+        editor = `<label class="selectField noOptions"><select disabled data-property-key="${escapeHtml(this.propertyKeyFor(row))}"><option>${escapeHtml(value ? this.productStateLabel(value, human(value)) : 'Options unavailable')}</option></select></label>`;
       } else {
         const options = opts.map(option => { const optValue=(option&&typeof option==='object')?(option.value??option.id??option.key??option.label):option; const optLabel=(option&&typeof option==='object')?(option.label??option.name??this.productStateLabel(optValue,human(optValue))):this.productStateLabel(optValue,human(optValue)); const selected=String(optValue).toLowerCase()===String(value??'').toLowerCase()?' selected':''; return `<option value="${escapeHtml(optValue)}"${selected}>${escapeHtml(optLabel)}</option>`; }).join('');
         editor = `<label class="selectField"><select ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}">${options}</select></label>`;
@@ -4481,7 +4481,7 @@
       const otherGrid = grid === null ? null : Math.max(0, grid - (lowGrid || 0));
       const values = [solar || 0, battery || 0, lowGrid || 0, otherGrid || 0];
       const total = values.reduce((a,b)=>a+b,0);
-      if (!total) return `<div class="consumerMixUnavailable">Source attribution not published</div>`;
+      if (!total) return `<div class="consumerMixUnavailable">Energy source unavailable</div>`;
       return `<div class="consumerMixBar" aria-label="Energy source mix"><span class="solar" style="width:${Math.max(0,values[0])}%"></span><span class="battery" style="width:${Math.max(0,values[1])}%"></span><span class="lowGrid" style="width:${Math.max(0,values[2])}%"></span><span class="grid" style="width:${Math.max(0,values[3])}%"></span></div><div class="consumerMixLegend"><span>Solar ${fmtPct(solar)}</span><span>Battery ${fmtPct(battery)}</span><span>Low-cost grid ${fmtPct(lowGrid)}</span><span>Other grid ${fmtPct(otherGrid)}</span></div>`;
     }
     consumerExplorerCard(rt, row = {}) {
@@ -5090,7 +5090,7 @@
       }).filter(Boolean).join('');
       const optional = [['Savings',v.savings],['Avoided grid cost',v.avoided],['Self-consumption value',v.selfConsumption]].filter(([,value])=>asNumber(value)!==null).map(([label,value])=>this.kv(label,money(value))).join('');
       const financialBody = configurationBlocked
-        ? `<section class="panel wide valueConfigurationState"><h2>Financial result</h2><div class="valueStateHeadline"><b>${escapeHtml(v.stateLabel)}</b><span>${escapeHtml(v.attention)}</span></div><p>Complete only the Pricing inputs the backend marks as blocking for ${escapeHtml(v.label.toLowerCase())}.</p><div class="valueConfigurationChecklist">${missingRequired.map(item=>`<div><span>${item.configured?'✓':'□'}</span><b>${escapeHtml(item.label)}</b><em>${escapeHtml(item.configured?'Configured':'Configuration required')}</em></div>`).join('')}</div></section>`
+        ? `<section class="panel wide valueConfigurationState"><h2>Financial result</h2><div class="valueStateHeadline"><b>${escapeHtml(v.stateLabel)}</b><span>${escapeHtml(v.attention)}</span></div><p>Complete only the Pricing inputs the backend marks as blocking for ${escapeHtml(v.label.toLowerCase())}.</p><div class="valueConfigurationChecklist">${missingRequired.map(item=>`<div><span>${item.configured?'✓':'□'}</span><b>${escapeHtml(item.label)}</b><em>${escapeHtml(item.configured?'Configured':'Setup needed')}</em></div>`).join('')}</div></section>`
         : !v.accountingReady && !hasFinancialValue
           ? `<section class="panel wide valueEvidenceState"><h2>Financial result</h2><div class="valueStateHeadline"><b>Waiting for measured evidence</b><span>${escapeHtml(v.attention)}</span></div><p>Pricing is usable. The financial result will appear when the selected Metering period contains sufficient measured import/export evidence.</p></section>`
           : `<section class="panel wide"><h2>${escapeHtml(v.label)} financial result</h2><p>Accumulated measured value for the Metering-selected period. No future value is predicted.</p><div class="r3280Balance"><span>Net financial result</span><b>${escapeHtml(money(v.net))}</b><p>${escapeHtml(v.interpretation)}</p></div><div class="goalGrid"><div class="goalRow"><span>Import cost</span><b>${escapeHtml(money(v.importCost))}</b></div><div class="goalRow"><span>Export revenue</span><b>${escapeHtml(money(v.exportRevenue))}</b></div><div class="goalRow"><span>Net energy cost</span><b>${escapeHtml(money(v.netEnergyCost))}</b></div><div class="goalRow"><span>Result completeness</span><b>${escapeHtml(v.resultCompletenessLabel)}</b><small>${escapeHtml(v.resultScopeLabel)}</small></div></div>${optional ? `<div class="softBox">${optional}</div>` : ''}</section>`;
@@ -5105,88 +5105,10 @@
       return `${this.tabExperienceHeader(rt,'value',pageVm)}${this.bodyContextBar(rt,'value','value-body')}<div id="value-body" class="valuePage r363ValuePage">
         <div class="valueGrid">${financialBody}
         <section class="panel wide strategyTablePanel pricingStrategyPanel" id="value-pricing-settings"><div class="strategyTableHead"><div><h2>Pricing settings</h2><p>${missingRequired.length ? `${missingRequired.length} value${missingRequired.length===1?'':'s'} still need configuration.` : 'Tariff configuration is complete.'}</p></div><div class="strategySetActions">${pricingActions}</div></div><div class="strategyTable"><div class="strategyColumnHead"><span>Setting</span><span>Value</span></div>${tariffRows}</div></section>
-        <section class="panel" id="value-flexible-pricing"><h2>Pricing of flexible loads</h2><p>Financial attribution is shown only when Value publishes it. The UX does not estimate costs.</p><div class="flexPricingList">${flexibleRows || `<div class="empty"><b>No flexible loads published</b><span>No controllable Energy assets are currently available.</span></div>`}</div></section>
-        <section class="panel" id="value-consumers"><h2>Consumer allocation</h2><p>Financial attribution by consumer for ${escapeHtml(v.label.toLowerCase())}.</p>${consumers || `<div class="empty"><b>Consumer allocation is not yet available for the selected period.</b><span>No consumer value attribution is currently published.</span></div>`}</section>
+        <section class="panel" id="value-flexible-pricing"><h2>Pricing of flexible loads</h2><p>Financial attribution is shown only when Value publishes it. The UX does not estimate costs.</p><div class="flexPricingList">${flexibleRows || `<div class="empty"><b>No controllable loads available</b><span>No controllable Energy assets are currently available.</span></div>`}</div></section>
+        <section class="panel" id="value-consumers"><h2>Consumer allocation</h2><p>Financial attribution by consumer for ${escapeHtml(v.label.toLowerCase())}.</p>${consumers || `<div class="empty"><b>Consumer allocation is not yet available for the selected period.</b><span>Consumer value allocation is not available yet.</span></div>`}</section>
         </div>
       </div>`;
-    }
-
-    productLanguage(html) {
-      let out = String(html || '');
-      const replacements = [
-        [/Data incomplete/gi,'Some details unavailable'],
-        [/Some guidance details unavailable/gi,'Some guidance is unavailable'],
-        [/Some forecast details unavailable/gi,'Some forecast information is unavailable'],
-        [/Some measurements unavailable/gi,'Some measurements are unavailable'],
-        [/Some consumer details unavailable/gi,'Some consumer information is unavailable'],
-        [/Configuration required/gi,'Setup needed'],
-        [/Published by Pricing/gi,'Configured'],
-        [/No reliable financial result is currently published\.?/gi,'A reliable financial result is not available yet.'],
-        [/No consumer value attribution is currently published\.?/gi,'Consumer value allocation is not available yet.'],
-        [/No flexible loads published/gi,'No controllable loads available'],
-        [/No consumers published/gi,'No consumers available'],
-        [/No charger connections published/gi,'No charger connections available'],
-        [/Source attribution not published/gi,'Energy source unavailable'],
-        [/Planning Value Published/gi,'Charging plan available'],
-        [/Horizon Summary Available/gi,'Outlook available'],
-        [/Calculation Not Trusted/gi,'Waiting for complete data'],
-        [/Calculation Trust Health Not Ok/gi,'Some planning inputs are incomplete'],
-        [/Runtime Error/gi,'Currently unavailable'],
-        [/\bUNKNOWN\b/gi,'Not measured'],
-        [/\bTRUST_STATE\b/gi,'Measurement quality'],
-        [/\bBASELINE_UNTRUSTED\b/gi,'Verification required'],
-        [/\bRESET_PENDING\b/gi,'Reset in progress'],
-        [/Approval required/gi,'Confirmation needed'],
-        [/Observed/gi,'Available'],
-        [/Flexible Asset/gi,'Controllable'],
-        [/Flexible assets/gi,'Controllable assets'],
-        [/public flow relations/gi,'connections'],
-        [/Topology evidence/gi,'Connection details'],
-        [/Physical topology/gi,'Energy connections'],
-        [/Published by Mobility as Energy connection assets\.?/gi,'Vehicle charging connections.'],
-        [/Aggregate storage state from public battery property index\.?/gi,'Combined state of your home batteries.'],
-        [/Rendered only from inline editable property metadata\.?/gi,'Settings available for this battery.'],
-        [/No editable battery settings published/gi,'No battery settings available'],
-        [/Editable metadata is inline on public property rows\.?/gi,'No adjustable battery settings are currently available.'],
-        [/Today and tomorrow horizon outlook from the canonical Outlook contract/gi,'Today and tomorrow energy outlook'],
-        [/Current-day horizon summary from the Outlook contract\.?/gi,'Today’s expected energy balance.'],
-        [/Some details are not published yet\. See quality details\.?/gi,'Planning detail is partial; open Quality for exact limitations.'],
-        [/Period summaries not published yet\.?/gi,'Week, month and year summaries are not available yet.'],
-        [/Showing clean today counters from the public metering index\. Week, month and year are not fabricated by UX\./gi,'Today’s measured totals remain available. Longer periods will appear when their summaries are ready.'],
-        [/Backend-published remediation advice for the selected period\.?/gi,'What needs attention for the selected period.'],
-        [/Reset Command Not Published/gi,'Reset is not available'],
-        [/Contract gap/gi,'Details'],
-        [/Mode is currently published read-only by the backend\.?/gi,'This mode is currently view-only.'],
-        [/Backend did not publish allowed values\.?/gi,'No selectable options are currently available.'],
-        [/Options not published/gi,'Options unavailable'],
-        [/No public write route published/gi,'Editing is unavailable'],
-        [/No public command published/gi,'Action unavailable'],
-        [/No command published/gi,'Action unavailable'],
-        [/No additional explanation is needed/gi,'No additional explanation available'],
-        [/Not published/gi,'Unavailable'],
-        [/Published/gi,'Available'],
-        [/Canonical/gi,'Main'],
-        [/property index/gi,'data source'],
-        [/contract/gi,'information'],
-        [/runtime/gi,'system'],
-        [/metadata/gi,'settings information'],
-        [/trust health/gi,'data quality'],
-        [/planner state/gi,'plan status'],
-        [/Energy Need Exists/gi,'Energy demand is waiting'],
-        [/Energy Need Blocked/gi,'Waiting for suitable energy'],
-        [/Automatic Blocker/gi,'Automatic start condition'],
-        [/Min(?:imum)? Power Above Surplus/gi,'Waiting for sufficient solar power'],
-        [/Checking Readiness/gi,'Preparing automatic control'],
-        [/Provider Remaining Forecast/gi,'Remaining forecast'],
-        [/Execution state/gi,'Status'],
-        [/Execution/gi,'Status'],
-        [/Candidate(?:s)?/gi,'Considered'],
-        [/Selected/gi,'Planned'],
-        [/Blocked/gi,'Waiting'],
-        [/Baseline reset required/gi,'Metering reset needed']
-      ];
-      for (const [pattern, value] of replacements) out = out.replace(pattern, value);
-      return out;
     }
 
     planningAssetIcon(asset = {}) {
@@ -5978,7 +5900,7 @@
 @media(max-width:1024px){.hiTabStatusItem{grid-template-columns:42px minmax(0,1fr);padding:10px;min-height:88px}.hiTabStatusIcon{width:40px;height:40px;min-width:40px}}
 @media(max-width:760px){.hiTabPurpose{font-size:12px}.hiQuickActionItems{flex-wrap:nowrap}.hiQuickAction{flex:0 0 auto}}
 @media(max-width:430px){.hiTabPurpose{font-size:10px;line-height:1.3}.hiTabStatusItem{grid-template-columns:34px minmax(0,1fr);min-height:76px;padding:8px;gap:7px}.hiTabStatusIcon{width:32px;height:32px;min-width:32px;border-radius:10px;font-size:18px}}
-</style><main class="energy rhiUxDomainBody rhi-ux-root">${this.nav()}${this.renderMainWarning(footer)}<section>${this.productLanguage(content)}</section>${this.propertyDraftBar()}${this.energyVisualPickerOverlay(rt)}${this.productLanguage(this.renderFooter(rt,this.view,footer))}</main>`;
+</style><main class="energy rhiUxDomainBody rhi-ux-root">${this.nav()}${this.renderMainWarning(footer)}<section>${content}</section>${this.propertyDraftBar()}${this.energyVisualPickerOverlay(rt)}${this.renderFooter(rt,this.view,footer)}</main>`;
       if (markup === this._lastMarkup) { this.persistInteractionContext(); return; }
       this._lastMarkup = markup;
       this.persistInteractionContext();
