@@ -91,14 +91,14 @@
     if (state === 'ok') return 'OK';
     if (state === 'warn') return human(row.health || row.quality || 'Degraded');
     if (state === 'fail') return human(row.health || row.quality || 'Fail');
-    if (state === 'missing') return 'Not available';
-    if (state === 'not-measured') return 'Not measured';
-    return 'Unknown';
+    if (state === 'missing') return rhiEnergyT(null,'common.not_available',{},'Not available');
+    if (state === 'not-measured') return rhiEnergyT(null,'common.not_measured',{},'Not measured');
+    return rhiEnergyT(null,'common.unknown',{},'Unknown');
   };
   const rowDisplayValue = (row, fallback = '—') => {
     if (!row || row.missing) return fallback;
     const value = rowValue(row, null);
-    if (value === null || value === undefined || value === '') return 'Not measured';
+    if (value === null || value === undefined || value === '') return rhiEnergyT(null,'common.not_measured',{},'Not measured');
     if (typeof value === 'number') return `${value}${row.unit ? ` ${row.unit}` : ''}`;
     return `${human(value, fallback)}${row.unit ? ` ${row.unit}` : ''}`;
   };
@@ -123,14 +123,14 @@
     if (!key) return fallback;
     const normalized = key.toLowerCase().replace(/[\s.-]+/g, '_');
     const labels = {
-      policy_mode_off: 'Energy Intelligence is off',
-      mode_off: 'Energy Intelligence is off',
-      intelligence_off: 'Energy Intelligence is off',
-      energy_intelligence_off: 'Energy Intelligence is off',
-      automation_disabled: 'Automation is disabled',
-      disabled: 'Disabled',
-      not_available: 'Not available',
-      not_published: 'Not published',
+      policy_mode_off: rhiEnergyT(null,'reason.intelligence_off',{},'Energy Intelligence is off'),
+      mode_off: rhiEnergyT(null,'reason.intelligence_off',{},'Energy Intelligence is off'),
+      intelligence_off: rhiEnergyT(null,'reason.intelligence_off',{},'Energy Intelligence is off'),
+      energy_intelligence_off: rhiEnergyT(null,'reason.intelligence_off',{},'Energy Intelligence is off'),
+      automation_disabled: rhiEnergyT(null,'reason.automation_disabled',{},'Automation is disabled'),
+      disabled: rhiEnergyT(null,'reason.disabled',{},'Disabled'),
+      not_available: rhiEnergyT(null,'reason.not_available',{},'Not available'),
+      not_published: rhiEnergyT(null,'reason.not_published',{},'Information is not available yet'),
       no_battery_policy_reason_published: 'No battery policy reason published'
     };
     return labels[normalized] || human(key, fallback);
@@ -154,6 +154,7 @@
   class EnergyRuntime {
     constructor(hass) {
       this.hass = hass || {};
+      rhiEnergySetLocaleFromHass(this.hass);
       this._allowed = null;
       this._rows = null;
       this._assets = null;
@@ -1235,7 +1236,7 @@
         : fallback;
       const showConsumers=has('flexible_loads', false);
       const showValue=has('pricing', false);
-      return HB_ENERGY_NAVIGATION.map(section=>({
+      return hbEnergyNavigation(this._hass).map(section=>({
         ...section,
         items:section.items.filter(item=>{
           if(item.id === 'battery') return has('battery', false);
@@ -1290,7 +1291,7 @@
       const target = this.resolveNavigation('', '', view);
       this.selectNavigation(target.section, target.item);
     }
-    title() { return this.activeNavigationItem().title || 'Energy'; }
+    title() { return this.activeNavigationItem().title || rhiEnergyT(this._hass,'nav.energy',{},'Energy'); }
     subtitle() { return this.activeNavigationItem().description || ''; }
     nav() {
       const sections = this.navigationModel();
@@ -1302,7 +1303,7 @@
       }));
       return `<div class="rhiEnergyNav rhiEnergyNav-${escapeHtml(active.section)}">${rhiUxDomainShell({
         product:'Home Intelligence',
-        domain:'ENERGIE',
+        domain:rhiEnergyT(this._hass,'nav.energy',{},'Energy').toUpperCase(),
         modules,
         activeModule:active.section,
         activeItem:active.item
@@ -2462,7 +2463,7 @@
       const semanticDescription = navItem?.description || p.explanation;
       const heroKey = navItem?.id || tab;
       return rhiEnergyPageHeader({
-        sectionLabel:navSection?.label || 'Energy',
+        sectionLabel:navSection?.label || rhiEnergyT(this._hass,'nav.energy',{},'Energy'),
         itemLabel:navItem?.label || p.eyebrow,
         title:semanticTitle,
         description:semanticDescription,
@@ -2519,7 +2520,7 @@
       if (!id) return '';
       const models = rt.commandActionModelsForAsset(id).filter(Boolean).slice(0, limit);
       if (!models.length) return '';
-      return `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${models.map(model => this.componentActionModelButton(model)).join('')}</div></div>`;
+      return `<div class="energyAssetQuickActions"><small>${escapeHtml(rhiEnergyT(this._hass,'common.quick_actions',{},'Quick actions'))}</small><div>${models.map(model => this.componentActionModelButton(model)).join('')}</div></div>`;
     }
     measuredAssetPower(asset = {}) {
       return asNumber(firstDefined(asset.actual_power_kw, asset.current_power_kw, asset.power_kw));
