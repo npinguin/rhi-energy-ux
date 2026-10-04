@@ -25,8 +25,8 @@ for (const file of [
 const registryState = {
   state:'2',
   attributes:{
-    contract_id:'RHI_VISUAL_ASSET_REGISTRY_V1',
-    contract_version:'1.1.0',
+    contract_id:'RHI_VISUAL_ASSET_REGISTRY_V2',
+    contract_version:'2.0.0',
     status:'valid',
     entries:[
       {
