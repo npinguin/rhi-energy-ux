@@ -18,7 +18,7 @@ const RHI_ENERGY_TRANSLATIONS = Object.freeze({
     "common.quick_actions":"Quick actions","common.not_available":"Not available","common.not_measured":"Not measured","common.unknown":"Unknown",
     "common.details":"Details","common.diagnostics":"Diagnostics","common.configuration":"Configuration","common.children":"Children","common.save":"Save","common.cancel":"Cancel","common.reset":"Reset",
     "common.today":"Today","common.tomorrow":"Tomorrow","common.information_missing":"This information is not available yet.",
-    "reason.intelligence_off":"Energy Intelligence is off","reason.automation_disabled":"Automation is disabled","reason.disabled":"Disabled","reason.not_available":"Not available","reason.not_published":"Information is not available yet."
+    "reason.intelligence_off":"Energy Intelligence is off","reason.automation_disabled":"Automation is disabled","reason.disabled":"Disabled","reason.not_available":"Not available","reason.not_published":"Information is not available yet.","reason.no_battery_policy":"Battery policy information is not available yet","reason.data_incomplete":"Some details are unavailable","reason.verification_required":"Verification is needed","reason.reset_pending":"Reset in progress","reason.confirmation_needed":"Confirmation needed","reason.waiting":"Waiting","reason.preparing":"Preparing","reason.not_configured":"Setup needed"
   }),
   nl:Object.freeze({
     "nav.energy":"Energie","nav.overview":"Overzicht","nav.flow":"Stromen","nav.solar":"Zonne-energie","nav.battery":"Thuisbatterij","nav.consumption":"Verbruik","nav.gas":"Gas",
@@ -37,7 +37,7 @@ const RHI_ENERGY_TRANSLATIONS = Object.freeze({
     "common.quick_actions":"Snelle acties","common.not_available":"Niet beschikbaar","common.not_measured":"Niet gemeten","common.unknown":"Onbekend",
     "common.details":"Details","common.diagnostics":"Diagnose","common.configuration":"Configuratie","common.children":"Onderdelen","common.save":"Opslaan","common.cancel":"Annuleren","common.reset":"Herstellen",
     "common.today":"Vandaag","common.tomorrow":"Morgen","common.information_missing":"Deze informatie is nog niet beschikbaar.",
-    "reason.intelligence_off":"Energie-intelligentie staat uit","reason.automation_disabled":"Automatisering is uitgeschakeld","reason.disabled":"Uitgeschakeld","reason.not_available":"Niet beschikbaar","reason.not_published":"Deze informatie is nog niet beschikbaar."
+    "reason.intelligence_off":"Energie-intelligentie staat uit","reason.automation_disabled":"Automatisering is uitgeschakeld","reason.disabled":"Uitgeschakeld","reason.not_available":"Niet beschikbaar","reason.not_published":"Deze informatie is nog niet beschikbaar.","reason.no_battery_policy":"Informatie over het batterijbeleid is nog niet beschikbaar","reason.data_incomplete":"Sommige details zijn niet beschikbaar","reason.verification_required":"Controle is nodig","reason.reset_pending":"Herstel wordt uitgevoerd","reason.confirmation_needed":"Bevestiging nodig","reason.waiting":"Wachten","reason.preparing":"Voorbereiden","reason.not_configured":"Instelling nodig"
   }),
   fr:Object.freeze({
     "nav.energy":"Énergie","nav.overview":"Vue d’ensemble","nav.flow":"Flux","nav.solar":"Solaire","nav.battery":"Batterie domestique","nav.consumption":"Consommation","nav.gas":"Gaz",
@@ -56,7 +56,7 @@ const RHI_ENERGY_TRANSLATIONS = Object.freeze({
     "common.quick_actions":"Actions rapides","common.not_available":"Non disponible","common.not_measured":"Non mesuré","common.unknown":"Inconnu",
     "common.details":"Détails","common.diagnostics":"Diagnostic","common.configuration":"Configuration","common.children":"Éléments","common.save":"Enregistrer","common.cancel":"Annuler","common.reset":"Réinitialiser",
     "common.today":"Aujourd’hui","common.tomorrow":"Demain","common.information_missing":"Cette information n’est pas encore disponible.",
-    "reason.intelligence_off":"L’intelligence énergétique est désactivée","reason.automation_disabled":"L’automatisation est désactivée","reason.disabled":"Désactivé","reason.not_available":"Non disponible","reason.not_published":"Cette information n’est pas encore disponible."
+    "reason.intelligence_off":"L’intelligence énergétique est désactivée","reason.automation_disabled":"L’automatisation est désactivée","reason.disabled":"Désactivé","reason.not_available":"Non disponible","reason.not_published":"Cette information n’est pas encore disponible.","reason.no_battery_policy":"Les informations sur la politique de batterie ne sont pas encore disponibles","reason.data_incomplete":"Certains détails ne sont pas disponibles","reason.verification_required":"Une vérification est nécessaire","reason.reset_pending":"Réinitialisation en cours","reason.confirmation_needed":"Confirmation nécessaire","reason.waiting":"En attente","reason.preparing":"Préparation","reason.not_configured":"Configuration nécessaire"
   })
 });
 let RHI_ENERGY_LOCALE="en";
