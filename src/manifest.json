@@ -42,7 +42,11 @@
         "app/localization.js",
         "app/presentation.js",
         "ui/components/page-header.js",
-        "ui/components/energy-visual-picker.js"
+        "ui/components/energy-visual-picker.js",
+        "ui/screens/product-pages.js",
+        "ui/screens/planning-pages.js",
+        "ui/screens/settings-page.js",
+        "ui/screens/insight-pages.js"
       ]
     }
   ],
