@@ -1940,7 +1940,7 @@
     userSafeProductText(value, fallback = '') {
       const raw = String(value ?? '').trim();
       if (!raw) return fallback;
-      if (/\b(?:RHI_[A-Z0-9_]+|sensor\.|script\.|property[_ ]?key|entity[_ ]?id|asset[_ ]?id|command[_ ]?id|contract(?:_id)?|canonical contract|public write route|backend)\b/i.test(raw)) return fallback;
+      if (/\b(?:RHI_[A-Z0-9_]+|sensor\.|script\.|property[_ ]?key|entity[_ ]?id|asset[_ ]?id|command[_ ]?id|contract(?:_id)?|canonical contract|public\s+write\s+route|backend)\b/i.test(raw)) return fallback;
       if (/^[a-z0-9]+(?:[_.:-][a-z0-9]+)+$/i.test(raw)) return fallback;
       return raw;
     }
