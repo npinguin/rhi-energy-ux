@@ -239,9 +239,9 @@ function readEnergyPublicV2(gateway) {
   }
 
   const publicContractOk = envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2';
-  const coreContractOk = String(core.contract_id || '') === 'RHI_ENERGY_CORE_V1';
+  const corePresent = Object.keys(core).length > 0;
   const capabilities = Object.freeze({
-    core:coreContractOk,
+    core:corePresent,
     assets:Array.isArray(objects),
     relationships:Array.isArray(relationships),
     connections:Array.isArray(connections),
@@ -254,17 +254,13 @@ function readEnergyPublicV2(gateway) {
     value_accounting:Object.keys(valueAccounting).length > 0,
     commands:Array.isArray(commands)
   });
-  const compatibilityReason = !publicContractOk
-    ? 'public_v2_contract_unavailable'
-    : !coreContractOk
-      ? 'required_core_contract_missing'
-      : '';
+  const compatibilityReason = !publicContractOk ? 'public_v2_contract_unavailable' : '';
 
   return Object.freeze({
     envelope,
-    available:publicContractOk && coreContractOk,
+    available:publicContractOk,
     publicContractOk,
-    coreContractOk,
+    corePresent,
     capabilities,
     compatibilityReason,
     contractVersion:String(attrs.contract_version || envelope.contractVersion || ''),
@@ -592,7 +588,7 @@ function rhiEnergyDefaultVisualEntry(asset = {}) {
 // Generic cross-domain visual presentation resolver.
 // Producer domains register visual identity + presentation with Foundation.
 // Energy must never carry producer model/brand/image-key mappings.
-const RHI_FOUNDATION_VISUAL_REGISTRY_CONTRACT = "RHI_VISUAL_ASSET_REGISTRY_V1";
+const RHI_FOUNDATION_VISUAL_REGISTRY_CONTRACT = "RHI_VISUAL_ASSET_REGISTRY_V2";
 
 function readFoundationVisualRegistry(hass = {}) {
   const states = Object.values(hass?.states || {});
@@ -1138,14 +1134,14 @@ function readEnergyCommandContract(gateway) {
     if (state === 'ok') return 'OK';
     if (state === 'warn') return human(row.health || row.quality || 'Degraded');
     if (state === 'fail') return human(row.health || row.quality || 'Fail');
-    if (state === 'missing') return 'Not available';
-    if (state === 'not-measured') return 'Not measured';
-    return 'Unknown';
+    if (state === 'missing') return rhiEnergyT(null,'common.not_available',{},'Not available');
+    if (state === 'not-measured') return rhiEnergyT(null,'common.not_measured',{},'Not measured');
+    return rhiEnergyT(null,'common.unknown',{},'Unknown');
   };
   const rowDisplayValue = (row, fallback = '—') => {
     if (!row || row.missing) return fallback;
     const value = rowValue(row, null);
-    if (value === null || value === undefined || value === '') return 'Not measured';
+    if (value === null || value === undefined || value === '') return rhiEnergyT(null,'common.not_measured',{},'Not measured');
     if (typeof value === 'number') return `${value}${row.unit ? ` ${row.unit}` : ''}`;
     return `${human(value, fallback)}${row.unit ? ` ${row.unit}` : ''}`;
   };
@@ -1170,15 +1166,21 @@ function readEnergyCommandContract(gateway) {
     if (!key) return fallback;
     const normalized = key.toLowerCase().replace(/[\s.-]+/g, '_');
     const labels = {
-      policy_mode_off: 'Energy Intelligence is off',
-      mode_off: 'Energy Intelligence is off',
-      intelligence_off: 'Energy Intelligence is off',
-      energy_intelligence_off: 'Energy Intelligence is off',
-      automation_disabled: 'Automation is disabled',
-      disabled: 'Disabled',
-      not_available: 'Not available',
-      not_published: 'Not published',
-      no_battery_policy_reason_published: 'No battery policy reason published'
+      policy_mode_off: rhiEnergyT(null,'reason.intelligence_off',{},'Energy Intelligence is off'),
+      mode_off: rhiEnergyT(null,'reason.intelligence_off',{},'Energy Intelligence is off'),
+      intelligence_off: rhiEnergyT(null,'reason.intelligence_off',{},'Energy Intelligence is off'),
+      energy_intelligence_off: rhiEnergyT(null,'reason.intelligence_off',{},'Energy Intelligence is off'),
+      automation_disabled: rhiEnergyT(null,'reason.automation_disabled',{},'Automation is disabled'),
+      disabled: rhiEnergyT(null,'reason.disabled',{},'Disabled'),
+      not_available: rhiEnergyT(null,'reason.not_available',{},'Not available'),
+      not_published: rhiEnergyT(null,'reason.not_published',{},'Information is not available yet'),
+      no_battery_policy_reason_published: rhiEnergyT(null,'reason.no_battery_policy',{},'Battery policy information is not available yet'),
+      data_incomplete: rhiEnergyT(null,'reason.data_incomplete',{},'Some details are unavailable'),
+      trust_state: rhiEnergyT(null,'reason.verification_required',{},'Verification is needed'),
+      baseline_untrusted: rhiEnergyT(null,'reason.verification_required',{},'Verification is needed'),
+      reset_pending: rhiEnergyT(null,'reason.reset_pending',{},'Reset in progress'),
+      approval_required: rhiEnergyT(null,'reason.confirmation_needed',{},'Confirmation needed'),
+      configuration_required: rhiEnergyT(null,'reason.not_configured',{},'Setup needed')
     };
     return labels[normalized] || human(key, fallback);
   };
@@ -1201,6 +1203,7 @@ function readEnergyCommandContract(gateway) {
   class EnergyRuntime {
     constructor(hass) {
       this.hass = hass || {};
+      rhiEnergySetLocaleFromHass(this.hass);
       this._allowed = null;
       this._rows = null;
       this._assets = null;
@@ -2803,44 +2806,127 @@ function rhiUxCoreStyles() {
   return "/* RHI UX Core 1.6.0 */\n:host,.rhi-ux-root{\n  --rhi-color-primary:#1467F5;\n  --rhi-color-primary-soft:#EAF3FF;\n  --rhi-color-text:#0F172A;\n  --rhi-color-muted:#64748B;\n  --rhi-color-muted-soft:#758399;\n  --rhi-color-line:#DCE5EF;\n  --rhi-color-line-soft:#EAF0F6;\n  --rhi-color-surface:#FFFFFF;\n  --rhi-color-surface-soft:#F8FAFC;\n  --rhi-color-ok:#22C55E;\n  --rhi-color-attention:#F59E0B;\n  --rhi-color-error:#B42318;\n  --rhi-color-unknown:#94A3B8;\n\n  --rhi-font-family:var(--ha-font-family-body,Roboto,Noto,sans-serif);\n  --rhi-font-family-mono:var(--ha-font-family-code,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);\n  --rhi-font-display:clamp(29px,2.55vw,42px);\n  --rhi-font-section:clamp(18px,1.4vw,22px);\n  --rhi-font-card:15px;\n  --rhi-font-body:12.5px;\n  --rhi-font-small:11px;\n  --rhi-font-label:10px;\n  --rhi-weight-regular:400;\n  --rhi-weight-medium:500;\n  --rhi-weight-strong:600;\n  --rhi-line-height-tight:1.15;\n  --rhi-line-height-body:1.42;\n\n  --rhi-space-1:4px;\n  --rhi-space-2:7px;\n  --rhi-space-3:10px;\n  --rhi-space-4:14px;\n  --rhi-space-5:18px;\n  --rhi-space-6:24px;\n  --rhi-radius-sm:9px;\n  --rhi-radius-md:12px;\n  --rhi-radius-lg:16px;\n  --rhi-radius-xl:20px;\n  --rhi-shadow-sm:0 4px 14px rgba(21,61,115,.025);\n  --rhi-shadow-md:0 7px 20px rgba(15,35,80,.035);\n  --rhi-page-max:1640px;\n  --rhi-page-pad-x:24px;\n  --rhi-page-pad-y:14px;\n  --rhi-control-h:38px;\n  --rhi-icon-action:18px;\n  --rhi-icon-status:24px;\n  --rhi-break-phone:430px;\n  --rhi-break-tablet:760px;\n  --rhi-break-desktop:1024px;\n  --rhi-domain-accent:var(--rhi-color-primary);\n\n  color:var(--rhi-color-text);\n  font-family:var(--rhi-font-family);\n  font-size:var(--rhi-font-body);\n  font-weight:var(--rhi-weight-regular);\n  line-height:var(--rhi-line-height-body);\n}\n\n.rhiUxDomainShell{\n  --rhi-nav-active-bg:var(--rhi-color-primary-soft);\n  --rhi-nav-active-border:#CFDEF1;\n  --rhi-nav-active-text:#0F4CA4;\n  position:relative;display:grid;grid-template-columns:minmax(0,1fr) clamp(190px,23%,280px);\n  width:100%;margin:0 0 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-xl);\n  background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(249,251,254,.91));box-shadow:var(--rhi-shadow-md);overflow:hidden;\n}\n.rhiUxProductArea{min-width:0;overflow:hidden}\n.rhiUxDomainShellTop{min-height:68px;display:grid;grid-template-columns:minmax(168px,.52fr) minmax(0,1.48fr);align-items:center;gap:14px;padding:10px 22px 9px}\n.rhiUxDomainIdentity{display:grid;align-content:center;gap:2px;min-width:0;min-height:48px;padding:2px 0 0 4px}\n.rhiUxDomainIdentity span{font-size:13px;line-height:1.15;font-weight:var(--rhi-weight-regular);color:#58708F;white-space:nowrap}\n.rhiUxDomainIdentity strong{font-size:21px;line-height:1.03;letter-spacing:.045em;font-weight:var(--rhi-weight-strong);color:#0B467F;white-space:nowrap}\n.rhiUxModuleTabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;min-width:0}\n.rhiUxModuleTab,.rhiUxDomainTab{appearance:none;border:0;background:transparent;font:inherit;color:#53647D;cursor:pointer;white-space:nowrap}\n.rhiUxModuleTab{min-height:40px;border-radius:12px;padding:8px;font-size:12px;font-weight:var(--rhi-weight-medium)}\n.rhiUxModuleTab.active{background:var(--rhi-nav-active-bg);color:var(--rhi-nav-active-text);box-shadow:inset 0 0 0 1px var(--rhi-nav-active-border),0 6px 16px rgba(15,23,42,.035)}\n.rhiUxDomainShellBottom{padding:5px 22px 7px;border-top:1px solid var(--rhi-color-line-soft);background:rgba(255,255,255,.52);min-height:46px;box-sizing:border-box}\n.rhiUxDomainTabs{display:flex;align-items:center;gap:10px;min-height:34px;overflow-x:auto;scrollbar-width:none}\n.rhiUxDomainTabs::-webkit-scrollbar{display:none}\n.rhiUxDomainTab{flex:0 0 auto;min-height:34px;border-radius:11px;padding:7px 12px;font-size:11.5px;font-weight:var(--rhi-weight-medium);color:#5F6D80}\n.rhiUxDomainTab.active{background:var(--rhi-nav-active-bg);color:var(--rhi-nav-active-text);box-shadow:inset 0 0 0 1px var(--rhi-nav-active-border)}\n.rhiUxCompanyBrand{min-width:0;border-left:1px solid var(--rhi-color-line-soft);display:grid;place-items:center;padding:10px 16px;background:linear-gradient(180deg,rgba(252,254,255,.78),rgba(247,250,253,.58))}\n.rhiUxCompanyLogo{display:block;width:min(100%,250px);max-height:116px;line-height:0;overflow:hidden}\n.rhiUxCompanyLogo svg{display:block;width:100%;height:auto;max-height:116px;object-fit:contain;object-position:center}\n\n/* Canonical page stack: visual order is invariant across domains. */\n.rhiUxPageStack{display:flex;flex-direction:column}\n.rhiUxPageStack>.rhiUxPageHero{order:1}\n.rhiUxPageStack>.rhiUxStatusGrid{order:2}\n.rhiUxPageStack>.rhiUxQuickActionBar{order:3}\n\n/* Canonical page hero: image is one background layer, never a split side panel. */\n.rhiUxPageHero{\n  position:relative;display:block;height:146px;min-height:146px;overflow:hidden;\n  border:0;border-radius:var(--rhi-radius-lg);background:#fff;box-shadow:none;margin:0;\n}\n.rhiUxPageHeroCopy{\n  position:relative;z-index:4;width:min(48%,650px);max-width:none;padding:20px 18px 18px 22px;box-sizing:border-box;\n}\n.rhiUxPageHeroCopy>small{display:none}\n.rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{\n  margin:4px 0 8px;font-size:var(--rhi-font-display);line-height:1.02;letter-spacing:-.038em;\n  color:#0B1739;font-weight:var(--rhi-weight-strong);\n}\n.rhiUxPageHeroCopy p{\n  margin:0;max-width:520px;font-size:clamp(12.5px,1.05vw,15px);line-height:var(--rhi-line-height-body);\n  color:#536781;font-weight:var(--rhi-weight-regular);\n}\n.rhiUxPageHeroArt{position:absolute;z-index:1;inset:0 0 0 28%;display:block;overflow:hidden;pointer-events:none}\n.rhiUxPageHeroArt:before{\n  content:\"\";display:block;position:absolute;z-index:2;inset:0;\n  background:linear-gradient(90deg,#fff 0%,rgba(255,255,255,.95) 8%,rgba(255,255,255,.62) 19%,rgba(255,255,255,.10) 38%,rgba(255,255,255,0) 57%);\n}\n.rhiUxPageHeroArt img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 52%;transform:none}\n\n/* One canonical page status layer. */\n.rhiUxStatusGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:7px 0 0;padding:0;border:0;background:transparent;box-shadow:none}\n.rhiUxStatusItem{\n  min-width:0;min-height:68px;display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;\n  padding:10px 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:#fff;box-shadow:var(--rhi-shadow-md);\n}\n.rhiUxStatusIcon{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:#F0F5FC;color:#355D96;font-size:18px}\n.rhiUxStatusIcon ha-icon{--mdc-icon-size:var(--rhi-icon-status)}\n.rhiUxStatusCopy{min-width:0;display:block}\n.rhiUxStatusCopy small{display:block;margin:0 0 2px;color:#476487;font-size:var(--rhi-font-label);font-weight:var(--rhi-weight-medium);line-height:1.2}\n.rhiUxStatusCopy b{display:block;margin:0 0 2px;color:var(--rhi-color-text);font-size:clamp(14px,1.12vw,17px);font-weight:var(--rhi-weight-strong);line-height:1.12;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n.rhiUxStatusCopy em{display:block;margin-top:2px;color:var(--rhi-color-muted);font-size:var(--rhi-font-small);font-style:normal;font-weight:var(--rhi-weight-regular);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n\n/* Canonical page-level quick actions. */\n.rhiUxQuickActionBar,.rhiEnergyQuickActions,.rhi-top-actions{\n  min-height:48px;padding:5px 8px;margin:7px 0 0;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);\n  background:#fff;box-shadow:var(--rhi-shadow-sm);display:flex;align-items:center;gap:7px;flex-wrap:wrap;\n}\n.rhiUxQuickActionBar>small,.rhiEnergyQuickActions>small,.rhi-top-actions-title{\n  font-size:var(--rhi-font-label);letter-spacing:.10em;text-transform:uppercase;color:#476487;\n  font-weight:var(--rhi-weight-medium);margin-right:2px;white-space:nowrap;\n}\n.rhiUxQuickActions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0}\n.rhiUxQuickAction,.rhiUxQuickActionBar button,.rhiEnergyQuickActions .hiAction,.rhi-top-action{\n  height:36px;min-height:36px;border:1px solid #D6E0EB;border-radius:9px;background:#fff;color:#125DB7;\n  box-shadow:none;font:inherit;font-size:11.5px;font-weight:var(--rhi-weight-medium);padding:0 12px;\n  display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;white-space:nowrap;\n}\n.rhiUxQuickAction.primary,.rhiUxQuickActionBar button:first-of-type,.rhiEnergyQuickActions .hiAction:first-of-type,.rhi-top-action.primary{\n  background:var(--rhi-color-primary);border-color:var(--rhi-color-primary);color:#fff;\n}\n.rhiUxQuickAction:disabled,.rhiEnergyQuickActions .hiAction:disabled,.rhi-top-action:disabled{opacity:.46}\n\n/* Canonical body grammar. */\n.rhiUxDomainBody{font-family:var(--rhi-font-family);color:var(--rhi-color-text);font-size:var(--rhi-font-body);line-height:var(--rhi-line-height-body)}\n.rhiUxDomainBody button,.rhiUxDomainBody select,.rhiUxDomainBody input,.rhiUxDomainBody textarea{font-family:inherit}\n.rhiUxPanel,.rhiUxDomainBody .panel,.rhiUxDomainBody .info,.rhiUxDomainBody .summary,.rhiUxDomainBody .ov-panel{\n  border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-lg);background:var(--rhi-color-surface);box-shadow:var(--rhi-shadow-sm);\n}\n.rhiUxPanel{padding:14px 16px}\n.rhiUxDomainBody .panel h2,.rhiUxDomainBody .info h2,.rhiUxDomainBody .summary h2,.rhiUxDomainBody .ov-panel h2{\n  font-size:var(--rhi-font-section);font-weight:var(--rhi-weight-strong);line-height:var(--rhi-line-height-tight);letter-spacing:-.02em;color:var(--rhi-color-text);\n}\n.rhiUxDomainBody .panel h3,.rhiUxDomainBody .info h3,.rhiUxDomainBody .summary h3,.rhiUxDomainBody .ov-panel h3{\n  font-size:var(--rhi-font-card);font-weight:var(--rhi-weight-strong);line-height:1.2;color:var(--rhi-color-text);\n}\n.rhiUxDomainBody .panel p,.rhiUxDomainBody .info p,.rhiUxDomainBody .summary p,.rhiUxDomainBody .ov-panel p{\n  font-size:var(--rhi-font-body);font-weight:var(--rhi-weight-regular);line-height:var(--rhi-line-height-body);color:var(--rhi-color-muted);\n}\n.rhiUxDataList{display:grid;gap:6px}\n.rhiUxDataRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:9px 10px;border:1px solid var(--rhi-color-line-soft);border-radius:var(--rhi-radius-sm);background:var(--rhi-color-surface-soft)}\n.rhiUxState{display:grid;gap:4px;padding:14px 16px;border:1px dashed var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface-soft);color:var(--rhi-color-muted)}\n.rhiUxState b{color:var(--rhi-color-text);font-size:13px}\n.rhiUxState[data-state=\"attention\"]{border-color:#F6D48C;background:#FFFBEB}\n.rhiUxState[data-state=\"error\"]{border-color:#F1B8B4;background:#FFF7F7}\n.rhiUxConclusion{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:linear-gradient(135deg,rgba(255,255,255,.98),rgba(247,250,252,.96))}\n.rhiUxConclusion small{font-size:var(--rhi-font-label);letter-spacing:.1em;text-transform:uppercase;color:var(--rhi-color-muted)}\n.rhiUxConclusion h2{font-size:var(--rhi-font-card);line-height:1.2;margin:1px 0 2px}\n.rhiUxConclusion p{font-size:var(--rhi-font-small);line-height:1.3;margin:0;color:var(--rhi-color-muted)}\n.rhiUxTechnicalFooter{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 9px;margin:6px 0 0;padding:3px 2px 0;border-top:1px solid rgba(148,163,184,.20);color:#94A3B8;font-size:9px;line-height:1.2}\n.rhiUxTechnicalFooter span+span:before{content:\"·\";margin-right:9px;color:#CBD5E1}\n.rhiUxTechnicalFooter [data-severity=\"warning\"]{color:#B7791F;font-weight:var(--rhi-weight-strong)}\n.rhiUxTechnicalFooter [data-severity=\"error\"]{color:var(--rhi-color-error);font-weight:var(--rhi-weight-strong)}\n\n@media(max-width:1180px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:18px}\n  .rhiUxPageHero{height:140px;min-height:140px}\n  .rhiUxPageHeroCopy{width:51%;padding:18px 14px 16px 18px}\n  .rhiUxPageHeroArt{inset:0 0 0 30%}\n  .rhiUxStatusItem{grid-template-columns:40px minmax(0,1fr);padding:9px 10px;min-height:66px}\n  .rhiUxStatusIcon{width:37px;height:37px}\n}\n@media(max-width:760px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:10px;--rhi-page-pad-y:9px;--rhi-font-body:12px;--rhi-font-small:10.75px}\n  .rhiUxDomainShell{grid-template-columns:1fr}.rhiUxCompanyBrand{display:none}.rhiUxDomainShellTop{grid-template-columns:1fr;padding:10px 12px}.rhiUxDomainIdentity{min-height:auto}.rhiUxDomainShellBottom{padding:7px 12px 9px}\n  .rhiUxPageHero{height:128px;min-height:128px;border-radius:14px}\n  .rhiUxPageHeroCopy{width:59%;padding:18px 9px 16px 13px}\n  .rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{font-size:27px;letter-spacing:-.032em}\n  .rhiUxPageHeroCopy p{font-size:11px;line-height:1.32;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}\n  .rhiUxPageHeroArt{inset:0 0 0 34%}\n  .rhiUxStatusGrid{grid-template-columns:repeat(2,minmax(0,1fr))}\n  .rhiUxStatusItem{min-height:74px;grid-template-columns:34px minmax(0,1fr);gap:7px;padding:8px}\n  .rhiUxStatusIcon{width:32px;height:32px;border-radius:9px}.rhiUxStatusIcon ha-icon{--mdc-icon-size:20px}\n  .rhiUxQuickActionBar,.rhiEnergyQuickActions,.rhi-top-actions{overflow-x:auto;flex-wrap:nowrap}\n  .rhiUxQuickActionBar>small,.rhiEnergyQuickActions>small,.rhi-top-actions-title,.rhiUxQuickAction,.rhiUxQuickActionBar button,.rhiEnergyQuickActions .hiAction,.rhi-top-action{flex:0 0 auto}\n  .rhiUxConclusion{grid-template-columns:1fr}\n}\n@media(max-width:430px){\n  :host,.rhi-ux-root{--rhi-page-pad-x:8px;--rhi-page-pad-y:8px}\n  .rhiUxPageHero{height:118px;min-height:118px}\n  .rhiUxPageHeroCopy{width:64%;padding:16px 8px 14px 11px}\n  .rhiUxPageHeroCopy h1,.rhiUxPageHeroCopy h2{font-size:24px}\n  .rhiUxPageHeroCopy p{font-size:10.5px;-webkit-line-clamp:2}\n  .rhiUxPageHeroArt{inset:0 0 0 38%}\n  .rhiUxStatusGrid{grid-template-columns:1fr 1fr}\n}\n\n/* Optional body/section-scoped view and filter controls. */\n.rhiUxContextBar{\n  min-height:42px;padding:4px 7px;margin:0 0 8px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);\n  background:#fff;box-shadow:var(--rhi-shadow-sm);display:flex;align-items:center;gap:7px;flex-wrap:wrap;\n}\n.rhiUxContextBar>small{\n  font-size:var(--rhi-font-label);letter-spacing:.10em;text-transform:uppercase;color:#476487;font-weight:var(--rhi-weight-medium);white-space:nowrap;\n}\n.rhiUxContextControls{display:flex;align-items:center;gap:6px;flex-wrap:wrap}\n.rhiUxContextControl{\n  min-height:32px;border:1px solid #D6E0EB;border-radius:9px;background:#fff;color:#355D96;font:inherit;font-size:11.5px;font-weight:var(--rhi-weight-medium);padding:0 11px;cursor:pointer;white-space:nowrap;\n}\n.rhiUxContextControl.active,.rhiUxContextControl[aria-pressed=\"true\"]{background:var(--rhi-color-primary-soft);border-color:#CFDEF1;color:#0F4CA4}\n.rhiUxContextControl:disabled{opacity:.46}\n@media(max-width:760px){.rhiUxContextBar{overflow-x:auto;flex-wrap:nowrap}.rhiUxContextBar>small,.rhiUxContextControls,.rhiUxContextControl{flex:0 0 auto}}\n\n/* Canonical cross-domain appearance picker. Domains own catalogs and persistence. */\n.rhiUxVisualPickerBackdrop{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.44);display:grid;place-items:center;padding:20px}\n.rhiUxVisualPickerPanel{width:min(920px,94vw);max-height:min(82vh,760px);overflow:hidden;background:#fff;border:1px solid var(--rhi-color-line);border-radius:20px;box-shadow:0 30px 80px rgba(15,23,42,.24);padding:16px;box-sizing:border-box;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto;gap:10px}\n.rhiUxVisualPickerHead{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;min-height:0}\n.rhiUxVisualPickerHead small{font-size:10px;font-weight:800;letter-spacing:.12em;color:#64748b}.rhiUxVisualPickerHead h3{margin:2px 0 0;font-size:20px}.rhiUxVisualPickerHead p{margin:3px 0 0;font-size:11px;color:#64748b}\n.rhiUxVisualPickerFilters{display:flex;gap:6px;flex-wrap:wrap;margin:0;min-height:0}\n.rhiUxVisualPickerFilters button{border:1px solid #dbe3ee;background:#fff;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer}.rhiUxVisualPickerFilters button.selected{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}\n.rhiUxVisualChoiceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:142px;gap:8px;margin:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 3px 4px 1px;align-content:start}\n.rhiUxVisualChoice{height:142px;min-height:142px;max-height:142px;display:grid;grid-template-rows:86px minmax(0,1fr);gap:6px;align-items:stretch;text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:12px;padding:8px;cursor:pointer;overflow:hidden}.rhiUxVisualChoice:hover{border-color:#93c5fd;background:#f8fbff}.rhiUxVisualChoice.selected{border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12);background:#f8fbff}\n.rhiUxVisualChoiceImage{width:100%;height:86px;min-width:0;min-height:86px;max-width:none;max-height:86px;display:grid;place-items:center;overflow:hidden}.rhiUxVisualChoiceImage img{display:block;width:100%;height:100%;min-width:0;min-height:0;max-width:100%;max-height:100%;object-fit:contain;object-position:center}\n.rhiUxVisualChoiceCopy{min-width:0;align-self:end}.rhiUxVisualChoiceCopy small,.rhiUxVisualChoiceCopy b,.rhiUxVisualChoiceCopy em{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rhiUxVisualChoiceCopy small{font-size:8px;color:#64748b;text-transform:uppercase}.rhiUxVisualChoiceCopy b{font-size:11px;margin-top:1px}.rhiUxVisualChoiceCopy em{font-size:9px;color:#64748b;font-style:normal;margin-top:1px}\n.rhiUxVisualPickerRefine{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px;margin:0}.rhiUxVisualPickerRefine label span{display:block;font-size:8px;color:#64748b;margin-bottom:3px}.rhiUxVisualPickerRefine select{width:100%;height:34px;border:1px solid #dbe3ee;border-radius:8px;background:#fff;padding:0 8px}\n.rhiUxVisualPickerFooter{display:flex;align-items:center;gap:8px;margin:0;padding-top:9px;border-top:1px solid #edf1f6}.rhiUxVisualPickerSpacer{flex:1}.rhiUxVisualPickerFooter button{height:34px;border:1px solid #dbe3ee;border-radius:9px;background:#fff;padding:0 12px;font-size:10px;font-weight:700}.rhiUxVisualPickerFooter button.primary{background:#0b65ea;color:#fff;border-color:#0b65ea}.rhiUxVisualPickerFooter button:disabled{opacity:.45}\n@media(max-width:900px){.rhiUxVisualChoiceGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}\n@media(max-width:560px){.rhiUxVisualPickerBackdrop{padding:8px}.rhiUxVisualPickerPanel{width:96vw;max-height:88vh;padding:12px}.rhiUxVisualChoiceGrid{grid-template-columns:1fr;grid-auto-rows:116px}.rhiUxVisualChoice{height:116px;min-height:116px;max-height:116px;grid-template-columns:94px minmax(0,1fr);grid-template-rows:1fr}.rhiUxVisualChoiceImage{width:94px;height:86px;min-width:94px;max-width:94px}.rhiUxVisualChoiceCopy{align-self:center}.rhiUxVisualPickerRefine{grid-template-columns:1fr 1fr}.rhiUxVisualPickerFooter{flex-wrap:wrap}}\n\n\n/* Canonical page and asset composition primitives. */\n.rhiUxPage{display:block;width:100%;max-width:var(--rhi-page-max);margin:0 auto;padding:var(--rhi-page-pad-y) var(--rhi-page-pad-x);box-sizing:border-box}\n.rhiUxPageContent{display:grid;gap:var(--rhi-space-3);margin-top:var(--rhi-space-3)}\n.rhiUxAssetIdentity{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;min-width:0}\n.rhiUxAssetVisual{width:72px;height:58px;display:grid;place-items:center;overflow:hidden}\n.rhiUxAssetVisual img{display:block;width:100%;height:100%;object-fit:contain}\n.rhiUxAssetIdentityCopy{min-width:0}.rhiUxAssetIdentityCopy small{display:block;color:var(--rhi-color-muted);font-size:var(--rhi-font-label);text-transform:uppercase;letter-spacing:.08em}\n.rhiUxAssetIdentityCopy h2{margin:2px 0;font-size:var(--rhi-font-section);line-height:1.12}.rhiUxAssetIdentityCopy p{margin:0;color:var(--rhi-color-muted);font-size:var(--rhi-font-body)}\n.rhiUxAssetFactGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--rhi-space-2)}\n.rhiUxAssetFact{min-width:0;padding:9px 10px;border:1px solid var(--rhi-color-line);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface)}\n.rhiUxAssetFact small,.rhiUxAssetFact b,.rhiUxAssetFact span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}\n.rhiUxAssetFact small{font-size:var(--rhi-font-label);color:var(--rhi-color-muted)}.rhiUxAssetFact b{margin-top:2px;font-size:13px}.rhiUxAssetFact span{margin-top:2px;font-size:var(--rhi-font-small);color:var(--rhi-color-muted)}\n.rhiUxAssetRelationship{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 10px;border:1px solid var(--rhi-color-line-soft);border-radius:var(--rhi-radius-md);background:var(--rhi-color-surface-soft)}\n.rhiUxAssetRelationship small,.rhiUxAssetRelationship b,.rhiUxAssetRelationship span{display:block}.rhiUxAssetRelationship small,.rhiUxAssetRelationship span{color:var(--rhi-color-muted);font-size:var(--rhi-font-small)}\n.rhiUxAssetDisclosure{border-top:1px solid var(--rhi-color-line-soft);padding-top:8px}.rhiUxAssetDisclosure summary{cursor:pointer;font-weight:var(--rhi-weight-medium)}\n.rhiUxAssetDisclosure>div{padding-top:8px}\n.rhiUxWriteFeedback{margin-top:6px;font-size:var(--rhi-font-small);color:var(--rhi-color-muted)}.rhiUxWriteFeedback[data-state=\"success\"]{color:#15803D}.rhiUxWriteFeedback[data-state=\"error\"]{color:var(--rhi-color-error)}\n@media(max-width:760px){.rhiUxAssetFactGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}\n";
 }
 
+// ---- src/app/localization.js ----
+// Energy product localization.
+// Machine identifiers and backend semantic codes remain untranslated.
+const RHI_ENERGY_TRANSLATIONS = Object.freeze({
+  en:Object.freeze({
+    "nav.energy":"Energy","nav.overview":"Overview","nav.flow":"Flow","nav.solar":"Solar","nav.battery":"Home Battery","nav.consumption":"Consumption","nav.gas":"Gas",
+    "nav.intelligence":"Intelligence","nav.plan":"Plan","nav.operational_plan":"Now","nav.tactical_plan":"Today & Tomorrow","nav.strategic_plan":"Long term","nav.settings":"Settings","nav.insights":"Insights","nav.performance":"Performance","nav.value":"Value","nav.retrospective":"Retrospective",
+    "hero.overview.title":"Energy Overview","hero.overview.description":"See what your home is producing, using, storing and exchanging right now.",
+    "hero.flow.title":"Energy Flow","hero.flow.description":"See where energy is coming from and where it is going right now.",
+    "hero.solar.title":"Solar","hero.solar.description":"See current solar production and the equipment contributing to it.",
+    "hero.battery.title":"Home Battery","hero.battery.description":"See stored energy, current battery activity and the reserve available to your home.",
+    "hero.consumption.title":"Consumption","hero.consumption.description":"See where energy is being used and which flexible loads can be planned.",
+    "hero.gas.title":"Gas","hero.gas.description":"See gas use over time and whether measurements are available.",
+    "hero.plan.title":"Plan","hero.plan.description":"See what should happen now, today and tomorrow, and what still needs attention.",
+    "hero.settings.title":"Settings","hero.settings.description":"Adjust how Home Intelligence should manage your energy within the available options.",
+    "hero.performance.title":"Performance","hero.performance.description":"Review measured energy and how Home Intelligence performed.",
+    "hero.value.title":"Value","hero.value.description":"See the financial result of your energy system for the selected period.",
+    "hero.retrospective.title":"Retrospective","hero.retrospective.description":"See what worked, what needs attention and where evidence is still incomplete.",
+    "common.quick_actions":"Quick actions","common.not_available":"Not available","common.not_measured":"Not measured","common.unknown":"Unknown",
+    "common.details":"Details","common.diagnostics":"Diagnostics","common.configuration":"Configuration","common.children":"Children","common.save":"Save","common.cancel":"Cancel","common.reset":"Reset",
+    "common.today":"Today","common.tomorrow":"Tomorrow","common.information_missing":"This information is not available yet.",
+    "reason.intelligence_off":"Energy Intelligence is off","reason.automation_disabled":"Automation is disabled","reason.disabled":"Disabled","reason.not_available":"Not available","reason.not_published":"Information is not available yet.","reason.no_battery_policy":"Battery policy information is not available yet","reason.data_incomplete":"Some details are unavailable","reason.verification_required":"Verification is needed","reason.reset_pending":"Reset in progress","reason.confirmation_needed":"Confirmation needed","reason.waiting":"Waiting","reason.preparing":"Preparing","reason.not_configured":"Setup needed"
+  }),
+  nl:Object.freeze({
+    "nav.energy":"Energie","nav.overview":"Overzicht","nav.flow":"Stromen","nav.solar":"Zonne-energie","nav.battery":"Thuisbatterij","nav.consumption":"Verbruik","nav.gas":"Gas",
+    "nav.intelligence":"Intelligentie","nav.plan":"Planning","nav.operational_plan":"Nu","nav.tactical_plan":"Vandaag & morgen","nav.strategic_plan":"Lange termijn","nav.settings":"Instellingen","nav.insights":"Inzichten","nav.performance":"Prestaties","nav.value":"Waarde","nav.retrospective":"Terugblik",
+    "hero.overview.title":"Energieoverzicht","hero.overview.description":"Zie wat je woning nu produceert, verbruikt, opslaat en uitwisselt.",
+    "hero.flow.title":"Energiestromen","hero.flow.description":"Zie waar energie nu vandaan komt en waar ze naartoe gaat.",
+    "hero.solar.title":"Zonne-energie","hero.solar.description":"Zie de huidige zonneproductie en welke installatieonderdelen daaraan bijdragen.",
+    "hero.battery.title":"Thuisbatterij","hero.battery.description":"Zie de opgeslagen energie, de huidige batterijactiviteit en de reserve voor je woning.",
+    "hero.consumption.title":"Verbruik","hero.consumption.description":"Zie waar energie wordt gebruikt en welke flexibele verbruikers gepland kunnen worden.",
+    "hero.gas.title":"Gas","hero.gas.description":"Bekijk het gasverbruik doorheen de tijd en of metingen beschikbaar zijn.",
+    "hero.plan.title":"Planning","hero.plan.description":"Zie wat nu, vandaag en morgen moet gebeuren en wat nog aandacht nodig heeft.",
+    "hero.settings.title":"Instellingen","hero.settings.description":"Pas aan hoe Home Intelligence je energie mag beheren binnen de beschikbare opties.",
+    "hero.performance.title":"Prestaties","hero.performance.description":"Bekijk gemeten energie en hoe Home Intelligence heeft gepresteerd.",
+    "hero.value.title":"Waarde","hero.value.description":"Zie het financiële resultaat van je energiesysteem voor de gekozen periode.",
+    "hero.retrospective.title":"Terugblik","hero.retrospective.description":"Zie wat goed werkte, wat aandacht nodig heeft en waar nog informatie ontbreekt.",
+    "common.quick_actions":"Snelle acties","common.not_available":"Niet beschikbaar","common.not_measured":"Niet gemeten","common.unknown":"Onbekend",
+    "common.details":"Details","common.diagnostics":"Diagnose","common.configuration":"Configuratie","common.children":"Onderdelen","common.save":"Opslaan","common.cancel":"Annuleren","common.reset":"Herstellen",
+    "common.today":"Vandaag","common.tomorrow":"Morgen","common.information_missing":"Deze informatie is nog niet beschikbaar.",
+    "reason.intelligence_off":"Energie-intelligentie staat uit","reason.automation_disabled":"Automatisering is uitgeschakeld","reason.disabled":"Uitgeschakeld","reason.not_available":"Niet beschikbaar","reason.not_published":"Deze informatie is nog niet beschikbaar.","reason.no_battery_policy":"Informatie over het batterijbeleid is nog niet beschikbaar","reason.data_incomplete":"Sommige details zijn niet beschikbaar","reason.verification_required":"Controle is nodig","reason.reset_pending":"Herstel wordt uitgevoerd","reason.confirmation_needed":"Bevestiging nodig","reason.waiting":"Wachten","reason.preparing":"Voorbereiden","reason.not_configured":"Instelling nodig"
+  }),
+  fr:Object.freeze({
+    "nav.energy":"Énergie","nav.overview":"Vue d’ensemble","nav.flow":"Flux","nav.solar":"Solaire","nav.battery":"Batterie domestique","nav.consumption":"Consommation","nav.gas":"Gaz",
+    "nav.intelligence":"Intelligence","nav.plan":"Planification","nav.operational_plan":"Maintenant","nav.tactical_plan":"Aujourd’hui & demain","nav.strategic_plan":"Long terme","nav.settings":"Réglages","nav.insights":"Analyses","nav.performance":"Performance","nav.value":"Valeur","nav.retrospective":"Bilan",
+    "hero.overview.title":"Vue d’ensemble de l’énergie","hero.overview.description":"Voyez ce que votre habitation produit, consomme, stocke et échange en ce moment.",
+    "hero.flow.title":"Flux d’énergie","hero.flow.description":"Voyez d’où vient l’énergie et où elle va en ce moment.",
+    "hero.solar.title":"Solaire","hero.solar.description":"Voyez la production solaire actuelle et les équipements qui y contribuent.",
+    "hero.battery.title":"Batterie domestique","hero.battery.description":"Voyez l’énergie stockée, l’activité actuelle de la batterie et la réserve disponible.",
+    "hero.consumption.title":"Consommation","hero.consumption.description":"Voyez où l’énergie est utilisée et quelles charges flexibles peuvent être planifiées.",
+    "hero.gas.title":"Gaz","hero.gas.description":"Consultez la consommation de gaz et vérifiez si les mesures sont disponibles.",
+    "hero.plan.title":"Planification","hero.plan.description":"Voyez ce qui doit se passer maintenant, aujourd’hui et demain, et ce qui demande encore votre attention.",
+    "hero.settings.title":"Réglages","hero.settings.description":"Ajustez la manière dont Home Intelligence peut gérer votre énergie dans les limites disponibles.",
+    "hero.performance.title":"Performance","hero.performance.description":"Consultez l’énergie mesurée et les performances de Home Intelligence.",
+    "hero.value.title":"Valeur","hero.value.description":"Voyez le résultat financier de votre système énergétique pour la période sélectionnée.",
+    "hero.retrospective.title":"Bilan","hero.retrospective.description":"Voyez ce qui a fonctionné, ce qui demande votre attention et où des informations manquent encore.",
+    "common.quick_actions":"Actions rapides","common.not_available":"Non disponible","common.not_measured":"Non mesuré","common.unknown":"Inconnu",
+    "common.details":"Détails","common.diagnostics":"Diagnostic","common.configuration":"Configuration","common.children":"Éléments","common.save":"Enregistrer","common.cancel":"Annuler","common.reset":"Réinitialiser",
+    "common.today":"Aujourd’hui","common.tomorrow":"Demain","common.information_missing":"Cette information n’est pas encore disponible.",
+    "reason.intelligence_off":"L’intelligence énergétique est désactivée","reason.automation_disabled":"L’automatisation est désactivée","reason.disabled":"Désactivé","reason.not_available":"Non disponible","reason.not_published":"Cette information n’est pas encore disponible.","reason.no_battery_policy":"Les informations sur la politique de batterie ne sont pas encore disponibles","reason.data_incomplete":"Certains détails ne sont pas disponibles","reason.verification_required":"Une vérification est nécessaire","reason.reset_pending":"Réinitialisation en cours","reason.confirmation_needed":"Confirmation nécessaire","reason.waiting":"En attente","reason.preparing":"Préparation","reason.not_configured":"Configuration nécessaire"
+  })
+});
+let RHI_ENERGY_LOCALE="en";
+function rhiEnergyLocale(hass=null){
+  const raw=hass?.locale?.language || hass?.language || RHI_ENERGY_LOCALE || globalThis?.document?.documentElement?.lang || "en";
+  return String(raw||"en").replace(/_/g,"-");
+}
+function rhiEnergySetLocaleFromHass(hass=null){RHI_ENERGY_LOCALE=rhiEnergyLocale(hass);return RHI_ENERGY_LOCALE;}
+function rhiEnergyT(hass,key,params={},fallback=""){return rhiUxTranslate(RHI_ENERGY_TRANSLATIONS,key,{locale:rhiEnergyLocale(hass),params,fallback});}
+function rhiEnergyFormatNumber(hass,value,options={}){return rhiUxFormatNumber(value,{locale:rhiEnergyLocale(hass),...options});}
+function rhiEnergyFormatCurrency(hass,value,currency="EUR",options={}){return rhiUxFormatCurrency(value,currency,{locale:rhiEnergyLocale(hass),...options});}
+function rhiEnergyFormatPercent(hass,value,options={}){return rhiUxFormatPercent(value,{locale:rhiEnergyLocale(hass),...options});}
+
 // ---- src/app/presentation.js ----
 // Energy presentation grammar.
 // Owns navigation metadata, tab hero assets, shared visual hierarchy and card primitives.
 // Domain semantics, calculations, actions and runtime truth remain backend/domain owned.
 
-const HB_ENERGY_NAVIGATION = Object.freeze([
+const HB_ENERGY_NAVIGATION_SPEC = Object.freeze([
   {
-    id: "energy",
-    label: "Energy",
-    items: [
-      { id:"overview", label:"Overview", view:"overview", title:"Energy Overview", description:"Your home energy system at a glance." },
-      { id:"flow", label:"Flow", view:"flow", title:"Energy Flow", description:"See where energy is flowing right now." },
-      { id:"solar", label:"Solar", view:"solar", title:"Solar", description:"Solar generation, arrays, inverters and the relationship with storage." },
-      { id:"battery", label:"Home Battery", view:"battery", title:"Home Battery", description:"Storage state, capacity and contribution to the home." },
-      { id:"consumers", label:"Consumers", view:"consumers", title:"Consumers", description:"Where energy is used and which loads are controllable." },
-      { id:"gas", label:"Gas", view:"gas", title:"Gas", description:"Gas consumption, history and meter health." }
+    id:"energy", labelKey:"nav.energy", fallback:"Energy",
+    items:[
+      { id:"overview", labelKey:"nav.overview", fallback:"Overview", view:"overview", titleKey:"hero.overview.title", descriptionKey:"hero.overview.description" },
+      { id:"flow", labelKey:"nav.flow", fallback:"Flow", view:"flow", titleKey:"hero.flow.title", descriptionKey:"hero.flow.description" },
+      { id:"solar", labelKey:"nav.solar", fallback:"Solar", view:"solar", titleKey:"hero.solar.title", descriptionKey:"hero.solar.description" },
+      { id:"battery", labelKey:"nav.battery", fallback:"Home Battery", view:"battery", titleKey:"hero.battery.title", descriptionKey:"hero.battery.description" },
+      { id:"consumers", labelKey:"nav.consumption", fallback:"Consumption", view:"consumers", titleKey:"hero.consumption.title", descriptionKey:"hero.consumption.description" },
+      { id:"gas", labelKey:"nav.gas", fallback:"Gas", view:"gas", titleKey:"hero.gas.title", descriptionKey:"hero.gas.description" }
     ]
   },
   {
-    id: "intelligence",
-    label: "Intelligence",
-    items: [
-      { id:"operational-planning", label:"Operational Planning", view:"operational-planning", title:"Operational Planning", description:"What should happen now and in the next hours." },
-      { id:"tactical-planning", label:"Tactical Planning", view:"planning", title:"Tactical Planning", description:"How energy is allocated across today and tomorrow." },
-      { id:"strategic-planning", label:"Strategic Planning", view:"strategic-planning", title:"Strategic Planning", description:"Longer-term energy goals, constraints and optimisation." },
-      { id:"settings", label:"Settings", view:"strategies", title:"Settings", description:"Review and edit domain-owned Energy settings and policies." }
+    id:"intelligence", labelKey:"nav.intelligence", fallback:"Intelligence",
+    items:[
+      { id:"operational-planning", labelKey:"nav.operational_plan", fallback:"Now", view:"operational-planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
+      { id:"tactical-planning", labelKey:"nav.tactical_plan", fallback:"Today & Tomorrow", view:"planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
+      { id:"strategic-planning", labelKey:"nav.strategic_plan", fallback:"Long term", view:"strategic-planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
+      { id:"settings", labelKey:"nav.settings", fallback:"Settings", view:"strategies", titleKey:"hero.settings.title", descriptionKey:"hero.settings.description" }
     ]
   },
   {
-    id: "insights",
-    label: "Insights",
-    items: [
-      { id:"metering", label:"Metering", view:"metering", title:"Metering", description:"Measured energy for the selected period." },
-      { id:"value", label:"Value", view:"value", title:"Value", description:"Financial impact of your energy system." },
-      { id:"retrospective", label:"Retrospective", view:"retrospective", title:"Retrospective", description:"How Home Intelligence performed and what can improve." }
+    id:"insights", labelKey:"nav.insights", fallback:"Insights",
+    items:[
+      { id:"metering", labelKey:"nav.performance", fallback:"Performance", view:"metering", titleKey:"hero.performance.title", descriptionKey:"hero.performance.description" },
+      { id:"value", labelKey:"nav.value", fallback:"Value", view:"value", titleKey:"hero.value.title", descriptionKey:"hero.value.description" },
+      { id:"retrospective", labelKey:"nav.retrospective", fallback:"Retrospective", view:"retrospective", titleKey:"hero.retrospective.title", descriptionKey:"hero.retrospective.description" }
     ]
   }
 ]);
+
+function hbEnergyNavigation(hass = null) {
+  return HB_ENERGY_NAVIGATION_SPEC.map(section => ({
+    id:section.id,
+    label:rhiEnergyT(hass,section.labelKey,{},section.fallback),
+    items:section.items.map(item => ({
+      ...item,
+      label:rhiEnergyT(hass,item.labelKey,{},item.fallback),
+      title:rhiEnergyT(hass,item.titleKey,{},item.fallback),
+      description:rhiEnergyT(hass,item.descriptionKey,{},"")
+    }))
+  }));
+}
 
 const HB_ENERGY_HERO_ASSETS = Object.freeze({
   overview: "heroes/overview-hero.webp",
@@ -2896,8 +2982,8 @@ function hbEnergyPresentationStyles() {
       --rhi-shadow:var(--rhi-shadow-md);
       --rhi-card-gap:var(--rhi-space-2);
     }
-    .rhiEnergyNav-intelligence .rhiUxDomainShell{--rhi-nav-active-bg:#F1EDFF;--rhi-nav-active-border:#DFD5FB;--rhi-nav-active-text:#5A38B3}
-    .rhiEnergyNav-insights .rhiUxDomainShell{--rhi-nav-active-bg:#E7F7F4;--rhi-nav-active-border:#CDEBE6;--rhi-nav-active-text:#176E67}
+    .rhiEnergyNav-intelligence{--rhi-nav-active-bg:#F1EDFF;--rhi-nav-active-border:#DFD5FB;--rhi-nav-active-text:#5A38B3}
+    .rhiEnergyNav-insights{--rhi-nav-active-bg:#E7F7F4;--rhi-nav-active-border:#CDEBE6;--rhi-nav-active-text:#176E67}
     .rhiEnergyPageHeader{display:block;margin:0 0 10px}
     @media(max-width:760px){
     }
@@ -2914,7 +3000,7 @@ function hbEnergyPresentationStyles() {
 // Page-level header owns Hero, Status and executable Quick Actions only.
 // Body-scoped view/filter controls are rendered immediately above the content they govern.
 function rhiEnergyPageHeader({
-  sectionLabel = "Energy",
+  sectionLabel = "",
   itemLabel = "",
   title = "",
   description = "",
@@ -2929,7 +3015,7 @@ function rhiEnergyPageHeader({
     icon:icon || "•", label:label || "", value:value ?? "—", detail:detail || ""
   })));
   const actionsMarkup = commandActions
-    ? `<section class="rhiUxQuickActionBar" aria-label="Quick actions"><small>Quick actions</small><div class="rhiUxQuickActions">${commandActions}</div></section>`
+    ? `<section class="rhiUxQuickActionBar" aria-label="${rhiUxEscape(rhiEnergyT(null,'common.quick_actions',{},'Quick actions'))}"><small>${rhiUxEscape(rhiEnergyT(null,'common.quick_actions',{},'Quick actions'))}</small><div class="rhiUxQuickActions">${commandActions}</div></section>`
     : "";
   return `<section class="rhiEnergyPageHeader rhiUxPageStack ${rhiUxEscape(tone)}">${heroMarkup}${statusMarkup}${actionsMarkup}</section>`;
 }
@@ -3087,6 +3173,7 @@ function rhiEnergyVisualPickerStyles() {
     setConfig(config) { this.config = config || {}; }
     set hass(hass) {
       this._hass = hass;
+      rhiEnergySetLocaleFromHass(hass);
       this.reconcileWriteFeedback();
       this.reconcilePendingAppearances();
       this.syncMeteringPeriodFromRuntime();
@@ -3127,7 +3214,7 @@ function rhiEnergyVisualPickerStyles() {
       };
       const keys = ['release', ...(byView[this.view] || [])];
       const registryEntity = Object.entries(this._hass?.states || {}).find(([,state]) =>
-        String(state?.attributes?.contract_id || '') === 'RHI_VISUAL_ASSET_REGISTRY_V1'
+        String(state?.attributes?.contract_id || '') === 'RHI_VISUAL_ASSET_REGISTRY_V2'
       )?.[0] || '';
       return [...new Set([...keys.map(key => UX_INTERFACES[key]).filter(Boolean), registryEntity].filter(Boolean))];
     }
@@ -3169,7 +3256,7 @@ function rhiEnergyVisualPickerStyles() {
         : fallback;
       const showConsumers=has('flexible_loads', false);
       const showValue=has('pricing', false);
-      return HB_ENERGY_NAVIGATION.map(section=>({
+      return hbEnergyNavigation(this._hass).map(section=>({
         ...section,
         items:section.items.filter(item=>{
           if(item.id === 'battery') return has('battery', false);
@@ -3224,7 +3311,7 @@ function rhiEnergyVisualPickerStyles() {
       const target = this.resolveNavigation('', '', view);
       this.selectNavigation(target.section, target.item);
     }
-    title() { return this.activeNavigationItem().title || 'Energy'; }
+    title() { return this.activeNavigationItem().title || rhiEnergyT(this._hass,'nav.energy',{},'Energy'); }
     subtitle() { return this.activeNavigationItem().description || ''; }
     nav() {
       const sections = this.navigationModel();
@@ -3236,7 +3323,7 @@ function rhiEnergyVisualPickerStyles() {
       }));
       return `<div class="rhiEnergyNav rhiEnergyNav-${escapeHtml(active.section)}">${rhiUxDomainShell({
         product:'Home Intelligence',
-        domain:'ENERGIE',
+        domain:rhiEnergyT(this._hass,'nav.energy',{},'Energy').toUpperCase(),
         modules,
         activeModule:active.section,
         activeItem:active.item
@@ -3735,7 +3822,7 @@ function rhiEnergyVisualPickerStyles() {
         const profileRow = runtime.strategyProfileEditableRowByKey(propertyKey);
         const effectiveRow = catalogRow || profileRow || (row && !row.missing ? row : null);
         if (!this.isWritableRow(effectiveRow)) {
-          this.writeFeedback[propertyKey] = { state: 'rejected', reason: effectiveRow?.editable_reason || 'No public write route published', updated: Date.now() };
+          this.writeFeedback[propertyKey] = { state: 'rejected', reason: effectiveRow?.editable_reason || 'Editing is unavailable', updated: Date.now() };
           return;
         }
         const control = this.shadowRoot.querySelector(`[data-property-key="${CSS.escape(propertyKey)}"]`);
@@ -4046,7 +4133,7 @@ function rhiEnergyVisualPickerStyles() {
       const normalized = String(state || '').trim().toLowerCase();
       if (['complete','ok','ready'].includes(normalized)) return 'Complete';
       if (['incomplete','partial'].includes(normalized)) return 'Partial result';
-      if (['not_configured','configuration_required','not ready','not_ready'].includes(normalized)) return 'Configuration required';
+      if (['not_configured','configuration_required','not ready','not_ready'].includes(normalized)) return 'Setup needed';
       if (['reset_pending','pending','baseline_reset_required'].includes(normalized)) return 'Awaiting reset';
       return 'Unavailable';
     }
@@ -4396,7 +4483,7 @@ function rhiEnergyVisualPickerStyles() {
       const semanticDescription = navItem?.description || p.explanation;
       const heroKey = navItem?.id || tab;
       return rhiEnergyPageHeader({
-        sectionLabel:navSection?.label || 'Energy',
+        sectionLabel:navSection?.label || rhiEnergyT(this._hass,'nav.energy',{},'Energy'),
         itemLabel:navItem?.label || p.eyebrow,
         title:semanticTitle,
         description:semanticDescription,
@@ -4453,7 +4540,7 @@ function rhiEnergyVisualPickerStyles() {
       if (!id) return '';
       const models = rt.commandActionModelsForAsset(id).filter(Boolean).slice(0, limit);
       if (!models.length) return '';
-      return `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${models.map(model => this.componentActionModelButton(model)).join('')}</div></div>`;
+      return `<div class="energyAssetQuickActions"><small>${escapeHtml(rhiEnergyT(this._hass,'common.quick_actions',{},'Quick actions'))}</small><div>${models.map(model => this.componentActionModelButton(model)).join('')}</div></div>`;
     }
     measuredAssetPower(asset = {}) {
       return asNumber(firstDefined(asset.actual_power_kw, asset.current_power_kw, asset.power_kw));
@@ -4508,10 +4595,8 @@ function rhiEnergyVisualPickerStyles() {
       const compatibility = rt.contractCompatibility();
       if (!compatibility.available && compatibility.reason) {
         return `${this.tabExperienceHeader(rt,'overview',pageVm)}
-          <section class="panel" style="padding:18px">
-            <h2 style="margin:0 0 8px">Energy contract unavailable</h2>
-            <p style="margin:0 0 8px">The canonical Energy product contract or required core capability is not available.</p>
-            <p style="margin:0;color:var(--muted)">Backend: ${escapeHtml(compatibility.release || 'unknown')} · ${escapeHtml(compatibility.reason)}</p>
+          <section class="panel energyUnavailableState">
+            ${rhiUxState({state:'unavailable',title:rhiEnergyT(this._hass,'common.not_available',{},'Not available'),detail:rhiEnergyT(this._hass,'common.information_missing',{},'This information is not available yet.')})}
           </section>`;
       }
       const d = rt.decision();
@@ -4641,7 +4726,7 @@ function rhiEnergyVisualPickerStyles() {
       const opts = allowed.length ? allowed.map(v => ({ value:v, label:this.productStateLabel(v, human(v)) })) : fallbackOptions;
       let editor = '';
       if (!opts.length) {
-        editor = `<label class="selectField noOptions"><select disabled data-property-key="${escapeHtml(this.propertyKeyFor(row))}"><option>${escapeHtml(value ? this.productStateLabel(value, human(value)) : 'Options not published')}</option></select></label>`;
+        editor = `<label class="selectField noOptions"><select disabled data-property-key="${escapeHtml(this.propertyKeyFor(row))}"><option>${escapeHtml(value ? this.productStateLabel(value, human(value)) : 'Options unavailable')}</option></select></label>`;
       } else {
         const options = opts.map(option => { const optValue=(option&&typeof option==='object')?(option.value??option.id??option.key??option.label):option; const optLabel=(option&&typeof option==='object')?(option.label??option.name??this.productStateLabel(optValue,human(optValue))):this.productStateLabel(optValue,human(optValue)); const selected=String(optValue).toLowerCase()===String(value??'').toLowerCase()?' selected':''; return `<option value="${escapeHtml(optValue)}"${selected}>${escapeHtml(optLabel)}</option>`; }).join('');
         editor = `<label class="selectField"><select ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}">${options}</select></label>`;
@@ -5028,7 +5113,7 @@ function rhiEnergyVisualPickerStyles() {
       const priority = this.priorityControl(rt,load,id);
       const configurationBody = [requestedControl,priority].filter(Boolean).join('');
       const configuration = configurationBody
-        ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${configurationBody}</div></details>`
+        ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.configuration',{},'Configuration'))}</summary><div class="energyAssetFoldBody">${configurationBody}</div></details>`
         : '';
       const detailsRows = [
         ['Connection',connection.label || 'Unavailable'],
@@ -5038,7 +5123,7 @@ function rhiEnergyVisualPickerStyles() {
         reason ? ['Reason',reason] : null
       ].filter(Boolean);
       const details = detailsRows.length
-        ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailsRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
+        ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.details',{},'Details'))}</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailsRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
         : '';
       const diagnosticRows = [
         ['Asset id', id],
@@ -5369,6 +5454,7 @@ function rhiEnergyVisualPickerStyles() {
     }
 
     energyAssetDiagnosticsDisclosure(rt, asset = {}) {
+      if (this.config?.show_diagnostics !== true) return '';
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       if (!id) return '';
@@ -5398,7 +5484,7 @@ function rhiEnergyVisualPickerStyles() {
         missing.length ? ['Missing publication fields',missing.join(' · ')] : null,
         ...propertyRows
       ].filter(Boolean);
-      return `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
+      return `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.diagnostics',{},'Diagnostics'))}</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
     }
 
     energyAppearanceAction(rt, asset = {}) {
@@ -5410,7 +5496,7 @@ function rhiEnergyVisualPickerStyles() {
       const row = rt.editableProperty(`appearance:${id}:visual_ref`);
       const directWrite = objectFrom(enriched.appearance?.write || {});
       if (!this.isWritableRow(row) && !(directWrite.supported === true && directWrite.operation_id === 'energy.property.write' && directWrite.service === 'rhi_energy.write_property')) return '';
-      return `<button type="button" class="energyAppearanceAction" data-energy-visual-open="${escapeHtml(id)}">Appearance</button>`;
+      return `<button type="button" class="energyAppearanceAction" data-energy-visual-open="${escapeHtml(id)}">${escapeHtml(rhiEnergyT(this._hass,'common.appearance',{},'Appearance'))}</button>`;
     }
 
     energyDeviceStatusCard(rt, asset = {}, roleLabel = '', childrenHtml = '') {
@@ -5438,7 +5524,7 @@ function rhiEnergyVisualPickerStyles() {
       const details = this.energyAssetDetailDisclosure(rt,enriched);
       const diagnostics = this.energyAssetDiagnosticsDisclosure(rt,enriched);
       const children = childrenHtml
-        ? `<details class="energyAssetChildrenSibling"><summary>Children</summary><div class="energyAssetChildrenStack">${childrenHtml}</div></details>`
+        ? `<details class="energyAssetChildrenSibling"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.children',{},'Children'))}</summary><div class="energyAssetChildrenStack">${childrenHtml}</div></details>`
         : '';
       return `<div class="energyAssetNode" data-energy-device-type="${escapeHtml(type)}"><article class="energyDeviceCard">
         <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
@@ -6414,7 +6500,7 @@ function rhiEnergyVisualPickerStyles() {
       const otherGrid = grid === null ? null : Math.max(0, grid - (lowGrid || 0));
       const values = [solar || 0, battery || 0, lowGrid || 0, otherGrid || 0];
       const total = values.reduce((a,b)=>a+b,0);
-      if (!total) return `<div class="consumerMixUnavailable">Source attribution not published</div>`;
+      if (!total) return `<div class="consumerMixUnavailable">Energy source unavailable</div>`;
       return `<div class="consumerMixBar" aria-label="Energy source mix"><span class="solar" style="width:${Math.max(0,values[0])}%"></span><span class="battery" style="width:${Math.max(0,values[1])}%"></span><span class="lowGrid" style="width:${Math.max(0,values[2])}%"></span><span class="grid" style="width:${Math.max(0,values[3])}%"></span></div><div class="consumerMixLegend"><span>Solar ${fmtPct(solar)}</span><span>Battery ${fmtPct(battery)}</span><span>Low-cost grid ${fmtPct(lowGrid)}</span><span>Other grid ${fmtPct(otherGrid)}</span></div>`;
     }
     consumerExplorerCard(rt, row = {}) {
@@ -7023,7 +7109,7 @@ function rhiEnergyVisualPickerStyles() {
       }).filter(Boolean).join('');
       const optional = [['Savings',v.savings],['Avoided grid cost',v.avoided],['Self-consumption value',v.selfConsumption]].filter(([,value])=>asNumber(value)!==null).map(([label,value])=>this.kv(label,money(value))).join('');
       const financialBody = configurationBlocked
-        ? `<section class="panel wide valueConfigurationState"><h2>Financial result</h2><div class="valueStateHeadline"><b>${escapeHtml(v.stateLabel)}</b><span>${escapeHtml(v.attention)}</span></div><p>Complete only the Pricing inputs the backend marks as blocking for ${escapeHtml(v.label.toLowerCase())}.</p><div class="valueConfigurationChecklist">${missingRequired.map(item=>`<div><span>${item.configured?'✓':'□'}</span><b>${escapeHtml(item.label)}</b><em>${escapeHtml(item.configured?'Configured':'Configuration required')}</em></div>`).join('')}</div></section>`
+        ? `<section class="panel wide valueConfigurationState"><h2>Financial result</h2><div class="valueStateHeadline"><b>${escapeHtml(v.stateLabel)}</b><span>${escapeHtml(v.attention)}</span></div><p>Complete only the Pricing inputs the backend marks as blocking for ${escapeHtml(v.label.toLowerCase())}.</p><div class="valueConfigurationChecklist">${missingRequired.map(item=>`<div><span>${item.configured?'✓':'□'}</span><b>${escapeHtml(item.label)}</b><em>${escapeHtml(item.configured?'Configured':'Setup needed')}</em></div>`).join('')}</div></section>`
         : !v.accountingReady && !hasFinancialValue
           ? `<section class="panel wide valueEvidenceState"><h2>Financial result</h2><div class="valueStateHeadline"><b>Waiting for measured evidence</b><span>${escapeHtml(v.attention)}</span></div><p>Pricing is usable. The financial result will appear when the selected Metering period contains sufficient measured import/export evidence.</p></section>`
           : `<section class="panel wide"><h2>${escapeHtml(v.label)} financial result</h2><p>Accumulated measured value for the Metering-selected period. No future value is predicted.</p><div class="r3280Balance"><span>Net financial result</span><b>${escapeHtml(money(v.net))}</b><p>${escapeHtml(v.interpretation)}</p></div><div class="goalGrid"><div class="goalRow"><span>Import cost</span><b>${escapeHtml(money(v.importCost))}</b></div><div class="goalRow"><span>Export revenue</span><b>${escapeHtml(money(v.exportRevenue))}</b></div><div class="goalRow"><span>Net energy cost</span><b>${escapeHtml(money(v.netEnergyCost))}</b></div><div class="goalRow"><span>Result completeness</span><b>${escapeHtml(v.resultCompletenessLabel)}</b><small>${escapeHtml(v.resultScopeLabel)}</small></div></div>${optional ? `<div class="softBox">${optional}</div>` : ''}</section>`;
@@ -7038,88 +7124,10 @@ function rhiEnergyVisualPickerStyles() {
       return `${this.tabExperienceHeader(rt,'value',pageVm)}${this.bodyContextBar(rt,'value','value-body')}<div id="value-body" class="valuePage r363ValuePage">
         <div class="valueGrid">${financialBody}
         <section class="panel wide strategyTablePanel pricingStrategyPanel" id="value-pricing-settings"><div class="strategyTableHead"><div><h2>Pricing settings</h2><p>${missingRequired.length ? `${missingRequired.length} value${missingRequired.length===1?'':'s'} still need configuration.` : 'Tariff configuration is complete.'}</p></div><div class="strategySetActions">${pricingActions}</div></div><div class="strategyTable"><div class="strategyColumnHead"><span>Setting</span><span>Value</span></div>${tariffRows}</div></section>
-        <section class="panel" id="value-flexible-pricing"><h2>Pricing of flexible loads</h2><p>Financial attribution is shown only when Value publishes it. The UX does not estimate costs.</p><div class="flexPricingList">${flexibleRows || `<div class="empty"><b>No flexible loads published</b><span>No controllable Energy assets are currently available.</span></div>`}</div></section>
-        <section class="panel" id="value-consumers"><h2>Consumer allocation</h2><p>Financial attribution by consumer for ${escapeHtml(v.label.toLowerCase())}.</p>${consumers || `<div class="empty"><b>Consumer allocation is not yet available for the selected period.</b><span>No consumer value attribution is currently published.</span></div>`}</section>
+        <section class="panel" id="value-flexible-pricing"><h2>Pricing of flexible loads</h2><p>Financial attribution is shown only when Value publishes it. The UX does not estimate costs.</p><div class="flexPricingList">${flexibleRows || `<div class="empty"><b>No controllable loads available</b><span>No controllable Energy assets are currently available.</span></div>`}</div></section>
+        <section class="panel" id="value-consumers"><h2>Consumer allocation</h2><p>Financial attribution by consumer for ${escapeHtml(v.label.toLowerCase())}.</p>${consumers || `<div class="empty"><b>Consumer allocation is not yet available for the selected period.</b><span>Consumer value allocation is not available yet.</span></div>`}</section>
         </div>
       </div>`;
-    }
-
-    productLanguage(html) {
-      let out = String(html || '');
-      const replacements = [
-        [/Data incomplete/gi,'Some details unavailable'],
-        [/Some guidance details unavailable/gi,'Some guidance is unavailable'],
-        [/Some forecast details unavailable/gi,'Some forecast information is unavailable'],
-        [/Some measurements unavailable/gi,'Some measurements are unavailable'],
-        [/Some consumer details unavailable/gi,'Some consumer information is unavailable'],
-        [/Configuration required/gi,'Setup needed'],
-        [/Published by Pricing/gi,'Configured'],
-        [/No reliable financial result is currently published\.?/gi,'A reliable financial result is not available yet.'],
-        [/No consumer value attribution is currently published\.?/gi,'Consumer value allocation is not available yet.'],
-        [/No flexible loads published/gi,'No controllable loads available'],
-        [/No consumers published/gi,'No consumers available'],
-        [/No charger connections published/gi,'No charger connections available'],
-        [/Source attribution not published/gi,'Energy source unavailable'],
-        [/Planning Value Published/gi,'Charging plan available'],
-        [/Horizon Summary Available/gi,'Outlook available'],
-        [/Calculation Not Trusted/gi,'Waiting for complete data'],
-        [/Calculation Trust Health Not Ok/gi,'Some planning inputs are incomplete'],
-        [/Runtime Error/gi,'Currently unavailable'],
-        [/\bUNKNOWN\b/gi,'Not measured'],
-        [/\bTRUST_STATE\b/gi,'Measurement quality'],
-        [/\bBASELINE_UNTRUSTED\b/gi,'Verification required'],
-        [/\bRESET_PENDING\b/gi,'Reset in progress'],
-        [/Approval required/gi,'Confirmation needed'],
-        [/Observed/gi,'Available'],
-        [/Flexible Asset/gi,'Controllable'],
-        [/Flexible assets/gi,'Controllable assets'],
-        [/public flow relations/gi,'connections'],
-        [/Topology evidence/gi,'Connection details'],
-        [/Physical topology/gi,'Energy connections'],
-        [/Published by Mobility as Energy connection assets\.?/gi,'Vehicle charging connections.'],
-        [/Aggregate storage state from public battery property index\.?/gi,'Combined state of your home batteries.'],
-        [/Rendered only from inline editable property metadata\.?/gi,'Settings available for this battery.'],
-        [/No editable battery settings published/gi,'No battery settings available'],
-        [/Editable metadata is inline on public property rows\.?/gi,'No adjustable battery settings are currently available.'],
-        [/Today and tomorrow horizon outlook from the canonical Outlook contract/gi,'Today and tomorrow energy outlook'],
-        [/Current-day horizon summary from the Outlook contract\.?/gi,'Today’s expected energy balance.'],
-        [/Some details are not published yet\. See quality details\.?/gi,'Planning detail is partial; open Quality for exact limitations.'],
-        [/Period summaries not published yet\.?/gi,'Week, month and year summaries are not available yet.'],
-        [/Showing clean today counters from the public metering index\. Week, month and year are not fabricated by UX\./gi,'Today’s measured totals remain available. Longer periods will appear when their summaries are ready.'],
-        [/Backend-published remediation advice for the selected period\.?/gi,'What needs attention for the selected period.'],
-        [/Reset Command Not Published/gi,'Reset is not available'],
-        [/Contract gap/gi,'Details'],
-        [/Mode is currently published read-only by the backend\.?/gi,'This mode is currently view-only.'],
-        [/Backend did not publish allowed values\.?/gi,'No selectable options are currently available.'],
-        [/Options not published/gi,'Options unavailable'],
-        [/No public write route published/gi,'Editing is unavailable'],
-        [/No public command published/gi,'Action unavailable'],
-        [/No command published/gi,'Action unavailable'],
-        [/No additional explanation is needed/gi,'No additional explanation available'],
-        [/Not published/gi,'Unavailable'],
-        [/Published/gi,'Available'],
-        [/Canonical/gi,'Main'],
-        [/property index/gi,'data source'],
-        [/contract/gi,'information'],
-        [/runtime/gi,'system'],
-        [/metadata/gi,'settings information'],
-        [/trust health/gi,'data quality'],
-        [/planner state/gi,'plan status'],
-        [/Energy Need Exists/gi,'Energy demand is waiting'],
-        [/Energy Need Blocked/gi,'Waiting for suitable energy'],
-        [/Automatic Blocker/gi,'Automatic start condition'],
-        [/Min(?:imum)? Power Above Surplus/gi,'Waiting for sufficient solar power'],
-        [/Checking Readiness/gi,'Preparing automatic control'],
-        [/Provider Remaining Forecast/gi,'Remaining forecast'],
-        [/Execution state/gi,'Status'],
-        [/Execution/gi,'Status'],
-        [/Candidate(?:s)?/gi,'Considered'],
-        [/Selected/gi,'Planned'],
-        [/Blocked/gi,'Waiting'],
-        [/Baseline reset required/gi,'Metering reset needed']
-      ];
-      for (const [pattern, value] of replacements) out = out.replace(pattern, value);
-      return out;
     }
 
     planningAssetIcon(asset = {}) {
@@ -7425,15 +7433,15 @@ function rhiEnergyVisualPickerStyles() {
         title:'Strategic Planning',
         explanation:'What your current Energy settings mean for longer-term behavior.',
         metrics:[
-          ['◎','Strategy',posture || 'Not published','Current longer-term posture'],
-          ['◇','Topics',String(topics.length),'Backend-owned policy areas influencing strategy'],
+          ['◎','Strategy',posture || 'Not available','Current longer-term posture'],
+          ['◇','Topics',String(topics.length),'Policy areas influencing your strategy'],
           ['↗','Tactical horizon','D0 / D1','Today and tomorrow remain in Tactical Planning']
         ]
       };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}
         <div class="strategicPlanningPage strategicBehaviorPage">
-          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not published')}</h2><p>Strategy configuration is the authority for longer-term intent. This read-only view explains the effective meaning of your current Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
-          <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No strategic behavior published</b><span>The backend has not published effective behavior topics yet.</span></div></section>'}</div>
+          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not available')}</h2><p>Strategy configuration is the authority for longer-term intent. This read-only view explains the effective meaning of your current Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
+          <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No long-term strategy available</b><span>Long-term strategy details are not available yet.</span></div></section>'}</div>
         </div>`;
     }
 
@@ -7441,12 +7449,12 @@ function rhiEnergyVisualPickerStyles() {
       if (view === 'solar-generation') {
         const p = this.buildPageViewModel(rt, 'solar');
         const model = { ...p, title:'Solar generation', badgeText:'Structure ready', badgeTone:'neutral' };
-        return `${this.tabExperienceHeader(rt,'solar-generation',model)}<section class="panel navigationPlaceholder"><small>ENERGY DOMAIN</small><h2>Solar generation content follows in the next screen pass</h2><p>The navigation and premium header are now in their final structural location. Inverter, panel and storage-link content is intentionally not moved into this release.</p></section>`;
+        return `${this.tabExperienceHeader(rt,'solar-generation',model)}<section class="panel navigationPlaceholder"><small>ENERGY DOMAIN</small><h2>Solar generation details are not available yet</h2><p>This information is not available yet.</p></section>`;
       }
       return `<section class="panel navigationPlaceholder"><h2>${escapeHtml(human(view))}</h2><p>This navigation target has no dedicated renderer.</p></section>`;
     }
     placeholder(rt) {
-      return `<section class="panel cleanPlaceholder"><h2>${escapeHtml(this.title())}</h2><p>This screen is outside the current clean rewrite scope. All V1 screens are active on the R1.56 public contract runtime.</p><div class="softBox"><b>Migration scope</b><span>Metering, Intelligence and Value are now clean active screens. Style cleanup stays for the final polish round.</span></div></section>`;
+      return `<section class="panel cleanPlaceholder"><h2>${escapeHtml(this.title())}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'common.information_missing',{},'This information is not available yet.'))}</p></section>`;
     }
     renderMainWarning(footer) {
       // R3.45.5: backend trust is a footer concern only.
@@ -7489,23 +7497,18 @@ function rhiEnergyVisualPickerStyles() {
       return '';
     }
     renderFooter(rt, tab, footer) {
+      if (this.config?.show_diagnostics !== true) return '';
       const backend = footer.backendVersion || 'Unknown';
       const contract = footer.contractVersion || 'Unknown';
       const issue = this.releaseIssueModel(rt, tab, footer);
-      const issueLines = issue
-        ? String(issue.tooltip || issue.label || 'Runtime issue').split('\n').map(line => line.trim()).filter(Boolean)
-        : [];
-      const issueDetails = issue ? `
-        <details class="rhiUxFooterDetails">
-          <summary class="hiReleaseIssue rhiUxFooterIssue ${issue.severity}">${escapeHtml(issue.label)} · details</summary>
-          <div class="rhiUxFooterPanel" role="status">
-            <div class="rhiUxFooterPanelMeta">Backend ${escapeHtml(backend)} · Contract ${escapeHtml(contract)}</div>
-            ${issueLines.map(line => `<div class="rhiUxFooterProblem"><span class="rhiUxFooterProblemDot" aria-hidden="true"></span><span>${escapeHtml(line)}</span></div>`).join('')}
-            <div class="rhiUxFooterAction">Resolve the listed runtime/backend condition, then reload this view to verify recovery.</div>
-          </div>
-        </details>` : '';
       const status = issue ? (issue.severity === 'error' ? 'Attention' : 'Degraded') : (footer.runtimeTrusted === false ? 'Attention' : 'Ready');
-      return `<footer class="hiRuntimeFooter rhiUxFooter" aria-label="RHI Energy release information"><span>RHI Energy UX ${escapeHtml(footer.uxVersion || UX_VERSION)}</span><span>Backend ${escapeHtml(backend)}</span><span>Status ${escapeHtml(status)}</span>${issueDetails}</footer>`;
+      return rhiUxTechnicalFooter({
+        product:'RHI Energy',
+        uxVersion:footer.uxVersion || UX_VERSION,
+        backendVersion:backend,
+        issue:issue ? `${issue.label} · contract ${contract}` : `Status ${status}`,
+        severity:issue?.severity || ''
+      });
     }
     renderError(view, error) {
       const message = error && error.message ? error.message : String(error || 'Unknown render error');
@@ -7916,7 +7919,7 @@ function rhiEnergyVisualPickerStyles() {
 @media(max-width:1024px){.hiTabStatusItem{grid-template-columns:42px minmax(0,1fr);padding:10px;min-height:88px}.hiTabStatusIcon{width:40px;height:40px;min-width:40px}}
 @media(max-width:760px){.hiTabPurpose{font-size:12px}.hiQuickActionItems{flex-wrap:nowrap}.hiQuickAction{flex:0 0 auto}}
 @media(max-width:430px){.hiTabPurpose{font-size:10px;line-height:1.3}.hiTabStatusItem{grid-template-columns:34px minmax(0,1fr);min-height:76px;padding:8px;gap:7px}.hiTabStatusIcon{width:32px;height:32px;min-width:32px;border-radius:10px;font-size:18px}}
-</style><main class="energy rhiUxDomainBody rhi-ux-root">${this.nav()}${this.renderMainWarning(footer)}<section>${this.productLanguage(content)}</section>${this.propertyDraftBar()}${this.energyVisualPickerOverlay(rt)}${this.productLanguage(this.renderFooter(rt,this.view,footer))}</main>`;
+</style><main class="energy rhiUxDomainBody rhi-ux-root">${this.nav()}${this.renderMainWarning(footer)}<section>${content}</section>${this.propertyDraftBar()}${this.energyVisualPickerOverlay(rt)}${this.renderFooter(rt,this.view,footer)}</main>`;
       if (markup === this._lastMarkup) { this.persistInteractionContext(); return; }
       this._lastMarkup = markup;
       this.persistInteractionContext();
