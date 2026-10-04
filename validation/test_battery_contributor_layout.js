@@ -28,7 +28,7 @@ assert.doesNotMatch(app,/rt\.number\(\`\$\{assetId\}\.soc_pct\`\)/);
 
 console.log("PASS Home Battery contributor layout + canonical multi-object access");
 
-assert.match(app,/Telemetry limited/);
-assert.match(app,/Battery is available; per-battery power is not published/);
+assert.match(app,/Measurements limited/);
+assert.match(app,/Battery is available; per-battery power is not available/);
 assert.doesNotMatch(app,/power === null \? 'Unavailable'/);
 assert.match(app,/const explicitlyUnavailable = \/unavailable\|offline\|disconnected\|failed/);
