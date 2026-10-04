@@ -78,7 +78,7 @@ for (const logicalType of ["flexible_asset","consumer","solar_array","inverter",
   assert.ok(!catalog.includes(`asset_type:"${logicalType}"`), "logical/non-canonical visual fallback returned "+logicalType);
 }
 
-assert.match(core,/RHI UX Core 1\.6\.0/);
+assert.ok(core.includes('const RHI_UX_CORE_VERSION = "1.6.0";'), 'Energy must vendor UX Core 1.6.0');
 assert.match(core,/function rhiUxContextBar/);
 assert.match(core,/function rhiUxResolveDomainAssetNavigation/);
 assert.ok(core.includes("{asset_id}"), "runtime-safe Core navigation token missing");
