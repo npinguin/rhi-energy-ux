@@ -29,7 +29,9 @@ const method = name => {
 };
 
 assert.match(presentation, /id:"solar", labelKey:"nav\.solar", fallback:"Solar", view:"solar"/);
-assert.match(presentation, /id:"operational-planning", labelKey:"nav\.operational_plan", fallback:"Now", view:"operational-planning"/);
+assert.match(presentation, /id:"plan", labelKey:"nav\.plan", fallback:"Plan", view:"planning"/);
+assert.doesNotMatch(presentation, /id:"operational-planning", labelKey:"nav\.operational_plan"/);
+assert.match(app, /\['operational-planning','planning','strategic-planning'\]\.includes\(tab\)/);
 
 const solar = method("solar");
 assert.match(solar, /solarEnergyStory\(rt\)/);
