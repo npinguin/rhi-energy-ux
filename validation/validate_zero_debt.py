@@ -18,9 +18,16 @@ for path in (ROOT/"src").rglob("*.js"):
     rel=path.relative_to(ROOT)
     if "!important" in text:
         failures.append(f"{rel}: !important is forbidden; shared geometry belongs to UX Core")
+    if re.search(r"RHI_[A-Z0-9_]+_V1", text):
+        failures.append(f"{rel}: V1 contract identifier is forbidden in product source")
     for pattern in legacy_product:
         if re.search(pattern,text):
             failures.append(f"{rel}: legacy Energy product API remains: {pattern}")
+
+for relpath in ("release/product.json","release/RELEASE_STATUS.json","COMPATIBILITY.json","RELEASE_MANIFEST.json"):
+    text=(ROOT/relpath).read_text(encoding="utf-8")
+    if re.search(r"RHI_[A-Z0-9_]+_V1", text):
+        failures.append(f"{relpath}: V1 contract dependency remains in current release metadata")
 
 presentation=(ROOT/"src/app/presentation.js").read_text(encoding="utf-8")
 for selector in (".rhiUxPageHero{",".rhiUxStatusGrid{",".rhiUxQuickActionBar{",".rhiUxDomainShell{"):
