@@ -64,3 +64,9 @@ for (const token of [
 if(card.includes("const rawPeriod={};")) throw new Error('Metering may not discard canonical backend period evidence');
 if(card.includes("Canonical metering energy is not published by the current public contract.")) throw new Error('obsolete hard-coded unavailable Metering projection returned');
 console.log('PASS canonical Metering, Value blocker and Retrospective evidence chain');
+
+if(!card.includes("rhiUxAssetCardShell({ identity, facts, className:'energyFlowAssetCard flowConnectionCard' })")) throw new Error('Flow connection card must use shared Core AssetCardShell');
+if(!card.includes("rhiUxAssetCardShell({ identity, facts, className:'energyFlowAssetCard flowPhysicalConsumerCard' })")) throw new Error('Flow consumer card must use shared Core AssetCardShell');
+if(card.includes('.flowConnectionCard,.flowPhysicalConsumerCard{display:grid')) throw new Error('Flow asset card shell geometry must not be re-owned by Energy');
+if(!card.includes('.energyFlowAssetCard .rhiUxAssetFactGrid')) throw new Error('Energy may only refine domain-specific Flow fact placement');
+console.log('PASS Flow physical assets consume shared Core AssetCardShell without local shell ownership');
