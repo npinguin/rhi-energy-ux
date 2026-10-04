@@ -107,4 +107,5 @@ const intelligenceBlock = presentation.slice(presentation.indexOf('id:"intellige
 assert.ok(intelligenceBlock.lastIndexOf('id:"settings"') > intelligenceBlock.indexOf('id:"strategic-planning"'), "Settings must be the last Intelligence tab");
 assert.ok(!app.includes("understandingFooter(rt, this.view)"), "legacy Conclusion footer must not be injected into product views");
 assert.ok(!app.includes("understandingFooter(rt, tab)"), "legacy Conclusion component must be removed");
-assert.ok(app.includes("Status ${escapeHtml(status)}"), "runtime footer must expose explicit status");
+assert.ok(app.includes("this.config?.show_diagnostics !== true"), "technical footer must be explicitly diagnostics-gated");
+assert.ok(app.includes("rhiUxTechnicalFooter({"), "diagnostics footer must use shared Core primitive");
