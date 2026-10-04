@@ -2,7 +2,7 @@
 // Page-level header owns Hero, Status and executable Quick Actions only.
 // Body-scoped view/filter controls are rendered immediately above the content they govern.
 function rhiEnergyPageHeader({
-  sectionLabel = "Energy",
+  sectionLabel = "",
   itemLabel = "",
   title = "",
   description = "",
@@ -17,7 +17,7 @@ function rhiEnergyPageHeader({
     icon:icon || "•", label:label || "", value:value ?? "—", detail:detail || ""
   })));
   const actionsMarkup = commandActions
-    ? `<section class="rhiUxQuickActionBar" aria-label="Quick actions"><small>Quick actions</small><div class="rhiUxQuickActions">${commandActions}</div></section>`
+    ? `<section class="rhiUxQuickActionBar" aria-label="${rhiUxEscape(rhiEnergyT(null,'common.quick_actions',{},'Quick actions'))}"><small>${rhiUxEscape(rhiEnergyT(null,'common.quick_actions',{},'Quick actions'))}</small><div class="rhiUxQuickActions">${commandActions}</div></section>`
     : "";
   return `<section class="rhiEnergyPageHeader rhiUxPageStack ${rhiUxEscape(tone)}">${heroMarkup}${statusMarkup}${actionsMarkup}</section>`;
 }

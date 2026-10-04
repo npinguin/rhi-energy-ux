@@ -2,39 +2,49 @@
 // Owns navigation metadata, tab hero assets, shared visual hierarchy and card primitives.
 // Domain semantics, calculations, actions and runtime truth remain backend/domain owned.
 
-const HB_ENERGY_NAVIGATION = Object.freeze([
+const HB_ENERGY_NAVIGATION_SPEC = Object.freeze([
   {
-    id: "energy",
-    label: "Energy",
-    items: [
-      { id:"overview", label:"Overview", view:"overview", title:"Energy Overview", description:"Your home energy system at a glance." },
-      { id:"flow", label:"Flow", view:"flow", title:"Energy Flow", description:"See where energy is flowing right now." },
-      { id:"solar", label:"Solar", view:"solar", title:"Solar", description:"Solar generation, arrays, inverters and the relationship with storage." },
-      { id:"battery", label:"Home Battery", view:"battery", title:"Home Battery", description:"Storage state, capacity and contribution to the home." },
-      { id:"consumers", label:"Consumers", view:"consumers", title:"Consumers", description:"Where energy is used and which loads are controllable." },
-      { id:"gas", label:"Gas", view:"gas", title:"Gas", description:"Gas consumption, history and meter health." }
+    id:"energy", labelKey:"nav.energy", fallback:"Energy",
+    items:[
+      { id:"overview", labelKey:"nav.overview", fallback:"Overview", view:"overview", titleKey:"hero.overview.title", descriptionKey:"hero.overview.description" },
+      { id:"flow", labelKey:"nav.flow", fallback:"Flow", view:"flow", titleKey:"hero.flow.title", descriptionKey:"hero.flow.description" },
+      { id:"solar", labelKey:"nav.solar", fallback:"Solar", view:"solar", titleKey:"hero.solar.title", descriptionKey:"hero.solar.description" },
+      { id:"battery", labelKey:"nav.battery", fallback:"Home Battery", view:"battery", titleKey:"hero.battery.title", descriptionKey:"hero.battery.description" },
+      { id:"consumers", labelKey:"nav.consumption", fallback:"Consumption", view:"consumers", titleKey:"hero.consumption.title", descriptionKey:"hero.consumption.description" },
+      { id:"gas", labelKey:"nav.gas", fallback:"Gas", view:"gas", titleKey:"hero.gas.title", descriptionKey:"hero.gas.description" }
     ]
   },
   {
-    id: "intelligence",
-    label: "Intelligence",
-    items: [
-      { id:"operational-planning", label:"Operational Planning", view:"operational-planning", title:"Operational Planning", description:"What should happen now and in the next hours." },
-      { id:"tactical-planning", label:"Tactical Planning", view:"planning", title:"Tactical Planning", description:"How energy is allocated across today and tomorrow." },
-      { id:"strategic-planning", label:"Strategic Planning", view:"strategic-planning", title:"Strategic Planning", description:"Longer-term energy goals, constraints and optimisation." },
-      { id:"settings", label:"Settings", view:"strategies", title:"Settings", description:"Review and edit domain-owned Energy settings and policies." }
+    id:"intelligence", labelKey:"nav.intelligence", fallback:"Intelligence",
+    items:[
+      { id:"operational-planning", labelKey:"nav.operational_plan", fallback:"Now", view:"operational-planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
+      { id:"tactical-planning", labelKey:"nav.tactical_plan", fallback:"Today & Tomorrow", view:"planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
+      { id:"strategic-planning", labelKey:"nav.strategic_plan", fallback:"Long term", view:"strategic-planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
+      { id:"settings", labelKey:"nav.settings", fallback:"Settings", view:"strategies", titleKey:"hero.settings.title", descriptionKey:"hero.settings.description" }
     ]
   },
   {
-    id: "insights",
-    label: "Insights",
-    items: [
-      { id:"metering", label:"Metering", view:"metering", title:"Metering", description:"Measured energy for the selected period." },
-      { id:"value", label:"Value", view:"value", title:"Value", description:"Financial impact of your energy system." },
-      { id:"retrospective", label:"Retrospective", view:"retrospective", title:"Retrospective", description:"How Home Intelligence performed and what can improve." }
+    id:"insights", labelKey:"nav.insights", fallback:"Insights",
+    items:[
+      { id:"metering", labelKey:"nav.performance", fallback:"Performance", view:"metering", titleKey:"hero.performance.title", descriptionKey:"hero.performance.description" },
+      { id:"value", labelKey:"nav.value", fallback:"Value", view:"value", titleKey:"hero.value.title", descriptionKey:"hero.value.description" },
+      { id:"retrospective", labelKey:"nav.retrospective", fallback:"Retrospective", view:"retrospective", titleKey:"hero.retrospective.title", descriptionKey:"hero.retrospective.description" }
     ]
   }
 ]);
+
+function hbEnergyNavigation(hass = null) {
+  return HB_ENERGY_NAVIGATION_SPEC.map(section => ({
+    id:section.id,
+    label:rhiEnergyT(hass,section.labelKey,{},section.fallback),
+    items:section.items.map(item => ({
+      ...item,
+      label:rhiEnergyT(hass,item.labelKey,{},item.fallback),
+      title:rhiEnergyT(hass,item.titleKey,{},item.fallback),
+      description:rhiEnergyT(hass,item.descriptionKey,{},"")
+    }))
+  }));
+}
 
 const HB_ENERGY_HERO_ASSETS = Object.freeze({
   overview: "heroes/overview-hero.webp",
@@ -90,8 +100,8 @@ function hbEnergyPresentationStyles() {
       --rhi-shadow:var(--rhi-shadow-md);
       --rhi-card-gap:var(--rhi-space-2);
     }
-    .rhiEnergyNav-intelligence .rhiUxDomainShell{--rhi-nav-active-bg:#F1EDFF;--rhi-nav-active-border:#DFD5FB;--rhi-nav-active-text:#5A38B3}
-    .rhiEnergyNav-insights .rhiUxDomainShell{--rhi-nav-active-bg:#E7F7F4;--rhi-nav-active-border:#CDEBE6;--rhi-nav-active-text:#176E67}
+    .rhiEnergyNav-intelligence{--rhi-nav-active-bg:#F1EDFF;--rhi-nav-active-border:#DFD5FB;--rhi-nav-active-text:#5A38B3}
+    .rhiEnergyNav-insights{--rhi-nav-active-bg:#E7F7F4;--rhi-nav-active-border:#CDEBE6;--rhi-nav-active-text:#176E67}
     .rhiEnergyPageHeader{display:block;margin:0 0 10px}
     @media(max-width:760px){
     }

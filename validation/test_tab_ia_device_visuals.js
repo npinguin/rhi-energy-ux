@@ -28,8 +28,8 @@ const method = name => {
   throw new Error("unterminated method " + name);
 };
 
-assert.match(presentation, /id:"solar", label:"Solar", view:"solar"/);
-assert.match(presentation, /id:"operational-planning", label:"Operational Planning", view:"operational-planning"/);
+assert.match(presentation, /id:"solar", labelKey:"nav\.solar", fallback:"Solar", view:"solar"/);
+assert.match(presentation, /id:"operational-planning", labelKey:"nav\.operational_plan", fallback:"Now", view:"operational-planning"/);
 
 const solar = method("solar");
 assert.match(solar, /solarEnergyStory\(rt\)/);

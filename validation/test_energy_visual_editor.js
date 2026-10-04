@@ -52,14 +52,14 @@ console.log('PASS canonical Energy appearance editor with physical-only catalog 
 
 const coreVendor = fs.readFileSync('src/vendor/rhi-ux-core.js','utf8');
 for (const token of [
-  'const RHI_UX_CORE_VERSION = "1.5.5"',
+  'const RHI_UX_CORE_VERSION = "1.6.0"',
   'max-height:min(82vh,760px)',
   'grid-template-columns:repeat(3,minmax(0,1fr))',
   'grid-auto-rows:142px',
   'overflow-y:auto',
   'object-fit:contain'
 ]) {
-  if (!coreVendor.includes(token)) throw new Error('UX Core 1.5.5 bounded visual picker contract missing: ' + token);
+  if (!coreVendor.includes(token)) throw new Error('UX Core 1.6.0 bounded visual picker contract missing: ' + token);
 }
 if (!cardSource.includes('pendingAppearanceByAsset') || !cardSource.includes('reconcilePendingAppearances')) throw new Error('Energy appearance selection must remain pending until authoritative readback');
 if (!cardSource.includes('assetVisualAppearance')) throw new Error('Appearance action must be rendered consistently inside the image zone');

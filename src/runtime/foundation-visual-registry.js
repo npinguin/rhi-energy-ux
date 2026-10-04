@@ -1,7 +1,7 @@
 // Generic cross-domain visual presentation resolver.
 // Producer domains register visual identity + presentation with Foundation.
 // Energy must never carry producer model/brand/image-key mappings.
-const RHI_FOUNDATION_VISUAL_REGISTRY_CONTRACT = "RHI_VISUAL_ASSET_REGISTRY_V1";
+const RHI_FOUNDATION_VISUAL_REGISTRY_CONTRACT = "RHI_VISUAL_ASSET_REGISTRY_V2";
 
 function readFoundationVisualRegistry(hass = {}) {
   const states = Object.values(hass?.states || {});

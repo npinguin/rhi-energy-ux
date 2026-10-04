@@ -91,14 +91,14 @@
     if (state === 'ok') return 'OK';
     if (state === 'warn') return human(row.health || row.quality || 'Degraded');
     if (state === 'fail') return human(row.health || row.quality || 'Fail');
-    if (state === 'missing') return 'Not available';
-    if (state === 'not-measured') return 'Not measured';
-    return 'Unknown';
+    if (state === 'missing') return rhiEnergyT(null,'common.not_available',{},'Not available');
+    if (state === 'not-measured') return rhiEnergyT(null,'common.not_measured',{},'Not measured');
+    return rhiEnergyT(null,'common.unknown',{},'Unknown');
   };
   const rowDisplayValue = (row, fallback = '—') => {
     if (!row || row.missing) return fallback;
     const value = rowValue(row, null);
-    if (value === null || value === undefined || value === '') return 'Not measured';
+    if (value === null || value === undefined || value === '') return rhiEnergyT(null,'common.not_measured',{},'Not measured');
     if (typeof value === 'number') return `${value}${row.unit ? ` ${row.unit}` : ''}`;
     return `${human(value, fallback)}${row.unit ? ` ${row.unit}` : ''}`;
   };
@@ -123,15 +123,21 @@
     if (!key) return fallback;
     const normalized = key.toLowerCase().replace(/[\s.-]+/g, '_');
     const labels = {
-      policy_mode_off: 'Energy Intelligence is off',
-      mode_off: 'Energy Intelligence is off',
-      intelligence_off: 'Energy Intelligence is off',
-      energy_intelligence_off: 'Energy Intelligence is off',
-      automation_disabled: 'Automation is disabled',
-      disabled: 'Disabled',
-      not_available: 'Not available',
-      not_published: 'Not published',
-      no_battery_policy_reason_published: 'No battery policy reason published'
+      policy_mode_off: rhiEnergyT(null,'reason.intelligence_off',{},'Energy Intelligence is off'),
+      mode_off: rhiEnergyT(null,'reason.intelligence_off',{},'Energy Intelligence is off'),
+      intelligence_off: rhiEnergyT(null,'reason.intelligence_off',{},'Energy Intelligence is off'),
+      energy_intelligence_off: rhiEnergyT(null,'reason.intelligence_off',{},'Energy Intelligence is off'),
+      automation_disabled: rhiEnergyT(null,'reason.automation_disabled',{},'Automation is disabled'),
+      disabled: rhiEnergyT(null,'reason.disabled',{},'Disabled'),
+      not_available: rhiEnergyT(null,'reason.not_available',{},'Not available'),
+      not_published: rhiEnergyT(null,'reason.not_published',{},'Information is not available yet'),
+      no_battery_policy_reason_published: rhiEnergyT(null,'reason.no_battery_policy',{},'Battery policy information is not available yet'),
+      data_incomplete: rhiEnergyT(null,'reason.data_incomplete',{},'Some details are unavailable'),
+      trust_state: rhiEnergyT(null,'reason.verification_required',{},'Verification is needed'),
+      baseline_untrusted: rhiEnergyT(null,'reason.verification_required',{},'Verification is needed'),
+      reset_pending: rhiEnergyT(null,'reason.reset_pending',{},'Reset in progress'),
+      approval_required: rhiEnergyT(null,'reason.confirmation_needed',{},'Confirmation needed'),
+      configuration_required: rhiEnergyT(null,'reason.not_configured',{},'Setup needed')
     };
     return labels[normalized] || human(key, fallback);
   };
@@ -154,6 +160,7 @@
   class EnergyRuntime {
     constructor(hass) {
       this.hass = hass || {};
+      rhiEnergySetLocaleFromHass(this.hass);
       this._allowed = null;
       this._rows = null;
       this._assets = null;
@@ -1153,6 +1160,7 @@
     setConfig(config) { this.config = config || {}; }
     set hass(hass) {
       this._hass = hass;
+      rhiEnergySetLocaleFromHass(hass);
       this.reconcileWriteFeedback();
       this.reconcilePendingAppearances();
       this.syncMeteringPeriodFromRuntime();
@@ -1193,7 +1201,7 @@
       };
       const keys = ['release', ...(byView[this.view] || [])];
       const registryEntity = Object.entries(this._hass?.states || {}).find(([,state]) =>
-        String(state?.attributes?.contract_id || '') === 'RHI_VISUAL_ASSET_REGISTRY_V1'
+        String(state?.attributes?.contract_id || '') === 'RHI_VISUAL_ASSET_REGISTRY_V2'
       )?.[0] || '';
       return [...new Set([...keys.map(key => UX_INTERFACES[key]).filter(Boolean), registryEntity].filter(Boolean))];
     }
@@ -1235,7 +1243,7 @@
         : fallback;
       const showConsumers=has('flexible_loads', false);
       const showValue=has('pricing', false);
-      return HB_ENERGY_NAVIGATION.map(section=>({
+      return hbEnergyNavigation(this._hass).map(section=>({
         ...section,
         items:section.items.filter(item=>{
           if(item.id === 'battery') return has('battery', false);
@@ -1290,7 +1298,7 @@
       const target = this.resolveNavigation('', '', view);
       this.selectNavigation(target.section, target.item);
     }
-    title() { return this.activeNavigationItem().title || 'Energy'; }
+    title() { return this.activeNavigationItem().title || rhiEnergyT(this._hass,'nav.energy',{},'Energy'); }
     subtitle() { return this.activeNavigationItem().description || ''; }
     nav() {
       const sections = this.navigationModel();
@@ -1302,7 +1310,7 @@
       }));
       return `<div class="rhiEnergyNav rhiEnergyNav-${escapeHtml(active.section)}">${rhiUxDomainShell({
         product:'Home Intelligence',
-        domain:'ENERGIE',
+        domain:rhiEnergyT(this._hass,'nav.energy',{},'Energy').toUpperCase(),
         modules,
         activeModule:active.section,
         activeItem:active.item
@@ -1801,7 +1809,7 @@
         const profileRow = runtime.strategyProfileEditableRowByKey(propertyKey);
         const effectiveRow = catalogRow || profileRow || (row && !row.missing ? row : null);
         if (!this.isWritableRow(effectiveRow)) {
-          this.writeFeedback[propertyKey] = { state: 'rejected', reason: effectiveRow?.editable_reason || 'No public write route published', updated: Date.now() };
+          this.writeFeedback[propertyKey] = { state: 'rejected', reason: effectiveRow?.editable_reason || 'Editing is unavailable', updated: Date.now() };
           return;
         }
         const control = this.shadowRoot.querySelector(`[data-property-key="${CSS.escape(propertyKey)}"]`);
@@ -2112,7 +2120,7 @@
       const normalized = String(state || '').trim().toLowerCase();
       if (['complete','ok','ready'].includes(normalized)) return 'Complete';
       if (['incomplete','partial'].includes(normalized)) return 'Partial result';
-      if (['not_configured','configuration_required','not ready','not_ready'].includes(normalized)) return 'Configuration required';
+      if (['not_configured','configuration_required','not ready','not_ready'].includes(normalized)) return 'Setup needed';
       if (['reset_pending','pending','baseline_reset_required'].includes(normalized)) return 'Awaiting reset';
       return 'Unavailable';
     }
@@ -2462,7 +2470,7 @@
       const semanticDescription = navItem?.description || p.explanation;
       const heroKey = navItem?.id || tab;
       return rhiEnergyPageHeader({
-        sectionLabel:navSection?.label || 'Energy',
+        sectionLabel:navSection?.label || rhiEnergyT(this._hass,'nav.energy',{},'Energy'),
         itemLabel:navItem?.label || p.eyebrow,
         title:semanticTitle,
         description:semanticDescription,
@@ -2519,7 +2527,7 @@
       if (!id) return '';
       const models = rt.commandActionModelsForAsset(id).filter(Boolean).slice(0, limit);
       if (!models.length) return '';
-      return `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${models.map(model => this.componentActionModelButton(model)).join('')}</div></div>`;
+      return `<div class="energyAssetQuickActions"><small>${escapeHtml(rhiEnergyT(this._hass,'common.quick_actions',{},'Quick actions'))}</small><div>${models.map(model => this.componentActionModelButton(model)).join('')}</div></div>`;
     }
     measuredAssetPower(asset = {}) {
       return asNumber(firstDefined(asset.actual_power_kw, asset.current_power_kw, asset.power_kw));
@@ -2574,10 +2582,8 @@
       const compatibility = rt.contractCompatibility();
       if (!compatibility.available && compatibility.reason) {
         return `${this.tabExperienceHeader(rt,'overview',pageVm)}
-          <section class="panel" style="padding:18px">
-            <h2 style="margin:0 0 8px">Energy contract unavailable</h2>
-            <p style="margin:0 0 8px">The canonical Energy product contract or required core capability is not available.</p>
-            <p style="margin:0;color:var(--muted)">Backend: ${escapeHtml(compatibility.release || 'unknown')} · ${escapeHtml(compatibility.reason)}</p>
+          <section class="panel energyUnavailableState">
+            ${rhiUxState({state:'unavailable',title:rhiEnergyT(this._hass,'common.not_available',{},'Not available'),detail:rhiEnergyT(this._hass,'common.information_missing',{},'This information is not available yet.')})}
           </section>`;
       }
       const d = rt.decision();
@@ -2707,7 +2713,7 @@
       const opts = allowed.length ? allowed.map(v => ({ value:v, label:this.productStateLabel(v, human(v)) })) : fallbackOptions;
       let editor = '';
       if (!opts.length) {
-        editor = `<label class="selectField noOptions"><select disabled data-property-key="${escapeHtml(this.propertyKeyFor(row))}"><option>${escapeHtml(value ? this.productStateLabel(value, human(value)) : 'Options not published')}</option></select></label>`;
+        editor = `<label class="selectField noOptions"><select disabled data-property-key="${escapeHtml(this.propertyKeyFor(row))}"><option>${escapeHtml(value ? this.productStateLabel(value, human(value)) : 'Options unavailable')}</option></select></label>`;
       } else {
         const options = opts.map(option => { const optValue=(option&&typeof option==='object')?(option.value??option.id??option.key??option.label):option; const optLabel=(option&&typeof option==='object')?(option.label??option.name??this.productStateLabel(optValue,human(optValue))):this.productStateLabel(optValue,human(optValue)); const selected=String(optValue).toLowerCase()===String(value??'').toLowerCase()?' selected':''; return `<option value="${escapeHtml(optValue)}"${selected}>${escapeHtml(optLabel)}</option>`; }).join('');
         editor = `<label class="selectField"><select ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}">${options}</select></label>`;
@@ -3094,7 +3100,7 @@
       const priority = this.priorityControl(rt,load,id);
       const configurationBody = [requestedControl,priority].filter(Boolean).join('');
       const configuration = configurationBody
-        ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${configurationBody}</div></details>`
+        ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.configuration',{},'Configuration'))}</summary><div class="energyAssetFoldBody">${configurationBody}</div></details>`
         : '';
       const detailsRows = [
         ['Connection',connection.label || 'Unavailable'],
@@ -3104,7 +3110,7 @@
         reason ? ['Reason',reason] : null
       ].filter(Boolean);
       const details = detailsRows.length
-        ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailsRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
+        ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.details',{},'Details'))}</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailsRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
         : '';
       const diagnosticRows = [
         ['Asset id', id],
@@ -3435,6 +3441,7 @@
     }
 
     energyAssetDiagnosticsDisclosure(rt, asset = {}) {
+      if (this.config?.show_diagnostics !== true) return '';
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       if (!id) return '';
@@ -3464,7 +3471,7 @@
         missing.length ? ['Missing publication fields',missing.join(' · ')] : null,
         ...propertyRows
       ].filter(Boolean);
-      return `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
+      return `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.diagnostics',{},'Diagnostics'))}</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
     }
 
     energyAppearanceAction(rt, asset = {}) {
@@ -3476,7 +3483,7 @@
       const row = rt.editableProperty(`appearance:${id}:visual_ref`);
       const directWrite = objectFrom(enriched.appearance?.write || {});
       if (!this.isWritableRow(row) && !(directWrite.supported === true && directWrite.operation_id === 'energy.property.write' && directWrite.service === 'rhi_energy.write_property')) return '';
-      return `<button type="button" class="energyAppearanceAction" data-energy-visual-open="${escapeHtml(id)}">Appearance</button>`;
+      return `<button type="button" class="energyAppearanceAction" data-energy-visual-open="${escapeHtml(id)}">${escapeHtml(rhiEnergyT(this._hass,'common.appearance',{},'Appearance'))}</button>`;
     }
 
     energyDeviceStatusCard(rt, asset = {}, roleLabel = '', childrenHtml = '') {
@@ -3504,7 +3511,7 @@
       const details = this.energyAssetDetailDisclosure(rt,enriched);
       const diagnostics = this.energyAssetDiagnosticsDisclosure(rt,enriched);
       const children = childrenHtml
-        ? `<details class="energyAssetChildrenSibling"><summary>Children</summary><div class="energyAssetChildrenStack">${childrenHtml}</div></details>`
+        ? `<details class="energyAssetChildrenSibling"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.children',{},'Children'))}</summary><div class="energyAssetChildrenStack">${childrenHtml}</div></details>`
         : '';
       return `<div class="energyAssetNode" data-energy-device-type="${escapeHtml(type)}"><article class="energyDeviceCard">
         <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
@@ -4480,7 +4487,7 @@
       const otherGrid = grid === null ? null : Math.max(0, grid - (lowGrid || 0));
       const values = [solar || 0, battery || 0, lowGrid || 0, otherGrid || 0];
       const total = values.reduce((a,b)=>a+b,0);
-      if (!total) return `<div class="consumerMixUnavailable">Source attribution not published</div>`;
+      if (!total) return `<div class="consumerMixUnavailable">Energy source unavailable</div>`;
       return `<div class="consumerMixBar" aria-label="Energy source mix"><span class="solar" style="width:${Math.max(0,values[0])}%"></span><span class="battery" style="width:${Math.max(0,values[1])}%"></span><span class="lowGrid" style="width:${Math.max(0,values[2])}%"></span><span class="grid" style="width:${Math.max(0,values[3])}%"></span></div><div class="consumerMixLegend"><span>Solar ${fmtPct(solar)}</span><span>Battery ${fmtPct(battery)}</span><span>Low-cost grid ${fmtPct(lowGrid)}</span><span>Other grid ${fmtPct(otherGrid)}</span></div>`;
     }
     consumerExplorerCard(rt, row = {}) {
@@ -5089,7 +5096,7 @@
       }).filter(Boolean).join('');
       const optional = [['Savings',v.savings],['Avoided grid cost',v.avoided],['Self-consumption value',v.selfConsumption]].filter(([,value])=>asNumber(value)!==null).map(([label,value])=>this.kv(label,money(value))).join('');
       const financialBody = configurationBlocked
-        ? `<section class="panel wide valueConfigurationState"><h2>Financial result</h2><div class="valueStateHeadline"><b>${escapeHtml(v.stateLabel)}</b><span>${escapeHtml(v.attention)}</span></div><p>Complete only the Pricing inputs the backend marks as blocking for ${escapeHtml(v.label.toLowerCase())}.</p><div class="valueConfigurationChecklist">${missingRequired.map(item=>`<div><span>${item.configured?'✓':'□'}</span><b>${escapeHtml(item.label)}</b><em>${escapeHtml(item.configured?'Configured':'Configuration required')}</em></div>`).join('')}</div></section>`
+        ? `<section class="panel wide valueConfigurationState"><h2>Financial result</h2><div class="valueStateHeadline"><b>${escapeHtml(v.stateLabel)}</b><span>${escapeHtml(v.attention)}</span></div><p>Complete only the Pricing inputs the backend marks as blocking for ${escapeHtml(v.label.toLowerCase())}.</p><div class="valueConfigurationChecklist">${missingRequired.map(item=>`<div><span>${item.configured?'✓':'□'}</span><b>${escapeHtml(item.label)}</b><em>${escapeHtml(item.configured?'Configured':'Setup needed')}</em></div>`).join('')}</div></section>`
         : !v.accountingReady && !hasFinancialValue
           ? `<section class="panel wide valueEvidenceState"><h2>Financial result</h2><div class="valueStateHeadline"><b>Waiting for measured evidence</b><span>${escapeHtml(v.attention)}</span></div><p>Pricing is usable. The financial result will appear when the selected Metering period contains sufficient measured import/export evidence.</p></section>`
           : `<section class="panel wide"><h2>${escapeHtml(v.label)} financial result</h2><p>Accumulated measured value for the Metering-selected period. No future value is predicted.</p><div class="r3280Balance"><span>Net financial result</span><b>${escapeHtml(money(v.net))}</b><p>${escapeHtml(v.interpretation)}</p></div><div class="goalGrid"><div class="goalRow"><span>Import cost</span><b>${escapeHtml(money(v.importCost))}</b></div><div class="goalRow"><span>Export revenue</span><b>${escapeHtml(money(v.exportRevenue))}</b></div><div class="goalRow"><span>Net energy cost</span><b>${escapeHtml(money(v.netEnergyCost))}</b></div><div class="goalRow"><span>Result completeness</span><b>${escapeHtml(v.resultCompletenessLabel)}</b><small>${escapeHtml(v.resultScopeLabel)}</small></div></div>${optional ? `<div class="softBox">${optional}</div>` : ''}</section>`;
@@ -5104,88 +5111,10 @@
       return `${this.tabExperienceHeader(rt,'value',pageVm)}${this.bodyContextBar(rt,'value','value-body')}<div id="value-body" class="valuePage r363ValuePage">
         <div class="valueGrid">${financialBody}
         <section class="panel wide strategyTablePanel pricingStrategyPanel" id="value-pricing-settings"><div class="strategyTableHead"><div><h2>Pricing settings</h2><p>${missingRequired.length ? `${missingRequired.length} value${missingRequired.length===1?'':'s'} still need configuration.` : 'Tariff configuration is complete.'}</p></div><div class="strategySetActions">${pricingActions}</div></div><div class="strategyTable"><div class="strategyColumnHead"><span>Setting</span><span>Value</span></div>${tariffRows}</div></section>
-        <section class="panel" id="value-flexible-pricing"><h2>Pricing of flexible loads</h2><p>Financial attribution is shown only when Value publishes it. The UX does not estimate costs.</p><div class="flexPricingList">${flexibleRows || `<div class="empty"><b>No flexible loads published</b><span>No controllable Energy assets are currently available.</span></div>`}</div></section>
-        <section class="panel" id="value-consumers"><h2>Consumer allocation</h2><p>Financial attribution by consumer for ${escapeHtml(v.label.toLowerCase())}.</p>${consumers || `<div class="empty"><b>Consumer allocation is not yet available for the selected period.</b><span>No consumer value attribution is currently published.</span></div>`}</section>
+        <section class="panel" id="value-flexible-pricing"><h2>Pricing of flexible loads</h2><p>Financial attribution is shown only when Value publishes it. The UX does not estimate costs.</p><div class="flexPricingList">${flexibleRows || `<div class="empty"><b>No controllable loads available</b><span>No controllable Energy assets are currently available.</span></div>`}</div></section>
+        <section class="panel" id="value-consumers"><h2>Consumer allocation</h2><p>Financial attribution by consumer for ${escapeHtml(v.label.toLowerCase())}.</p>${consumers || `<div class="empty"><b>Consumer allocation is not yet available for the selected period.</b><span>Consumer value allocation is not available yet.</span></div>`}</section>
         </div>
       </div>`;
-    }
-
-    productLanguage(html) {
-      let out = String(html || '');
-      const replacements = [
-        [/Data incomplete/gi,'Some details unavailable'],
-        [/Some guidance details unavailable/gi,'Some guidance is unavailable'],
-        [/Some forecast details unavailable/gi,'Some forecast information is unavailable'],
-        [/Some measurements unavailable/gi,'Some measurements are unavailable'],
-        [/Some consumer details unavailable/gi,'Some consumer information is unavailable'],
-        [/Configuration required/gi,'Setup needed'],
-        [/Published by Pricing/gi,'Configured'],
-        [/No reliable financial result is currently published\.?/gi,'A reliable financial result is not available yet.'],
-        [/No consumer value attribution is currently published\.?/gi,'Consumer value allocation is not available yet.'],
-        [/No flexible loads published/gi,'No controllable loads available'],
-        [/No consumers published/gi,'No consumers available'],
-        [/No charger connections published/gi,'No charger connections available'],
-        [/Source attribution not published/gi,'Energy source unavailable'],
-        [/Planning Value Published/gi,'Charging plan available'],
-        [/Horizon Summary Available/gi,'Outlook available'],
-        [/Calculation Not Trusted/gi,'Waiting for complete data'],
-        [/Calculation Trust Health Not Ok/gi,'Some planning inputs are incomplete'],
-        [/Runtime Error/gi,'Currently unavailable'],
-        [/\bUNKNOWN\b/gi,'Not measured'],
-        [/\bTRUST_STATE\b/gi,'Measurement quality'],
-        [/\bBASELINE_UNTRUSTED\b/gi,'Verification required'],
-        [/\bRESET_PENDING\b/gi,'Reset in progress'],
-        [/Approval required/gi,'Confirmation needed'],
-        [/Observed/gi,'Available'],
-        [/Flexible Asset/gi,'Controllable'],
-        [/Flexible assets/gi,'Controllable assets'],
-        [/public flow relations/gi,'connections'],
-        [/Topology evidence/gi,'Connection details'],
-        [/Physical topology/gi,'Energy connections'],
-        [/Published by Mobility as Energy connection assets\.?/gi,'Vehicle charging connections.'],
-        [/Aggregate storage state from public battery property index\.?/gi,'Combined state of your home batteries.'],
-        [/Rendered only from inline editable property metadata\.?/gi,'Settings available for this battery.'],
-        [/No editable battery settings published/gi,'No battery settings available'],
-        [/Editable metadata is inline on public property rows\.?/gi,'No adjustable battery settings are currently available.'],
-        [/Today and tomorrow horizon outlook from the canonical Outlook contract/gi,'Today and tomorrow energy outlook'],
-        [/Current-day horizon summary from the Outlook contract\.?/gi,'Today’s expected energy balance.'],
-        [/Some details are not published yet\. See quality details\.?/gi,'Planning detail is partial; open Quality for exact limitations.'],
-        [/Period summaries not published yet\.?/gi,'Week, month and year summaries are not available yet.'],
-        [/Showing clean today counters from the public metering index\. Week, month and year are not fabricated by UX\./gi,'Today’s measured totals remain available. Longer periods will appear when their summaries are ready.'],
-        [/Backend-published remediation advice for the selected period\.?/gi,'What needs attention for the selected period.'],
-        [/Reset Command Not Published/gi,'Reset is not available'],
-        [/Contract gap/gi,'Details'],
-        [/Mode is currently published read-only by the backend\.?/gi,'This mode is currently view-only.'],
-        [/Backend did not publish allowed values\.?/gi,'No selectable options are currently available.'],
-        [/Options not published/gi,'Options unavailable'],
-        [/No public write route published/gi,'Editing is unavailable'],
-        [/No public command published/gi,'Action unavailable'],
-        [/No command published/gi,'Action unavailable'],
-        [/No additional explanation is needed/gi,'No additional explanation available'],
-        [/Not published/gi,'Unavailable'],
-        [/Published/gi,'Available'],
-        [/Canonical/gi,'Main'],
-        [/property index/gi,'data source'],
-        [/contract/gi,'information'],
-        [/runtime/gi,'system'],
-        [/metadata/gi,'settings information'],
-        [/trust health/gi,'data quality'],
-        [/planner state/gi,'plan status'],
-        [/Energy Need Exists/gi,'Energy demand is waiting'],
-        [/Energy Need Blocked/gi,'Waiting for suitable energy'],
-        [/Automatic Blocker/gi,'Automatic start condition'],
-        [/Min(?:imum)? Power Above Surplus/gi,'Waiting for sufficient solar power'],
-        [/Checking Readiness/gi,'Preparing automatic control'],
-        [/Provider Remaining Forecast/gi,'Remaining forecast'],
-        [/Execution state/gi,'Status'],
-        [/Execution/gi,'Status'],
-        [/Candidate(?:s)?/gi,'Considered'],
-        [/Selected/gi,'Planned'],
-        [/Blocked/gi,'Waiting'],
-        [/Baseline reset required/gi,'Metering reset needed']
-      ];
-      for (const [pattern, value] of replacements) out = out.replace(pattern, value);
-      return out;
     }
 
     planningAssetIcon(asset = {}) {
@@ -5491,15 +5420,15 @@
         title:'Strategic Planning',
         explanation:'What your current Energy settings mean for longer-term behavior.',
         metrics:[
-          ['◎','Strategy',posture || 'Not published','Current longer-term posture'],
-          ['◇','Topics',String(topics.length),'Backend-owned policy areas influencing strategy'],
+          ['◎','Strategy',posture || 'Not available','Current longer-term posture'],
+          ['◇','Topics',String(topics.length),'Policy areas influencing your strategy'],
           ['↗','Tactical horizon','D0 / D1','Today and tomorrow remain in Tactical Planning']
         ]
       };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}
         <div class="strategicPlanningPage strategicBehaviorPage">
-          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not published')}</h2><p>Strategy configuration is the authority for longer-term intent. This read-only view explains the effective meaning of your current Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
-          <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No strategic behavior published</b><span>The backend has not published effective behavior topics yet.</span></div></section>'}</div>
+          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not available')}</h2><p>Strategy configuration is the authority for longer-term intent. This read-only view explains the effective meaning of your current Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
+          <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No long-term strategy available</b><span>Long-term strategy details are not available yet.</span></div></section>'}</div>
         </div>`;
     }
 
@@ -5507,12 +5436,12 @@
       if (view === 'solar-generation') {
         const p = this.buildPageViewModel(rt, 'solar');
         const model = { ...p, title:'Solar generation', badgeText:'Structure ready', badgeTone:'neutral' };
-        return `${this.tabExperienceHeader(rt,'solar-generation',model)}<section class="panel navigationPlaceholder"><small>ENERGY DOMAIN</small><h2>Solar generation content follows in the next screen pass</h2><p>The navigation and premium header are now in their final structural location. Inverter, panel and storage-link content is intentionally not moved into this release.</p></section>`;
+        return `${this.tabExperienceHeader(rt,'solar-generation',model)}<section class="panel navigationPlaceholder"><small>ENERGY DOMAIN</small><h2>Solar generation details are not available yet</h2><p>This information is not available yet.</p></section>`;
       }
       return `<section class="panel navigationPlaceholder"><h2>${escapeHtml(human(view))}</h2><p>This navigation target has no dedicated renderer.</p></section>`;
     }
     placeholder(rt) {
-      return `<section class="panel cleanPlaceholder"><h2>${escapeHtml(this.title())}</h2><p>This screen is outside the current clean rewrite scope. All V1 screens are active on the R1.56 public contract runtime.</p><div class="softBox"><b>Migration scope</b><span>Metering, Intelligence and Value are now clean active screens. Style cleanup stays for the final polish round.</span></div></section>`;
+      return `<section class="panel cleanPlaceholder"><h2>${escapeHtml(this.title())}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'common.information_missing',{},'This information is not available yet.'))}</p></section>`;
     }
     renderMainWarning(footer) {
       // R3.45.5: backend trust is a footer concern only.
@@ -5555,23 +5484,18 @@
       return '';
     }
     renderFooter(rt, tab, footer) {
+      if (this.config?.show_diagnostics !== true) return '';
       const backend = footer.backendVersion || 'Unknown';
       const contract = footer.contractVersion || 'Unknown';
       const issue = this.releaseIssueModel(rt, tab, footer);
-      const issueLines = issue
-        ? String(issue.tooltip || issue.label || 'Runtime issue').split('\n').map(line => line.trim()).filter(Boolean)
-        : [];
-      const issueDetails = issue ? `
-        <details class="rhiUxFooterDetails">
-          <summary class="hiReleaseIssue rhiUxFooterIssue ${issue.severity}">${escapeHtml(issue.label)} · details</summary>
-          <div class="rhiUxFooterPanel" role="status">
-            <div class="rhiUxFooterPanelMeta">Backend ${escapeHtml(backend)} · Contract ${escapeHtml(contract)}</div>
-            ${issueLines.map(line => `<div class="rhiUxFooterProblem"><span class="rhiUxFooterProblemDot" aria-hidden="true"></span><span>${escapeHtml(line)}</span></div>`).join('')}
-            <div class="rhiUxFooterAction">Resolve the listed runtime/backend condition, then reload this view to verify recovery.</div>
-          </div>
-        </details>` : '';
       const status = issue ? (issue.severity === 'error' ? 'Attention' : 'Degraded') : (footer.runtimeTrusted === false ? 'Attention' : 'Ready');
-      return `<footer class="hiRuntimeFooter rhiUxFooter" aria-label="RHI Energy release information"><span>RHI Energy UX ${escapeHtml(footer.uxVersion || UX_VERSION)}</span><span>Backend ${escapeHtml(backend)}</span><span>Status ${escapeHtml(status)}</span>${issueDetails}</footer>`;
+      return rhiUxTechnicalFooter({
+        product:'RHI Energy',
+        uxVersion:footer.uxVersion || UX_VERSION,
+        backendVersion:backend,
+        issue:issue ? `${issue.label} · contract ${contract}` : `Status ${status}`,
+        severity:issue?.severity || ''
+      });
     }
     renderError(view, error) {
       const message = error && error.message ? error.message : String(error || 'Unknown render error');
@@ -5982,7 +5906,7 @@
 @media(max-width:1024px){.hiTabStatusItem{grid-template-columns:42px minmax(0,1fr);padding:10px;min-height:88px}.hiTabStatusIcon{width:40px;height:40px;min-width:40px}}
 @media(max-width:760px){.hiTabPurpose{font-size:12px}.hiQuickActionItems{flex-wrap:nowrap}.hiQuickAction{flex:0 0 auto}}
 @media(max-width:430px){.hiTabPurpose{font-size:10px;line-height:1.3}.hiTabStatusItem{grid-template-columns:34px minmax(0,1fr);min-height:76px;padding:8px;gap:7px}.hiTabStatusIcon{width:32px;height:32px;min-width:32px;border-radius:10px;font-size:18px}}
-</style><main class="energy rhiUxDomainBody rhi-ux-root">${this.nav()}${this.renderMainWarning(footer)}<section>${this.productLanguage(content)}</section>${this.propertyDraftBar()}${this.energyVisualPickerOverlay(rt)}${this.productLanguage(this.renderFooter(rt,this.view,footer))}</main>`;
+</style><main class="energy rhiUxDomainBody rhi-ux-root">${this.nav()}${this.renderMainWarning(footer)}<section>${content}</section>${this.propertyDraftBar()}${this.energyVisualPickerOverlay(rt)}${this.renderFooter(rt,this.view,footer)}</main>`;
       if (markup === this._lastMarkup) { this.persistInteractionContext(); return; }
       this._lastMarkup = markup;
       this.persistInteractionContext();

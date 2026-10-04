@@ -1,3 +1,10 @@
+## 4.3.26 — UX Core 1.6 / Zero-Debt Closure Candidate
+
+- adopt UX Core 1.6.0 compact shared page, asset and localization foundation;
+- retain one V2 Energy product-state entry point and fail closed on missing truth;
+- add release-blocking zero-debt validation for legacy product APIs and shared presentation drift;
+- preserve zero accepted technical and feature debt while target-runtime and multilingual proof remain blocking qualification items.
+
 ## 4.3.25 — Flat Hierarchy Section Parity
 
 - restore Solar Production to the same top-level section level as Home Battery;

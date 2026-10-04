@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "owner": "rhi-energy-ux",
+  "policy": "Frontend never reconstructs missing backend truth. Required unmapped semantics are blocking backend gaps.",
+  "gaps": [
+    {
+      "gap_id": "ENERGY-UX-FOUNDATION-VISUAL-REGISTRY-V2",
+      "surface": "cross-domain visual identity",
+      "requested_semantic": "canonical producer-owned visual registry without V1 dependency",
+      "owning_domain": "rhi_foundation",
+      "severity": "P0",
+      "blocking": true,
+      "backend_issue": "https://github.com/npinguin/rhi-foundation/issues/89",
+      "backend_pr": "https://github.com/npinguin/rhi-foundation/pull/90",
+      "status": "backend_merged_awaiting_target_runtime_qualification",
+      "required_release": "F1.8.38",
+      "frontend_behavior": "consume RHI_VISUAL_ASSET_REGISTRY_V2 only; fail closed when unavailable"
+    },
+    {
+      "gap_id": "ENERGY-UX-PLANNING-RECONCILIATION",
+      "surface": "today/tomorrow planning",
+      "requested_semantic": "canonical D0/D1 item and aggregate planning truth including planned today, still to plan and reconciled totals",
+      "owning_domain": "rhi_energy",
+      "severity": "P0",
+      "blocking": true,
+      "backend_issue": "https://github.com/npinguin/rhi-energy/issues/164",
+      "status": "backend_open",
+      "frontend_behavior": "render only published planning truth; unknown or incomplete totals remain unavailable"
+    },
+    {
+      "gap_id": "ENERGY-UX-SETTINGS-WRITE-READBACK",
+      "surface": "settings, automation mode and strategy profiles",
+      "requested_semantic": "configured intent, executable write metadata, authoritative readback, effective policy and persistence",
+      "owning_domain": "rhi_energy",
+      "severity": "P0",
+      "blocking": true,
+      "backend_issue": "https://github.com/npinguin/rhi-energy/issues/163",
+      "status": "backend_open",
+      "frontend_behavior": "show only canonical writable controls; never synthesize write routes or optimistic success"
+    },
+    {
+      "gap_id": "ENERGY-UX-MOBILITY-PLANNING-ELIGIBILITY",
+      "surface": "managed flexible loads and charging plan",
+      "requested_semantic": "coherent actual/requested/planned power, producer command capability, plan eligibility and physical relationship truth",
+      "owning_domain": "rhi_energy",
+      "severity": "P0",
+      "blocking": true,
+      "backend_issue": "https://github.com/npinguin/rhi-energy/issues/156",
+      "status": "backend_open",
+      "frontend_behavior": "exclude infrastructure-only rows from managed planning and fail closed when eligibility evidence is incomplete"
+    },
+    {
+      "gap_id": "ENERGY-UX-PER-ASSET-PERIOD-ENERGY",
+      "surface": "consumer metering and value attribution",
+      "requested_semantic": "canonical per-asset period energy and attribution for flexible/managed consumers",
+      "owning_domain": "rhi_energy",
+      "severity": "P1",
+      "blocking": true,
+      "backend_issue": "https://github.com/npinguin/rhi-energy/issues/137",
+      "status": "backend_open",
+      "frontend_behavior": "do not derive period energy from current power or buckets; show unavailable until published"
+    }
+  ]
+}

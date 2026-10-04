@@ -5,7 +5,7 @@ const app = fs.readFileSync("src/app/energy-card.js","utf8");
 const presentation = fs.readFileSync("src/app/presentation.js","utf8");
 const catalog = fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
 
-assert.match(presentation,/id:"consumers", label:"Consumers"[\s\S]*id:"gas", label:"Gas", view:"gas"/);
+assert.match(presentation,/id:"consumers", labelKey:"nav\.consumption", fallback:"Consumption"[\s\S]*id:"gas", labelKey:"nav\.gas", fallback:"Gas", view:"gas"/);
 assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v3.webp"'),"Gas page hero mapping must use approved photographic v3 asset");
 assert.ok(fs.existsSync("src/assets/heroes/gas-page-hero-v3.webp"),"missing approved Gas page hero v3 artwork");
 
