@@ -7,31 +7,40 @@ const HB_ENERGY_NAVIGATION_SPEC = Object.freeze([
     id:"energy", labelKey:"nav.energy", fallback:"Energy",
     items:[
       { id:"overview", labelKey:"nav.overview", fallback:"Overview", view:"overview", titleKey:"hero.overview.title", descriptionKey:"hero.overview.description" },
-      { id:"flow", labelKey:"nav.flow", fallback:"Flow", view:"flow", titleKey:"hero.flow.title", descriptionKey:"hero.flow.description" },
       { id:"solar", labelKey:"nav.solar", fallback:"Solar", view:"solar", titleKey:"hero.solar.title", descriptionKey:"hero.solar.description" },
       { id:"battery", labelKey:"nav.battery", fallback:"Home Battery", view:"battery", titleKey:"hero.battery.title", descriptionKey:"hero.battery.description" },
-      { id:"consumers", labelKey:"nav.consumption", fallback:"Consumption", view:"consumers", titleKey:"hero.consumption.title", descriptionKey:"hero.consumption.description" },
-      { id:"gas", labelKey:"nav.gas", fallback:"Gas", view:"gas", titleKey:"hero.gas.title", descriptionKey:"hero.gas.description" }
+      { id:"consumers", labelKey:"nav.consumption", fallback:"Consumption", view:"consumers", titleKey:"hero.consumption.title", descriptionKey:"hero.consumption.description" }
     ]
   },
   {
     id:"intelligence", labelKey:"nav.intelligence", fallback:"Intelligence",
     items:[
-      { id:"operational-planning", labelKey:"nav.operational_plan", fallback:"Now", view:"operational-planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
-      { id:"tactical-planning", labelKey:"nav.tactical_plan", fallback:"Today & Tomorrow", view:"planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
-      { id:"strategic-planning", labelKey:"nav.strategic_plan", fallback:"Long term", view:"strategic-planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
+      { id:"plan", labelKey:"nav.plan", fallback:"Plan", view:"planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
       { id:"settings", labelKey:"nav.settings", fallback:"Settings", view:"strategies", titleKey:"hero.settings.title", descriptionKey:"hero.settings.description" }
     ]
   },
   {
     id:"insights", labelKey:"nav.insights", fallback:"Insights",
     items:[
-      { id:"metering", labelKey:"nav.performance", fallback:"Performance", view:"metering", titleKey:"hero.performance.title", descriptionKey:"hero.performance.description" },
-      { id:"value", labelKey:"nav.value", fallback:"Value", view:"value", titleKey:"hero.value.title", descriptionKey:"hero.value.description" },
-      { id:"retrospective", labelKey:"nav.retrospective", fallback:"Retrospective", view:"retrospective", titleKey:"hero.retrospective.title", descriptionKey:"hero.retrospective.description" }
+      { id:"performance", labelKey:"nav.performance", fallback:"Performance", view:"metering", titleKey:"hero.performance.title", descriptionKey:"hero.performance.description" },
+      { id:"value", labelKey:"nav.value", fallback:"Value", view:"value", titleKey:"hero.value.title", descriptionKey:"hero.value.description" }
     ]
   }
 ]);
+
+const HB_ENERGY_SUBVIEW_OWNERS = Object.freeze({
+  flow:{section:"energy",item:"overview"},
+  gas:{section:"energy",item:"consumers"},
+  outlook:{section:"intelligence",item:"plan"},
+  "operational-planning":{section:"intelligence",item:"plan"},
+  planning:{section:"intelligence",item:"plan"},
+  "strategic-planning":{section:"intelligence",item:"plan"},
+  retrospective:{section:"insights",item:"performance"}
+});
+
+function hbEnergySubviewOwner(view = "") {
+  return HB_ENERGY_SUBVIEW_OWNERS[String(view || "")] || null;
+}
 
 function hbEnergyNavigation(hass = null) {
   return HB_ENERGY_NAVIGATION_SPEC.map(section => ({
