@@ -49,15 +49,15 @@ assert.match(app,/energyDeviceState/);
 assert.match(app,/\['Telemetry', telemetry\]/);
 assert.match(app,/assetQuickActions\(rt, assetId/);
 assert.match(app,/rt\.commandActionModelsForAsset\(id\)/);
-assert.match(app,/Telemetry limited/);
-assert.match(app,/per-battery power is not published/);
+assert.match(app,/Measurements limited/);
+assert.match(app,/per-battery power is not available/);
 assert.match(app,/solarProductionHierarchy/);
 assert.match(app,/solarOptimizerPrimaryCard/);
 assert.match(app,/OPTIMIZER \/ PANEL/);
 assert.doesNotMatch(app,/No panels linked to this zone/);
 assert.match(app,/solarTopologyDetails/);
 assert.match(app,/solarTopologyDiagnostics/);
-assert.match(app,/No charging topology published/);
+assert.match(app,/No charging connections available/);
 
 for (const token of [
   "battery_system.generic",
