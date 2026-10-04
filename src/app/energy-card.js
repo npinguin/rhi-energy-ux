@@ -1154,6 +1154,7 @@
     setConfig(config) { this.config = config || {}; }
     set hass(hass) {
       this._hass = hass;
+      rhiEnergySetLocaleFromHass(hass);
       this.reconcileWriteFeedback();
       this.reconcilePendingAppearances();
       this.syncMeteringPeriodFromRuntime();
@@ -2575,10 +2576,8 @@
       const compatibility = rt.contractCompatibility();
       if (!compatibility.available && compatibility.reason) {
         return `${this.tabExperienceHeader(rt,'overview',pageVm)}
-          <section class="panel" style="padding:18px">
-            <h2 style="margin:0 0 8px">Energy contract unavailable</h2>
-            <p style="margin:0 0 8px">The canonical Energy product contract or required core capability is not available.</p>
-            <p style="margin:0;color:var(--muted)">Backend: ${escapeHtml(compatibility.release || 'unknown')} · ${escapeHtml(compatibility.reason)}</p>
+          <section class="panel energyUnavailableState">
+            ${rhiUxState({state:'unavailable',title:rhiEnergyT(this._hass,'common.not_available',{},'Not available'),detail:rhiEnergyT(this._hass,'common.information_missing',{},'This information is not available yet.')})}
           </section>`;
       }
       const d = rt.decision();
@@ -3095,7 +3094,7 @@
       const priority = this.priorityControl(rt,load,id);
       const configurationBody = [requestedControl,priority].filter(Boolean).join('');
       const configuration = configurationBody
-        ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${configurationBody}</div></details>`
+        ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.configuration',{},'Configuration'))}</summary><div class="energyAssetFoldBody">${configurationBody}</div></details>`
         : '';
       const detailsRows = [
         ['Connection',connection.label || 'Unavailable'],
@@ -3105,7 +3104,7 @@
         reason ? ['Reason',reason] : null
       ].filter(Boolean);
       const details = detailsRows.length
-        ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailsRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
+        ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.details',{},'Details'))}</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailsRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
         : '';
       const diagnosticRows = [
         ['Asset id', id],
@@ -3436,6 +3435,7 @@
     }
 
     energyAssetDiagnosticsDisclosure(rt, asset = {}) {
+      if (this.config?.show_diagnostics !== true) return '';
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       if (!id) return '';
@@ -3465,7 +3465,7 @@
         missing.length ? ['Missing publication fields',missing.join(' · ')] : null,
         ...propertyRows
       ].filter(Boolean);
-      return `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
+      return `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.diagnostics',{},'Diagnostics'))}</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
     }
 
     energyAppearanceAction(rt, asset = {}) {
@@ -3477,7 +3477,7 @@
       const row = rt.editableProperty(`appearance:${id}:visual_ref`);
       const directWrite = objectFrom(enriched.appearance?.write || {});
       if (!this.isWritableRow(row) && !(directWrite.supported === true && directWrite.operation_id === 'energy.property.write' && directWrite.service === 'rhi_energy.write_property')) return '';
-      return `<button type="button" class="energyAppearanceAction" data-energy-visual-open="${escapeHtml(id)}">Appearance</button>`;
+      return `<button type="button" class="energyAppearanceAction" data-energy-visual-open="${escapeHtml(id)}">${escapeHtml(rhiEnergyT(this._hass,'common.appearance',{},'Appearance'))}</button>`;
     }
 
     energyDeviceStatusCard(rt, asset = {}, roleLabel = '', childrenHtml = '') {
@@ -3505,7 +3505,7 @@
       const details = this.energyAssetDetailDisclosure(rt,enriched);
       const diagnostics = this.energyAssetDiagnosticsDisclosure(rt,enriched);
       const children = childrenHtml
-        ? `<details class="energyAssetChildrenSibling"><summary>Children</summary><div class="energyAssetChildrenStack">${childrenHtml}</div></details>`
+        ? `<details class="energyAssetChildrenSibling"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.children',{},'Children'))}</summary><div class="energyAssetChildrenStack">${childrenHtml}</div></details>`
         : '';
       return `<div class="energyAssetNode" data-energy-device-type="${escapeHtml(type)}"><article class="energyDeviceCard">
         <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
@@ -5556,23 +5556,18 @@
       return '';
     }
     renderFooter(rt, tab, footer) {
+      if (this.config?.show_diagnostics !== true) return '';
       const backend = footer.backendVersion || 'Unknown';
       const contract = footer.contractVersion || 'Unknown';
       const issue = this.releaseIssueModel(rt, tab, footer);
-      const issueLines = issue
-        ? String(issue.tooltip || issue.label || 'Runtime issue').split('\n').map(line => line.trim()).filter(Boolean)
-        : [];
-      const issueDetails = issue ? `
-        <details class="rhiUxFooterDetails">
-          <summary class="hiReleaseIssue rhiUxFooterIssue ${issue.severity}">${escapeHtml(issue.label)} · details</summary>
-          <div class="rhiUxFooterPanel" role="status">
-            <div class="rhiUxFooterPanelMeta">Backend ${escapeHtml(backend)} · Contract ${escapeHtml(contract)}</div>
-            ${issueLines.map(line => `<div class="rhiUxFooterProblem"><span class="rhiUxFooterProblemDot" aria-hidden="true"></span><span>${escapeHtml(line)}</span></div>`).join('')}
-            <div class="rhiUxFooterAction">Resolve the listed runtime/backend condition, then reload this view to verify recovery.</div>
-          </div>
-        </details>` : '';
       const status = issue ? (issue.severity === 'error' ? 'Attention' : 'Degraded') : (footer.runtimeTrusted === false ? 'Attention' : 'Ready');
-      return `<footer class="hiRuntimeFooter rhiUxFooter" aria-label="RHI Energy release information"><span>RHI Energy UX ${escapeHtml(footer.uxVersion || UX_VERSION)}</span><span>Backend ${escapeHtml(backend)}</span><span>Status ${escapeHtml(status)}</span>${issueDetails}</footer>`;
+      return rhiUxTechnicalFooter({
+        product:'RHI Energy',
+        uxVersion:footer.uxVersion || UX_VERSION,
+        backendVersion:backend,
+        issue:issue ? `${issue.label} · contract ${contract}` : `Status ${status}`,
+        severity:issue?.severity || ''
+      });
     }
     renderError(view, error) {
       const message = error && error.message ? error.message : String(error || 'Unknown render error');
