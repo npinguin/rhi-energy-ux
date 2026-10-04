@@ -16,7 +16,9 @@ const required=[
   "fmtKw(currentPower,'—')",
   "presentation?.role",
   "behavior_topics",
-  "Published properties"
+  "userSafeProductText(value, fallback = '')",
+  "rhiUxAssetIdentity({",
+  "rhiUxAssetFactGrid("
 ];
 for(const token of required){
   if(!source.includes(token)) throw new Error("literal UX contract missing: "+token);
@@ -28,7 +30,15 @@ for(const forbidden of [
   "No explanation published.",
   "No explanation Available.",
   "fmtKw(currentPower,'0.0 kW')",
-  "rt.assetName(charger) || human(charger)"
+  "rt.assetName(charger) || human(charger)",
+  "Published properties",
+  "backend ETA",
+  "backend ready time",
+  "public write route",
+  "frontend defect guard",
+  "No charging topology published",
+  "Canonical Tactical plan projected without frontend recalculation",
+  "Strategy configuration is the authority for longer-term intent"
 ]){
   if(source.includes(forbidden)) throw new Error("forbidden UX drift returned: "+forbidden);
 }
@@ -51,6 +61,13 @@ const settingsEnd=source.indexOf("meteringPeriodRow(",settingsStart);
 const settings=source.slice(settingsStart,settingsEnd);
 if(settings.includes("Settings profile")) throw new Error("Settings must be topic-first, not profile-first");
 if(!settings.includes("settingsTopicGrid")) throw new Error("Settings topic navigation missing");
+
+const presentation=fs.readFileSync("src/app/presentation.js","utf8");
+const intelligence=presentation.slice(presentation.indexOf('id:"intelligence"'),presentation.indexOf('id:"insights"'));
+if(!intelligence.includes('id:"plan"') || !intelligence.includes('id:"settings"')) throw new Error("Intelligence navigation must expose Plan and Settings");
+for(const legacyTopLevel of ['id:"operational-planning"','id:"tactical-planning"','id:"strategic-planning"']){
+  if(intelligence.includes(legacyTopLevel)) throw new Error("planning subview leaked back into top-level navigation: "+legacyTopLevel);
+}
 
 const strategicStart=source.indexOf("strategicPlanning(rt) {");
 const strategicEnd=source.indexOf("navigationPlaceholder(",strategicStart);
