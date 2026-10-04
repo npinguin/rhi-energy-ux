@@ -68,8 +68,8 @@ for (const token of ["Power now","Available energy","Capacity","Reserve","Health
 }
 
 const child = method("batteryChildCard");
-assert.match(child,/Telemetry limited/);
-assert.match(child,/per-battery power is not published/);
+assert.match(child,/Measurements limited/);
+assert.match(child,/per-battery power is not available/);
 assert.match(child,/energyAssetDetailDisclosure/);
 
 const flowCharger = method("connectorCard");
