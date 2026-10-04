@@ -4471,7 +4471,7 @@
       const stateDetail = stateLabel === 'Charging' ? 'Absorbing energy from the Home Bus'
         : stateLabel === 'Discharging' ? 'Supplying energy to the Home Bus'
         : stateLabel === 'Idle' ? 'No active battery flow'
-        : stateLabel === 'Measurements limited' ? 'Battery is available; per-battery power is not published'
+        : stateLabel === 'Measurements limited' ? 'Battery is available; per-battery power is not available'
         : 'Battery is currently unavailable';
       const quickFacts = [
         ['Power now',fmtKw(power,'—')],
