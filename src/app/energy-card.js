@@ -181,6 +181,28 @@
       this._visualRegistry = null;
     }
     rawState(entityId) { return this.hass?.states?.[entityId] || null; }
+    subscriptionEntityIds() {
+      const registryEntity = String(this.visualRegistry()?.entityId || '');
+      return [...new Set([UX_INTERFACES.publicV2, registryEntity].filter(Boolean))];
+    }
+    entitySignature(entityIds = []) {
+      return (entityIds || []).map(id => {
+        const state = this.rawState(id);
+        return `${id}:${state?.state ?? ''}:${state?.last_updated ?? ''}`;
+      }).join('|');
+    }
+    gasStatisticsEntityId(assetId = '') {
+      const v2 = this.publicV2();
+      const row = v2.property('gas.total_m3', assetId) || v2.property('gas.total_m3');
+      if (!row || typeof row !== 'object') return '';
+      return String(firstDefined(
+        row.statistics_entity_id,
+        row.history_entity_id,
+        row.source_entity_id,
+        row.source?.entity_id,
+        ''
+      ) || '').trim();
+    }
     visualRegistry() {
       if (!this._visualRegistry) this._visualRegistry = readFoundationVisualRegistry(this.hass);
       return this._visualRegistry;
@@ -1182,35 +1204,11 @@
       }, immediate ? 0 : 350);
     }
     relevantEntityIds() {
-      const byView = {
-        overview:['overviewExperience','solar','battery','grid','consumption','forecast','intelligence'],
-        outlook:['outlook','forecast','battery','consumption','flexibleAssets'],
-        flow:['solar','battery','grid','consumption','connection','flexibleAssets','relationships'],
-        'solar-generation':['solar','forecast','battery','grid'],
-        solar:['solar','forecast','planning','flexibleAssets','commands','intelligence'],
-        battery:['battery','strategyEffective','planning'],
-        consumers:['consumer','consumerMix','flexibleAssets'],
-        gas:['consumer'],
-        strategies:['strategyProfiles','strategyEffective','editableProperties'],
-        metering:['metering'],
-        intelligence:['intelligence','activity','planning'],
-        value:['value','metering','pricing'],
-        planning:['planning','flexibleAssets','forecast','battery'],
-        'strategic-planning':['intelligence','planning','forecast','strategyEffective'],
-        retrospective:['retrospective']
-      };
-      const keys = ['release', ...(byView[this.view] || [])];
-      const registryEntity = Object.entries(this._hass?.states || {}).find(([,state]) =>
-        String(state?.attributes?.contract_id || '') === 'RHI_VISUAL_ASSET_REGISTRY_V2'
-      )?.[0] || '';
-      return [...new Set([...keys.map(key => UX_INTERFACES[key]).filter(Boolean), registryEntity].filter(Boolean))];
+      return this.runtime().subscriptionEntityIds();
     }
     runtimeSignature() {
-      const states = this._hass?.states || {};
-      const entities = this.relevantEntityIds().map(id => {
-        const state = states[id];
-        return `${id}:${state?.state ?? ''}:${state?.last_updated ?? ''}`;
-      }).join('|');
+      const rt = this.runtime();
+      const entities = rt.entitySignature(this.relevantEntityIds());
       return `${this.navSection}|${this.navItem}|${this.view}|${this.selectedMeteringPeriodId}|${this.selectedOutlookHorizonId}|${this.selectedPlanningHorizonId}|${this.selectedMeteringHorizonId}|${this.selectedStrategyProfileId}|${this.loadSort}|${this.meteringSort}|${this.consumerSort}|${this.consumerFilter}|${entities}`;
     }
 
@@ -2366,17 +2364,8 @@
       const flowM3h = firstDefined(propertyValue('gas.flow_m3_h'), asNumber(asset?.flow_m3_h), asNumber(asset?.gas_flow_m3_h));
       const health = String(firstDefined(asset?.health, asset?.normalization_status, 'UNKNOWN') || 'UNKNOWN');
       const source = String(firstDefined(asset?.integration_domain, properties.find(row=>row?.integration_domain)?.integration_domain, 'Gas meter') || 'Gas meter');
-      const totalEntityId = this.gasTotalEntityId();
+      const totalEntityId = rt.gasStatisticsEntityId(String(asset?.asset_id || ''));
       return Object.freeze({ asset, totalM3, flowM3h, health, source, totalEntityId });
-    }
-    gasTotalEntityId() {
-      const states = this._hass?.states || {};
-      for (const [entityId, state] of Object.entries(states)) {
-        const attrs = state?.attributes || {};
-        if (String(attrs.logical_object_class || '').toLowerCase() !== 'gas_meter') continue;
-        if (String(attrs.property_key || '') === 'gas.total_m3') return entityId;
-      }
-      return '';
     }
     gasVolume(value, fallback = '—') {
       const number = asNumber(value);
@@ -2390,7 +2379,7 @@
       if (this.view !== 'gas') return;
       const host = this.shadowRoot?.querySelector('[data-gas-statistics-host]');
       if (!host || host.firstElementChild || host.dataset.loading === 'true') return;
-      const entityId = String(host.dataset.entityId || this.gasTotalEntityId() || '');
+      const entityId = String(host.dataset.entityId || '');
       if (!entityId) return;
       host.dataset.loading = 'true';
       try {
