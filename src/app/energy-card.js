@@ -539,21 +539,21 @@
     }
     consumerMixSummary() {
       if (this._consumerMixSummary) return this._consumerMixSummary;
-      const rows=this.consumerMixRows();
-      const power=rows.map(row=>asNumber(row.current_power_kw));
-      const need=rows.map(row=>asNumber(row.energy_need_kwh)).filter(value=>value!==null);
+      const current=createCurrentEnergyViewModel(this.contractGateway()).consumption;
+      const planning=this.planningProjection('D0');
       this._consumerMixSummary={
-        current_power_kw:power.length && power.every(value=>value!==null) ? power.reduce((sum,value)=>sum+value,0) : null,
-        known_energy_need_kwh:need.length ? need.reduce((sum,value)=>sum+value,0) : null,
-        asset_count:rows.length,
+        current_power_kw:current.flexibleLoadsKw,
+        known_energy_need_kwh:asNumber(firstDefined(planning.lane_totals?.flexible_required_kwh,planning.lane_totals?.required_kwh,null)),
+        asset_count:this.flexibleAssetIndexRows().filter(row=>row.infrastructure_only!==true).length,
         energy_kwh:null,
         energy_by_asset_kwh:{},
-        health:'PARTIAL',
-        reason:'Canonical current flexible-asset truth is available; category/per-asset period energy is not published by the current public contract.',
-        source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.objects']
+        health:current.flexibleStatus || 'UNAVAILABLE',
+        reason:current.flexibleReason || '',
+        source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.core','RHI_ENERGY_PUBLIC_CONTRACT_V2.planning']
       };
       return this._consumerMixSummary;
     }
+
     consumerRows() {
       return this.assets().filter(a => String(a.asset_type || '') === 'consumer' && String(a.parent_asset_id || '') === 'consumer').map(asset => {
         const id = asset.asset_id;
@@ -2274,94 +2274,67 @@
     }
 
     buildMeteringPeriodViewModel(rt) {
-      const publishedPeriods = rt.meteringPeriods();
-      const defaultPeriods = this.defaultMeteringPeriods();
-      const byPeriodId = new Map(defaultPeriods.map(period => [String(period.period_id).toLowerCase(), period]));
-      publishedPeriods.forEach(period => {
-        const id = String(period.period_id || '').toLowerCase();
-        if (id) byPeriodId.set(id, { ...(byPeriodId.get(id) || {}), ...period });
-      });
-      const periods = [...byPeriodId.values()].sort((a, b) => (asNumber(a.selector_order) || 99) - (asNumber(b.selector_order) || 99));
-      const requested = String(this.selectedMeteringPeriodId || rt.value('metering.selected_period','today') || 'today').toLowerCase();
+      const requested = String(this.selectedMeteringPeriodId || 'today').toLowerCase();
       const periodId = requested === 'day' ? 'today' : requested;
-      const period = byPeriodId.get(periodId) || { period_id:periodId, label:this.periodLabel({ period_id:periodId }), graph_support:false, bucket_support:false };
-      const rawPeriod=objectFrom(period);
-      const summary=objectFrom(rawPeriod.summary);
-      const measured=objectFrom(summary.measured);
-      const qualityPayload=objectFrom(summary.quality);
-      const effectivePeriod={ ...rawPeriod, summary:{ ...summary, measured, quality:qualityPayload } };
+      const projection = rt.meteringProjection(periodId);
+      const period = objectFrom(projection.period || {});
+      const measured = objectFrom(projection.measured || {});
+      const quality = objectFrom(projection.quality || {});
+      const rows = this.meteringRowsFromPeriod(period);
       const flexibleLoadRows = this.flexibleLoadMeteringRows(rt, periodId);
-      const rows = this.meteringRowsFromPeriod(effectivePeriod);
-      const recordsHaveValues = this.meteringPeriodRowsAvailable(rows);
-      const summaryHasData = recordsHaveValues || Object.keys(measured).some(key => measured[key] !== null && measured[key] !== undefined);
-      const quality = {
-        ...qualityPayload,
-        health:String(firstDefined(qualityPayload.health,rawPeriod.quality,rawPeriod.measurement_state,'UNAVAILABLE')),
-        measurement_state:String(firstDefined(qualityPayload.measurement_state,rawPeriod.measurement_state,rawPeriod.availability,'UNAVAILABLE')),
-        user_action_required:asBool(firstDefined(qualityPayload.user_action_required,rawPeriod.user_action_required,rawPeriod.baseline_reset_required,false),false)
-      };
-      const normalizeMetricKey = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-      const allRows = Object.values(rows).flat().filter(Boolean);
-      const metricValue = aliases => {
-        const wanted = aliases.map(normalizeMetricKey);
-        const row = allRows.find(candidate => {
-          const keys = [candidate.metric_key, candidate.semantic_key, candidate.fact_key, candidate.property_key, candidate.key].map(normalizeMetricKey).filter(Boolean);
-          return keys.some(key => wanted.some(alias => key === alias || key.endsWith(`_${alias}`)));
-        });
-        return asNumber(row?.value);
-      };
-      const health = normalizeMetricKey(firstDefined(quality.health, quality.status, period.health, 'unavailable'));
-      const verifiedStates = new Set(['trusted','verified','complete','ok','ready']);
+      const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+      const health = normalize(firstDefined(projection.measurement_state,quality.health,'unavailable'));
+      const verifiedStates = new Set(['trusted','verified','complete','ok','ready','available']);
       const verificationStates = new Set(['pending','verification_required','verify','reset_required','untrusted','baseline_untrusted','baseline_required','configuration_required']);
-      const partialStates = new Set(['partial','estimated','incomplete']);
+      const partialStates = new Set(['partial','estimated','incomplete','attribution_pending']);
       const qualityState = verifiedStates.has(health) ? 'verified' : verificationStates.has(health) ? 'verification_required' : partialStates.has(health) ? 'partial' : 'unavailable';
       const qualityLabel = qualityState === 'verified' ? 'Verified' : qualityState === 'verification_required' ? 'Verification required' : qualityState === 'partial' ? 'Partial' : 'Unavailable';
+      const label = this.periodLabel(period.period_id ? period : {period_id:periodId});
       const remediations = rt.meteringRemediationsForPeriod(periodId);
-      const label = this.periodLabel(period);
       const remediation = remediations[0] || null;
-      const userActionRequired = asBool(firstDefined(quality.user_action_required,effectivePeriod.user_action_required,false),false);
-      const command = remediation && userActionRequired ? (remediation.command || rt.meteringResetCommandFor(remediation, periodId)) : null;
+      const command = remediation && projection.user_action_required ? (remediation.command || rt.meteringResetCommandFor(remediation,periodId)) : null;
       const conclusion = qualityState === 'verified'
-        ? { title:`${label} totals are verified`, why:'These totals are measured and ready to use.', recommendation:'No action is needed.', tone:'green' }
+        ? {title:`${label} totals are verified`,why:'These totals are measured and ready to use.',recommendation:'No action is needed.',tone:'green'}
         : qualityState === 'partial'
-          ? { title:`${label} totals are partial`, why:'Measured values are available, but the selected period is not yet complete.', recommendation:'Use the available totals with the shown completeness in mind.', tone:'orange' }
+          ? {title:`${label} totals are partial`,why:'Measured values are available, but the selected period is not yet complete.',recommendation:'Use the available totals with the shown completeness in mind.',tone:'orange'}
           : qualityState === 'verification_required'
-            ? { title:`${label} totals need verification`, why:'Measurements exist, but Home Intelligence cannot yet verify the complete period.', recommendation:command ? `Reset ${label.toLowerCase()} once and wait for confirmation.` : 'Wait for Home Intelligence to confirm the measured period.', tone:'orange' }
-            : { title:`${label} totals are unavailable`, why:'Reliable measured totals are not currently published for this period.', recommendation:'The totals will appear when measurements become available.', tone:'blue' };
+            ? {title:`${label} totals need verification`,why:'Measurements exist, but Home Intelligence cannot yet verify the complete period.',recommendation:command?`Reset ${label.toLowerCase()} once and wait for confirmation.`:'Wait for Home Intelligence to confirm the measured period.',tone:'orange'}
+            : {title:`${label} totals are unavailable`,why:'Reliable measured totals are not currently published for this period.',recommendation:'The totals will appear when measurements become available.',tone:'blue'};
       return {
-        periodId, period, periods, label, rows, quality, health, qualityState, qualityLabel, conclusion, command,
-        available:this.meteringPeriodRowsAvailable(rows), summaryHasData,
-        solar:metricValue(['solar_production_kwh']),
-        consumption:metricValue(['site_consumption_kwh']),
-        homeConsumption:metricValue(['home_consumption_kwh']),
-        gridImport:metricValue(['grid_import_kwh']),
-        gridExport:metricValue(['grid_export_kwh']),
-        batteryCharge:metricValue(['battery_charge_kwh']),
-        batteryDischarge:metricValue(['battery_discharge_kwh']),
-        flexibleLoads:metricValue(['flexible_loads_energy_in_kwh']),
-        sourceRefs:firstDefined(period.summary?.source_refs, period.source_refs, []), flexibleLoadRows, remediations
+        periodId,period,periods:rt.meteringPeriods(),label,rows,quality,health,qualityState,qualityLabel,conclusion,command,
+        available:projection.available,summaryHasData:Object.values(measured).some(value=>value!==null&&value!==undefined),
+        solar:asNumber(measured.solar_production_kwh),
+        consumption:asNumber(measured.site_consumption_kwh),
+        homeConsumption:asNumber(measured.home_consumption_kwh),
+        gridImport:asNumber(measured.grid_import_kwh),
+        gridExport:asNumber(measured.grid_export_kwh),
+        batteryCharge:asNumber(measured.battery_charge_kwh),
+        batteryDischarge:asNumber(measured.battery_discharge_kwh),
+        flexibleLoads:asNumber(measured.flexible_loads_energy_in_kwh),
+        sourceRefs:firstDefined(period.summary?.source_refs,period.source_refs,[]),flexibleLoadRows,remediations,
+        source:projection.source
       };
     }
+
     meteringHeaderContext(rt) {
       return this.buildMeteringPeriodViewModel(rt);
     }
 
     gasModel(rt) {
-      const assets = typeof rt.assets === 'function' ? rt.assets() : [];
-      const raw = assets.find(asset => String(firstDefined(asset?.asset_type, asset?.object_class, '') || '').toLowerCase() === 'gas_meter') || null;
-      const asset = raw ? this.energyAssetContext(rt, raw) : null;
-      const properties = Array.isArray(asset?.properties) ? asset.properties : [];
-      const propertyValue = key => {
-        const prop = properties.find(row => String(row?.property_key || '') === key);
-        return asNumber(firstDefined(prop?.value, prop?.resolution?.value, null));
-      };
-      const totalM3 = firstDefined(propertyValue('gas.total_m3'), asNumber(asset?.total_m3), asNumber(asset?.gas_total_m3));
-      const flowM3h = firstDefined(propertyValue('gas.flow_m3_h'), asNumber(asset?.flow_m3_h), asNumber(asset?.gas_flow_m3_h));
-      const health = String(firstDefined(asset?.health, asset?.normalization_status, 'UNKNOWN') || 'UNKNOWN');
-      const source = String(firstDefined(asset?.integration_domain, properties.find(row=>row?.integration_domain)?.integration_domain, 'Gas meter') || 'Gas meter');
-      const totalEntityId = rt.gasStatisticsEntityId(String(asset?.asset_id || ''));
-      return Object.freeze({ asset, totalM3, flowM3h, health, source, totalEntityId });
+      const raw = rt.assets().find(asset => String(firstDefined(asset?.asset_type,asset?.object_class,'') || '').toLowerCase() === 'gas_meter') || null;
+      if (!raw) return Object.freeze({ asset:null, totalM3:null, flowM3h:null, health:'UNAVAILABLE', source:'RHI_ENERGY_PUBLIC_CONTRACT_V2', totalEntityId:'' });
+      const asset = this.energyAssetContext(rt, raw);
+      const projection = rt.assetProjection(String(raw.asset_id || ''));
+      const total = projection?.property?.('gas.total_m3');
+      const flow = projection?.property?.('gas.flow_m3_h');
+      const state = projection?.property?.('gas.state');
+      const totalM3 = total?.resolved === true ? asNumber(total.value) : null;
+      const flowM3h = flow?.resolved === true ? asNumber(flow.value) : null;
+      const health = String(firstDefined(state?.status,projection?.lifecycle?.state,raw.health,'UNAVAILABLE') || 'UNAVAILABLE');
+      const totalEntityId = rt.gasStatisticsEntityId(String(raw.asset_id || ''));
+      return Object.freeze({ asset, totalM3, flowM3h, health, source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.objects', totalEntityId });
     }
+
     gasVolume(value, fallback = '—') {
       const number = asNumber(value);
       return number === null ? fallback : `${number.toLocaleString(undefined,{maximumFractionDigits:3})} m³`;
