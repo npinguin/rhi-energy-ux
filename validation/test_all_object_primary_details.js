@@ -44,7 +44,10 @@ for (const phrase of [
   "Charging power","Requested power","Grid power","Grid state"
 ]) assert.ok(app.includes(phrase), "missing primary fact "+phrase);
 
-assert.match(facts,/valueAtPath\(asset, path\)/, "primary facts must consume explicit published asset values when the indexed field is not materialized");
+assert.doesNotMatch(facts,/valueAtPath\(asset, path\)/, "renderer may not own raw asset semantic fallback; V2 adapter must normalize direct published values");
+const v2 = fs.readFileSync("src/runtime/energy-v2-contract.js","utf8");
+assert.match(v2,/const assetFieldAliases = Object\.freeze\(\{/,"V2 adapter must own explicit direct-field aliases");
+assert.match(v2,/const assetField = \(assetId, key\) =>/,"V2 adapter must own asset semantic resolution");
 assert.doesNotMatch(facts,/friendly_name|asset_id.*match|includes\(name/i, "primary fact resolution must not infer semantics from names");
 assert.match(facts,/presentation\?\.role === 'key'/, "primary facts must prefer backend-owned key-property presentation role");
 
