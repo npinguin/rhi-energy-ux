@@ -93,13 +93,18 @@ assert.equal(domain.physicalFlowParticipants().length,1,'charger-linked idle veh
 const card = fs.readFileSync('src/app/energy-card.js','utf8');
 assert.ok(card.includes('canonicalConnectionSnapshot(rt)'));
 assert.ok(card.includes('rt.publicV2().connections'));
-assert.ok(card.includes('rt.connectedRelationships().forEach'));
-assert.ok(card.includes('asset.effective_connection_id'));
-assert.ok(card.includes('asset.assigned_connection_id'));
-assert.ok(card.includes('rt.assets().filter(isCharger)'));
+assert.ok(card.includes("source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.connections'"));
+for (const forbidden of [
+  'rt.connectedRelationships().forEach',
+  'asset.effective_connection_id',
+  'asset.assigned_connection_id',
+  'rt.assets().filter(isCharger)',
+  'rows.set(chargerKey, row)'
+]) assert.ok(!card.includes(forbidden), 'parallel connection projection remains: '+forbidden);
 assert.ok(card.includes('No charging connections available'));
 assert.ok(card.includes("visual_ref:firstDefined(vm.visualRef, raw.visual_ref, published.visual_ref, '')"), 'Consumers must preserve canonical producer visual_ref before any secondary projection');
 assert.ok(!card.includes('Canonical physical connection telemetry is not published by E0.15.48.'));
+
 
 const presentation = fs.readFileSync('src/app/presentation.js','utf8');
 assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v3.webp"'));
@@ -127,12 +132,6 @@ assert.ok(card.includes('consumer.assigned_connection_id'));
 assert.ok(card.includes('consumer.physical_connection_id'));
 console.log('PASS physical consumer rows are connection targets, never charger infrastructure');
 
-
-assert.ok(card.includes('rows.set(chargerKey, row)'), 'connection identity must be charger-only');
-assert.ok(card.includes('if (!chargerKey || rows.has(chargerKey)) return;'), 'duplicate charger materialization must fail closed');
-assert.ok(card.includes('relationship.visual_ref, charger.visual_ref'), 'producer visual_ref must outrank Energy-local visual');
-assert.ok(!card.includes('rows.set(`${chargerKey}::${consumerKey}`, row)'), 'consumer assignment must not create a second physical connection row');
-console.log('PASS one charger row per physical connection and producer visual ownership');
 
 
 assert.ok(card.includes('assetDomain.consumerFacing()'), 'Operational Planning must use consumer-facing assets');
