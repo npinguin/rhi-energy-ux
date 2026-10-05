@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.28';
+  const UX_VERSION = 'R4.3.29';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
@@ -1311,10 +1311,10 @@ function readEnergyCommandContract(gateway) {
           key
         });
       };
-      (v2.allPropertyRows || []).forEach(add);
-      // Core is the only authority for current home-energy facts. Expose the
-      // canonical SemanticValue fields through the existing row API so screens
-      // cannot fall back to object property indexes for aggregate truth.
+      // Core is the only authority for current home-energy facts. Insert Core
+      // before object/configuration rows because add() intentionally preserves the
+      // first owner of a global property key. Asset-specific detail remains
+      // available through propertyByAssetAndKey and assetField().
       for (const [key, field] of (v2.coreByKey || new Map()).entries()) {
         add({
           asset_id:'core',
@@ -1330,6 +1330,7 @@ function readEnergyCommandContract(gateway) {
           source_type:'canonical_v2_core'
         });
       }
+      (v2.allPropertyRows || []).forEach(add);
 
       // Preserve the existing view API without creating another truth source:
       // intelligence fields are direct projections of the canonical V2 object.
