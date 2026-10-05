@@ -99,16 +99,16 @@ function selectEnergyValue(store, period='today') {
   });
 }
 
-function selectEnergyMetering(store, period='today') {
-  const id=String(period || 'today').toLowerCase();
-  return Object.freeze({
-    available:false,
-    partial:false,
-    period_id:id,
-    metrics:Object.freeze({}),
-    reason:'canonical_period_energy_not_published',
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
-  });
+function selectEnergyMetering(store,period='today'){
+  const metering=store?.metering&&typeof store.metering==='object'?store.metering:{};
+  const id=String(period||metering.selected_period_id||'today').toLowerCase();
+  const periods=metering.periods&&typeof metering.periods==='object'?metering.periods:{};
+  const row=periods[id]&&typeof periods[id]==='object'?periods[id]:{};
+  const summary=row.summary&&typeof row.summary==='object'?row.summary:{};
+  const measured=summary.measured&&typeof summary.measured==='object'?summary.measured:{};
+  const quality=summary.quality&&typeof summary.quality==='object'?summary.quality:{};
+  const state=String(row.measurement_state||row.availability||row.status||quality.measurement_state||quality.health||'UNAVAILABLE').toUpperCase();
+  return Object.freeze({available:store?.available===true&&Object.keys(row).length>0,partial:['PARTIAL','INCOMPLETE','ATTRIBUTION_PENDING'].includes(state),period_id:id,period:row,measured:Object.freeze({...measured}),quality:Object.freeze({...quality}),measurement_state:state,baseline_reset_required:row.baseline_reset_required===true,user_action_required:row.user_action_required===true||quality.user_action_required===true,reason:String(row.reason||quality.reason||''),source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.metering.periods'});
 }
 
 function selectEnergyActivity(store) {
