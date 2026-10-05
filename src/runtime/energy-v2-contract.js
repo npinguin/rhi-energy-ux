@@ -115,7 +115,7 @@ function readEnergyPublicV2(gateway) {
     ['flexible_loads.attributed_power_kw', coreField('flexible','attributed_power_kw')]
   ]);
 
-  const aggregateFieldAliases = Object.freeze({
+  const assetFieldAliases = Object.freeze({
     'battery.power_kw':['power_kw','current_power_kw','actual_power_kw','battery_power_kw'],
     'battery.soc_pct':['soc_pct','battery_soc_pct'],
     'battery.capacity_kwh':['capacity_kwh','battery_capacity_kwh'],
@@ -134,30 +134,39 @@ function readEnergyPublicV2(gateway) {
     const wanted = new Set((Array.isArray(types) ? types : [types]).map(value => String(value || '').toLowerCase()));
     return objects.find(row => wanted.has(String(row.asset_type || row.object_class || '').toLowerCase())) || null;
   };
+  const assetField = (assetId, key) => {
+    const id = String(assetId || '');
+    const semanticKey = String(key || '');
+    const asset = id ? objectById.get(id) : null;
+    if (!asset) return semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:'asset_not_published'});
+    const scoped = propertyByAssetAndKey.get(`${id}::${semanticKey}`) || null;
+    if (scoped) {
+      const projected = semantic(scoped);
+      if (projected.resolved || projected.value !== null) return projected;
+    }
+    for (const alias of assetFieldAliases[semanticKey] || []) {
+      if (Object.prototype.hasOwnProperty.call(asset, alias)) {
+        const value = asset[alias];
+        if (value !== undefined && value !== null && value !== '') {
+          return semantic({
+            value,
+            status:'AVAILABLE',
+            quality:'CANONICAL',
+            reason:null,
+            source_asset_id:id,
+            source_field:alias
+          });
+        }
+      }
+    }
+    return semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:'canonical_asset_field_not_published'});
+  };
+
   const aggregateField = (types, key) => {
     const aggregate = aggregateObject(types);
     if (aggregate) {
-      const assetId = String(aggregate.asset_id || '');
-      const scoped = assetId ? propertyByAssetAndKey.get(`${assetId}::${String(key || '')}`) : null;
-      if (scoped) {
-        const projected = semantic(scoped);
-        if (projected.resolved || projected.value !== null) return projected;
-      }
-      for (const alias of aggregateFieldAliases[String(key || '')] || []) {
-        if (Object.prototype.hasOwnProperty.call(aggregate, alias)) {
-          const value = aggregate[alias];
-          if (value !== undefined && value !== null && value !== '') {
-            return semantic({
-              value,
-              status:'AVAILABLE',
-              quality:'CANONICAL',
-              reason:null,
-              source_asset_id:assetId,
-              source_field:alias
-            });
-          }
-        }
-      }
+      const projected = assetField(String(aggregate.asset_id || ''), key);
+      if (projected.resolved || projected.value !== null) return projected;
     }
     return coreByKey.get(String(key || '')) || semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:'canonical_field_not_published'});
   };
@@ -300,6 +309,7 @@ function readEnergyPublicV2(gateway) {
     coreByKey,
     aggregateObject,
     aggregateField,
+    assetField,
     object(assetId) { return objectById.get(String(assetId || '')) || null; },
     profile(profileId) { return profileById.get(String(profileId || '')) || null; },
     property(key, assetId = '') {
@@ -342,7 +352,7 @@ function createEnergyAssetProjection(v2, assetId) {
       source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
     }),
     properties:Object.freeze(properties),
-    property(key) { return v2.field(key, assetId); },
+    property(key) { return v2.assetField(assetId, key); },
     relationships:Object.freeze(relationships),
     controls:Object.freeze(controls),
     profile,
