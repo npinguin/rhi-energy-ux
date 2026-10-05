@@ -111,6 +111,28 @@ function selectEnergyMetering(store, period='today') {
   });
 }
 
+function selectEnergyGas(store) {
+  const objects=Array.isArray(store?.objects) ? store.objects : [];
+  const asset=objects.find(row => String(row?.asset_type || row?.object_class || '').toLowerCase() === 'gas_meter') || null;
+  if(!asset) return Object.freeze({available:false,asset:null,asset_id:'',total_m3:null,flow_m3_h:null,state:'UNAVAILABLE',health:'UNAVAILABLE',source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.objects'});
+  const assetId=String(asset.asset_id || '');
+  const projection=createEnergyAssetProjection(store,assetId);
+  const total=projection?.property?.('gas.total_m3') || {};
+  const flow=projection?.property?.('gas.flow_m3_h') || {};
+  const stateField=projection?.property?.('gas.state') || {};
+  return Object.freeze({
+    available:true,
+    asset,
+    projection,
+    asset_id:assetId,
+    total_m3:asNumber(total.value),
+    flow_m3_h:asNumber(flow.value),
+    state:String(stateField.value || asset.state || ''),
+    health:String(asset.health || asset.status || stateField.status || 'UNKNOWN'),
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.objects'
+  });
+}
+
 function selectEnergyActivity(store) {
   return Object.freeze({
     available:store?.available === true,
