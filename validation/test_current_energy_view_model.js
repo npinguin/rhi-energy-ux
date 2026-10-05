@@ -60,4 +60,40 @@ for(const [state,signed,display,signedFlow,label,direction] of cases){
   if(model.consumption.siteConsumptionKw!==2.7 || model.consumption.homeConsumptionKw!==2.6) throw new Error('core consumption projection failed');
   if(model.consumption.flexibleLoadContributors.length!==1 || model.consumption.flexibleLoadContributors[0].asset_id!=='vehicle_1') throw new Error('infrastructure leaked into managed contributor identities');
 }
+
+function aggregateGateway() {
+  const unavailable=(unit=null)=>({value:null,unit,status:'UNAVAILABLE',quality:'UNKNOWN',reason:'core_not_published'});
+  const attrs={
+    contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',contract_version:'2.0.0',release:'E0.15.87',
+    core:{
+      battery:{fields:{state:unavailable(),power_kw:unavailable('kW'),soc_pct:unavailable('%'),available_kwh:unavailable('kWh'),capacity_kwh:unavailable('kWh'),reserve_target_pct:unavailable('%')}},
+      solar:{fields:{power_kw:unavailable('kW')}},
+      grid:{fields:{net_power_kw:unavailable('kW'),import_power_kw:unavailable('kW'),export_power_kw:unavailable('kW'),flow_direction:unavailable()}},
+      consumption:{fields:{power_kw:unavailable('kW')}},
+      home:{fields:{power_kw:unavailable('kW')}},
+      flexible:{fields:{power_kw:unavailable('kW'),attributed_power_kw:unavailable('kW')},assets:[]}
+    },
+    objects:[
+      {asset_id:'battery_system',object_class:'battery_system',power_kw:2.855,soc_pct:51.826,capacity_kwh:29.2,available_kwh:15.1333,operating_state:'discharging',reserve_target_pct:20,properties:[]},
+      {asset_id:'solar_production',object_class:'solar_production',power_kw:0.0,properties:[]},
+      {asset_id:'grid_connection',object_class:'grid_connection',net_power_kw:1.1,import_power_kw:1.1,export_power_kw:0,flow_direction:'importing',properties:[]},
+      {asset_id:'site_consumption',object_class:'site_consumption',power_kw:3.955,properties:[]},
+      {asset_id:'home_consumption',object_class:'home_consumption',power_kw:3.955,properties:[]}
+    ],
+    profiles:[],relationships:[],planning:{horizons:{}},configuration:{},intelligence:{},summary:{}
+  };
+  return {contract(key){
+    if(key!=='publicV2') throw new Error(`unexpected contract read: ${key}`);
+    return {entityId:'sensor.rhi_energy_public_contract_v2',state:'OK',available:true,attributes:attrs,contractVersion:'2.0.0'};
+  }};
+}
+const aggregateModel=context.createCurrentEnergyViewModel(aggregateGateway());
+if(aggregateModel.battery.displayPowerKw!==2.855) throw new Error('battery aggregate power did not win over unavailable core');
+if(aggregateModel.battery.socPct!==51.826 || aggregateModel.battery.capacityKwh!==29.2 || aggregateModel.battery.availableKwh!==15.1333) throw new Error('battery aggregate facts diverged');
+if(aggregateModel.battery.label!=='Discharging') throw new Error('battery aggregate state diverged');
+if(aggregateModel.solar.powerKw!==0) throw new Error('solar aggregate zero must remain measured zero');
+if(aggregateModel.grid.importPowerKw!==1.1 || aggregateModel.grid.direction!=='importing') throw new Error('grid aggregate projection failed');
+if(aggregateModel.consumption.siteConsumptionKw!==3.955 || aggregateModel.consumption.homeConsumptionKw!==3.955) throw new Error('consumption aggregate projection failed');
+console.log('PASS current Energy model uses one canonical aggregate projection when core fields are unavailable');
+
 console.log('current-energy V2 core view-model matrix PASS');
