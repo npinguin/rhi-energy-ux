@@ -81,6 +81,26 @@ for legacy_key in ("assets:", "relationships:", "commands:", "planning:", "meter
     if legacy_key in registry:
         failures.append(f"parallel_product_registry_owner:{legacy_key}")
 
+
+# Current Energy semantics have one owner: energy-v2-contract.js -> current/view projections.
+for token in (
+    "rt.number('battery.power_kw')",
+    "rt.number('battery.soc_pct')",
+    "rt.number('solar.power_kw')",
+    "rt.number('grid.net_power_kw')",
+    "rt.number('site_consumption.power_kw')",
+    "rt.number('home_consumption.power_kw')",
+):
+    if token in screen_source:
+        failures.append(f"renderer_current_energy_projection_bypass:{token}")
+
+facts_start = screen_source.find("    energyAssetFacts(rt, asset = {}, limit = 4) {")
+facts_end = screen_source.find("\n    energyAssetAreaLabel", facts_start)
+if facts_start >= 0 and facts_end > facts_start:
+    facts_source = screen_source[facts_start:facts_end]
+    if "valueAtPath(asset, path)" in facts_source:
+        failures.append("renderer_raw_asset_semantic_fallback")
+
 if failures:
     for failure in failures:
         print("FAIL", failure)
