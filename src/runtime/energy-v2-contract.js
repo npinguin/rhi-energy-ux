@@ -195,6 +195,127 @@ function readEnergyPublicV2(gateway) {
     }
   }
 
+  const assetFieldAliases = Object.freeze({
+    'battery.power_kw':['battery.power_kw','power_kw','current_power_kw','actual_power_kw','battery_power_kw'],
+    'battery.soc_pct':['battery.soc_pct','soc_pct','battery_soc_pct'],
+    'battery.capacity_kwh':['battery.capacity_kwh','capacity_kwh','battery_capacity_kwh'],
+    'battery.available_kwh':['battery.available_kwh','available_kwh','battery_available_kwh'],
+    'battery.state':['battery.state','operating_state','state'],
+    'battery.reserve_target_pct':['battery.reserve_target_pct','reserve_target_pct'],
+    'battery.temperature_c':['battery.temperature_c','temperature_c'],
+    'solar.power_kw':['solar.power_kw','power_kw','current_power_kw','actual_power_kw','solar_power_kw'],
+    'solar.energy_today_kwh':['solar.energy_today_kwh','energy_today_kwh'],
+    'solar.capacity_kwp':['solar.capacity_kwp','capacity_kwp'],
+    'solar.state':['solar.state','operating_state','state'],
+    'grid.net_power_kw':['grid.net_power_kw','net_power_kw','power_kw'],
+    'grid_import.power_kw':['grid_import.power_kw','import_power_kw','grid_import_power_kw'],
+    'grid_export.power_kw':['grid_export.power_kw','export_power_kw','grid_export_power_kw'],
+    'grid.flow_direction':['grid.flow_direction','flow_direction','direction'],
+    'site_consumption.power_kw':['site_consumption.power_kw','consumption.power_kw','power_kw','current_power_kw','site_consumption_kw'],
+    'site_consumption.energy_today_kwh':['site_consumption.energy_today_kwh','consumption.energy_today_kwh','energy_today_kwh'],
+    'site_consumption.state':['site_consumption.state','consumption.state','measurement_state','state'],
+    'home_consumption.power_kw':['home_consumption.power_kw','consumption.power_kw','power_kw','current_power_kw','home_consumption_kw'],
+    'home_consumption.energy_today_kwh':['home_consumption.energy_today_kwh','consumption.energy_today_kwh','energy_today_kwh'],
+    'home_consumption.state':['home_consumption.state','consumption.state','measurement_state','state'],
+    'gas.flow_m3_h':['gas.flow_m3_h','flow_m3_h'],
+    'gas.total_m3':['gas.total_m3','total_m3'],
+    'gas.state':['gas.state','measurement_state','state'],
+    'flexible_load.power_kw':['flexible_load.power_kw','power_kw','current_power_kw','actual_power_kw'],
+    'flexible_load.energy_to_target_kwh':['flexible_load.energy_to_target_kwh','energy_to_target_kwh','energy_needed_kwh','remaining_energy_kwh'],
+    'flexible_load.state':['flexible_load.state','operating_state','state'],
+    'flexible_load.automation_mode':['flexible_load.automation_mode','automation_mode'],
+    'consumer.power_kw':['consumer.power_kw','power_kw','current_power_kw','actual_power_kw'],
+    'consumer.energy_today_kwh':['consumer.energy_today_kwh','energy_today_kwh'],
+    'consumer.state':['consumer.state','operating_state','state'],
+    'vehicle.power_kw':['vehicle.power_kw','charging_power_kw','current_power_kw','actual_power_kw','power_kw'],
+    'vehicle.energy_to_target_kwh':['vehicle.energy_to_target_kwh','energy_to_target_kwh','energy_needed_kwh','remaining_energy_kwh'],
+    'vehicle.soc_pct':['vehicle.soc_pct','soc_pct'],
+    'vehicle.state':['vehicle.state','charging_state','operating_state','state'],
+    'charger.power_kw':['charger.power_kw','current_power_kw','actual_power_kw','power_kw'],
+    'charger.requested_power_kw':['charger.requested_power_kw','requested_power_kw'],
+    'charger.state':['charger.state','connection_state','operating_state','state'],
+    'inverter.power_kw':['inverter.power_kw','solar.power_kw','power_kw','current_power_kw','actual_power_kw'],
+    'inverter.efficiency_pct':['inverter.efficiency_pct','efficiency_pct'],
+    'inverter.state':['inverter.state','operating_state','state'],
+    'solar_optimizer.power_w':['solar_optimizer.power_w','optimizer.power_w','power_w','current_power_w'],
+    'solar_optimizer.energy_kwh':['solar_optimizer.energy_kwh','optimizer.energy_kwh','energy_kwh'],
+    'solar_optimizer.status':['solar_optimizer.status','optimizer.status','status','operating_state','state'],
+    'solar_optimizer.last_measurement':['solar_optimizer.last_measurement','optimizer.last_measurement','last_measurement'],
+    'solar_optimizer.optimizer_voltage_v':['solar_optimizer.optimizer_voltage_v','optimizer_voltage_v'],
+    'solar_optimizer.panel_voltage_v':['solar_optimizer.panel_voltage_v','panel_voltage_v'],
+    'solar_optimizer.current_a':['solar_optimizer.current_a','optimizer.current_a','current_a'],
+    'solar_optimizer.temperature_c':['solar_optimizer.temperature_c','temperature_c'],
+    'solar_optimizer.panel_identity':['solar_optimizer.panel_identity','panel_identity'],
+    'solar_zone.power_w':['solar_zone.power_w','power_w'],
+    'solar_zone.energy_kwh':['solar_zone.energy_kwh','energy_kwh'],
+    'solar_zone.status':['solar_zone.status','status','operating_state','state'],
+    'solar_zone.child_count':['solar_zone.child_count','child_count'],
+    'solar_zone.last_measurement':['solar_zone.last_measurement','last_measurement'],
+    'solar_zone.voltage_average_v':['solar_zone.voltage_average_v','voltage_average_v'],
+    'solar_zone.current_average_a':['solar_zone.current_average_a','current_average_a']
+  });
+
+  const assetField = (assetId, key) => {
+    const id=String(assetId || '');
+    const semanticKey=String(key || '');
+    const asset=objectById.get(id) || null;
+    if(!asset) return semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:'asset_not_published'});
+    const exact=propertyByAssetAndKey.get(`${id}::${semanticKey}`) || null;
+    if(exact){
+      const projected=semantic(exact);
+      if(projected.resolved || projected.value !== null) return projected;
+    }
+    for(const alias of assetFieldAliases[semanticKey] || []){
+      if(Object.prototype.hasOwnProperty.call(asset,alias)){
+        const value=asset[alias];
+        if(value !== undefined && value !== null && value !== ''){
+          return semantic({value,status:'AVAILABLE',quality:'CANONICAL',source_asset_id:id,source_field:alias});
+        }
+      }
+    }
+    return semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:'canonical_asset_field_not_published'});
+  };
+
+  const aggregateObject = types => {
+    const wanted=new Set((Array.isArray(types)?types:[types]).map(v=>String(v||'').toLowerCase()));
+    return objects.find(row=>wanted.has(String(row.asset_type || row.object_class || '').toLowerCase())) || null;
+  };
+  const currentAuthority = Object.freeze({
+    'battery.power_kw':['battery_system','home_battery_system'],
+    'battery.soc_pct':['battery_system','home_battery_system'],
+    'battery.capacity_kwh':['battery_system','home_battery_system'],
+    'battery.available_kwh':['battery_system','home_battery_system'],
+    'battery.state':['battery_system','home_battery_system'],
+    'battery.reserve_target_pct':['battery_system','home_battery_system'],
+    'solar.power_kw':['solar_production'],
+    'solar.energy_today_kwh':['solar_production'],
+    'solar.capacity_kwp':['solar_production'],
+    'solar.state':['solar_production'],
+    'grid.net_power_kw':['grid_connection'],
+    'grid_import.power_kw':['grid_connection'],
+    'grid_export.power_kw':['grid_connection'],
+    'grid.flow_direction':['grid_connection'],
+    'site_consumption.power_kw':['site_consumption'],
+    'site_consumption.energy_today_kwh':['site_consumption'],
+    'site_consumption.state':['site_consumption'],
+    'home_consumption.power_kw':['home_consumption'],
+    'home_consumption.energy_today_kwh':['home_consumption'],
+    'home_consumption.state':['home_consumption']
+  });
+  const canonicalField = key => {
+    const semanticKey=String(key || '');
+    const types=currentAuthority[semanticKey] || [];
+    if(types.length){
+      const aggregate=aggregateObject(types);
+      if(aggregate){
+        const projected=assetField(String(aggregate.asset_id || ''),semanticKey);
+        if(projected.resolved || projected.value !== null) return projected;
+      }
+    }
+    if(coreByKey.has(semanticKey)) return coreByKey.get(semanticKey);
+    return semantic(propertyByKey.get(semanticKey) || {value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:'canonical_field_not_published'});
+  };
+
   const publicContractOk = envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2';
   const corePresent = Object.keys(core).length > 0;
   const capabilities = Object.freeze({
@@ -251,6 +372,11 @@ function readEnergyPublicV2(gateway) {
     propertyByKey,
     propertyByAssetAndKey,
     coreByKey,
+    assetFieldAliases,
+    assetField,
+    aggregateObject,
+    currentAuthority,
+    canonicalField,
     object(assetId) { return objectById.get(String(assetId || '')) || null; },
     profile(profileId) { return profileById.get(String(profileId || '')) || null; },
     property(key, assetId = '') {
@@ -258,8 +384,7 @@ function readEnergyPublicV2(gateway) {
       return id ? (propertyByAssetAndKey.get(`${id}::${String(key || '')}`) || null) : (propertyByKey.get(String(key || '')) || null);
     },
     field(key, assetId = '') {
-      if (!assetId && coreByKey.has(String(key || ''))) return coreByKey.get(String(key || ''));
-      return semantic(this.property(key, assetId));
+      return assetId ? assetField(assetId,key) : canonicalField(key);
     }
   });
 }
