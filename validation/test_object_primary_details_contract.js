@@ -94,23 +94,18 @@ const temp = store.field("battery.temperature_c","battery_1");
 assert.equal(temp.resolved,false,"explicitly unavailable property must remain unavailable");
 assert.equal(temp.status,"UNAVAILABLE");
 
-for (const objectType of [
-  "battery:","battery_system:","home_battery_system:",
-  "solar_production:","solar_array:","solar_zone:","solar_panel:","solar_optimizer:",
-  "solar_inverter:","grid_connection:","gas_meter:",
-  "flexible_load:","vehicle:","charger:","site_consumption:","home_consumption:",
-  "backup_interface:","energy_system:"
-]) {
-  assert.ok(app.includes(objectType), "missing explicit primary-property contract for "+objectType);
-}
-
-assert.match(app,/for \(const key of spec\.keys \|\| \[spec\.key\]\)/);
-assert.match(app,/home_consumption\.power_kw/);
-assert.match(app,/solar_zone\.power_w/);
-assert.match(app,/More information/);
+const presentation = fs.readFileSync("src/domain/models/asset-presentation-model.js","utf8");
+assert.match(presentation,/presentation\.role/);
+assert.match(presentation,/keyFacts:byRole\("key"/);
+assert.match(presentation,/details:byRole\("detail"/);
+assert.match(presentation,/diagnostics:byRole\("diagnostics"/);
+assert.match(presentation,/unmapped:Object\.freeze/);
+assert.doesNotMatch(app,/const byType = \{/,"renderer-side asset type/property inference must not return");
+assert.doesNotMatch(app,/for \(const key of spec\.keys/,"renderer alias probing must not return");
+assert.match(app,/rt\.assetPresentation\(id\)/);
 assert.match(app,/rhiUxAssetIdentity\(/);
 assert.match(app,/rhiUxAssetFactGrid\(/);
-assert.match(app,/projection\?\.properties/);
+assert.match(app,/rhiUxAssetCardShell\(/);
 assert.match(app,/\['solar_array','solar_zone'\]/);
 assert.match(app,/productionSection/);
 assert.match(app,/this\.batteryChildCard\(rt,String\(firstDefined\(asset\.asset_id/);
