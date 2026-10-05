@@ -16,6 +16,7 @@ function readFoundationVisualRegistry(hass = {}) {
   const byRef = new Map(entries.map(row => [String(row.visual_ref || ""), Object.freeze({...row})]).filter(([ref]) => ref));
   return Object.freeze({
     available: !!state,
+    entityId: String(state?.entity_id || ""),
     contractId: String(attributes.contract_id || ""),
     contractVersion: String(attributes.contract_version || ""),
     status: String(attributes.status || state?.state || "UNAVAILABLE"),
