@@ -3403,14 +3403,6 @@
             ? field.display
             : (field.value === null || field.value === undefined ? '' : `${field.value}${field.unit ? ` ${field.unit}` : ''}`);
         }
-        if (!value || value === '—') {
-          let direct;
-          for (const path of spec.direct) {
-            const candidate = valueAtPath(asset, path);
-            if (candidate !== undefined && candidate !== null && candidate !== '') { direct = candidate; break; }
-          }
-          if (direct !== undefined) value = formatDirect(direct, spec.formatter);
-        }
         if (!value || value === '—') continue;
         seenLabels.add(spec.label);
         facts.push({ label:spec.label, value, status, key:usedKey });
