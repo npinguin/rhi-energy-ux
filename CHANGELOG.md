@@ -1,3 +1,11 @@
+## 4.3.29 — Canonical Core Authority Closure
+
+- make Public V2 Core the first and global authority for aggregate Battery, Solar, Grid, Site/Home Consumption and Flexible Loads property keys;
+- prevent asset-detail property rows from shadowing canonical current-home Core truth in generic UX accessors;
+- preserve asset-scoped detail through asset_id + property_key access;
+- add a release-blocking precedence regression;
+- qualify against Energy E0.15.100 live Public V2 truth closure.
+
 ## 4.3.28 — Target HA UX closure
 
 - scope and deduplicate product actions, including mutually exclusive charging/managed-state actions;
