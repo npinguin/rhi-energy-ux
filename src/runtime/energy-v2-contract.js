@@ -88,7 +88,7 @@ function readEnergyPublicV2(gateway) {
       const value = section[fieldName];
       return semantic({
         value,
-        unit:({power_kw:'kW',net_power_kw:'kW',import_power_kw:'kW',export_power_kw:'kW',attributed_power_kw:'kW',soc_pct:'%',reserve_target_pct:'%',capacity_kwh:'kWh',available_kwh:'kWh'})[fieldName] || null,
+        unit:({power_kw:'kW',net_power_kw:'kW',import_power_kw:'kW',export_power_kw:'kW',attributed_power_kw:'kW',available_power_kw:'kW',soc_pct:'%',reserve_target_pct:'%',capacity_kwh:'kWh',available_kwh:'kWh'})[fieldName] || null,
         status:value === null || value === undefined ? 'UNAVAILABLE' : 'AVAILABLE',
         quality:value === null || value === undefined ? 'UNKNOWN' : 'CANONICAL',
         reason:value === null || value === undefined ? String(section.reason || '') : null
@@ -112,7 +112,8 @@ function readEnergyPublicV2(gateway) {
     ['site_consumption.power_kw', coreField('consumption','power_kw')],
     ['home_consumption.power_kw', coreField('home','power_kw')],
     ['flexible_loads.power_kw', coreField('flexible','power_kw')],
-    ['flexible_loads.attributed_power_kw', coreField('flexible','attributed_power_kw')]
+    ['flexible_loads.attributed_power_kw', coreField('flexible','attributed_power_kw')],
+    ['flexible_loads.available_power_kw', coreField('flexible','available_power_kw')]
   ]);
 
   const coreFlexible = object(core.flexible);
