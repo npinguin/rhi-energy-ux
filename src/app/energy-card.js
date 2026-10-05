@@ -2546,13 +2546,13 @@
       const d = rt.decision();
       const balanceVm = this.canonicalLiveEnergyBalance(rt);
       const batterySoc = balanceVm.battery.socPct;
-      const reasonRaw = firstDefined(objectFrom(d.reason || {}).message, d.reason_label, rt.rawText('energy_intelligence.reason', null));
+      const reasonRaw = firstDefined(objectFrom(d.reason || {}).message,d.reason_label,d.reason);
       const reasonCandidate = reasonRaw ? humanReason(reasonRaw, '') : '';
       const reason = /residual|reconciliation|canonical|bucket|projection|not.?published|completed|unsustainable/i.test(reasonCandidate)
         ? 'Current production, demand and grid exchange are being monitored against the active strategy.'
         : (reasonCandidate || 'Current production, demand and grid exchange are being monitored against the active strategy.');
       const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
-      const reservePct = this.batteryReservePct(rt);
+      const reservePct=balanceVm.battery.reserveTargetPct;
       const sourceRows = [];
       if (balanceVm.solarKw !== null && balanceVm.solarKw > 0.05) sourceRows.push(this.overviewEnergyRow({icon:'☀',label:'Solar',subtitle:'Producing now',value:fmtKw(balanceVm.solarKw),progress:this.progress(balanceVm.solarKw)}));
       if (balanceVm.battery.direction === 'out_of_storage' && balanceVm.battery.displayPowerKw !== null) sourceRows.push(this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}));
@@ -3913,41 +3913,24 @@
       return `<div class="flowConnectionCard">${art}<div><b>${escapeHtml(charger.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(context || 'Connection state unavailable')}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
     consumerCard(rt, consumer) {
-      const id = consumer.asset_id;
-      const power = asNumber(firstDefined(consumer.physical_power_kw, consumer.power_kw, consumer.current_power_kw, consumer.actual_power_kw));
-      const powerText = power === null ? '—' : fmtKw(power);
-      const operating = firstDefined(consumer.operating_state, consumer.state, rt.value(`${id}.operating_state`, null));
-      const active = asBool(firstDefined(consumer.active, rt.value(`${id}.active`, false)));
-      const charging = asBool(firstDefined(consumer.charging, rt.value(`${id}.charging`, false))) || /charging/i.test(String(operating || ''));
-      const connectionState = String(firstDefined(consumer.connection_state, '') || '').trim().toLowerCase();
-      const connected = asBool(firstDefined(consumer.connected, rt.value(`${id}.connected`, false)))
-        || ['connected','asset_connected'].includes(connectionState);
-      const available = !/unavailable|offline|disconnected/i.test(String(firstDefined(consumer.availability_state, '')));
-      const charger = firstDefined(
-        consumer.effective_charger,
-        consumer.effective_connection_id,
-        consumer.assigned_connection_id,
-        consumer.physical_connection_id,
-        consumer.charger_asset_id,
-        consumer.connection_asset_id,
-        consumer.execution_target_asset_id,
-        ''
-      );
-      const requested = asNumber(firstDefined(consumer.requested_power_kw_effective, consumer.requested_power_kw));
-      const state = charging ? 'Charging' : active || (power !== null && power > 0.05) ? 'Active' : connected ? 'Connected' : available ? 'Available' : 'Unavailable';
-      const chargerDisplay = String(firstDefined(
-        consumer.effective_charger_display_name,
-        consumer.charger_display_name,
-        consumer.connection_display_name,
-        consumer.physical_connection_display_name,
-        charger ? rt.assetName(charger) : '',
-        ''
-      ) || '').trim();
-      const relation = charger ? this.userRelationshipLabel(chargerDisplay, 'Assigned charger') : '';
-      const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
-      const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
-      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(relation ? `${relation} · ${state}` : state)}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+      const id=String(consumer.asset_id||'');
+      const power=asNumber(consumer.physical_power_kw);
+      const powerText=power===null?'—':fmtKw(power);
+      const operating=String(consumer.operating_state||'unknown');
+      const connectionState=String(consumer.connection_state||'').trim().toLowerCase();
+      const connected=['connected','asset_connected'].includes(connectionState);
+      const charging=/charging/i.test(operating);
+      const active=charging || (power!==null&&power>0.05);
+      const available=!/unavailable|offline|disconnected/i.test(String(consumer.availability_state||''));
+      const charger=String(consumer.connection_asset_id||consumer.charger_asset_id||'');
+      const state=charging?'Charging':active?'Active':connected?'Connected':available?'Available':'Unavailable';
+      const chargerDisplay=charger?String(rt.assetName(charger)||'').trim():'';
+      const relation=charger?this.userRelationshipLabel(chargerDisplay,'Assigned charger'):'';
+      const visual=rt.resolveVisualRef(consumer.visual_ref,'card');
+      const art=`<div class="flowAssetVisual">${visual?.url?`<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter||'none')}">`:''}</div>`;
+      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name||rt.assetName(id)||human(id))}</b><span>${escapeHtml(relation?`${relation} · ${state}`:state)}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
+
     flowConsumers(rt, connectionSnapshot = { rows:[] }) {
       const domain = this.flexibleAssetDomain(rt);
       const snapshotRows = asArray(connectionSnapshot?.rows);
@@ -3994,11 +3977,11 @@
         addConsumer({
           ...asset,
           asset_id:consumerId,
-          connection_state:firstDefined(asset.connection_state, connection.connection_state, ''),
-          effective_connection_id:firstDefined(asset.effective_connection_id, connection.connection_asset_id, connection.asset_id, ''),
-          physical_connection_id:firstDefined(asset.physical_connection_id, connection.connection_asset_id, connection.asset_id, ''),
-          visual_ref:firstDefined(asset.visual_ref, connection.connected_consumer_visual_ref, ''),
-          physical_power_kw:firstDefined(asset.physical_power_kw, asset.current_power_kw, asset.actual_power_kw, connection.physical_power_kw, connection.power_kw)
+          connection_state:firstDefined(connection.connection_state,asset.connection_state,''),
+          connection_asset_id:firstDefined(connection.connection_asset_id,connection.asset_id,''),
+          charger_asset_id:firstDefined(connection.connection_asset_id,connection.asset_id,''),
+          visual_ref:firstDefined(connection.connected_consumer_visual_ref,asset.visual_ref,''),
+          physical_power_kw:firstDefined(connection.physical_power_kw,connection.power_kw,null)
         });
       }
 
