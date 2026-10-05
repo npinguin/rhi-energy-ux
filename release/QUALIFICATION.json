@@ -1,8 +1,8 @@
 {
-  "version": "4.3.28",
-  "candidate_tag": "v4.3.28",
+  "version": "4.3.29",
+  "candidate_tag": "v4.3.29",
   "candidate_sha": "pending",
-  "previous_release": "4.3.27",
+  "previous_release": "4.3.28",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",
@@ -11,7 +11,7 @@
   "ipad_render": "NOT_EXECUTED",
   "backend_release_identity": "NOT_EXECUTED",
   "public_v2_contract_available": "NOT_EXECUTED",
-  "core_contract_available": "NOT_EXECUTED",
+  "core_contract_available": "STATIC_PASS",
   "overview_live_data": "NOT_EXECUTED",
   "planning_d0_d1": "NOT_EXECUTED",
   "pricing_write_readback": "NOT_EXECUTED",
@@ -92,10 +92,10 @@
   "solar_production_root_level": "NOT_EXECUTED",
   "solar_children_flat_vertical_stack": "NOT_EXECUTED",
   "solar_top_level_section_parity": "NOT_EXECUTED",
-  "v1_product_api_decommissioned": "NOT_EXECUTED",
-  "zero_presentation_debt": "NOT_EXECUTED",
-  "multilingual_en_nl_fr": "NOT_EXECUTED",
-  "user_safe_copy": "NOT_EXECUTED",
-  "core_1_6_0_provenance": "NOT_EXECUTED",
-  "static_validation": "NOT_EXECUTED"
+  "v1_product_api_decommissioned": "STATIC_PASS",
+  "zero_presentation_debt": "STATIC_PASS",
+  "multilingual_en_nl_fr": "STATIC_PASS",
+  "user_safe_copy": "STATIC_PASS",
+  "core_1_6_0_provenance": "STATIC_PASS",
+  "static_validation": "STATIC_PASS"
 }
