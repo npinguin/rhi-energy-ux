@@ -102,3 +102,7 @@ assert.match(app,/solarProductionRepresentative/);
 assert.match(app,/energy\.logical\.solar_zone\.generic/);
 assert.match(app,/solarStringVisual/);
 assert.doesNotMatch(app,/solarHardwareSection\(\n\s*'Inverter system'/,"inverters must not be projected in a duplicate standalone section");
+
+assert.match(app,/homeBatteryAggregateCard\(rt, system/,"Solar must reuse canonical Home Battery current projection");
+assert.match(app,/data-current-energy-projection="battery"/,"canonical battery projection marker missing");
+assert.doesNotMatch(app,/this\.energyDeviceStatusCard\(rt,system,'Battery system'\)/,"Solar may not independently project battery-system semantics");
