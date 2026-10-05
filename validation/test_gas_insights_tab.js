@@ -5,7 +5,10 @@ const app = fs.readFileSync("src/app/energy-card.js","utf8");
 const presentation = fs.readFileSync("src/app/presentation.js","utf8");
 const catalog = fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
 
-assert.match(presentation,/id:"consumers", labelKey:"nav\.consumption", fallback:"Consumption"[\s\S]*id:"gas", labelKey:"nav\.gas", fallback:"Gas", view:"gas"/);
+assert.match(presentation,/id:"consumers", labelKey:"nav\.consumption", fallback:"Consumption", view:"consumers"/);
+assert.doesNotMatch(presentation,/id:"gas", labelKey:"nav\.gas"/);
+assert.ok(app.includes("['consumers','gas'].includes(tab)"),"Gas must remain an internal Consumption capability view");
+assert.ok(app.includes("value:'gas'") && app.includes("'data-tab-target':'gas'"),"Consumption selector must expose Gas when present");
 assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v3.webp"'),"Gas page hero mapping must use approved photographic v3 asset");
 assert.ok(fs.existsSync("src/assets/heroes/gas-page-hero-v3.webp"),"missing approved Gas page hero v3 artwork");
 
@@ -36,7 +39,7 @@ const gasEnd = app.indexOf("\n    battery(rt)", gasStart);
 const gasMethod = app.slice(gasStart, gasEnd);
 assert.ok(gasMethod.indexOf('${setupOrMeter}') < gasMethod.indexOf('${graph}'), "Gas primary meter must render before history");
 
-console.log("PASS Gas is the final Energy tab with dedicated hero, canonical meter and HA-native statistics history");
+console.log("PASS Gas is an internal Consumption view with dedicated hero, canonical meter and HA-native statistics history");
 
 assert.match(app,/async mountGasStatisticsGraph\(\)/);
 assert.match(app,/window\.loadCardHelpers/);
