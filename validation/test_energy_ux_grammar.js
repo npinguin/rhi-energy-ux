@@ -116,7 +116,7 @@ assert.ok(app.includes("rhiUxTechnicalFooter({"), "diagnostics footer must use s
 for (const needle of [
   "Energy assessment unavailable",
   "Historical statistics not available yet",
-  "Current meter reading is available; historical statistics are separate.",
+  "The current meter reading is available; historical statistics are separate.",
   "userRelationshipLabel(value, fallback = 'Assigned charger')",
   "coherentCommandModels(models = [], stateHint = '')",
   "4.3.28 target-HA phone closure",
