@@ -8,10 +8,9 @@ const catalog = fs.readFileSync("src/app/energy-asset-catalog.js","utf8");
 const core = fs.readFileSync("src/vendor/rhi-ux-core.js","utf8");
 
 for (const [id,labelKey] of [
-  ["overview","nav.overview"],["flow","nav.flow"],["solar","nav.solar"],["battery","nav.battery"],
-  ["consumers","nav.consumption"],["gas","nav.gas"],["settings","nav.settings"],
-  ["plan","nav.plan"],["metering","nav.performance"],
-  ["value","nav.value"],["retrospective","nav.retrospective"]
+  ["overview","nav.overview"],["solar","nav.solar"],["battery","nav.battery"],
+  ["consumers","nav.consumption"],["settings","nav.settings"],
+  ["plan","nav.plan"],["metering","nav.performance"],["value","nav.value"]
 ]) {
   assert.ok(presentation.includes(`id:"${id}"`) && presentation.includes(`labelKey:"${labelKey}"`), "missing localized navigation definition "+id);
 }
@@ -33,7 +32,7 @@ assert.ok(app.includes("commandActions:this.pageQuickActions(rt, tab)"));
 assert.match(app,/pageContextControls\(rt, tab\)/);
 assert.match(app,/bodyContextBar\(rt, tab/);
 assert.match(app,/rhiUxContextBar/);
-for (const tab of ["outlook","consumers","metering","planning","value"]) {
+for (const tab of ["outlook","planning","value"]) {
   assert.ok(app.includes(`tab === '${tab}'`), "missing body-scoped context case "+tab);
 }
 const contextBlock=app.slice(app.indexOf("pageContextControls(rt, tab)"),app.indexOf("bodyContextBar(rt, tab"));
@@ -77,7 +76,7 @@ for (const logicalType of ["flexible_asset","consumer","solar_array","inverter",
   assert.ok(!catalog.includes(`asset_type:"${logicalType}"`), "logical/non-canonical visual fallback returned "+logicalType);
 }
 
-assert.ok(core.includes('const RHI_UX_CORE_VERSION = "1.6.0";'), 'Energy must vendor UX Core 1.6.0');
+assert.ok(core.includes('const RHI_UX_CORE_VERSION = "1.6.3";'), 'Energy must vendor UX Core 1.6.3');
 assert.match(core,/function rhiUxContextBar/);
 assert.match(core,/function rhiUxResolveDomainAssetNavigation/);
 assert.ok(core.includes("{asset_id}"), "runtime-safe Core navigation token missing");
@@ -106,6 +105,10 @@ const intelligenceBlock = presentation.slice(presentation.indexOf('id:"intellige
 assert.ok(intelligenceBlock.lastIndexOf('id:"settings"') > intelligenceBlock.indexOf('id:"plan"'), "Settings must be the last Intelligence tab");
 assert.ok(!intelligenceBlock.includes('id:"operational-planning"') && !intelligenceBlock.includes('id:"tactical-planning"') && !intelligenceBlock.includes('id:"strategic-planning"'), "planning subviews must not return as top-level navigation tabs");
 assert.ok(app.includes("['operational-planning','planning','strategic-planning'].includes(tab)"), "Plan must expose operational/tactical/strategic internal views");
+assert.ok(app.includes("['overview','flow'].includes(tab)"), "Overview must retain Flow as an internal view");
+assert.ok(app.includes("['consumers','gas'].includes(tab)"), "Consumption must retain Gas as an internal view");
+assert.ok(app.includes("['metering','retrospective'].includes(tab)"), "Performance must retain Retrospective as an internal view");
+assert.ok(!presentation.includes('id:"flow"') && !presentation.includes('id:"gas"') && !presentation.includes('id:"retrospective"'), "internal capability views must not return as top-level navigation tabs");
 assert.ok(!app.includes("understandingFooter(rt, this.view)"), "legacy Conclusion footer must not be injected into product views");
 assert.ok(!app.includes("understandingFooter(rt, tab)"), "legacy Conclusion component must be removed");
 assert.ok(app.includes("this.config?.show_diagnostics !== true"), "technical footer must be explicitly diagnostics-gated");
