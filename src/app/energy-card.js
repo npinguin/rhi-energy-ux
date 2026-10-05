@@ -2092,19 +2092,14 @@
       return asNumber(firstDefined(effective.available_above_reserve_kwh, effective.usable_above_reserve_kwh));
     }
     flexibleNeedKwh(rt) {
-      const values = this.flexibleAssetDomain(rt).planningParticipants().map(vm => asNumber(firstDefined(vm.raw.energy_to_target_kwh, vm.raw.energy_needed_kwh, vm.raw.remaining_energy_kwh))).filter(value => value !== null);
-      if (!values.length) return null;
-      return values.reduce((sum, value) => sum + Math.max(0, value), 0);
+      const totals = rt.planningHorizonTotals('D0') || {};
+      return asNumber(firstDefined(totals.flexible_required_kwh, totals.required_kwh, null));
     }
     flexiblePowerNowKw(rt) {
-      // Live Flexible Loads power is physical connection truth owned by Energy core.
-      // Do not re-sum planning participants: infrastructure may consume power without being a planning target.
-      const physical = rt.number('flexible_loads.power_kw');
-      if (physical !== null) return Math.abs(physical);
-      const values = this.flexibleAssetDomain(rt).planningParticipants().map(vm => asNumber(firstDefined(vm.raw.power_kw, vm.raw.current_power_kw, vm.raw.actual_power_kw))).filter(value => value !== null);
-      if (!values.length) return null;
-      return values.reduce((sum, value) => sum + Math.abs(value), 0);
+      const value = this.currentEnergyModel(rt).consumption.flexibleLoadsKw;
+      return value === null ? null : Math.abs(value);
     }
+
     currentEnergyModel(rt) { return createCurrentEnergyViewModel(rt.contractGateway()); }
     progress(value, max = null) { return this.componentProgressBar(value, max); }
     assetRow(icon, title, label, value, pct) { return this.componentAssetRow({ icon, title, label, value, pct }); }
@@ -2464,8 +2459,14 @@
       const profileKey = hbEnergyProfileKey(tab);
       const baseProfile = profiles[profileKey] || profiles.overview;
       const p = { ...baseProfile, image: hbEnergyHeroAsset(tab) };
-      const badgeKey = tab === 'gas' ? '' : tab === 'solar' ? 'solar.power_kw' : tab === 'battery' ? 'battery.soc_pct' : tab === 'flow' ? 'grid.flow_direction' : tab === 'metering' ? 'metering.integrity_state' : tab === 'value' ? 'value_accounting.state' : 'energy_intelligence.status';
-      let rawBadge = badgeKey ? String(this.rowStatus(rt.row(badgeKey)) || '').trim().toLowerCase() : '';
+      const badgeKey = tab === 'gas' ? '' : tab === 'metering' ? 'metering.integrity_state' : tab === 'value' ? 'value_accounting.state' : 'energy_intelligence.status';
+      let rawBadge = tab === 'solar'
+        ? String(current.solar.health || '').toLowerCase()
+        : tab === 'battery'
+          ? String(current.battery.health || '').toLowerCase()
+          : tab === 'flow'
+            ? (current.grid.direction === 'unknown' ? 'unavailable' : 'available')
+            : (badgeKey ? String(this.rowStatus(rt.row(badgeKey)) || '').trim().toLowerCase() : '');
       if (tab === 'metering') rawBadge = String(meteringContext.health || rawBadge).toLowerCase();
       if (tab === 'value') rawBadge = String(valueContext.state || rawBadge).toLowerCase();
       const attentionBadgeByTab = {gas:'Gas meter needs attention',overview:'Overview needs attention',outlook:'Forecast needs attention',flow:'Flow needs attention',solar:'Solar needs attention',battery:'Home Battery needs attention',consumers:'Consumers need attention',strategies:'Strategy needs attention',metering:'Measurements need attention',intelligence:'Guidance needs attention',retrospective:'Review needs evidence',value:'Financial setup needs attention'};
@@ -3387,14 +3388,6 @@
             ? field.display
             : (field.value === null || field.value === undefined ? '' : `${field.value}${field.unit ? ` ${field.unit}` : ''}`);
         }
-        if (!value || value === '—') {
-          let direct;
-          for (const path of spec.direct) {
-            const candidate = valueAtPath(asset, path);
-            if (candidate !== undefined && candidate !== null && candidate !== '') { direct = candidate; break; }
-          }
-          if (direct !== undefined) value = formatDirect(direct, spec.formatter);
-        }
         if (!value || value === '—') continue;
         seenLabels.add(spec.label);
         facts.push({ label:spec.label, value, status, key:usedKey });
@@ -3852,11 +3845,6 @@
 
     solar(rt) {
       const pageVm = this.buildPageViewModel(rt, 'solar');
-      const solarPower = rt.number('solar.power_kw');
-      const forecastToday = rt.number('forecast.solar_today_kwh');
-      const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
-      const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
-      const gridExportToday = rt.number('metering.grid_export_today_kwh');
       return `${this.tabExperienceHeader(rt,'solar',pageVm)}<div class="solarPage solarHardwarePage">
         ${this.solarEnergyStory(rt)}
         ${this.solarHardwareExperience(rt)}
@@ -4520,10 +4508,7 @@
       const available = batteryVm.availableKwh;
       const power = batteryVm.displayPowerKw;
       const state = batteryVm.label;
-      const reserve = asNumber(firstDefined(
-        rt.value('battery.reserve_target_pct', null),
-        rt.value('battery.reserve_pct', null)
-      ));
+      const reserve = batteryVm.reserveTargetPct;
       const batterySystem = rt.assets().find(asset => ['battery_system','home_battery_system'].includes(String(asset.asset_type || asset.object_class || '').toLowerCase())) || rt.asset('battery_system');
       const children = batterySystem
         ? rt.childrenOfType(String(batterySystem.asset_id || 'battery_system'), 'battery')
