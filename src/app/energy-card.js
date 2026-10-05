@@ -2420,7 +2420,7 @@
     buildPageViewModel(rt, tab) {
       const current = this.currentEnergyModel(rt);
       const solar = current.solar.powerKw;
-      const flexibleLoadBudget = null; // R1.89.22 does not register a canonical public budget field.
+      const flexibleLoadBudget = rt.number('flexible_loads.available_power_kw');
       const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
       const solarForecast = rt.number('forecast.solar_today_kwh');
       const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
