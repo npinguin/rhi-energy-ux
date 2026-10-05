@@ -1,15 +1,16 @@
-# RHI Energy UX 4.3.27 — canonical V2 boundary closure candidate
+# RHI Energy UX 4.3.28 — target Home Assistant UX closure candidate
 
-Follow-up candidate on **Foundation F1.8.38 / Mobility M0.10.25 / Energy E0.15.87 / UX Core 1.6.0**.
+- keep page-level actions product-scoped so ambiguous asset Start/Stop and repeated per-device commands no longer leak into headers;
+- deduplicate commands and suppress contradictory Start/Stop or Pause/Resume combinations based on published state;
+- fail closed in Overview intelligence when the canonical live Energy balance is incomplete;
+- keep opaque IDs, provider states and technical relationship wording out of normal product UX;
+- distinguish an available current gas meter from unavailable historical statistics;
+- remove duplicate Appearance actions;
+- make Battery, Gas and Solar asset compositions flow correctly on phone widths without presentation debt.
 
-- enforce `RHI_ENERGY_PUBLIC_CONTRACT_V2` as the sole Energy product-state ingress through the runtime gateway;
-- remove screen-level Home Assistant state and contract discovery from the Energy card;
-- make Gas history consume only an explicitly Public-V2-published history/statistics entity reference and fail closed when absent;
-- strengthen architecture validation so renderers cannot regain direct `hass.states` discovery;
-- preserve backend-owned planning, metering, value, strategy, command and write/readback semantics;
-- keep missing canonical backend truth unavailable instead of recovering it from parallel or legacy indexes.
+No Energy measurements are reconstructed in the frontend. Missing Public V2 truth remains unavailable.
 
-Rollback: **v4.3.26**.  
+Rollback: **v4.3.27**.  
 Known accepted technical debt: **0**.  
 Known accepted feature debt: **0**.
 
