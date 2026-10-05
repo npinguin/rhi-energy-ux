@@ -397,6 +397,7 @@
     pricingProjection() { return selectEnergyPricing(this.publicV2()); }
     valueProjection(period = 'today') { return selectEnergyValue(this.publicV2(), period); }
     meteringProjection(period = 'today') { return selectEnergyMetering(this.publicV2(), period); }
+    intelligenceProjection() { return selectEnergyIntelligence(this.publicV2()); }
     activityProjection() { return selectEnergyActivity(this.publicV2()); }
     commandProjection(assetId = '') { return selectEnergyCommands(this.publicV2(), assetId); }
     coverage() { return selectEnergyCoverage(this.publicV2()); }
@@ -461,22 +462,9 @@
     }
     activity(type) { return this.activities().find(a => String(a.activity_type || '').toLowerCase() === String(type).toLowerCase()) || null; }
     decision() {
-      const d = this.value('energy_intelligence.decision', null);
-      if (d && typeof d === 'object') return d;
-      return {
-        goal: this.value('energy_intelligence.goal', ''),
-        observation: this.value('energy_intelligence.observation', ''),
-        assessment: this.value('energy_intelligence.assessment', ''),
-        recommendation: this.value('energy_intelligence.recommendation', ''),
-        automation_mode: this.value('energy_intelligence.automation_mode', ''),
-        automation_status: this.value('energy_intelligence.automation_status', ''),
-        status: this.value('energy_intelligence.status', ''),
-        reason: this.value('energy_intelligence.reason', ''),
-        confidence: this.value('energy_intelligence.confidence', ''),
-        affected_assets: this.value('energy_intelligence.affected_assets', []),
-        next_review: this.value('energy_intelligence.next_review', '')
-      };
+      return this.intelligenceProjection();
     }
+
     overviewExperience() {
       const projection=this.overviewProjection();
       return projection.available ? { entity_id:this.contractEntityId(), ...projection.raw } : null;
@@ -573,95 +561,46 @@
       });
     }
 
-    flexibleRuntimePropertyRow(assetId, names) {
-      const exact = [];
-      names.forEach(name => {
-        exact.push(`${assetId}.${name}`);
-        exact.push(`${assetId}.${name.replace(/^energy_control_/, '')}`);
-      });
-      const direct = exact.map(key => this.row(key)).find(r => r && !r.missing);
-      if (direct) return direct;
-      const rows = this.propertyRows().filter(row => String(row.asset_id || '') === String(assetId));
-      return rows.find(row => names.some(name => String(row.key || row.property_key || '').toLowerCase().endsWith(`.${name.toLowerCase()}`) || String(row.key || row.property_key || '').toLowerCase() === name.toLowerCase())) || { missing: true };
-    }
-    isDeprecatedTargetEnergyAlias(row) {
-      if (!row || row.missing) return false;
-      const text = `${row.key || row.property_key || ''} ${row.quality || ''} ${row.source_type || ''} ${row.resolution_mode || ''} ${row.alias_of || ''} ${row.deprecated_alias_of || ''} ${row.migration_role || ''}`.toLowerCase();
-      return /deprecated|source_alias|derived_alias|alias/.test(text);
-    }
-    targetEnergyForAsset(assetId, sourceRow = {}) {
-      const canonical = this.flexibleRuntimePropertyRow(assetId, ['energy_to_target_kwh']);
-      if (canonical && !canonical.missing) return rowValue(canonical, null);
-      if (sourceRow && sourceRow.energy_to_target_kwh !== undefined) return asNumber(sourceRow.energy_to_target_kwh);
-      const aliases = [this.flexibleRuntimePropertyRow(assetId, ['remaining_energy_kwh']), this.flexibleRuntimePropertyRow(assetId, ['energy_needed_kwh'])];
-      for (const row of aliases) {
-        if (row && !row.missing && this.isDeprecatedTargetEnergyAlias(row)) return rowValue(row, null);
-      }
-      const rowText = `${sourceRow.alias_of || ''} ${sourceRow.deprecated_alias_of || ''} ${sourceRow.migration_role || ''} ${sourceRow.source_type || ''}`.toLowerCase();
-      if (/deprecated|source_alias|derived_alias|alias/.test(rowText)) return asNumber(sourceRow.remaining_energy_kwh ?? sourceRow.energy_needed_kwh);
-      return null;
-    }
     normalizeFlexibleAssetRow(row) {
-      const id = row.asset_id || row.flexible_asset_id || row.target_asset_id;
-      // R1.59.4AKL: active flexible-load/runtime path is canonical-only.
-      // Use power_kw + energy_flow_direction. Legacy actual/current power aliases are not active UX truth.
-      const actual = this.number(`${id}.power_kw`) ?? asNumber(row.power_kw);
-      const targetEnergy = this.targetEnergyForAsset(id, row);
-      const remaining = this.number(`${id}.remaining_energy_kwh`) ?? asNumber(row.remaining_energy_kwh);
-      const required = this.number(`${id}.required_energy_kwh`) ?? asNumber(row.required_energy_kwh);
-      const requestedEffective = this.number(`${id}.requested_power_kw_effective`) ?? this.number(`${id}.requested_power_kw`) ?? asNumber(row.requested_power_kw_effective ?? row.requested_power_kw);
+      const id=String(firstDefined(row.asset_id,row.flexible_asset_id,row.target_asset_id,'')||'');
+      const actual=asNumber(row.power_kw);
+      const targetEnergy=asNumber(row.energy_to_target_kwh);
       return {
         ...row,
-        asset_id: id,
-        display_name: row.display_name || this.assetName(id),
-        ux_asset_type: row.ux_asset_type || row.asset_type || (String(row.flexible_role || '').includes('storage') ? 'storage' : 'flexible_asset'),
-        flexible_role: row.flexible_role || (String(row.asset_type || '').toLowerCase().includes('storage') ? 'storage' : 'load'),
-        cluster_role: row.cluster_role || 'standalone',
-        show_in_primary_ux: row.show_in_primary_ux ?? true,
-        show_in_engineering: row.show_in_engineering ?? false,
-        planning_enabled: row.planning_enabled ?? true,
-        contributor_asset_ids: asArray(row.contributor_asset_ids),
-        actual_power_kw: actual,
-        current_power_kw: actual,
-        power_kw: actual,
-        energy_flow_direction: this.value(`${id}.energy_flow_direction`, row.energy_flow_direction || 'unknown'),
-        power_direction: this.value(`${id}.energy_flow_direction`, row.energy_flow_direction || 'unknown'),
-        energy_to_target_kwh: targetEnergy,
-        remaining_energy_kwh: remaining,
-        required_energy_kwh: required,
-        energy_needed_kwh: targetEnergy,
-        requested_power_kw_effective: requestedEffective,
-        min_power_kw: this.number(`${id}.min_power_kw`) ?? asNumber(row.min_power_kw),
-        max_power_kw: this.number(`${id}.max_power_kw`) ?? asNumber(row.max_power_kw),
-        energy_control_priority: this.value(`${id}.energy_control_priority`, row.energy_control_priority ?? row.priority ?? 'normal'),
-        availability_state: this.value(`${id}.availability_state`, row.availability_state || 'unknown'),
-        availability_reason: this.value(`${id}.availability_reason`, row.availability_reason || ''),
-        operating_state: this.value(`${id}.operating_state`, row.operating_state || 'unknown'),
-        energy_control_hold_state: this.value(`${id}.energy_control_hold_state`, row.energy_control_hold_state || 'none'),
-        energy_control_mode: this.value(`${id}.energy_control_mode`, row.energy_control_mode || row.current_mode || 'advice'),
-        can_execute_energy_action_now: asBool(this.value(`${id}.can_execute_energy_action_now`, row.can_execute_energy_action_now), false),
-        energy_planning: this.planningOutcomeFor(id),
-        // Canonical producer-owned charging relation aliases. These are
-        // presentation conveniences only; the values remain Mobility-owned.
-        effective_charger: firstDefined(
-          row.effective_charger,
-          row.effective_connection_id,
-          row.assigned_connection_id,
-          row.physical_connection_id,
-          row.charger_asset_id,
-          row.connection_asset_id,
-          ''
-        ),
-        charger_asset_id: firstDefined(
-          row.charger_asset_id,
-          row.effective_connection_id,
-          row.assigned_connection_id,
-          row.physical_connection_id,
-          row.connection_asset_id,
-          ''
-        )
+        asset_id:id,
+        display_name:row.display_name||this.assetName(id),
+        ux_asset_type:row.ux_asset_type||row.asset_type||(String(row.flexible_role||'').includes('storage')?'storage':'flexible_asset'),
+        flexible_role:row.flexible_role||(String(row.asset_type||'').toLowerCase().includes('storage')?'storage':'load'),
+        cluster_role:row.cluster_role||'standalone',
+        show_in_primary_ux:row.show_in_primary_ux??true,
+        show_in_engineering:row.show_in_engineering??false,
+        planning_enabled:row.planning_enabled??true,
+        contributor_asset_ids:asArray(row.contributor_asset_ids),
+        actual_power_kw:actual,
+        current_power_kw:actual,
+        power_kw:actual,
+        energy_flow_direction:String(row.energy_flow_direction||'unknown'),
+        power_direction:String(row.energy_flow_direction||'unknown'),
+        energy_to_target_kwh:targetEnergy,
+        remaining_energy_kwh:asNumber(row.remaining_energy_kwh),
+        required_energy_kwh:asNumber(row.required_energy_kwh),
+        energy_needed_kwh:targetEnergy,
+        requested_power_kw_effective:asNumber(firstDefined(row.requested_power_kw_effective,row.requested_power_kw,null)),
+        min_power_kw:asNumber(row.min_power_kw),
+        max_power_kw:asNumber(row.max_power_kw),
+        energy_control_priority:firstDefined(row.energy_control_priority,row.priority,'normal'),
+        availability_state:String(row.availability_state||'unknown'),
+        availability_reason:String(row.availability_reason||''),
+        operating_state:String(row.operating_state||'unknown'),
+        energy_control_hold_state:String(row.energy_control_hold_state||'none'),
+        energy_control_mode:String(firstDefined(row.energy_control_mode,row.current_mode,'advice')),
+        can_execute_energy_action_now:asBool(row.can_execute_energy_action_now,false),
+        energy_planning:this.planningOutcomeFor(id),
+        effective_charger:String(firstDefined(row.effective_charger,row.charger_asset_id,row.connection_asset_id,row.execution_target_asset_id,'')||''),
+        charger_asset_id:String(firstDefined(row.charger_asset_id,row.effective_charger,row.connection_asset_id,row.execution_target_asset_id,'')||'')
       };
     }
+
     flexibleAssetIndexRows() {
       if (this._flexibleAssets) return this._flexibleAssets;
       const v2=this.publicV2();
