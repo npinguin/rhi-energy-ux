@@ -47,7 +47,7 @@ const EnergyCard = registry.get('homebrain-energy-card');
 const first = new EnergyCard();
 first.navSection = 'insights';
 first.navItem = 'metering';
-first.navSelectionBySection = { energy:'overview', intelligence:'operational-planning', insights:'metering' };
+first.navSelectionBySection = { energy:'overview', intelligence:'plan', insights:'metering' };
 first.view = 'metering';
 first.selectedMeteringPeriodId = 'hour';
 first._meteringPeriodHydrated = true;
@@ -95,7 +95,7 @@ for (const [key, value] of Object.entries(expected)) {
 }
 if (!recreated._meteringPeriodHydrated) throw new Error('restored Metering period must not be overwritten by backend hydration');
 if (!recreated.disclosureOpen['metering:details']) throw new Error('disclosure state not restored');
-if (recreated.navSelectionBySection.intelligence !== 'operational-planning') throw new Error('per-section navigation memory not restored');
+if (recreated.navSelectionBySection.intelligence !== 'plan') throw new Error('per-section navigation memory not restored');
 
 const model = recreated.navigationModel();
 if (model.map(section => section.id).join('|') !== 'energy|intelligence|insights') throw new Error('two-level navigation sections drifted');
@@ -103,11 +103,11 @@ const energy = model.find(section => section.id === 'energy');
 const intelligence = model.find(section => section.id === 'intelligence');
 const insights = model.find(section => section.id === 'insights');
 if (energy.items.map(item => item.id).join('|') !== 'overview|flow|solar') throw new Error('minimal structural-presence Energy navigation drifted');
-if (intelligence.items.map(item => item.id).join('|') !== 'operational-planning|tactical-planning|strategic-planning|settings') throw new Error('Intelligence navigation order drifted');
+if (intelligence.items.map(item => item.id).join('|') !== 'plan|settings') throw new Error('Intelligence navigation order drifted');
 if (insights.items.map(item => item.id).join('|') !== 'metering|retrospective') throw new Error('minimal structural-presence Insights navigation drifted');
 if (recreated.resolveNavigation('', '', 'solar').item !== 'solar') throw new Error('Solar must resolve to the Energy Solar tab');
-if (recreated.resolveNavigation('', '', 'operational-planning').item !== 'operational-planning') throw new Error('Operational Planning must keep its own renderer');
-if (recreated.resolveNavigation('', '', 'planning').item !== 'tactical-planning') throw new Error('legacy Planning must migrate to Tactical Planning');
+if (recreated.resolveNavigation('', '', 'operational-planning').item !== 'plan') throw new Error('Operational Planning must resolve inside Plan');
+if (recreated.resolveNavigation('', '', 'planning').item !== 'plan') throw new Error('legacy Planning must resolve inside Plan');
 if (recreated.resolveNavigation('', '', 'intelligence').item !== 'settings') throw new Error('legacy Intelligence must migrate to Settings');
 const navMarkup = recreated.nav();
 if (!/rhiUxModuleTabs/.test(navMarkup) || !/rhiUxDomainTabs/.test(navMarkup)) throw new Error('shared Core two-level navigation not rendered');

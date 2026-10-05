@@ -24,6 +24,13 @@ for path in (ROOT/"src").rglob("*.js"):
         if re.search(pattern,text):
             failures.append(f"{rel}: legacy Energy product API remains: {pattern}")
 
+for path in (ROOT/"validation").rglob("*"):
+    if path.suffix not in {".js",".mjs",".py",".json"} or path.name=="validate_zero_debt.py":
+        continue
+    text=path.read_text(encoding="utf-8")
+    if re.search(r"RHI_[A-Z0-9_]+_V1", text):
+        failures.append(f"{path.relative_to(ROOT)}: V1 contract identifier is forbidden in active validation fixtures")
+
 for relpath in ("release/product.json","release/RELEASE_STATUS.json","COMPATIBILITY.json","RELEASE_MANIFEST.json"):
     text=(ROOT/relpath).read_text(encoding="utf-8")
     if re.search(r"RHI_[A-Z0-9_]+_V1", text):

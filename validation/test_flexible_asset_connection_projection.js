@@ -97,7 +97,7 @@ assert.ok(card.includes('rt.connectedRelationships().forEach'));
 assert.ok(card.includes('asset.effective_connection_id'));
 assert.ok(card.includes('asset.assigned_connection_id'));
 assert.ok(card.includes('rt.assets().filter(isCharger)'));
-assert.ok(card.includes('No charging topology published'));
+assert.ok(card.includes('No charging connections available'));
 assert.ok(card.includes("visual_ref:firstDefined(vm.visualRef, raw.visual_ref, published.visual_ref, '')"), 'Consumers must preserve canonical producer visual_ref before any secondary projection');
 assert.ok(!card.includes('Canonical physical connection telemetry is not published by E0.15.48.'));
 

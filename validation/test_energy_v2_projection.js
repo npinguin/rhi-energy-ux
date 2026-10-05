@@ -20,7 +20,7 @@ const states = {
       contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
       contract_version:'2.0.0',
       release:'E0.15.52',
-      core:{contract_id:'RHI_ENERGY_CORE_V1',
+      core:{contract_id:'RHI_ENERGY_CORE_V2',
         battery:{status:'AVAILABLE',fields:{
           power_kw:{value:-1.2,unit:'kW',status:'AVAILABLE',quality:'CANONICAL',reason:null},
           soc_pct:{value:72,unit:'%',status:'AVAILABLE',quality:'CANONICAL',reason:null},
@@ -85,7 +85,7 @@ const states = {
       planning:{horizons:{D0:{required_kwh:19.2,planned_kwh:19.2,executed_kwh:null,still_to_plan_kwh:0,status:'AVAILABLE',execution_status:'NOT_MEASURED'},D1:{required_kwh:11,planned_kwh:4,still_to_plan_kwh:7,status:'AVAILABLE'}}},
       configuration:{strategy:{configured:{status:'AVAILABLE',properties:[]},effective:{status:'AVAILABLE',properties:[],runtime_overrides:[]}}},
       metering:{selected_period_id:'today',periods:{today:{period_id:'today',availability:'AVAILABLE',measurement_state:'AVAILABLE',quality:'OK',baseline_reset_required:false,user_action_required:false,summary:{measured:{solar_production_kwh:4.2,site_consumption_kwh:3.1,grid_import_kwh:0.4,grid_export_kwh:0.2,battery_charge_kwh:0.5,battery_discharge_kwh:1.0,flexible_loads_energy_in_kwh:0.0},quality:{period:'OK',health:'OK',measurement_state:'AVAILABLE',user_action_required:false}}}}},
-      retrospective:{contract_id:'RHI_ENERGY_RETROSPECTIVE_V1',status:'COLLECTING_EVIDENCE',reason:'retrospective_prerequisites_incomplete',prerequisites:[{prerequisite_id:'planning_outcome',state:'READY'},{prerequisite_id:'execution_evidence',state:'PENDING'},{prerequisite_id:'completed_metering',state:'READY'}],evidence_coverage_pct:66.7,score:null},
+      retrospective:{contract_id:'RHI_ENERGY_RETROSPECTIVE_V2',status:'COLLECTING_EVIDENCE',reason:'retrospective_prerequisites_incomplete',prerequisites:[{prerequisite_id:'planning_outcome',state:'READY'},{prerequisite_id:'execution_evidence',state:'PENDING'},{prerequisite_id:'completed_metering',state:'READY'}],evidence_coverage_pct:66.7,score:null},
       value_accounting:{selected_period_id:'today',net_financial_result:{value:1.23,unit:'EUR',status:'AVAILABLE'},periods:{today:{net_financial_result_eur:1.23}}},
       commands:[]
     }

@@ -38,7 +38,7 @@ const states = {
       contract_visibility:'ux_safe',
       contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
       contract_version:'2.0.0',
-      core:{contract_id:'RHI_ENERGY_CORE_V1'},
+      core:{contract_id:'RHI_ENERGY_CORE_V2'},
       objects:[
         {
           asset_id:'vehicle_test',

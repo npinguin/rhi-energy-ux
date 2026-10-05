@@ -2899,9 +2899,7 @@ const HB_ENERGY_NAVIGATION_SPEC = Object.freeze([
   {
     id:"intelligence", labelKey:"nav.intelligence", fallback:"Intelligence",
     items:[
-      { id:"operational-planning", labelKey:"nav.operational_plan", fallback:"Now", view:"operational-planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
-      { id:"tactical-planning", labelKey:"nav.tactical_plan", fallback:"Today & Tomorrow", view:"planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
-      { id:"strategic-planning", labelKey:"nav.strategic_plan", fallback:"Long term", view:"strategic-planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
+      { id:"plan", labelKey:"nav.plan", fallback:"Plan", view:"planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
       { id:"settings", labelKey:"nav.settings", fallback:"Settings", view:"strategies", titleKey:"hero.settings.title", descriptionKey:"hero.settings.description" }
     ]
   },
@@ -3274,10 +3272,10 @@ function rhiEnergyVisualPickerStyles() {
       if (bySection && byItem) return { section:bySection.id, item:byItem.id, view:byItem.view };
       const legacy = {
         overview:['energy','overview'], flow:['energy','flow'], battery:['energy','battery'], consumers:['energy','consumers'], gas:['energy','gas'],
-        strategies:['intelligence','settings'], intelligence:['intelligence','settings'], solar:['energy','solar'], 'operational-planning':['intelligence','operational-planning'],
-        planning:['intelligence','tactical-planning'], outlook:['intelligence','tactical-planning'],
+        strategies:['intelligence','settings'], intelligence:['intelligence','settings'], solar:['energy','solar'], 'operational-planning':['intelligence','plan'],
+        planning:['intelligence','plan'], outlook:['intelligence','plan'],
         metering:['insights','metering'], value:['insights','value'], retrospective:['insights','retrospective'],
-        'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','strategic-planning']
+        'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','plan']
       };
       const [fallbackSection,fallbackItem] = legacy[String(legacyView || '')] || ['energy','overview'];
       const section = sections.find(row => row.id === fallbackSection) || sections[0];
@@ -3309,7 +3307,15 @@ function rhiEnergyVisualPickerStyles() {
     }
     navigateToView(view) {
       const target = this.resolveNavigation('', '', view);
-      this.selectNavigation(target.section, target.item);
+      const requested = String(view || target.view || '');
+      const planningViews = new Set(['operational-planning','planning','outlook','strategic-planning']);
+      this.navSection = target.section;
+      this.navItem = target.item;
+      this.view = planningViews.has(requested) ? requested : target.view;
+      this.navSelectionBySection = { ...(this.navSelectionBySection || {}), [target.section]:target.item };
+      this.persistView();
+      this._forceRender = true;
+      this.render();
     }
     title() { return this.activeNavigationItem().title || rhiEnergyT(this._hass,'nav.energy',{},'Energy'); }
     subtitle() { return this.activeNavigationItem().description || ''; }
@@ -3942,6 +3948,27 @@ function rhiEnergyVisualPickerStyles() {
     productStoryCard({ eyebrow = 'Current situation', title = '', why = '', recommendation = '', actions = '', details = '', tone = 'blue' } = {}) {
       return `<section class="panel productStory ${escapeHtml(tone)}"><div class="productStoryCopy"><small>${escapeHtml(eyebrow)}</small><h2>${escapeHtml(title)}</h2>${why ? `<p>${escapeHtml(why)}</p>` : ''}${recommendation ? `<div class="productStoryRecommendation"><span>Home Intelligence recommendation</span><b>${escapeHtml(recommendation)}</b></div>` : ''}</div>${actions ? `<div class="productStoryActions">${actions}</div>` : ''}${details ? this.componentDetailsBlock(`story-${Math.abs(String(title).split('').reduce((a,c)=>a+c.charCodeAt(0),0))}`, 'Details', details) : ''}</section>`;
     }
+    userSafeProductText(value, fallback = '') {
+      const raw = String(value ?? '').trim();
+      if (!raw) return fallback;
+      if (/\b(?:RHI_[A-Z0-9_]+|sensor\.|script\.|property[_ ]?key|entity[_ ]?id|asset[_ ]?id|command[_ ]?id|contract(?:_id)?|canonical contract|public\s+write\s+route|backend)\b/i.test(raw)) return fallback;
+      if (/^[a-z0-9]+(?:[_.:-][a-z0-9]+)+$/i.test(raw)) return fallback;
+      return raw;
+    }
+    userSafeReason(value, fallback = 'This information is not available yet.') {
+      const raw = String(value ?? '').trim();
+      const key = raw.toLowerCase().replace(/[\s.-]+/g,'_');
+      const known = {
+        not_published:'reason.not_published', not_available:'reason.not_available',
+        unavailable:'reason.not_available', disabled:'reason.disabled',
+        automation_disabled:'reason.automation_disabled', intelligence_off:'reason.intelligence_off',
+        verification_required:'reason.verification_required', reset_pending:'reason.reset_pending',
+        confirmation_needed:'reason.confirmation_needed', not_configured:'reason.not_configured',
+        configuration_required:'reason.not_configured'
+      };
+      if (known[key]) return rhiEnergyT(this._hass,known[key],{},fallback);
+      return this.userSafeProductText(raw,fallback);
+    }
     productStateLabel(value, fallback = 'Not available') {
       const key = String(value ?? '').trim().toLowerCase().replace(/[\s.-]+/g, '_');
       const map = {
@@ -4025,7 +4052,12 @@ function rhiEnergyVisualPickerStyles() {
       return items.length ? `<div class="warningChips">${items.map(item => `<span>${escapeHtml(item)}</span>`).join('')}</div>` : '';
     }
     contractGap(title, body, details = '') {
-      return `<section class="panel wide"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(body)}</p>${details ? this.componentDetailsBlock('contract-gap-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-'), 'Details', details) : ''}</section>`;
+      const safeTitle = this.userSafeProductText(title, rhiEnergyT(this._hass,'common.not_available',{},'Not available'));
+      const safeBody = this.userSafeProductText(body, rhiEnergyT(this._hass,'common.information_missing',{},'This information is not available yet.'));
+      const diagnostics = this.config?.show_diagnostics === true && details
+        ? this.componentDetailsBlock('diagnostics-' + String(title || 'information').toLowerCase().replace(/[^a-z0-9]+/g, '-'), rhiEnergyT(this._hass,'common.diagnostics',{},'Diagnostics'), details)
+        : '';
+      return `<section class="panel wide"><h2>${escapeHtml(safeTitle)}</h2><p>${escapeHtml(safeBody)}</p>${diagnostics}</section>`;
     }
     rowStatus(row) {
       if (!row || row.missing) return 'missing';
@@ -4117,7 +4149,17 @@ function rhiEnergyVisualPickerStyles() {
       if (tab === 'outlook') return this.componentHorizonSelector('outlook', rt.outlookHorizons(), this.selectedOutlookHorizonId);
       if (tab === 'consumers') return `<label class="hiQuickSelect"><span>Group</span><select data-consumer-filter-select>${this.consumerFilterOptions().map(([id,label])=>`<option value="${id}"${this.consumerFilter===id?' selected':''}>${label}</option>`).join('')}</select></label><label class="hiQuickSelect"><span>Sort</span><select data-consumer-sort-select>${this.consumerSortOptions().map(([id,label])=>`<option value="${id}"${this.consumerSort===id?' selected':''}>${label}</option>`).join('')}</select></label>`;
       if (tab === 'metering') return this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId) + this.componentMeteringSort();
-      if (tab === 'planning') return `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">Today</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">Tomorrow</button></div>`;
+      if (['operational-planning','planning','strategic-planning'].includes(tab)) {
+        const selector = this.componentSegmentedControl([
+          { value:'operational-planning', label:rhiEnergyT(this._hass,'nav.operational_plan',{},'Now'), attrs:{'data-tab-target':'operational-planning'} },
+          { value:'planning', label:rhiEnergyT(this._hass,'nav.tactical_plan',{},'Today & Tomorrow'), attrs:{'data-tab-target':'planning'} },
+          { value:'strategic-planning', label:rhiEnergyT(this._hass,'nav.strategic_plan',{},'Long term'), attrs:{'data-tab-target':'strategic-planning'} }
+        ], tab, 'planningViewSelector');
+        const horizon = tab === 'planning'
+          ? `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">Today</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">Tomorrow</button></div>`
+          : '';
+        return selector + horizon;
+      }
       if (tab === 'value') return this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId, 'value');
       return '';
     }
@@ -4432,8 +4474,8 @@ function rhiEnergyVisualPickerStyles() {
         flow: { image:hbEnergyHeroAsset('flow'), icon:'⚡', eyebrow:'Live energy flow', title:flowState, value:fmtKw(flowValue), unit:current.grid.direction === 'exporting' ? 'to grid' : current.grid.direction === 'importing' ? 'from grid' : 'grid flow', explanation:`${fmtKw(solar)} solar · ${fmtKw(demand)} demand`, tone:'purple', metrics:[['☀','Solar',fmtKw(solar),'Supplying the home'],['▣','Home Battery',fmtKw(batteryPower),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['⌂','Demand',fmtKw(demand),'Home consumption']] },
         solar: { image:hbEnergyHeroAsset('solar-generation'), icon:'☀', eyebrow:'Solar', title:(solar||0)>0.05?'Generating now':'Not generating', value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
         battery: { image:hbEnergyHeroAsset('battery'), icon:'▣', eyebrow:'Home Battery', title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(this.batteryReservePct(rt)),'Protected minimum']] },
-        consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',flexibleLoadBudget===null?'Not published':fmtKw(flexibleLoadBudget),flexibleLoadBudget===null?'Planning budget not published':'Current planning budget'],['◷','Planning',flexibleLoadBudget===null && flexNeed===null?'Incomplete':this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),flexibleLoadBudget===null?'Budget not published':'Planning data available']] },
-        gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:'Gas', title:gas.asset ? 'Gas consumption' : 'Gas meter not connected', value:this.gasVolume(gas.totalM3), unit:'total meter reading', explanation:gas.asset ? 'Measured gas use, meter health and 30-day history.' : 'Connect one authoritative gas meter to start measured consumption history.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),gas.flowM3h===null?'Not measured':'Current measured flow'],['◫','Meter total',this.gasVolume(gas.totalM3),gas.totalM3===null?'Not measured':'Cumulative meter reading'],['↺','History',gas.totalEntityId?({week:'7 days',month:'30 days',quarter:'90 days',year:'365 days'}[this.selectedGasHorizonId] || '30 days'):'Not available',gas.totalEntityId?'Daily measured consumption':'Waiting for total meter'],['✓','Health',gas.asset?human(gas.health):'Not configured',gas.asset?'Gas meter health':'Authoritative source required']] },
+        consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',flexibleLoadBudget===null?rhiEnergyT(this._hass,'common.not_available',{},'Not available'):fmtKw(flexibleLoadBudget),flexibleLoadBudget===null?'Planning budget not published':'Current planning budget'],['◷','Planning',flexibleLoadBudget===null && flexNeed===null?'Incomplete':this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),flexibleLoadBudget===null?'Budget not published':'Planning data available']] },
+        gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:'Gas', title:gas.asset ? 'Gas consumption' : 'Gas meter not connected', value:this.gasVolume(gas.totalM3), unit:'total meter reading', explanation:gas.asset ? 'Measured gas use, meter health and 30-day history.' : 'Connect a gas meter to start measured consumption history.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),gas.flowM3h===null?'Not measured':'Current measured flow'],['◫','Meter total',this.gasVolume(gas.totalM3),gas.totalM3===null?'Not measured':'Cumulative meter reading'],['↺','History',gas.totalEntityId?({week:'7 days',month:'30 days',quarter:'90 days',year:'365 days'}[this.selectedGasHorizonId] || '30 days'):'Not available',gas.totalEntityId?'Daily measured consumption':'Waiting for total meter'],['✓','Health',gas.asset?human(gas.health):'Not configured',gas.asset?'Gas meter health':'Authoritative source required']] },
         strategies: { image:hbEnergyHeroAsset('strategies'), icon:'◎', eyebrow:'Settings', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Domain-owned settings, configured intent and effective policy', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
         'operational-planning': { image:hbEnergyHeroAsset('operational-planning'), icon:'◷', eyebrow:'Operational Planning', title:this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'), value:fmtKw(flexPower), unit:'managed power now', explanation:'Current flexible-load execution and next actions', tone:'purple', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Managed power now'],['⌂','Energy need',fmtKwh(flexNeed),'Known remaining need'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Current operational state'],['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'),'Energy control mode']] },
         metering: { image:hbEnergyHeroAsset('metering'), icon:'▥', eyebrow:'Metering', title:meteringContext.label, value:meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar), unit:'Solar production', explanation:`Measured energy flows this ${meteringContext.label.toLowerCase()}`, tone:'blue', metrics:[['▥','Consumption',meteringContext.consumption === null ? 'Unavailable' : fmtKwh(meteringContext.consumption),meteringContext.label],['☀','Solar',meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar),meteringContext.label],['↓','Grid import',meteringContext.gridImport === null ? 'Unavailable' : fmtKwh(meteringContext.gridImport),meteringContext.label],['↑','Grid export',meteringContext.gridExport === null ? 'Unavailable' : fmtKwh(meteringContext.gridExport),meteringContext.label]] },
@@ -4627,7 +4669,7 @@ function rhiEnergyVisualPickerStyles() {
       const recommendation = String(firstDefined(d.what_text, d.recommendation_text, d.recommendation, d.summary, 'Monitoring current energy flow') || 'Monitoring current energy flow');
       return `${this.tabExperienceHeader(rt,'overview',pageVm)}
         <div class="overviewCoreGrid">
-          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon orange">☀</span><div><h2>Production & supply</h2><p>Energy available to the home now.</p></div></div>${sourceRows.join('') || `<div class="empty compact"><b>Supply unavailable</b><span>Current supply cannot be determined from canonical measurements.</span></div>`}</section>
+          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon orange">☀</span><div><h2>Production & supply</h2><p>Energy available to the home now.</p></div></div>${sourceRows.join('') || `<div class="empty compact"><b>Supply unavailable</b><span>Current supply cannot be determined from the available measurements.</span></div>`}</section>
           <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(reason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>Grid</small><b>${escapeHtml(fmtKw(gridValue,'—'))} ${escapeHtml(gridDirection)}</b></div>${rt.experiencePresence().battery === true ? `<div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div>` : ''}</div></div></section>
           <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>Consumption</h2><p>Site demand and its active components.</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'}) : ''}${contributorRows}${rt.experiencePresence().battery === true && balanceVm.battery.direction === 'into_storage' && balanceVm.battery.displayPowerKw !== null ? this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}) : ''}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${this.overviewEnergyRow({icon:'',label:gridDirection === 'Exporting' ? 'Grid Export' : gridDirection === 'Importing' ? 'Grid Import' : 'Grid',subtitle:'Grid boundary',value:fmtKw(gridValue,'—'),variant:'boundary'})}</section>
         </div>
@@ -4669,18 +4711,19 @@ function rhiEnergyVisualPickerStyles() {
       const max = meta.max !== undefined ? ` max="${escapeHtml(meta.max)}"` : '';
       const step = meta.step !== undefined ? ` step="${escapeHtml(meta.step)}"` : ' step="0.1"';
       const editor = `<label class="editField"><input type="number" inputmode="decimal" value="${escapeHtml(value ?? '')}" ${min}${max}${step} ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}"><em>${escapeHtml(row.unit || '')}</em></label>`;
-      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'numberProperty' });
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Current: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'numberProperty' });
     }
     editablePropertyFeedback(row) {
       const fb = this.writeFeedbackFor(row);
       if (!fb) return '';
       const labels = { pending:'Changing…', verifying:'Confirming…', accepted:'Updated', rejected:'Change failed' };
       const label = labels[String(fb.state || '').toLowerCase()] || this.productStateLabel(fb.state, 'Updating');
-      return `<small class="writeState ${escapeHtml(fb.state || '')}">${escapeHtml(label)}${fb.reason ? ` · ${escapeHtml(fb.reason)}` : ''}</small>`;
+      const reason = fb.reason ? this.userSafeReason(fb.reason,'') : '';
+      return `<small class="writeState ${escapeHtml(fb.state || '')}">${escapeHtml(label)}${reason ? ` · ${escapeHtml(reason)}` : ''}</small>`;
     }
     editablePropertyShell({ row, title, description = '', editor = '', readback = '', className = '' } = {}) {
       const writable = this.isWritableRow(row);
-      const disabledReason = writable ? '' : (row?.editable_reason || 'This setting is not currently editable.');
+      const disabledReason = writable ? '' : this.userSafeReason(row?.editable_reason,'This setting is not currently editable.');
       return `<div class="editableProperty ${escapeHtml(className)} ${writable ? 'writable' : 'readonly'}"><div class="editablePropertyCopy"><span>${escapeHtml(title || row?.display_name || 'Setting')}</span>${description ? `<small>${escapeHtml(description)}</small>` : ''}</div><div class="editablePropertyEditor">${editor}${readback ? `<em class="editablePropertyReadback">${escapeHtml(readback)}</em>` : ''}${this.editablePropertyFeedback(row)}${disabledReason ? `<small class="editablePropertyDisabled">${escapeHtml(disabledReason)}</small>` : ''}</div></div>`;
     }
     editablePropertyControl(row, { title = '', description = '', type = 'number', fallbackValue = null, fallbackOptions = [], immediateWrite = false } = {}) {
@@ -4699,24 +4742,24 @@ function rhiEnergyVisualPickerStyles() {
       const min = meta.min ?? asNumber(row.min) ?? asNumber(row.minimum) ?? 0;
       const max = meta.max ?? asNumber(row.max) ?? asNumber(row.maximum) ?? Math.max(10, Number(value || 0));
       const step = meta.step ?? asNumber(row.step) ?? 0.1;
-      const title = writable ? 'Editable profile setting' : (row.editable_reason || 'Read-only public property');
+      const title = writable ? 'Adjustable setting' : this.userSafeReason(row.editable_reason,'This setting is read-only');
       const unit = row.unit || '';
       const editor = `<label class="sliderField"><div><b data-live-range-value="true">${escapeHtml(this.editValueLabel(row, value, '—'))}</b></div><input type="range" value="${escapeHtml(value ?? '')}" min="${escapeHtml(min)}" max="${escapeHtml(max)}" step="${escapeHtml(step)}" ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(row.key || row.property_key || '')}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}" data-property-immediate-write="${immediateWrite ? 'true' : 'false'}" data-range-unit="${escapeHtml(unit)}" title="${escapeHtml(title)}"></label>`;
-      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'rangeProperty' });
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Current: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'rangeProperty' });
     }
     editableTimeControl(row, label, description = '') {
       if (!row || row.missing) return '';
       const value = this.draftValueForRow(row, '');
       const writable = this.isWritableRow(row);
       const editor = `<label class="editField"><input type="time" value="${escapeHtml(value ?? '')}" ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}"></label>`;
-      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'timeProperty' });
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Current: ${this.editValueLabel(row, rowValue(row, value), '—')}`, className:'timeProperty' });
     }
     editableToggleControl(row, label, description = '') {
       if (!row || row.missing) return '';
       const value = asBool(this.draftValueForRow(row, false), false);
       const writable = this.isWritableRow(row);
       const editor = `<label class="toggleField"><input type="checkbox" ${value ? 'checked' : ''} ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}"><b>${escapeHtml(value ? 'On' : 'Off')}</b></label>`;
-      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${value ? 'On' : 'Off'}`, className:'toggleProperty' });
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Current: ${value ? 'On' : 'Off'}`, className:'toggleProperty' });
     }
     editableSelectControl(row, label, fallbackValue = '', fallbackOptions = [], description = '') {
       if (!row || row.missing) return '';
@@ -4731,7 +4774,7 @@ function rhiEnergyVisualPickerStyles() {
         const options = opts.map(option => { const optValue=(option&&typeof option==='object')?(option.value??option.id??option.key??option.label):option; const optLabel=(option&&typeof option==='object')?(option.label??option.name??this.productStateLabel(optValue,human(optValue))):this.productStateLabel(optValue,human(optValue)); const selected=String(optValue).toLowerCase()===String(value??'').toLowerCase()?' selected':''; return `<option value="${escapeHtml(optValue)}"${selected}>${escapeHtml(optLabel)}</option>`; }).join('');
         editor = `<label class="selectField"><select ${writable ? '' : 'disabled'} data-property-key="${escapeHtml(this.propertyKeyFor(row))}" data-profile-id="${escapeHtml(row.profile_id || '')}" data-field-key="${escapeHtml(row.field_key || '')}" data-strategy-profile-field="${escapeHtml((row.__strategyProfileField || row.contract_role === 'editable_strategy_profile_field') ? 'true' : '')}">${options}</select></label>`;
       }
-      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Readback: ${this.productStateLabel(rowValue(row, value), human(rowValue(row, value), '—'))}`, className:'selectProperty' });
+      return this.editablePropertyShell({ row, title:label, description, editor, readback:`Current: ${this.productStateLabel(rowValue(row, value), human(rowValue(row, value), '—'))}`, className:'selectProperty' });
     }
     flexiblePropertyRow(rt, assetId, names) {
       for (const name of names) {
@@ -4777,10 +4820,10 @@ function rhiEnergyVisualPickerStyles() {
       const resumeReady = resumeCommand && runtime.commandEnabled(resumeCommand);
       if (pauseReady || resumeReady) {
         const key = pauseReady ? pauseCommand.command_id : resumeCommand.command_id;
-        const title = pauseReady ? 'Uses public pause command because no editable hold-state property is published' : 'Uses public resume command because no editable hold-state property is published';
+        const title = pauseReady ? 'Pause is handled automatically for this asset' : 'Resume is handled automatically for this asset';
         return `<label class="selectField"><span>Pause mode</span><select data-hold-command-select="true" data-command-key="${escapeHtml(key)}" data-target-asset-id="${escapeHtml(assetId)}" title="${escapeHtml(title)}"><option value="automatic">Automatic</option><option value="forced">Forced pause</option></select></label>`;
       }
-      return `<label class="selectField"><span>Pause mode</span><select disabled title="No public pause/hold property or executable pause command published"><option>Automatic</option></select></label>`;
+      return `<label class="selectField"><span>Pause mode</span><select disabled title="Pause mode cannot be changed for this asset"><option>Automatic</option></select></label>`;
     }
     strategySettingsPanel(rt) {
       const wanted = [
@@ -4806,7 +4849,7 @@ function rhiEnergyVisualPickerStyles() {
         if (editor.includes('select') || allowedValuesForRow(row).length) return this.editableSelectControl(row, label);
         return this.editableNumberControl(row, label);
       }).join('');
-      return `<div class="strategySettingsRow"><div class="strategySettingsIntro"><b>⚙ Strategy settings</b><span>Editable planning properties for flexible-load execution.</span></div><div class="strategySettingsControls">${controls || `<span class="noStrategySettings">No editable flexible-load strategy settings published.</span>`}</div></div>`;
+      return `<div class="strategySettingsRow"><div class="strategySettingsIntro"><b>⚙ Strategy settings</b><span>Editable planning properties for flexible-load execution.</span></div><div class="strategySettingsControls">${controls || `<span class="noStrategySettings">No adjustable strategy settings are available for this asset.</span>`}</div></div>`;
     }
     normalizeEnergyModeValue(value) {
       const text = String(value || '').toLowerCase().trim();
@@ -4883,7 +4926,7 @@ function rhiEnergyVisualPickerStyles() {
           'data-property-key': propertyKey
         }
       }));
-      const explanation = writable ? 'Choose how Home Intelligence manages flexible energy.' : 'Automation control is unavailable because no writable public mode property is published.';
+      const explanation = writable ? 'Choose how Home Intelligence manages flexible energy.' : 'Automation mode cannot be changed right now.';
       const editor = `<div class="automationQuickControl">${this.segmentedControl(opts, active, 'mode')}</div>`;
       return this.editablePropertyShell({ row:modeRow, title:'Automation mode', description:explanation, editor, readback:`Current: ${{disabled:'Off',advice:'Recommend',automation:'Automatic'}[active] || 'Not available'}`, className:'automationProperty' });
     }
@@ -4958,13 +5001,13 @@ function rhiEnergyVisualPickerStyles() {
             : /paused/.test(status) ? 'Paused' : /no_charge_needed/.test(status) ? 'No charge needed' : 'Not planned today';
         const state = todayLabel || (plannedToday !== null && plannedToday > 0 ? `${fmtKwh(plannedToday)} planned today` : human(status));
         const tone = /planned today|charging|completed|no charge needed/i.test(`${state} ${expected}`) ? 'ok' : /paused|not planned|waiting|later/i.test(`${state} ${expected}`) ? 'wait' : 'neutral';
-        return { state, tone, why: whyText || 'Published by Tactical Planning', sub: planning.what_text && planning.what_text !== state ? planning.what_text : '', expected, expectedSub: plannedToday !== null ? `${fmtKwh(plannedToday)} planned today` : '' };
+        return { state, tone, why: whyText || 'From the current plan', sub: planning.what_text && planning.what_text !== state ? planning.what_text : '', expected, expectedSub: plannedToday !== null ? `${fmtKwh(plannedToday)} planned today` : '' };
       }
       const rawReason = String(planning.reason || planning.blocked_reason || load.availability_reason || rt.value(`${id}.availability_reason`, '') || '').toLowerCase();
       if (powerActive) return { state: 'Charging now', tone: 'ok', why: human(planning.reason || 'Charging now'), sub: '', expected: '—', expectedSub: '' };
       if (/waiting|scheduled|planned/.test(rawState)) return { state: human(rawState), tone: 'wait', why: human(planning.reason || 'Waiting'), sub: '', expected: '—', expectedSub: '' };
       if (/blocked|failed|unavailable/.test(rawState)) return { state: human(rawState), tone: 'warn', why: human(planning.blocked_reason || planning.reason || 'Blocked'), sub: '', expected: '—', expectedSub: '' };
-      return { state: planning.state ? human(planning.state) : 'No plan published', tone: 'neutral', why: planning.reason ? human(planning.reason) : '', sub: '', expected: '—', expectedSub: '' };
+      return { state: planning.state ? human(planning.state) : 'No plan available', tone: 'neutral', why: planning.reason ? human(planning.reason) : '', sub: '', expected: '—', expectedSub: '' };
     }
     etaDisplayFor(planning) {
       // R1.64.0 UX brief: UX must not invent ready-in or infer ETA from energy/power.
@@ -4974,9 +5017,9 @@ function rhiEnergyVisualPickerStyles() {
         const total = Math.round(explicitMinutes);
         const h = Math.floor(total / 60);
         const m = total % 60;
-        return { main: h > 0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m`, sub: explicitAt ? `≈ ${human(explicitAt)}` : 'backend ETA' };
+        return { main: h > 0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m`, sub: explicitAt ? `≈ ${human(explicitAt)}` : 'Estimated' };
       }
-      if (explicitAt) return { main: human(explicitAt), sub: 'backend ready time' };
+      if (explicitAt) return { main: human(explicitAt), sub: 'Ready by' };
       return { main: '—', sub: '' };
     }
     automationDisplayFor(rt, load, id) {
@@ -5128,7 +5171,7 @@ function rhiEnergyVisualPickerStyles() {
       const diagnosticRows = [
         ['Asset id', id],
         ...unavailableActions.map(action=>[`${action.label || human(action.role)} command`,humanReason(action.reason,'Unavailable')]),
-        requestedControl ? null : ['Requested charge power',requestedRow && !requestedRow.missing ? (requestedRow.editable_reason || 'Read-only') : 'Not published']
+        requestedControl ? null : ['Requested charge power',requestedRow && !requestedRow.missing ? (this.userSafeReason(requestedRow.editable_reason,'Read-only')) : 'Not available']
       ].filter(Boolean);
       const diagnostics = `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${commandAvailability}${diagnosticRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`;
       const actions = enabledActions.length
@@ -5450,7 +5493,7 @@ function rhiEnergyVisualPickerStyles() {
         }).filter(Boolean);
       const all = [...rows,...properties];
       if (!all.length) return '';
-      return `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody"><small class="energyAssetPublishedLabel">Published properties</small><div class="energyAssetDetailGrid">${all.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></div></details>`;
+      return `<details class="energyAssetDisclosure energyAssetDetails"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.details',{},'Details'))}</summary><div class="energyAssetFoldBody"><small class="energyAssetPublishedLabel">More information</small><div class="energyAssetDetailGrid">${all.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></div></details>`;
     }
 
     energyAssetDiagnosticsDisclosure(rt, asset = {}) {
@@ -5514,22 +5557,34 @@ function rhiEnergyVisualPickerStyles() {
       const area = this.energyAssetAreaLabel(enriched);
       const parentId = this.energyAssetParentId(enriched);
       const parentName = parentId ? String(rt.assetName(parentId) || '').trim() : '';
-      const relation = parentName ? `<span class="energyDeviceRelation"><small>Part of</small><b>${escapeHtml(parentName)}</b></span>` : '';
       const actions = this.assetQuickActions(rt,id,3);
       const keyFacts = facts.filter(row => !/^(state|status)$/i.test(String(row.label || ''))).slice(0,4);
-      const keyProperties = keyFacts.length
-        ? keyFacts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
-        : `<span><small>Energy state</small><b>${escapeHtml(primaryState || 'Unavailable')}</b></span>`;
+      const identity = rhiUxAssetIdentity({
+        eyebrow:roleLabel || human(type),
+        title:name,
+        subtitle:[area,primaryState].filter(Boolean).join(' · '),
+        visual:this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})
+      });
+      const factGrid = rhiUxAssetFactGrid(
+        keyFacts.length
+          ? keyFacts.map(row=>({label:row.label,value:row.value}))
+          : [{label:'Energy state',value:primaryState || rhiEnergyT(this._hass,'common.not_available',{},'Not available')}]
+      );
+      const relationship = parentName
+        ? rhiUxAssetRelationship({label:'Part of',value:parentName})
+        : '';
       const configuration = this.energyAssetConfigurationDisclosure(rt,enriched);
       const details = this.energyAssetDetailDisclosure(rt,enriched);
       const diagnostics = this.energyAssetDiagnosticsDisclosure(rt,enriched);
       const children = childrenHtml
         ? `<details class="energyAssetChildrenSibling"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.children',{},'Children'))}</summary><div class="energyAssetChildrenStack">${childrenHtml}</div></details>`
         : '';
-      return `<div class="energyAssetNode" data-energy-device-type="${escapeHtml(type)}"><article class="energyDeviceCard">
-        <div class="energyDeviceVisual">${this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})}</div>
-        <div class="energyDeviceBody"><div class="energyDeviceTop"><div><small>${escapeHtml(roleLabel || human(type))}</small><h3>${escapeHtml(name)}</h3>${area ? `<span class="energyDeviceArea">${escapeHtml(area)}</span>` : ''}</div>${primaryState ? `<div class="energyDeviceTopActions"><span class="energyDeviceState">${escapeHtml(primaryState)}</span></div>` : ''}</div>
-        <div class="energyDeviceFacts">${keyProperties}${relation}</div>${actions}<div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div></div>
+      return `<div class="energyAssetNode" data-energy-device-type="${escapeHtml(type)}"><article class="energyDeviceCard rhiEnergyCoreAssetCard">
+        ${identity}
+        ${factGrid}
+        ${relationship}
+        ${actions}
+        <div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div>
       </article>${children}</div>`;
     }
 
@@ -5554,7 +5609,7 @@ function rhiEnergyVisualPickerStyles() {
       return `<article class="solarModuleCard solarPanelOnlyCard">
         <div class="solarModuleVisual">${this.assetVisual(enriched,{size:'md',fallbackIcon:'☀',decorative:false})}</div>
         <div class="solarModuleBody"><div class="solarModuleHead"><div><small>SOLAR PANEL</small><h4>${escapeHtml(name)}</h4>${area ? `<span>${escapeHtml(area)}</span>` : ''}</div><div class="solarModuleHeadActions"><b>Panel</b></div></div>
-        <div class="solarModuleFacts">${panelFacts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') || '<span><small>Status</small><b>Published panel</b></span>'}</div>
+        <div class="solarModuleFacts">${panelFacts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('') || '<span><small>Status</small><b>Panel available</b></span>'}</div>
         ${this.energyAssetDetailDisclosure(rt,enriched)}
         ${optimizerDetails ? `<details class="solarTopologyDetails"><summary>Related optimizer details</summary>${optimizerDetails}</details>` : ''}
         </div>
@@ -5589,14 +5644,14 @@ function rhiEnergyVisualPickerStyles() {
           : '';
       const facts = primaryFacts.length
         ? primaryFacts.map(f=>`<span><small>${escapeHtml(f.label)}</small><b>${escapeHtml(f.value)}</b></span>`).join('')
-        : '<span><small>Operational data</small><b>Telemetry unavailable</b></span>';
+        : '<span><small>Measurements</small><b>Not available</b></span>';
       const panelDetails = linkedPanel ? this.energyAssetDetailDisclosure(rt,this.energyAssetContext(rt,linkedPanel)) : '';
       return `<article class="solarModuleCard solarOptimizerPrimaryCard">
         <div class="solarModuleVisual">${this.assetVisual(enriched,{size:'md',fallbackIcon:'☀',decorative:false})}</div>
         <div class="solarModuleBody"><div class="solarModuleHead"><div><small>OPTIMIZER / PANEL</small><h4>${escapeHtml(name)}</h4>${area ? `<span>${escapeHtml(area)}</span>` : ''}</div><div class="solarModuleHeadActions"><b>${escapeHtml(statusLabel)}</b></div></div>
         <div class="solarModuleFacts">${facts}</div>
         ${relationship}
-        ${!telemetryAvailable && !unavailable ? '<small class="solarOptimizerHint">Energy telemetry is not currently published; the optimizer remains part of the solar topology.</small>' : ''}
+        ${!telemetryAvailable && !unavailable ? '<small class="solarOptimizerHint">Energy measurements are not available right now; the optimizer remains part of the solar system.</small>' : ''}
         ${this.energyAssetDetailDisclosure(rt,enriched)}
         ${panelDetails ? `<details class="solarTopologyDetails"><summary>Panel details</summary>${panelDetails}</details>` : ''}
         </div>
@@ -5659,7 +5714,7 @@ function rhiEnergyVisualPickerStyles() {
       const system = systems[0] || null;
       const head = system
         ? this.energyDeviceStatusCard(rt,system,'Battery system')
-        : `<div class="solarSystemSummary"><div><small>BATTERY SYSTEM</small><h3>Home Battery System</h3><p>No aggregate battery-system object is currently published.</p></div><div class="solarAggregateFacts"><span><small>Batteries</small><b>${batteries.length}</b></span></div></div>`;
+        : `<div class="solarSystemSummary"><div><small>BATTERY SYSTEM</small><h3>Home Battery System</h3><p>A combined battery summary is not available; individual batteries are shown below.</p></div><div class="solarAggregateFacts"><span><small>Batteries</small><b>${batteries.length}</b></span></div></div>`;
       const children = batteries.length ? `<div class="solarChildGrid">${batteries.map(asset=>this.batteryChildCard(rt,String(firstDefined(asset.asset_id,asset.id,'') || ''))).join('')}</div>` : '';
       return this.solarHardwareSection(
         'Home Battery',
@@ -5837,7 +5892,7 @@ function rhiEnergyVisualPickerStyles() {
           ? 'Advice · plan waits for your approval'
           : 'Disabled · planning is informational only';
       const policyWhy = executionPolicy.configuredMode === 'automatic'
-        ? 'Only the current canonical D0 allocation may be dispatched, with producer readiness and authoritative readback still required.'
+        ? 'Only the current plan can be executed, and each device must confirm the change.'
         : executionPolicy.configuredMode === 'advice'
           ? 'Home Intelligence calculates the same plan but cannot dispatch it autonomously.'
           : 'Home Intelligence keeps calculating planning insight but managed plan execution is blocked.';
@@ -5856,7 +5911,7 @@ function rhiEnergyVisualPickerStyles() {
         actions:executeAction,
         tone:executionPolicy.configuredMode === 'automatic' ? 'green' : executionPolicy.configuredMode === 'advice' ? 'blue' : 'orange'
       });
-      return `${this.tabExperienceHeader(rt,'operational-planning',pageVm)}<div class="operationalPlanningPage">${authorityCard}
+      return `${this.tabExperienceHeader(rt,'operational-planning',pageVm)}${this.bodyContextBar(rt,'operational-planning','operational-planning-body')}<div id="operational-planning-body" class="operationalPlanningPage">${authorityCard}
         <section class="panel operationalPlanningLoads"><div class="energySectionHead"><div><h2>Flexible loads</h2><p>Current execution, next action, requested power and operational reason. Hardware configuration is not shown here.</p></div></div><div class="flexLoadList">${cards || '<div class="empty"><b>No participating flexible loads</b><span>No controllable load currently participates in operational planning.</span></div>'}</div></section>
         ${disabledCards ? `<details class="panel compactDisclosure"><summary>Other assets (${disabled.length})</summary><p>These assets are excluded from operational planning.</p><div class="disabledAssetList">${disabledCards}</div></details>` : ''}
       </div>`;
@@ -5897,7 +5952,7 @@ function rhiEnergyVisualPickerStyles() {
       const totalRow=(label,value,formatter=fmtKwh)=>`<div class="outlookTotalRow"><span>${escapeHtml(label)}</span><b>${escapeHtml(formatter(value,'—'))}</b></div>`;
       return `${this.tabExperienceHeader(rt,'outlook',pageVm)}${this.bodyContextBar(rt,'outlook','outlook-body')}<div class="outlookPage outlookPageV2" id="outlook-body"><div class="outlookThreeGrid">
         <section class="panel outlookBalanceCard"><h2>Supply</h2><p>Expected usable energy for the selected horizon.</p>${isTomorrow?this.kv('Solar forecast',fmtKwh(solarForecast)):this.kv('Solar remaining',fmtKwh(solarRemaining))}${batteryAboveReserve!==null?this.kv('Home Battery above reserve',fmtKwh(batteryAboveReserve)):''}${batteryReserve!==null?this.kv('Protected reserve',fmtKwh(batteryReserve)):''}${totalRow('Total usable supply',totalAvailable)}</section>
-        <section class="panel outlookBalanceCard"><h2>Demand</h2><p>Expected Home Consumption, Flexible Loads and storage charging.</p>${this.kv('Home Consumption forecast',fmtKwh(homeConsumption))}<div class="outlookAggregateRow"><span>Flexible Loads</span><b>${escapeHtml(fmtKwh(flexibleTotal,'—'))}</b></div><div class="outlookChildren">${planningRows||'<span class="muted">No per-asset demand published</span>'}</div>${this.kv('Home Battery',fmtKwh(storageDemand,'0.0 kWh'))}${totalRow('Total expected demand',totalDemand)}</section>
+        <section class="panel outlookBalanceCard"><h2>Demand</h2><p>Expected Home Consumption, Flexible Loads and storage charging.</p>${this.kv('Home Consumption forecast',fmtKwh(homeConsumption))}<div class="outlookAggregateRow"><span>Flexible Loads</span><b>${escapeHtml(fmtKwh(flexibleTotal,'—'))}</b></div><div class="outlookChildren">${planningRows||'<span class="muted">No per-device demand available</span>'}</div>${this.kv('Home Battery',fmtKwh(storageDemand,'0.0 kWh'))}${totalRow('Total expected demand',totalDemand)}</section>
         <section class="panel outlookBalanceCard"><h2>Grid impact</h2><p>Expected grid exchange for the selected horizon.</p>${this.kv('Expected Grid Import',fmtKwh(gridImport,'—'))}${this.kv('Expected Grid Export',fmtKwh(gridExport,'—'))}${totalRow('Grid Balance',gridBalance,v=>v===null?'—':`${v.toFixed(1)} kWh`)}<small class="outlookBalanceMeaning">${gridBalance===null?'Balance unavailable':gridBalance<0?`${Math.abs(gridBalance).toFixed(1)} kWh net export`:gridBalance>0?`${gridBalance.toFixed(1)} kWh net import`:'Balanced'}</small></section>
       </div></div>`;
     }
@@ -6147,7 +6202,7 @@ function rhiEnergyVisualPickerStyles() {
         // Deliberately not derived from row power: Energy aggregate truth stays backend-owned.
         totalPowerKw:null,
         observedAt,
-        reason:projected.length ? '' : 'No explicit charging connection is currently published.',
+        reason:projected.length ? '' : 'No charging connection is currently available.',
         source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
       });
     }
@@ -6200,8 +6255,8 @@ function rhiEnergyVisualPickerStyles() {
           </div>
         </section>
         <div class="flowDetailsGrid flowDetailsGridTwoUp">
-          <section class="panel"><h2>Charging connections</h2><p>Chargers and vehicle assignments currently visible to Energy.</p>${chargers.map(charger => this.connectorCard(rt, charger)).join('') || `<div class="empty"><b>${connectionSnapshot.available ? 'No charging topology published' : 'Connection data unavailable'}</b><span>${connectionSnapshot.available ? 'No charger or charger assignment is currently published.' : 'The canonical connection snapshot is not available.'}</span></div>`}</section>
-          <section class="panel"><h2>Physical consumers</h2><p>Participating loads with a published physical relationship; idle assets remain visible.</p>${consumers.map(consumer => this.consumerCard(rt, consumer)).join('') || `<div class="empty"><b>No flexible consumers available</b><span>No controllable loads are currently available.</span></div>`}</section>
+          <section class="panel"><h2>Charging connections</h2><p>Chargers and vehicle assignments currently visible to Energy.</p>${chargers.map(charger => this.connectorCard(rt, charger)).join('') || `<div class="empty"><b>${connectionSnapshot.available ? 'No charging connections available' : 'Connection data unavailable'}</b><span>${connectionSnapshot.available ? 'No charger or vehicle assignment is currently available.' : 'Connection information is not available right now.'}</span></div>`}</section>
+          <section class="panel"><h2>Physical consumers</h2><p>Participating loads and their current charging connection; idle assets remain visible.</p>${consumers.map(consumer => this.consumerCard(rt, consumer)).join('') || `<div class="empty"><b>No flexible consumers available</b><span>No controllable loads are currently available.</span></div>`}</section>
         </div>
       </div>`;
     }
@@ -6209,12 +6264,14 @@ function rhiEnergyVisualPickerStyles() {
       const title = label || row.display_name || human(row.key || row.property_key || row.asset_id || 'Property');
       const value = formatter ? formatter(rowValue(row, null), row) : rowDisplayValue(row);
       const state = rowState(row);
-      return `<div class="propertyRow ${escapeHtml(state)}"><div><b>${escapeHtml(title)}</b><span>${escapeHtml(row.key || row.property_key || '')}</span></div><strong>${escapeHtml(value)}</strong><small class="qs ${escapeHtml(state)}">${escapeHtml(rowStatusLabel(row))}</small></div>`;
+      return `<div class="propertyRow ${escapeHtml(state)}"><div><b>${escapeHtml(title)}</b></div><strong>${escapeHtml(value)}</strong><small class="qs ${escapeHtml(state)}">${escapeHtml(rowStatusLabel(row))}</small></div>`;
     }
     commandRow(rt, command) {
       const state = rt.commandState(command);
       const reason = rt.commandReasonObject(command);
-      return `<div class="commandRow ${escapeHtml(state)}"><div><b>${escapeHtml(human(command.role || command.command_id))}</b><span>${escapeHtml(command.command_id || '')}</span></div><strong>${escapeHtml(human(state))}</strong><small>${escapeHtml(reason.message || reason.code || 'Command is available')}</small></div>`;
+      const label = this.userSafeProductText(command.label || human(command.role || ''),'Action');
+      const message = this.userSafeReason(reason.message || reason.code,'Action is available');
+      return `<div class="commandRow ${escapeHtml(state)}"><div><b>${escapeHtml(label)}</b></div><strong>${escapeHtml(this.productStateLabel(state,human(state)))}</strong><small>${escapeHtml(message)}</small></div>`;
     }
     visibleProfileValue(...values) {
       const value = firstDefined(...values);
@@ -6260,8 +6317,8 @@ function rhiEnergyVisualPickerStyles() {
         home_battery: 'Reserve, charge policy and support rules for home storage.',
         battery: 'Reserve, charge policy and support rules for home storage.',
         generic_flexible_load: 'Default policy for Energy-controllable flexible loads.',
-        thermal_flexible_load: 'Policy for domain-published thermal loads such as heating or jacuzzi.',
-        outdoor_flexible_load: 'Policy for domain-published outdoor loads such as pool or irrigation.',
+        thermal_flexible_load: 'Policy for flexible thermal loads such as heating or jacuzzi.',
+        outdoor_flexible_load: 'Policy for flexible outdoor loads such as pool or irrigation.',
         solar_surplus: 'How excess solar should be allocated before export.',
         resilience: 'How Energy protects essential goals and reserve during resilience mode.'
       };
@@ -6330,7 +6387,7 @@ function rhiEnergyVisualPickerStyles() {
         return { value: row.unit ? `${recommended} ${row.unit}` : human(recommended), text: reason ? String(reason) : 'Recommended by Energy.' };
       }
       if (defaultValue !== null && defaultValue !== undefined && defaultValue !== '') {
-        return { value: row.unit ? `${defaultValue} ${row.unit}` : human(defaultValue), text: reason ? String(reason) : 'Published default.' };
+        return { value: row.unit ? `${defaultValue} ${row.unit}` : human(defaultValue), text: reason ? String(reason) : 'Default value.' };
       }
       return reason ? { value: '', text: String(reason) } : null;
     }
@@ -6361,7 +6418,7 @@ function rhiEnergyVisualPickerStyles() {
       const actions = editing
         ? `<span class="strategyChangeCount">${changed.length ? `${changed.length} changed` : 'No changes'}</span><button class="strategyTextAction" data-strategy-cancel="${escapeHtml(id)}">Discard</button><button class="strategySaveAction" data-strategy-save="${escapeHtml(id)}"${changed.length ? '' : ' disabled'}>Save</button>`
         : `<button class="strategyTextAction" data-strategy-edit="${escapeHtml(id)}"${rows.length ? '' : ' disabled'}>Edit</button>`;
-      return `<section class="panel strategyTablePanel"><div class="strategyTableHead"><div><h2>${escapeHtml(title)}</h2>${description ? `<p>${escapeHtml(description)}</p>` : ''}</div><div class="strategySetActions">${actions}</div></div><div class="strategyTable"><div class="strategyColumnHead"><span>Setting</span><span>Value</span></div>${rowHtml || `<div class="profileNoControls">No editable strategy settings are published.</div>`}</div>${options.details || ''}</section>`;
+      return `<section class="panel strategyTablePanel"><div class="strategyTableHead"><div><h2>${escapeHtml(title)}</h2>${description ? `<p>${escapeHtml(description)}</p>` : ''}</div><div class="strategySetActions">${actions}</div></div><div class="strategyTable"><div class="strategyColumnHead"><span>Setting</span><span>Value</span></div>${rowHtml || `<div class="profileNoControls">No adjustable strategy settings are available.</div>`}</div>${options.details || ''}</section>`;
     }
     strategyProfileForDomain(rt, domain) {
       const wanted = String(domain || '').toLowerCase();
@@ -6386,7 +6443,7 @@ function rhiEnergyVisualPickerStyles() {
       const mode = human(strategy.mode || strategy.energy_control_mode || '—');
       const asset = assetId ? this.energyAssetContext(rt, rt.asset(assetId) || { ...strategy, asset_id:assetId }) : null;
       const identity = asset ? `<span class="effectivePolicyIdentity">${this.assetVisual(asset,{size:'xs',fallbackIcon:this.flexibleAssetIcon(asset)})}<b>${escapeHtml(rt.assetName(assetId) || human(assetId))}</b></span>` : `<b>${escapeHtml(human(strategy.strategy_id || 'Asset'))}</b>`;
-      return `<div class="effectivePolicyRow compact">${identity}<span>${escapeHtml(human(profileId || strategy.policy_profile || 'Not published'))}</span><strong>${escapeHtml(human(planLabel))}</strong>${mode !== '—' ? `<small>${escapeHtml(mode)}</small>` : ''}</div>`;
+      return `<div class="effectivePolicyRow compact">${identity}<span>${escapeHtml(human(profileId || strategy.policy_profile || 'Not available'))}</span><strong>${escapeHtml(human(planLabel))}</strong>${mode !== '—' ? `<small>${escapeHtml(mode)}</small>` : ''}</div>`;
     }
     strategyIntentCard(rt, intent) {
       const state = intent.state || intent.intent_state || 'observed';
@@ -6394,7 +6451,7 @@ function rhiEnergyVisualPickerStyles() {
       const required = asNumber(intent.required_power_kw);
       const target = intent.target_asset_id ? rt.assetName(intent.target_asset_id) : human(intent.strategy_family || 'Energy');
       const command = intent.recommended_action_id || '';
-      return `<div class="intentCard"><div><small>${escapeHtml(human(intent.strategy_family || intent.intent_type || 'Strategy'))}</small><h3>${escapeHtml(human(state))}</h3><p>${escapeHtml(intent.reason || intent.blocked_reason || 'Strategy intent published by Energy backend.')}</p></div><div class="intentFacts">${this.kv('Target', target)}${this.kv('Available', power === null ? '—' : fmtKw(power))}${this.kv('Required', required === null ? '—' : fmtKw(required))}${this.kv('Command', command ? human(command) : 'No command')}</div></div>`;
+      return `<div class="intentCard"><div><small>${escapeHtml(human(intent.strategy_family || intent.intent_type || 'Strategy'))}</small><h3>${escapeHtml(human(state))}</h3><p>${escapeHtml(intent.reason || intent.blocked_reason || 'No additional explanation is available.')}</p></div><div class="intentFacts">${this.kv('Target', target)}${this.kv('Available', power === null ? '—' : fmtKw(power))}${this.kv('Required', required === null ? '—' : fmtKw(required))}${this.kv('Command', command ? human(command) : 'No command')}</div></div>`;
     }
     batteryHeroImagePath(assetId, name = '') {
       const key = `${assetId || ''} ${name || ''}`.toLowerCase();
@@ -6419,13 +6476,13 @@ function rhiEnergyVisualPickerStyles() {
         : state === 'charging' ? 'Charging'
         : state === 'discharging' ? 'Discharging'
         : state === 'idle' ? 'Idle'
-        : power === null ? 'Telemetry limited'
+        : power === null ? 'Measurements limited'
         : Math.abs(power) <= 0.05 ? 'Idle'
         : power < 0 ? 'Charging' : 'Discharging';
       const stateDetail = stateLabel === 'Charging' ? 'Absorbing energy from the Home Bus'
         : stateLabel === 'Discharging' ? 'Supplying energy to the Home Bus'
         : stateLabel === 'Idle' ? 'No active battery flow'
-        : stateLabel === 'Telemetry limited' ? 'Battery is available; per-battery power is not published'
+        : stateLabel === 'Measurements limited' ? 'Battery is available; per-battery power is not available'
         : 'Battery is currently unavailable';
       const quickFacts = [
         ['Power now',fmtKw(power,'—')],
@@ -6445,11 +6502,11 @@ function rhiEnergyVisualPickerStyles() {
       const gasHorizonLabel = gasHorizons.find(([id])=>id===this.selectedGasHorizonId)?.[1] || 'Month';
       const gasHorizonSelector = `<div class="scopeSelector gasHorizonSelector" aria-label="Gas history horizon">${gasHorizons.map(([id,label])=>`<button type="button" class="scopeOption ${this.selectedGasHorizonId===id?'active':''}" data-gas-horizon="${id}">${label}</button>`).join('')}</div>`;
       const graph = historyAvailable
-        ? `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily measured gas use from Home Assistant long-term statistics on the canonical total-increasing meter.</p></div><div class="gasHistoryControls"><span>${escapeHtml(gasHorizonLabel)}</span>${gasHorizonSelector}</div></div><div class="gasStatisticsHost" data-gas-statistics-host data-entity-id="${escapeHtml(gas.totalEntityId)}"></div></section>`
-        : `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily gas consumption will appear here when a canonical total-increasing gas meter is available.</p></div></div><div class="empty"><b>No measured gas history yet</b><span>Connect the authoritative gas meter to enable Home Assistant long-term statistics. The UX never estimates missing consumption.</span></div></section>`;
+        ? `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily measured gas use from Home Assistant history.</p></div><div class="gasHistoryControls"><span>${escapeHtml(gasHorizonLabel)}</span>${gasHorizonSelector}</div></div><div class="gasStatisticsHost" data-gas-statistics-host data-entity-id="${escapeHtml(gas.totalEntityId)}"></div></section>`
+        : `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>Gas usage history</h2><p>Daily gas consumption will appear here when a configured gas meter is available.</p></div></div><div class="empty"><b>No measured gas history yet</b><span>Connect a supported gas meter to enable Home Assistant history. Missing consumption is never estimated.</span></div></section>`;
       const setupOrMeter = hasMeter
         ? `<section class="panel gasMeterPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Gas meter</h2><p>Current meter state and measured values.</p></div></div>${meter}</section>`
-        : `<section class="panel gasSetupPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Connect your gas meter</h2><p>RHI Energy needs one authoritative gas source before it can show consumption history.</p></div></div><div class="gasSetupFacts"><div><small>Required</small><b>Total gas meter</b><span>A cumulative total-increasing reading in m³.</span></div><div><small>Optional</small><b>Live gas flow</b><span>An instantaneous m³/h reading when the source publishes it.</span></div><div><small>History</small><b>Home Assistant statistics</b><span>Daily changes are shown without frontend estimation.</span></div></div></section>`;
+        : `<section class="panel gasSetupPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>Connect your gas meter</h2><p>Connect a gas meter before consumption history can be shown.</p></div></div><div class="gasSetupFacts"><div><small>Required</small><b>Total gas meter</b><span>A cumulative total-increasing reading in m³.</span></div><div><small>Optional</small><b>Live gas flow</b><span>An instantaneous m³/h reading when available.</span></div><div><small>History</small><b>Home Assistant statistics</b><span>Daily changes are shown without estimating missing data.</span></div></div></section>`;
       return `${this.tabExperienceHeader(rt,'gas',pageVm)}<div class="gasPage">
         ${setupOrMeter}
         ${graph}
@@ -6476,7 +6533,7 @@ function rhiEnergyVisualPickerStyles() {
       return `${this.tabExperienceHeader(rt,'battery',pageVm)}<div class="batteryPage">
         <div class="batteryGrid batteryGridTwoUp">
           <section class="panel batteryHero"><h2>Home Battery state</h2><p>Combined operational truth for the Home Battery system.</p><div class="batteryGauge"><b>${escapeHtml(fmtPct(soc))}</b><span>${escapeHtml(fmtKwh(available))} / ${escapeHtml(fmtKwh(capacity))}</span><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div>${this.kv('State', human(state))}${this.kv('Power now', fmtKw(power,'—'))}${this.kv('Available energy', fmtKwh(available))}${this.kv('Capacity', fmtKwh(capacity))}${reserve === null ? '' : this.kv('Reserve',fmtPct(reserve))}${this.kv('Health', human(batteryVm.health))}${systemDetails}</section>
-          <section class="panel" id="battery-contributors"><h2>Home Battery contributors</h2><p>Physical batteries contributing to the aggregate.</p><div class="batteryContributorList">${children.map(id => this.batteryChildCard(rt, id)).join('') || `<div class="empty"><b>No Home Battery units published</b><span>Home Battery aggregate only.</span></div>`}</div></section>
+          <section class="panel" id="battery-contributors"><h2>Home Battery contributors</h2><p>Physical batteries contributing to the aggregate.</p><div class="batteryContributorList">${children.map(id => this.batteryChildCard(rt, id)).join('') || `<div class="empty"><b>No Home Battery units available</b><span>Home Battery aggregate only.</span></div>`}</div></section>
         </div>
       </div>`;
     }
@@ -6556,7 +6613,7 @@ function rhiEnergyVisualPickerStyles() {
       const details = detailRows.length
         ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
         : '';
-      const diagnostics = `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid"><span><small>Asset id</small><b>${escapeHtml(id)}</b></span><span><small>Health</small><b>${escapeHtml(human(firstDefined(asset.health,asset.lifecycle_state,asset.status,'Unknown')))}</b></span>${requestedControl ? '' : `<span><small>Requested charge power</small><b>${escapeHtml(requestedRow && !requestedRow.missing ? (requestedRow.editable_reason || 'Read-only') : 'Not published')}</b></span>`}</div></details>`;
+      const diagnostics = `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid"><span><small>Asset id</small><b>${escapeHtml(id)}</b></span><span><small>Health</small><b>${escapeHtml(human(firstDefined(asset.health,asset.lifecycle_state,asset.status,'Unknown')))}</b></span>${requestedControl ? '' : `<span><small>Requested charge power</small><b>${escapeHtml(requestedRow && !requestedRow.missing ? (this.userSafeReason(requestedRow.editable_reason,'Read-only')) : 'Not available')}</b></span>`}</div></details>`;
       return `<article class="managedAssetCard compactManagedAsset"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${escapeHtml(state)}${relation ? ` · ${escapeHtml(relation)}` : ''}</span></div></div><b>${escapeHtml(fmtKw(currentPower,'—'))}</b></div>
         ${keyFacts.length ? `<div class="managedAssetFacts">${keyFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>` : ''}
         ${actions.length ? `<div class="energyAssetQuickActions"><small>Quick actions</small><div>${actions.map(action=>this.componentActionModelButton(action)).join('')}</div></div>` : ''}
@@ -6627,7 +6684,7 @@ function rhiEnergyVisualPickerStyles() {
       const cards = participating.map(row=>this.consumerExplorerCard(rt,row)).join('');
       const disabledRows = disabled.map(row=>{ const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return this.disabledFlexibleAssetCard(rt,vm?.raw||row,vm?.planning||{}); }).join('');
       return `${this.tabExperienceHeader(rt,'consumers',pageVm)}${this.bodyContextBar(rt,'consumers','consumer-list')}<div class="consumersPage productPortalPage">
-        <section class="panel consumerExplorer" id="consumer-list"><div class="consumerExplorerHeader"><div><h2>Managed flexible assets</h2><p>Primary cards show current power and published energy need. Details hold the deeper technical context.</p></div><strong>${fmtKw(totalPower,'—')}</strong></div><div class="consumerExplorerList">${cards || `<div class="empty"><b>No managed assets</b><span>Enable participation for an asset to let Home Intelligence manage it.</span></div>`}</div></section>
+        <section class="panel consumerExplorer" id="consumer-list"><div class="consumerExplorerHeader"><div><h2>Managed flexible assets</h2><p>Primary cards show current power and energy need. Details contain additional user information; technical evidence stays in Diagnostics.</p></div><strong>${fmtKw(totalPower,'—')}</strong></div><div class="consumerExplorerList">${cards || `<div class="empty"><b>No managed assets</b><span>Enable participation for an asset to let Home Intelligence manage it.</span></div>`}</div></section>
         ${disabledRows ? `<details class="panel compactDisclosure"><summary>Other assets (${disabled.length})</summary><p>These assets are not managed by Home Intelligence.</p><div class="disabledAssetList">${disabledRows}</div></details>` : ''}
       </div>`;
     }
@@ -6674,7 +6731,7 @@ function rhiEnergyVisualPickerStyles() {
         : ['automatic','advice','disabled'].map(value => ({ value, label:this.productStateLabel(value,human(value)), attrs:{'data-mode-value':value,'data-property-key':'energy.automation_mode'} }));
       const automationControl = this.isWritableRow(automationRow)
         ? this.componentSegmentedControl(automationOptions, automationMode, 'automationModeControl')
-        : `<div class="profileNoControls">Automation mode is not writable in the current public contract.</div>`;
+        : `<div class="profileNoControls">Automation mode cannot be changed right now.</div>`;
 
       const effectiveRowsForProfile = selectedId
         ? effectiveStrategies.filter(strategy => {
@@ -6692,10 +6749,10 @@ function rhiEnergyVisualPickerStyles() {
 
       return `${this.tabExperienceHeader(rt,'strategies',pageVm)}<div class="strategiesPage settingsTopicPage">
         <section class="panel strategyAutomationMode compactSettingsBlock"><div><h2>Automation</h2><p>Choose how much Home Intelligence may act for you.</p></div>${automationControl}${this.editablePropertyFeedback(automationRow)}</section>
-        <section class="panel settingsTopicChooser"><div class="settingsTopicHead"><h2>What do you want to adjust?</h2><p>Settings are grouped by the part of your energy system you want to influence.</p></div><div class="settingsTopicGrid">${topicButtons || '<div class="empty"><b>No settings topics available</b><span>No editable Energy policy profiles are currently published.</span></div>'}</div></section>
+        <section class="panel settingsTopicChooser"><div class="settingsTopicHead"><h2>What do you want to adjust?</h2><p>Settings are grouped by the part of your energy system you want to influence.</p></div><div class="settingsTopicGrid">${topicButtons || '<div class="empty"><b>No settings topics available</b><span>No adjustable Energy settings are currently available.</span></div>'}</div></section>
         ${selected ? `<section class="settingsSelectedTopic"><div class="settingsSelectedTopicHead"><div><small>SETTINGS</small><h2>${escapeHtml(selectedTopic)}</h2></div>${variantSelect}</div>${this.strategyProfileCard(rt,selected)}</section>` : ''}
         <details class="panel settingsAdvancedDisclosure"><summary>Advanced</summary><div class="settingsAdvancedBody">
-          <section><h3>Effective behavior</h3><div class="effectivePolicyList">${effectiveRows || '<div class="empty compact"><b>No effective behavior published</b></div>'}</div></section>
+          <section><h3>Effective behavior</h3><div class="effectivePolicyList">${effectiveRows || '<div class="empty compact"><b>No effective behavior available</b></div>'}</div></section>
           ${participation ? `<section><h3>Participating assets</h3><div class="settingsParticipationTree">${participation}</div></section>` : ''}
         </div></details>
       </div>`;
@@ -6746,21 +6803,21 @@ function rhiEnergyVisualPickerStyles() {
       return list;
     }
     meteringDisplayValue(row) {
-      if (!row || row.value === null || row.value === undefined || row.value === '') return 'Not published';
+      if (!row || row.value === null || row.value === undefined || row.value === '') return 'Not available';
       const unit = String(row.unit || 'kWh');
       if (/eur|€/.test(unit.toLowerCase())) {
         const n = asNumber(row.value);
         return n === null ? String(row.value) : `€${n.toFixed(2)}`;
       }
-      if (/kwh/i.test(unit)) return fmtKwh(row.value, 'Not published');
-      if (/kw/i.test(unit)) return fmtKw(row.value, 'Not published');
+      if (/kwh/i.test(unit)) return fmtKwh(row.value, 'Not available');
+      if (/kw/i.test(unit)) return fmtKw(row.value, 'Not available');
       const n = asNumber(row.value);
       return n === null ? String(row.value) : `${n.toFixed(1)}${unit ? ` ${unit}` : ''}`;
     }
     meteringStatus(row) { return row?.status || 'unknown'; }
     meteringClusterCard(title, rows = [], description = '') {
       const sorted = this.sortMeteringRows(rows);
-      const body = sorted.length ? sorted.map(row => `<div class="meteringCleanRow ${escapeHtml(rowState({ health: this.meteringStatus(row), missing: row.value === null }))}"><div><b>${escapeHtml(row.label)}</b>${row.sub ? `<span>${escapeHtml(row.sub)}</span>` : ''}</div><strong>${escapeHtml(this.meteringDisplayValue(row))}</strong>${['unknown','unavailable',''].includes(String(this.meteringStatus(row)||'').toLowerCase()) ? '' : this.componentQualityChip(this.meteringStatus(row))}</div>`).join('') : `<div class="empty"><b>No values published</b><span>This cluster has no public metering values for the selected period.</span></div>`;
+      const body = sorted.length ? sorted.map(row => `<div class="meteringCleanRow ${escapeHtml(rowState({ health: this.meteringStatus(row), missing: row.value === null }))}"><div><b>${escapeHtml(row.label)}</b>${row.sub ? `<span>${escapeHtml(row.sub)}</span>` : ''}</div><strong>${escapeHtml(this.meteringDisplayValue(row))}</strong>${['unknown','unavailable',''].includes(String(this.meteringStatus(row)||'').toLowerCase()) ? '' : this.componentQualityChip(this.meteringStatus(row))}</div>`).join('') : `<div class="empty"><b>No values available</b><span>No measurements are available for the selected period.</span></div>`;
       return `<section class="panel meteringCleanCard"><div class="meteringCardHead"><div><h2>${escapeHtml(title)}</h2>${description ? `<p>${escapeHtml(description)}</p>` : ''}</div></div><div class="meteringCleanRows">${body}</div></section>`;
     }
     meteringRawRowsDetails(rows = [], id = 'metering-raw-rows') {
@@ -6778,7 +6835,7 @@ function rhiEnergyVisualPickerStyles() {
         const id = String(remediation.remediation_id || remediation.problem_id || 'metering_remediation');
         const command = runtime.meteringResetCommandFor(remediation, period?.period_id || remediation.period_id || '');
         const enabled = command ? runtime.commandEnabled(command) : false;
-        const reason = command ? runtime.commandReason(command) : 'Reset command not published';
+        const reason = command ? runtime.commandReason(command) : 'Reset is not available right now';
         const feedback = this.remediationFeedback[id] || null;
         const affected = asArray(remediation.affected_keys || problem.affected_keys || action.affected_keys);
         const title = firstDefined(advice.title, remediation.title, problem.title, 'Metering baseline reset required');
@@ -6787,8 +6844,15 @@ function rhiEnergyVisualPickerStyles() {
         const scope = firstDefined(action.reset_scope, remediation.reset_scope, command?.readback?.reset_scope, 'period_baseline_only');
         const button = command
           ? `<button type="button" class="hiAction remediationAction ${enabled ? 'enabled' : 'disabled'}" ${enabled ? '' : 'disabled'} data-metering-remediation-command-row-id="${escapeHtml(command.command_instance_id || command.command_row_id || '')}" data-remediation-id="${escapeHtml(id)}" title="${escapeHtml(reason)}">Reset baseline</button>`
-          : `<button type="button" class="hiAction disabled" disabled title="Reset command not published">Reset baseline</button>`;
-        return `<div class="meteringRemediationItem"><div class="meteringRemediationText"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(message)}</p><div class="remediationImpact"><b>Impact</b><span>${escapeHtml(impact)}</span></div>${feedback ? `<div class="writeFeedback ${escapeHtml(feedback.state)}">${escapeHtml(humanReason(feedback.reason || feedback.state, feedback.state))}</div>` : ''}</div><div class="meteringRemediationAction">${button}<small>${escapeHtml(enabled ? 'Manual confirmation required' : humanReason(reason, 'Command not ready'))}</small></div>${this.componentDetailsBlock(`metering-remediation-details-${escapeHtml(id)}`, 'Remediation details', `${this.kv('Problem id', remediation.problem_id || problem.problem_id || id)}${this.kv('Selected period', this.periodLabel(period))}${this.kv('Affected counters', affected.length ? affected.join(', ') : 'Not published')}${this.kv('Reset scope', human(scope))}${this.kv('Source totals', 'Not changed')}${this.kv('Statistics', 'Not changed')}${this.kv('Command key', command?.command_id || remediation.command_ref || 'Not published')}${this.kv('Command state', command ? (enabled ? 'Ready' : humanReason(reason, 'Not ready')) : 'Not published')}`)}</div>`;
+          : `<button type="button" class="hiAction disabled" disabled title="Reset is not available right now">Reset baseline</button>`;
+        const diagnostics = this.config?.show_diagnostics === true
+          ? this.componentDetailsBlock(
+              `metering-remediation-details-${escapeHtml(id)}`,
+              'Remediation details',
+              `${this.kv('Problem id', remediation.problem_id || problem.problem_id || id)}${this.kv('Selected period', this.periodLabel(period))}${this.kv('Affected counters', affected.length ? affected.join(', ') : 'Not available')}${this.kv('Reset scope', human(scope))}${this.kv('Source totals', 'Not changed')}${this.kv('Statistics', 'Not changed')}${this.kv('Command key', command?.command_id || remediation.command_ref || 'Not available')}${this.kv('Command state', command ? (enabled ? 'Ready' : humanReason(reason, 'Not ready')) : 'Not available')}`
+            )
+          : '';
+        return `<div class="meteringRemediationItem"><div class="meteringRemediationText"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(message)}</p><div class="remediationImpact"><b>Impact</b><span>${escapeHtml(impact)}</span></div>${feedback ? `<div class="writeFeedback ${escapeHtml(feedback.state)}">${escapeHtml(this.userSafeReason(feedback.reason || feedback.state,'Update status unavailable'))}</div>` : ''}</div><div class="meteringRemediationAction">${button}<small>${escapeHtml(enabled ? 'Manual confirmation required' : this.userSafeReason(reason,'Action is not ready'))}</small></div>${diagnostics}</div>`;
       }).join('');
       return `<section class="panel wide meteringRemediationPanel"><div class="meteringCardHead"><div><h2>Metering attention</h2><p>Resolve the selected period before relying on its totals.</p></div></div>${items}</section>`;
     }
@@ -6804,7 +6868,7 @@ function rhiEnergyVisualPickerStyles() {
         availability:String(firstDefined(row.availability,'')),
         status_label:String(firstDefined(row.status_label,'')),
         user_action_required:asBool(row.user_action_required,false),
-        sub:row?.missing ? 'Not published' : ''
+        sub:row?.missing ? 'Not available' : ''
       };
     }
     flexibleLoadMeteringRows(_rt, _periodId = 'today') {
@@ -6902,7 +6966,7 @@ function rhiEnergyVisualPickerStyles() {
       const action = command ? this.componentActionButton(command, `Reset ${label.toLowerCase()} totals`, 'metering') : '';
       const title = remediation ? `${label} totals need a one-time reset` : `${label} totals are being prepared`;
       const why = remediation ? `Home Intelligence found measurements for ${label.toLowerCase()}, but the starting point cannot yet be trusted.` : `Reliable ${label.toLowerCase()} totals are not available yet.`;
-      const recommendation = remediation ? `Reset once. Home Intelligence will confirm the new baseline while keeping the measured values visible.` : `${label} measurements are currently unavailable. They will appear when the contract publishes them.`;
+      const recommendation = remediation ? `Reset once. Home Intelligence will confirm the new baseline while keeping the measured values visible.` : `${label} measurements are currently unavailable. They will appear when measurements become available.`;
       const selector = this.componentPeriodSelector(periods, selected.period_id || this.selectedMeteringPeriodId || 'today', 'metering-period');
       return `<div class="meteringPage productPortalPage"><section class="panel compact meteringPeriodControl"><div><h2>Measurement period</h2><p>Select the period even while totals are still being prepared.</p></div>${selector}${this.editablePropertyFeedback(this.runtime().row('metering.selected_period'))}</section>${this.productStoryCard({ eyebrow:`${label} measurements`, title, why, recommendation, actions:action, tone:remediation?'orange':'blue' })}</div>`;
     }
@@ -7020,13 +7084,13 @@ function rhiEnergyVisualPickerStyles() {
           {label:'Execution results',state:'PENDING',ready:false},
           {label:'Measured energy',state:'PENDING',ready:false}
         ]).map(step=>`<span><b>${escapeHtml(step.label)}</b><em>${escapeHtml(step.ready?'Ready':human(step.state || 'Pending'))}</em>${step.reason?`<small>${escapeHtml(step.reason)}</small>`:''}</span>`).join('');
-        return `${this.tabExperienceHeader(rt,'retrospective',vm)}<div class="retrospectivePage"><section class="panel retroCollectingState"><div class="retroCollectingIcon">↺</div><div><small>REVIEW PREREQUISITES</small><h2>${escapeHtml(review.rating || 'Waiting for evidence')}</h2><p>${escapeHtml(review.explanation)}</p><div class="retroEvidenceSteps">${steps}</div><div class="productNotice"><b>No action required</b><span>The review appears automatically when the published prerequisites are complete.</span></div></div></section></div>`;
+        return `${this.tabExperienceHeader(rt,'retrospective',vm)}<div class="retrospectivePage"><section class="panel retroCollectingState"><div class="retroCollectingIcon">↺</div><div><small>REVIEW PREREQUISITES</small><h2>${escapeHtml(review.rating || 'Waiting for evidence')}</h2><p>${escapeHtml(review.explanation)}</p><div class="retroEvidenceSteps">${steps}</div><div class="productNotice"><b>No action required</b><span>The review appears automatically when enough evidence is available.</span></div></div></section></div>`;
       }
       const scoreOf=row=>asNumber(firstDefined(row.score,row.score_pct,row.value,row.achieved_score));
       const weightOf=row=>asNumber(firstDefined(row.weight,row.weight_pct));
       const statusOf=row=>human(firstDefined(row.status,row.rating,row.state,scoreOf(row)!==null?(scoreOf(row)>=90?'Excellent':scoreOf(row)>=75?'Good':'Improving'):'Collecting evidence'));
       const titleOf=(row,fallback)=>human(firstDefined(row.label,row.title,row.name,row.kpi_name,row.objective,row.recommendation,row.recommendation_title,fallback));
-      const explanationOf=row=>humanReason(firstDefined(row.explanation,row.reason,row.summary,row.reasoning,row.description),'No additional explanation published.');
+      const explanationOf=row=>humanReason(firstDefined(row.explanation,row.reason,row.summary,row.reasoning,row.description),'No additional explanation is available.');
       const kpis=review.kpis.map((row,i)=>{const score=scoreOf(row);const weight=weightOf(row);return `<article class="retroKpiCard"><div class="retroKpiHead"><span>${escapeHtml(firstDefined(row.icon,'◎'))}</span><div><h3>${escapeHtml(titleOf(row,`Objective ${i+1}`))}</h3><p>${escapeHtml(explanationOf(row))}</p></div><strong>${score===null?'—':Math.round(score)}</strong></div><div class="retroProgress"><i style="width:${Math.max(0,Math.min(100,score||0))}%"></i></div><footer><span>${escapeHtml(statusOf(row))}</span><span>${weight===null?'Measured objective':`${Math.round(weight)}% weight`}</span></footer></article>`;}).join('');
       const deductions=review.deductions.slice(0,4).map((row,i)=>{const points=Math.abs(asNumber(firstDefined(row.points_lost,row.deduction_points,row.score_impact,row.points))||0);return `<article class="retroOpportunity"><span class="retroOpportunityIcon">${escapeHtml(firstDefined(row.icon,'↗'))}</span><div><h3>${escapeHtml(titleOf(row,`Opportunity ${i+1}`))}</h3><p>${escapeHtml(explanationOf(row))}</p></div><strong>${points?`+${Math.round(points)} potential`:'Review'}</strong></article>`;}).join('');
       const rec=review.recommendations[0]||null;
@@ -7109,7 +7173,7 @@ function rhiEnergyVisualPickerStyles() {
       }).filter(Boolean).join('');
       const optional = [['Savings',v.savings],['Avoided grid cost',v.avoided],['Self-consumption value',v.selfConsumption]].filter(([,value])=>asNumber(value)!==null).map(([label,value])=>this.kv(label,money(value))).join('');
       const financialBody = configurationBlocked
-        ? `<section class="panel wide valueConfigurationState"><h2>Financial result</h2><div class="valueStateHeadline"><b>${escapeHtml(v.stateLabel)}</b><span>${escapeHtml(v.attention)}</span></div><p>Complete only the Pricing inputs the backend marks as blocking for ${escapeHtml(v.label.toLowerCase())}.</p><div class="valueConfigurationChecklist">${missingRequired.map(item=>`<div><span>${item.configured?'✓':'□'}</span><b>${escapeHtml(item.label)}</b><em>${escapeHtml(item.configured?'Configured':'Setup needed')}</em></div>`).join('')}</div></section>`
+        ? `<section class="panel wide valueConfigurationState"><h2>Financial result</h2><div class="valueStateHeadline"><b>${escapeHtml(v.stateLabel)}</b><span>${escapeHtml(v.attention)}</span></div><p>Complete the Pricing inputs still needed for ${escapeHtml(v.label.toLowerCase())}.</p><div class="valueConfigurationChecklist">${missingRequired.map(item=>`<div><span>${item.configured?'✓':'□'}</span><b>${escapeHtml(item.label)}</b><em>${escapeHtml(item.configured?'Configured':'Setup needed')}</em></div>`).join('')}</div></section>`
         : !v.accountingReady && !hasFinancialValue
           ? `<section class="panel wide valueEvidenceState"><h2>Financial result</h2><div class="valueStateHeadline"><b>Waiting for measured evidence</b><span>${escapeHtml(v.attention)}</span></div><p>Pricing is usable. The financial result will appear when the selected Metering period contains sufficient measured import/export evidence.</p></section>`
           : `<section class="panel wide"><h2>${escapeHtml(v.label)} financial result</h2><p>Accumulated measured value for the Metering-selected period. No future value is predicted.</p><div class="r3280Balance"><span>Net financial result</span><b>${escapeHtml(money(v.net))}</b><p>${escapeHtml(v.interpretation)}</p></div><div class="goalGrid"><div class="goalRow"><span>Import cost</span><b>${escapeHtml(money(v.importCost))}</b></div><div class="goalRow"><span>Export revenue</span><b>${escapeHtml(money(v.exportRevenue))}</b></div><div class="goalRow"><span>Net energy cost</span><b>${escapeHtml(money(v.netEnergyCost))}</b></div><div class="goalRow"><span>Result completeness</span><b>${escapeHtml(v.resultCompletenessLabel)}</b><small>${escapeHtml(v.resultScopeLabel)}</small></div></div>${optional ? `<div class="softBox">${optional}</div>` : ''}</section>`;
@@ -7379,7 +7443,7 @@ function rhiEnergyVisualPickerStyles() {
           ['✓','Confidence',this.productStateLabel(confidence,'Limited'),'Planning confidence']
         ]
       };
-      if (!vm.contractSupported) return `${this.tabExperienceHeader(rt,'planning',planningHeader)}${this.contractGap('Tactical planning unavailable','The backend did not publish canonical Planning energy lanes.')}`;
+      if (!vm.contractSupported) return `${this.tabExperienceHeader(rt,'planning',planningHeader)}${this.contractGap('Tactical planning unavailable','Planning information is not available right now.')}`;
       const participatingCount = assetTotals.length;
       const nextLines = assetTotals.map(item => this.assetIdentityChip(item.asset,fmtKw(firstDefined(item.asset.requested_power_kw,item.asset.requested_charge_power_kw,item.asset.requested_power_kw_effective),'—'))).join('');
       const planningLoadRows = assetTotals.map(item => {
@@ -7401,7 +7465,7 @@ function rhiEnergyVisualPickerStyles() {
       const incompletePlanningRows = asArray(vm.assets).filter(asset => asset && asset.planning_input_ready === false).map(asset => { const blockers=asArray(asset.planning_blockers); const userReason=blockers.includes('target_soc_not_configured')?'Set a target charge level.':blockers.includes('ready_by_not_configured')?'Set a ready-by time.':blockers.includes('charger_not_assigned')?'Assign a charger.':'Charging information is incomplete.'; return `<article class="planningLoadRow planningInputIncomplete"><div class="planningLoadIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.planningAssetIcon(asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(asset))}</b></div><small>${escapeHtml(userReason)}</small></div></div><div><small>Current charge</small><b>${fmtPct(asset.current_soc_pct)}</b></div><div><small>Target</small><b>${fmtPct(asset.target_soc_pct)}</b></div><div><small>Ready by</small><b>${escapeHtml(asset.ready_by || 'Not set')}</b></div><div><small>Charging power</small><b>${fmtKw(asset.max_power_kw,'—')}</b></div><div><small>Status</small><b class="planStatusBadge exception">Needs setup</b></div></article>`; }).join('');
       return `${this.tabExperienceHeader(rt,'planning',planningHeader)}
       ${this.bodyContextBar(rt,'planning','planning-body')}
-      <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>${vm.buckets.length} published bucket${vm.buckets.length===1?'':'s'} · backend timestamps preserved · no interpolation · zero values hidden · Grid out fixed at table end</p></div><span>All primary values are kWh per bucket</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>published by Planning</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Canonical Tactical plan projected without frontend recalculation.</p></div></div><div class="planningLoadList">${planningLoadRows || incompletePlanningRows || '<div class="empty"><b>No flexible loads currently need planning</b></div>'}</div></section>`;
+      <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>Hourly view of expected production, consumption, storage and grid exchange.</p></div><span>Energy per hour (kWh)</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>for this period</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Loads Home Intelligence is currently planning for this period.</p></div></div><div class="planningLoadList">${planningLoadRows || incompletePlanningRows || '<div class="empty"><b>No flexible loads currently need planning</b></div>'}</div></section>`;
     }
 
     strategicPlanning(rt) {
@@ -7409,7 +7473,7 @@ function rhiEnergyVisualPickerStyles() {
       const topics = rt.strategyBehaviorTopics();
       const valueText = row => {
         const value = firstDefined(row.effective_value,row.value,row.configured_value,row.selected_value,row.current_value,null);
-        if (value === null || value === undefined || value === '') return 'Not published';
+        if (value === null || value === undefined || value === '') return 'Not available';
         return this.genericValueWithUnit(value, firstDefined(row.unit,row.native_unit,''));
       };
       const topicCards = topics.map(topic => {
@@ -7418,7 +7482,7 @@ function rhiEnergyVisualPickerStyles() {
           const label = this.profileFieldLabel(row);
           return `<div class="strategicBehaviorRow"><span>${escapeHtml(label)}</span><b>${escapeHtml(valueText(row))}</b></div>`;
         }).join('');
-        return `<section class="panel strategicBehaviorCard"><h2>${escapeHtml(topic.topic_label || human(topic.topic_id))}</h2><div class="strategicBehaviorRows">${lines || '<div class="empty compact"><span>No effective values published.</span></div>'}</div></section>`;
+        return `<section class="panel strategicBehaviorCard"><h2>${escapeHtml(topic.topic_label || human(topic.topic_id))}</h2><div class="strategicBehaviorRows">${lines || '<div class="empty compact"><span>No effective values available.</span></div>'}</div></section>`;
       }).join('');
 
       const allProperties = topics.flatMap(topic => asArray(topic.properties));
@@ -7426,7 +7490,7 @@ function rhiEnergyVisualPickerStyles() {
       const objectiveRow = allProperties.find(row => ['home.primary_objective','strategy.home.primary_objective'].includes(String(firstDefined(row.property_id,row.property_key,row.key,'') || ''))) || null;
       const mode = automationRow ? valueText(automationRow) : this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'),'Advice');
       const objective = objectiveRow ? valueText(objectiveRow) : '';
-      const posture = [mode,objective].filter(value=>value && value!=='Not published').join(' · ');
+      const posture = [mode,objective].filter(value=>value && value!=='Not available').join(' · ');
       const model = {
         ...base,
         image:hbEnergyHeroAsset('strategic-planning'),
@@ -7439,8 +7503,9 @@ function rhiEnergyVisualPickerStyles() {
         ]
       };
       return `${this.tabExperienceHeader(rt,'strategic-planning',model)}
-        <div class="strategicPlanningPage strategicBehaviorPage">
-          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not available')}</h2><p>Strategy configuration is the authority for longer-term intent. This read-only view explains the effective meaning of your current Settings; Tactical Planning decides today/tomorrow and Operational Planning handles execution.</p></section>
+        ${this.bodyContextBar(rt,'strategic-planning','strategic-planning-body')}
+        <div id="strategic-planning-body" class="strategicPlanningPage strategicBehaviorPage">
+          <section class="panel strategicPlanningIntro compactStrategicIntro"><small>LONGER-TERM BEHAVIOR</small><h2>${escapeHtml(posture || 'Strategy not available')}</h2><p>This view explains how your current settings influence longer-term energy behavior. Today and tomorrow remain visible in Planning.</p></section>
           <div class="strategicBehaviorGrid">${topicCards || '<section class="panel"><div class="empty"><b>No long-term strategy available</b><span>Long-term strategy details are not available yet.</span></div></section>'}</div>
         </div>`;
     }
@@ -7513,7 +7578,10 @@ function rhiEnergyVisualPickerStyles() {
     renderError(view, error) {
       const message = error && error.message ? error.message : String(error || 'Unknown render error');
       const stack = error && error.stack ? String(error.stack).split('\n').slice(0, 4).join('\n') : '';
-      return `<section class="panel"><h2>${escapeHtml(human(view))} unavailable</h2><p>The screen failed to render. This is a frontend defect guard; other Energy tabs remain available.</p><div class="softBox"><b>Error</b><span>${escapeHtml(message)}</span></div>${stack ? `<pre class="decisionDump">${escapeHtml(stack)}</pre>` : ''}</section>`;
+      const diagnostics = this.config?.show_diagnostics === true
+        ? `<div class="softBox"><b>Error</b><span>${escapeHtml(message)}</span></div>${stack ? `<pre class="decisionDump">${escapeHtml(stack)}</pre>` : ''}`
+        : '';
+      return `<section class="panel"><h2>${escapeHtml(human(view))} unavailable</h2><p>${escapeHtml(rhiEnergyT(this._hass,'common.information_missing',{},'This information is not available yet.'))}</p>${diagnostics}</section>`;
     }
     viewContent(rt) {
       const body = this.view === 'overview' ? this.overview(rt) : this.view === 'outlook' ? this.outlook(rt) : this.view === 'flow' ? this.flow(rt) : this.view === 'solar' ? this.solar(rt) : this.view === 'operational-planning' ? this.operationalPlanning(rt) : this.view === 'battery' ? this.battery(rt) : this.view === 'consumers' ? this.consumers(rt) : this.view === 'gas' ? this.gas(rt) : this.view === 'strategies' ? this.strategies(rt) : this.view === 'metering' ? this.metering(rt) : this.view === 'intelligence' ? this.intelligence(rt) : this.view === 'retrospective' ? this.retrospective(rt) : this.view === 'value' ? this.value(rt) : this.view === 'planning' ? this.planning(rt) : this.view === 'strategic-planning' ? this.strategicPlanning(rt) : this.placeholder(rt);

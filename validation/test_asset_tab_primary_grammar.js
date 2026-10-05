@@ -11,20 +11,28 @@ assert.match(app,/location_name/);
 const deviceStart = app.indexOf("\n    energyDeviceStatusCard(");
 const deviceEnd = app.indexOf("\n    energyAssetType(", deviceStart);
 const device = app.slice(deviceStart, deviceEnd);
-assert.match(device,/energyDeviceArea/);
+assert.match(device,/const area = this\.energyAssetAreaLabel\(enriched\)/);
 assert.match(device,/energyAssetFacts\(rt,enriched,5\)/);
 assert.doesNotMatch(device,/energyDeviceConfig/);
 assert.doesNotMatch(device,/>Config</);
 assert.doesNotMatch(device,/>Telemetry</);
 
 const detailsStart = app.indexOf("\n    energyAssetDetailDisclosure(");
-const detailsEnd = app.indexOf("\n    energyDeviceStatusCard(", detailsStart);
+const detailsEnd = app.indexOf("\n    energyAssetDiagnosticsDisclosure(", detailsStart);
 const details = app.slice(detailsStart, detailsEnd);
 assert.match(details,/\['Area'/);
 assert.match(details,/\['Profile'/);
-assert.match(details,/\['Telemetry'/);
-assert.match(details,/\['Source'/);
-assert.match(details,/\['Asset id'/);
+assert.doesNotMatch(details,/\['Telemetry'/);
+assert.doesNotMatch(details,/\['Source'/);
+assert.doesNotMatch(details,/\['Asset id'/);
+
+const diagnosticsStart = app.indexOf("\n    energyAssetDiagnosticsDisclosure(");
+const diagnosticsEnd = app.indexOf("\n    energyAppearanceAction(", diagnosticsStart);
+const diagnostics = app.slice(diagnosticsStart, diagnosticsEnd);
+assert.match(diagnostics,/this\.config\?\.show_diagnostics !== true/);
+assert.match(diagnostics,/\['Telemetry'/);
+assert.match(diagnostics,/\['Source'/);
+assert.match(diagnostics,/\['Asset id'/);
 
 const batteryStart = app.indexOf("\n    batteryChildCard(");
 const batteryEnd = app.indexOf("\n    gas(rt)", batteryStart);

@@ -10,8 +10,7 @@ const core = fs.readFileSync("src/vendor/rhi-ux-core.js","utf8");
 for (const [id,labelKey] of [
   ["overview","nav.overview"],["flow","nav.flow"],["solar","nav.solar"],["battery","nav.battery"],
   ["consumers","nav.consumption"],["gas","nav.gas"],["settings","nav.settings"],
-  ["operational-planning","nav.operational_plan"],["tactical-planning","nav.tactical_plan"],
-  ["strategic-planning","nav.strategic_plan"],["metering","nav.performance"],
+  ["plan","nav.plan"],["metering","nav.performance"],
   ["value","nav.value"],["retrospective","nav.retrospective"]
 ]) {
   assert.ok(presentation.includes(`id:"${id}"`) && presentation.includes(`labelKey:"${labelKey}"`), "missing localized navigation definition "+id);
@@ -50,15 +49,15 @@ assert.match(app,/energyDeviceState/);
 assert.match(app,/\['Telemetry', telemetry\]/);
 assert.match(app,/assetQuickActions\(rt, assetId/);
 assert.match(app,/rt\.commandActionModelsForAsset\(id\)/);
-assert.match(app,/Telemetry limited/);
-assert.match(app,/per-battery power is not published/);
+assert.match(app,/Measurements limited/);
+assert.match(app,/per-battery power is not available/);
 assert.match(app,/solarProductionHierarchy/);
 assert.match(app,/solarOptimizerPrimaryCard/);
 assert.match(app,/OPTIMIZER \/ PANEL/);
 assert.doesNotMatch(app,/No panels linked to this zone/);
 assert.match(app,/solarTopologyDetails/);
 assert.match(app,/solarTopologyDiagnostics/);
-assert.match(app,/No charging topology published/);
+assert.match(app,/No charging connections available/);
 
 for (const token of [
   "battery_system.generic",
@@ -97,14 +96,16 @@ assert.match(app,/object-fit:contain/);
 assert.ok(app.includes('rhiUxDomainShell({'));
 assert.match(app,/domain:rhiEnergyT\(this\._hass,'nav\.energy',\{\},'Energy'\)\.toUpperCase\(\)/);
 assert.ok(app.includes('strategicPlanning(rt)'), "Strategic Planning must be a real contract-backed surface");
-assert.ok(app.includes('Strategy configuration is the authority for longer-term intent'), "Strategic Planning must explain its contract authority");
+assert.ok(app.includes('This view explains how your current settings influence longer-term energy behavior.'), "Strategic Planning must explain longer-term behavior in user language");
 assert.ok(!app.includes('Strategic planning content follows in the next screen pass'), "Strategic Planning placeholder must not return");
 
 console.log("PASS Energy 4.3 canonical page/body controls, asset grammar, visuals and responsive ownership");
 
 
 const intelligenceBlock = presentation.slice(presentation.indexOf('id:"intelligence"'), presentation.indexOf('id:"insights"'));
-assert.ok(intelligenceBlock.lastIndexOf('id:"settings"') > intelligenceBlock.indexOf('id:"strategic-planning"'), "Settings must be the last Intelligence tab");
+assert.ok(intelligenceBlock.lastIndexOf('id:"settings"') > intelligenceBlock.indexOf('id:"plan"'), "Settings must be the last Intelligence tab");
+assert.ok(!intelligenceBlock.includes('id:"operational-planning"') && !intelligenceBlock.includes('id:"tactical-planning"') && !intelligenceBlock.includes('id:"strategic-planning"'), "planning subviews must not return as top-level navigation tabs");
+assert.ok(app.includes("['operational-planning','planning','strategic-planning'].includes(tab)"), "Plan must expose operational/tactical/strategic internal views");
 assert.ok(!app.includes("understandingFooter(rt, this.view)"), "legacy Conclusion footer must not be injected into product views");
 assert.ok(!app.includes("understandingFooter(rt, tab)"), "legacy Conclusion component must be removed");
 assert.ok(app.includes("this.config?.show_diagnostics !== true"), "technical footer must be explicitly diagnostics-gated");
