@@ -3687,12 +3687,33 @@
         : '';
       return `<div class="solarProductionChildren" id="solar-inverter-detail">${inverterCards}${unresolved}</div>`;
     }
+    homeBatteryAggregateCard(rt, system = null) {
+      const battery = this.currentEnergyModel(rt).battery;
+      const enriched = system ? this.energyAssetContext(rt, system) : {};
+      const id = String(firstDefined(enriched.asset_id,enriched.id,'battery_system') || 'battery_system');
+      const name = firstDefined(enriched.display_name,enriched.name,'Home Battery System');
+      const facts = [
+        ['Power',fmtKw(battery.displayPowerKw,'—')],
+        ['State of charge',fmtPct(battery.socPct)],
+        ['Capacity',fmtKwh(battery.capacityKwh)],
+        ['Available energy',fmtKwh(battery.availableKwh)]
+      ];
+      const identity = rhiUxAssetIdentity({
+        eyebrow:'Battery system',
+        title:name,
+        subtitle:battery.label === 'Unavailable' ? rhiEnergyT(this._hass,'common.not_available',{},'Not available') : battery.label,
+        visual:system ? this.assetVisual(enriched,{size:'lg',fallbackIcon:'▣',decorative:false}) : ''
+      });
+      const factGrid = rhiUxAssetFactGrid(facts.map(([label,value])=>({label,value})));
+      const details = system ? this.energyAssetDetailDisclosure(rt,enriched) : '';
+      const diagnostics = system ? this.energyAssetDiagnosticsDisclosure(rt,enriched) : '';
+      return `<div class="energyAssetNode" data-energy-device-type="battery_system"><article class="energyDeviceCard rhiEnergyCoreAssetCard" data-current-energy-projection="battery">${identity}${factGrid}<div class="energyAssetFoldStack">${details}${diagnostics}</div></article></div>`;
+    }
+
     solarBatterySystem(rt, systems = [], batteries = []) {
       if (!systems.length && !batteries.length) return '';
       const system = systems[0] || null;
-      const head = system
-        ? this.energyDeviceStatusCard(rt,system,'Battery system')
-        : `<div class="solarSystemSummary"><div><small>BATTERY SYSTEM</small><h3>Home Battery System</h3><p>A combined battery summary is not available; individual batteries are shown below.</p></div><div class="solarAggregateFacts"><span><small>Batteries</small><b>${batteries.length}</b></span></div></div>`;
+      const head = this.homeBatteryAggregateCard(rt, system);
       const children = batteries.length ? `<div class="solarChildGrid">${batteries.map(asset=>this.batteryChildCard(rt,String(firstDefined(asset.asset_id,asset.id,'') || ''))).join('')}</div>` : '';
       return this.solarHardwareSection(
         'Home Battery',
