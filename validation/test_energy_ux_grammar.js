@@ -21,7 +21,8 @@ assert.match(presentation,/label:rhiEnergyT\(hass,section\.labelKey/);
 assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v3.webp"'), "Gas page must use immutable photographic hero v3");
 assert.ok(!presentation.includes('gas: "heroes/gas-hero.webp"'), "legacy Gas page hero mapping must not return");
 assert.ok(!presentation.includes('gas: "heroes/gas-page-hero-v2.svg"'), "blurred Gas SVG transport must not return");
-assert.ok(app.includes("if (tab === 'gas') return !!target && type === 'gas_meter';"), "Gas page must reject global/untargeted commands");
+assert.ok(app.includes("type === 'energy_system' || target === 'energy' || target === 'energy_system'"), "Page headers must reject asset-scoped commands and keep only system-level actions");
+assert.ok(!app.includes("if (tab === 'gas') return !!target && type === 'gas_meter';"), "Gas must not regain a page-specific asset-command exception");
 assert.ok(app.includes("window.loadCardHelpers"), "Gas statistics graph must use Home Assistant card helpers");
 assert.ok(app.includes("helpers.createCardElement"), "Gas statistics graph must lazy-create the native card");
 
@@ -110,3 +111,16 @@ assert.ok(!app.includes("understandingFooter(rt, this.view)"), "legacy Conclusio
 assert.ok(!app.includes("understandingFooter(rt, tab)"), "legacy Conclusion component must be removed");
 assert.ok(app.includes("this.config?.show_diagnostics !== true"), "technical footer must be explicitly diagnostics-gated");
 assert.ok(app.includes("rhiUxTechnicalFooter({"), "diagnostics footer must use shared Core primitive");
+
+
+for (const needle of [
+  "Energy assessment unavailable",
+  "Historical statistics not available yet",
+  "The current meter reading is available; historical statistics are separate.",
+  "userRelationshipLabel(value, fallback = 'Assigned charger')",
+  "coherentCommandModels(models = [], stateHint = '')",
+  "4.3.28 target-HA phone closure",
+  ".batteryGrid.batteryGridTwoUp{display:grid;grid-template-columns:1fr"
+]) assert.ok(app.includes(needle), "target-HA UX closure missing: "+needle);
+assert.ok(!app.includes("Configured · physical identity not proven"), "Energy normal UX must not expose technical physical-identity wording");
+console.log("PASS target-HA product-safe actions, Gas capability copy and phone flow closure");

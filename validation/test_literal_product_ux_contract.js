@@ -4,7 +4,7 @@ const source=fs.readFileSync("src/app/energy-card.js","utf8");
 
 const required=[
   "typeof rhiUxVisualPickerStyles === 'function' ? rhiUxVisualPickerStyles() : ''",
-  "const assetScopedOnly = new Set(['flow','consumers','strategies','operational-planning','planning','strategic-planning'])",
+  "type === 'energy_system' || target === 'energy' || target === 'energy_system'",
   "profileSettingsTopic(profile = {})",
   "What do you want to adjust?",
   "What your current Energy settings mean for longer-term behavior.",
@@ -12,7 +12,7 @@ const required=[
   "energyAssetDiagnosticsDisclosure(rt, asset = {})",
   "energyAssetFoldStack",
   "energyAssetChildren",
-  "Charger unavailable",
+  "userRelationshipLabel(value, fallback = 'Assigned charger')",
   "fmtKw(currentPower,'—')",
   "presentation?.role",
   "behavior_topics",
@@ -31,6 +31,7 @@ for(const forbidden of [
   "No explanation Available.",
   "fmtKw(currentPower,'0.0 kW')",
   "rt.assetName(charger) || human(charger)",
+  "Charger unavailable",
   "Published properties",
   "backend ETA",
   "backend ready time",

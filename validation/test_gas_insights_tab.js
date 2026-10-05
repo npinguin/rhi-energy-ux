@@ -42,4 +42,5 @@ console.log("PASS Gas is the final Energy tab with dedicated hero, canonical met
 assert.match(app,/async mountGasStatisticsGraph\(\)/);
 assert.match(app,/window\.loadCardHelpers/);
 assert.match(app,/helpers\.createCardElement/);
-assert.match(app,/tab === 'gas'\) return !!target && type === 'gas_meter'/);
+assert.match(app,/type === 'energy_system' \|\| target === 'energy' \|\| target === 'energy_system'/);
+assert.doesNotMatch(app,/tab === 'gas'\) return !!target && type === 'gas_meter'/);

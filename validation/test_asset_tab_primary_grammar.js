@@ -39,7 +39,7 @@ const batteryEnd = app.indexOf("\n    gas(rt)", batteryStart);
 const battery = app.slice(batteryStart, batteryEnd);
 assert.match(battery,/batteryContributorArea/);
 assert.match(battery,/energyAssetDetailDisclosure\(rt,asset\)/);
-assert.match(battery,/assetQuickActions\(rt,assetId,3\)/);
+assert.match(battery,/assetQuickActions\(rt,assetId,3(?:,stateLabel)?\)/);
 assert.doesNotMatch(battery,/Home Battery strategy/,"Home Battery page must not contain local strategy editor");
 
 const consumerStart = app.indexOf("\n    consumerExplorerCard(");
