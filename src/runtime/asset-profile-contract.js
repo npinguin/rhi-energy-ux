@@ -28,7 +28,6 @@ function energyAssetPublicationGap(gateway, assetId = "") {
     missing,
     unresolved,
     resolution_complete: publication.resolution_complete === true,
-    authority: String(publication.authority || "RHI_ENERGY_PUBLIC_CONTRACT_V2"),
-    v1_fallback_allowed: publication.v1_fallback_allowed === true
+    authority: String(publication.authority || "RHI_ENERGY_PUBLIC_CONTRACT_V2")
   };
 }
