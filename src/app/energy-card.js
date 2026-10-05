@@ -409,7 +409,7 @@
     asset(assetId) { return this.assets().find(a => String(a.asset_id || '') === String(assetId)) || null; }
     assetName(assetId) { return this.asset(assetId)?.display_name || human(assetId, '—'); }
     assetField(assetId, propertyKey) {
-      return this.publicV2().field(String(propertyKey || ''), String(assetId || ''));
+      return this.publicV2().assetField(String(assetId || ''), String(propertyKey || ''));
     }
     assetValue(assetId, propertyKey, fallback = null) {
       const field = this.assetField(assetId, propertyKey);
@@ -2101,19 +2101,14 @@
       return asNumber(firstDefined(effective.available_above_reserve_kwh, effective.usable_above_reserve_kwh));
     }
     flexibleNeedKwh(rt) {
-      const values = this.flexibleAssetDomain(rt).planningParticipants().map(vm => asNumber(firstDefined(vm.raw.energy_to_target_kwh, vm.raw.energy_needed_kwh, vm.raw.remaining_energy_kwh))).filter(value => value !== null);
-      if (!values.length) return null;
-      return values.reduce((sum, value) => sum + Math.max(0, value), 0);
+      const totals=rt.planningHorizonTotals('D0')||{};
+      return asNumber(firstDefined(totals.flexible_required_kwh,totals.required_kwh,null));
     }
     flexiblePowerNowKw(rt) {
-      // Live Flexible Loads power is physical connection truth owned by Energy core.
-      // Do not re-sum planning participants: infrastructure may consume power without being a planning target.
-      const physical = rt.number('flexible_loads.power_kw');
-      if (physical !== null) return Math.abs(physical);
-      const values = this.flexibleAssetDomain(rt).planningParticipants().map(vm => asNumber(firstDefined(vm.raw.power_kw, vm.raw.current_power_kw, vm.raw.actual_power_kw))).filter(value => value !== null);
-      if (!values.length) return null;
-      return values.reduce((sum, value) => sum + Math.abs(value), 0);
+      const value=this.currentEnergyModel(rt).consumption.flexibleLoadsKw;
+      return value===null?null:Math.abs(value);
     }
+
     currentEnergyModel(rt) { return createCurrentEnergyViewModel(rt.contractGateway()); }
     progress(value, max = null) { return this.componentProgressBar(value, max); }
     assetRow(icon, title, label, value, pct) { return this.componentAssetRow({ icon, title, label, value, pct }); }
@@ -2361,21 +2356,23 @@
     }
 
     gasModel(rt) {
-      const assets = typeof rt.assets === 'function' ? rt.assets() : [];
-      const raw = assets.find(asset => String(firstDefined(asset?.asset_type, asset?.object_class, '') || '').toLowerCase() === 'gas_meter') || null;
-      const asset = raw ? this.energyAssetContext(rt, raw) : null;
-      const properties = Array.isArray(asset?.properties) ? asset.properties : [];
-      const propertyValue = key => {
-        const prop = properties.find(row => String(row?.property_key || '') === key);
-        return asNumber(firstDefined(prop?.value, prop?.resolution?.value, null));
-      };
-      const totalM3 = firstDefined(propertyValue('gas.total_m3'), asNumber(asset?.total_m3), asNumber(asset?.gas_total_m3));
-      const flowM3h = firstDefined(propertyValue('gas.flow_m3_h'), asNumber(asset?.flow_m3_h), asNumber(asset?.gas_flow_m3_h));
-      const health = String(firstDefined(asset?.health, asset?.normalization_status, 'UNKNOWN') || 'UNKNOWN');
-      const source = String(firstDefined(asset?.integration_domain, properties.find(row=>row?.integration_domain)?.integration_domain, 'Gas meter') || 'Gas meter');
-      const totalEntityId = rt.gasStatisticsEntityId(String(asset?.asset_id || ''));
-      return Object.freeze({ asset, totalM3, flowM3h, health, source, totalEntityId });
+      const raw=rt.assets().find(asset=>String(firstDefined(asset?.asset_type,asset?.object_class,'')||'').toLowerCase()==='gas_meter')||null;
+      if(!raw)return Object.freeze({asset:null,totalM3:null,flowM3h:null,health:'UNAVAILABLE',source:'RHI_ENERGY_PUBLIC_CONTRACT_V2',totalEntityId:''});
+      const asset=this.energyAssetContext(rt,raw);
+      const projection=rt.assetProjection(String(raw.asset_id||''));
+      const total=projection?.property?.('gas.total_m3');
+      const flow=projection?.property?.('gas.flow_m3_h');
+      const state=projection?.property?.('gas.state');
+      return Object.freeze({
+        asset,
+        totalM3:total?.resolved===true?asNumber(total.value):null,
+        flowM3h:flow?.resolved===true?asNumber(flow.value):null,
+        health:String(firstDefined(state?.status,projection?.lifecycle?.state,raw.health,'UNAVAILABLE')||'UNAVAILABLE'),
+        source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.objects',
+        totalEntityId:rt.gasStatisticsEntityId(String(raw.asset_id||''))
+      });
     }
+
     gasVolume(value, fallback = '—') {
       const number = asNumber(value);
       return number === null ? fallback : `${number.toLocaleString(undefined,{maximumFractionDigits:3})} m³`;
@@ -3409,14 +3406,6 @@
             ? field.display
             : (field.value === null || field.value === undefined ? '' : `${field.value}${field.unit ? ` ${field.unit}` : ''}`);
         }
-        if (!value || value === '—') {
-          let direct;
-          for (const path of spec.direct) {
-            const candidate = valueAtPath(asset, path);
-            if (candidate !== undefined && candidate !== null && candidate !== '') { direct = candidate; break; }
-          }
-          if (direct !== undefined) value = formatDirect(direct, spec.formatter);
-        }
         if (!value || value === '—') continue;
         seenLabels.add(spec.label);
         facts.push({ label:spec.label, value, status, key:usedKey });
@@ -3870,12 +3859,7 @@
     }
 
     solar(rt) {
-      const pageVm = this.buildPageViewModel(rt, 'solar');
-      const solarPower = rt.number('solar.power_kw');
-      const forecastToday = rt.number('forecast.solar_today_kwh');
-      const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
-      const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
-      const gridExportToday = rt.number('metering.grid_export_today_kwh');
+      const pageVm=this.buildPageViewModel(rt,'solar');
       return `${this.tabExperienceHeader(rt,'solar',pageVm)}<div class="solarPage solarHardwarePage">
         ${this.solarEnergyStory(rt)}
         ${this.solarHardwareExperience(rt)}
@@ -4111,119 +4095,16 @@
       return [...byId.values()];
     }
     canonicalConnectionSnapshot(rt) {
-      // Connection materialization is projection-only: consume explicit public
-      // V2 asset links/relationships and asset-scoped measurements. Do not infer
-      // charger assignments from names and do not recalculate Energy aggregates.
-      const rows = new Map();
-      const assetType = asset => String(firstDefined(asset?.asset_type, asset?.object_class, '') || '').trim().toLowerCase();
-      const isCharger = asset => /(^|_)(charger|charging_point|charge_point)(_|$)/.test(assetType(asset));
-      const materialize = (chargerId, consumerId = '', relationship = {}) => {
-        const chargerKey = String(chargerId || '').trim();
-        const consumerKey = String(consumerId || '').trim();
-        if (!chargerKey || rows.has(chargerKey)) return;
-        // One physical charger is one connection row. The producer/public row is
-        // materialized first and remains authoritative over Energy-local fallbacks.
-        const charger = { ...objectFrom(rt.asset(chargerKey) || {}), ...objectFrom(relationship) };
-        const consumer = consumerKey
-          ? (rt.asset(consumerKey) || this.flexibleAssetDomain(rt).byId(consumerKey)?.raw || {})
-          : {};
-        const power = asNumber(firstDefined(
-          charger.actual_power_kw,
-          charger.current_power_kw,
-          charger.power_kw,
-          rt.number(`${chargerKey}.actual_power_kw`),
-          rt.number(`${chargerKey}.current_power_kw`),
-          rt.number(`${chargerKey}.power_kw`)
-        ));
-        const row = {
-          ...charger,
-          asset_id:chargerKey,
-          connection_asset_id:chargerKey,
-          connected_consumer_id:consumerKey,
-          connected_consumer_visual_ref:String(firstDefined(consumer.visual_ref, '') || ''),
-          connection_state:String(firstDefined(
-            relationship.connection_state,
-            relationship.state,
-            charger.connection_state,
-            consumer.connection_state,
-            consumer.connected === true ? 'connected' : ''
-          ) || ''),
-          operating_state:String(firstDefined(
-            charger.operating_state,
-            charger.operation_state,
-            consumer.operating_state,
-            consumer.operation_state,
-            ''
-          ) || ''),
-          physical_power_kw:power,
-          // Preserve producer-owned visual identity from the canonical connection
-          // row; Energy-local projections may only fill it when the producer omitted it.
-          visual_ref:String(firstDefined(relationship.visual_ref, charger.visual_ref, '') || ''),
-          source_relationship_id:String(firstDefined(relationship.relationship_id, relationship.id, '') || '')
-        };
-        rows.set(chargerKey, row);
-      };
-
-      // Prefer the exact producer-owned connection rows published by Energy V2.
-      // This is the canonical cross-domain topology boundary and remains visible
-      // even at 0 kW / idle.
-      asArray(rt.publicV2().connections).forEach(connection => {
-        materialize(
-          firstDefined(connection.asset_id, connection.connection_asset_id, ''),
-          firstDefined(connection.connected_asset_id, connection.connected_consumer_id, ''),
-          connection
-        );
-      });
-
-      // Flexible assets may publish their exact execution/charger target directly.
-      this.flexibleAssetDomain(rt).all()
-        .filter(vm => !vm.isDisabled && !vm.isStorage)
-        .forEach(vm => {
-          const asset = vm.raw || {};
-          const chargerId = firstDefined(
-            asset.effective_charger,
-            asset.effective_connection_id,
-            asset.assigned_connection_id,
-            asset.physical_connection_id,
-            asset.charger_asset_id,
-            asset.connection_asset_id,
-            asset.execution_target_asset_id,
-            ''
-          );
-          if (chargerId) materialize(chargerId, vm.id, { connection_state:asset.connection_state });
-        });
-
-      // Public connected_to relationships remain authoritative when present.
-      rt.connectedRelationships().forEach(relationship => {
-        const fromId = String(firstDefined(relationship.from_asset_id, relationship.source_asset_id, '') || '');
-        const toId = String(firstDefined(relationship.to_asset_id, relationship.target_asset_id, '') || '');
-        if (!fromId || !toId) return;
-        const from = rt.asset(fromId) || {};
-        const to = rt.asset(toId) || {};
-        if (isCharger(from)) materialize(fromId, toId, relationship);
-        else if (isCharger(to)) materialize(toId, fromId, relationship);
-      });
-
-      // Topology is not the same as active power flow: keep published chargers
-      // visible when idle or currently unassigned.
-      rt.assets().filter(isCharger).forEach(charger => {
-        const id=String(charger.asset_id || '');
-        if (!id) return;
-        if (!rows.has(id)) materialize(id, '', charger);
-      });
-
-      const projected = Object.freeze([...rows.values()].map(row => Object.freeze(row)));
-      const observedAt = projected.map(row => String(firstDefined(row.observed_at, row.updated_at, '') || '')).filter(Boolean).sort().pop() || '';
-      return Object.freeze({
-        available:rt.publicV2().available === true,
-        rows:projected,
-        // Deliberately not derived from row power: Energy aggregate truth stays backend-owned.
-        totalPowerKw:null,
-        observedAt,
-        reason:projected.length ? '' : 'No charging connection is currently available.',
-        source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
-      });
+      const rows=asArray(rt.publicV2().connections).map(connection=>{
+        const chargerId=String(firstDefined(connection.asset_id,connection.connection_asset_id,'')||'').trim();
+        const consumerId=String(firstDefined(connection.connected_asset_id,connection.connected_consumer_id,connection.target_asset_id,'')||'').trim();
+        const consumer=consumerId?(rt.asset(consumerId)||this.flexibleAssetDomain(rt).byId(consumerId)?.raw||{}):{};
+        return Object.freeze({...objectFrom(connection),asset_id:chargerId,connection_asset_id:chargerId,connected_consumer_id:consumerId,connected_consumer_visual_ref:String(firstDefined(connection.connected_consumer_visual_ref,consumer.visual_ref,'')||''),physical_power_kw:asNumber(firstDefined(connection.physical_power_kw,connection.power_kw)),visual_ref:String(firstDefined(connection.visual_ref,'')||'')});
+      }).filter(row=>row.connection_asset_id);
+      const observedAt=rows.map(row=>String(firstDefined(row.observed_at,row.updated_at,'')||'')).filter(Boolean).sort().pop()||'';
+      return Object.freeze({available:rt.publicV2().available===true&&Array.isArray(rt.publicV2().connections),rows:Object.freeze(rows),totalPowerKw:null,observedAt,reason:rows.length?'':'No charging connection is currently published.',source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.connections'});
     }
+
     flow(rt) {
       const pageVm = this.buildPageViewModel(rt, 'flow');
       const current = this.currentEnergyModel(rt);
