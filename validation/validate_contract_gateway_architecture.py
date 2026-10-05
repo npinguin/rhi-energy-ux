@@ -32,6 +32,32 @@ for token in ("this._hass?.states", "this._hass.states", "Object.entries(this._h
 if "gasTotalEntityId()" in screen_source:
     failures.append("renderer_gas_entity_discovery_bypass")
 
+# Current physical truth has one projection owner. Screens may not independently
+# read the same semantic fields through generic runtime property helpers.
+current_semantic_bypasses = [
+    r"rt\.number\(['\"]solar\.power_kw",
+    r"rt\.number\(['\"]battery\.",
+    r"rt\.number\(['\"]grid(?:_|\.)",
+    r"rt\.number\(['\"](?:site|home)_consumption\.power_kw",
+    r"rt\.value\(['\"]battery\.reserve",
+]
+for pattern in current_semantic_bypasses:
+    if re.search(pattern, screen_source):
+        failures.append(f"parallel_current_energy_projection:{pattern}")
+
+# Physical charging topology has one owner: Public V2 connections.
+connection_start = screen_source.find("canonicalConnectionSnapshot(rt)")
+connection_end = screen_source.find("\n    flow(rt)", connection_start)
+connection_source = screen_source[connection_start:connection_end] if connection_start >= 0 and connection_end > connection_start else ""
+for token in ("connectedRelationships()", "effective_connection_id", "assigned_connection_id", "rt.assets().filter(isCharger)"):
+    if token in connection_source:
+        failures.append(f"parallel_connection_projection:{token}")
+
+planning_adapter = (ROOT / "src/domain/planning/contract-adapter.js").read_text(encoding="utf-8")
+for token in ("R1.79.3", "planningEnergyFromPower", "signedPlanningGrid"):
+    if token in planning_adapter:
+        failures.append(f"legacy_planning_reconstruction:{token}")
+
 # Product source must never regain legacy V1 product authority.
 legacy_product_tokens = [
     "sensor.energy_asset_index",
