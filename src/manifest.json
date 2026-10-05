@@ -9,6 +9,7 @@
         "runtime/energy-contract-gateway.js",
         "runtime/energy-v2-contract.js",
         "domain/selectors/energy-selectors.js",
+        "domain/models/asset-presentation-model.js",
         "app/energy-asset-catalog.js",
         "runtime/foundation-visual-registry.js",
         "runtime/visual-asset-resolver.js",
