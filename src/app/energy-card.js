@@ -397,6 +397,7 @@
     pricingProjection() { return selectEnergyPricing(this.publicV2()); }
     valueProjection(period = 'today') { return selectEnergyValue(this.publicV2(), period); }
     meteringProjection(period = 'today') { return selectEnergyMetering(this.publicV2(), period); }
+    gasProjection() { return selectEnergyGas(this.publicV2()); }
     activityProjection() { return selectEnergyActivity(this.publicV2()); }
     commandProjection(assetId = '') { return selectEnergyCommands(this.publicV2(), assetId); }
     coverage() { return selectEnergyCoverage(this.publicV2()); }
@@ -2355,21 +2356,19 @@
     }
 
     gasModel(rt) {
-      const assets = typeof rt.assets === 'function' ? rt.assets() : [];
-      const raw = assets.find(asset => String(firstDefined(asset?.asset_type, asset?.object_class, '') || '').toLowerCase() === 'gas_meter') || null;
-      const asset = raw ? this.energyAssetContext(rt, raw) : null;
-      const properties = Array.isArray(asset?.properties) ? asset.properties : [];
-      const propertyValue = key => {
-        const prop = properties.find(row => String(row?.property_key || '') === key);
-        return asNumber(firstDefined(prop?.value, prop?.resolution?.value, null));
-      };
-      const totalM3 = firstDefined(propertyValue('gas.total_m3'), asNumber(asset?.total_m3), asNumber(asset?.gas_total_m3));
-      const flowM3h = firstDefined(propertyValue('gas.flow_m3_h'), asNumber(asset?.flow_m3_h), asNumber(asset?.gas_flow_m3_h));
-      const health = String(firstDefined(asset?.health, asset?.normalization_status, 'UNKNOWN') || 'UNKNOWN');
-      const source = String(firstDefined(asset?.integration_domain, properties.find(row=>row?.integration_domain)?.integration_domain, 'Gas meter') || 'Gas meter');
-      const totalEntityId = rt.gasStatisticsEntityId(String(asset?.asset_id || ''));
-      return Object.freeze({ asset, totalM3, flowM3h, health, source, totalEntityId });
+      const projected = rt.gasProjection();
+      const asset = projected.asset ? this.energyAssetContext(rt, projected.asset) : null;
+      const totalEntityId = projected.asset_id ? rt.gasStatisticsEntityId(projected.asset_id) : '';
+      return Object.freeze({
+        asset,
+        totalM3:projected.total_m3,
+        flowM3h:projected.flow_m3_h,
+        health:projected.health,
+        source:projected.source,
+        totalEntityId
+      });
     }
+
     gasVolume(value, fallback = '—') {
       const number = asNumber(value);
       return number === null ? fallback : `${number.toLocaleString(undefined,{maximumFractionDigits:3})} m³`;
