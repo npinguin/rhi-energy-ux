@@ -1,4 +1,4 @@
-# RHI Energy UX 4.3.29 — unified semantic projection candidate
+# RHI Energy UX 4.3.30 — unified semantic projection candidate
 
 - make one canonical Public V2 semantic resolver authoritative for aggregate and asset facts;
 - use the same published aggregate object truth across Overview, Flow, Solar, Home Battery and Consumption;
@@ -7,7 +7,7 @@
 - make legacy row/value helpers consume the same canonical resolver so older screen code cannot disagree with current-energy projections;
 - add cross-surface architecture gates reproducing the observed “value on one page, unavailable on another” failure.
 
-Rollback: **v4.3.28**.  
+Rollback: **v4.3.29**.  
 Known accepted technical debt: **0**.  
 Known accepted feature debt: **0**.
 
