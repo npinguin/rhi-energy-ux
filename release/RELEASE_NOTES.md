@@ -1,17 +1,17 @@
-# RHI Energy UX 4.3.28 — target Home Assistant UX closure candidate
+# RHI Energy UX 4.3.29 — canonical projection closure
 
-- keep page-level actions product-scoped so ambiguous asset Start/Stop and repeated per-device commands no longer leak into headers;
-- deduplicate commands and suppress contradictory Start/Stop or Pause/Resume combinations based on published state;
-- fail closed in Overview intelligence when the canonical live Energy balance is incomplete;
-- keep opaque IDs, provider states and technical relationship wording out of normal product UX;
-- distinguish an available current gas meter from unavailable historical statistics;
-- remove duplicate Appearance actions;
-- make Battery, Gas and Solar asset compositions flow correctly on phone widths without presentation debt.
+- converge Overview, Flow, Solar, Home Battery and Consumption on one current-energy projection;
+- normalize already-published aggregate object truth and core truth once inside the Public V2 adapter;
+- remove frontend fallback sums for Flexible Loads current power and planning need;
+- route Gas through a domain selector instead of parsing raw object properties in the renderer;
+- make the Solar Home Battery section reuse the exact same aggregate battery projection as Overview, Flow and Home Battery;
+- keep physical child assets as detail projections without recalculating aggregate truth;
+- add architecture gates preventing cross-surface semantic paths from drifting apart again.
 
-No Energy measurements are reconstructed in the frontend. Missing Public V2 truth remains unavailable.
+No Energy measurements or planning totals are reconstructed in the frontend. Missing Public V2 truth remains unavailable.
 
-Rollback: **v4.3.27**.  
+Rollback: **v4.3.28**.  
 Known accepted technical debt: **0**.  
 Known accepted feature debt: **0**.
 
-Target Home Assistant qualification remains mandatory before stable promotion.
+Target Home Assistant runtime and rollback qualification remain mandatory before stable promotion.
