@@ -3330,47 +3330,48 @@
     energyDeviceStatusCard(rt, asset = {}, roleLabel = '', childrenHtml = '') {
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
-      const name = firstDefined(enriched.display_name,enriched.name,rt.assetName(id),human(id));
-      const type = String(firstDefined(enriched.asset_type,enriched.object_class,'device') || 'device');
+      const model = rt.assetPresentation(id);
+      const name = firstDefined(model?.identity?.display_name,enriched.display_name,enriched.name,rt.assetName(id),human(id));
+      const type = String(firstDefined(model?.identity?.asset_type,enriched.asset_type,enriched.object_class,'device') || 'device');
       const facts = this.energyAssetFacts(rt,enriched,5);
       const stateFact = facts.find(row => /^(state|status|direction)$/i.test(String(row.label || ''))) || null;
-      const measuredPower = this.measuredAssetPower(enriched);
-      const solarLike = /solar|inverter|panel|optimizer/.test(type);
-      const primaryState = stateFact?.value
-        || (solarLike && measuredPower !== null ? (measuredPower > 0.005 ? 'Producing' : 'Idle') : '')
-        || '';
+      const primaryState = stateFact?.value || this.productStateLabel(model?.lifecycle?.state || '', '');
       const area = this.energyAssetAreaLabel(enriched);
       const parentId = this.energyAssetParentId(enriched);
       const parentName = parentId ? String(rt.assetName(parentId) || '').trim() : '';
-      const actions = this.assetQuickActions(rt,id,3);
-      const keyFacts = facts.filter(row => !/^(state|status)$/i.test(String(row.label || ''))).slice(0,4);
       const identity = rhiUxAssetIdentity({
         eyebrow:roleLabel || human(type),
         title:name,
         subtitle:[area,primaryState].filter(Boolean).join(' · '),
         visual:this.assetVisual(enriched,{size:'lg',fallbackIcon:this.planningAssetIcon(enriched),decorative:false})
       });
+      const visibleFacts = facts.filter(row => !/^(state|status)$/i.test(String(row.label || ''))).slice(0,4);
       const factGrid = rhiUxAssetFactGrid(
-        keyFacts.length
-          ? keyFacts.map(row=>({label:row.label,value:row.value}))
-          : [{label:'Energy state',value:primaryState || rhiEnergyT(this._hass,'common.not_available',{},'Not available')}]
+        visibleFacts.length
+          ? visibleFacts.map(row=>({label:row.label,value:row.value}))
+          : [{label:rhiEnergyT(this._hass,'asset.energy_state',{},'Energy state'),value:primaryState || rhiEnergyT(this._hass,'common.not_available',{},'Not available')}]
       );
       const relationship = parentName
-        ? rhiUxAssetRelationship({label:'Part of',value:parentName})
+        ? rhiUxAssetRelationship({label:rhiEnergyT(this._hass,'asset.part_of',{},'Part of'),value:parentName})
         : '';
-      const configuration = this.energyAssetConfigurationDisclosure(rt,enriched);
-      const details = this.energyAssetDetailDisclosure(rt,enriched);
-      const diagnostics = this.energyAssetDiagnosticsDisclosure(rt,enriched);
+      const actions = this.assetQuickActions(rt,id,3);
+      const details = [
+        this.energyAssetConfigurationDisclosure(rt,enriched),
+        this.energyAssetDetailDisclosure(rt,enriched),
+        this.energyAssetDiagnosticsDisclosure(rt,enriched)
+      ].join('');
+      const card = rhiUxAssetCardShell({
+        identity,
+        facts:factGrid,
+        relationships:relationship,
+        actions,
+        details,
+        className:'rhiEnergyCoreAssetCard'
+      });
       const children = childrenHtml
         ? `<details class="energyAssetChildrenSibling"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.children',{},'Children'))}</summary><div class="energyAssetChildrenStack">${childrenHtml}</div></details>`
         : '';
-      return `<div class="energyAssetNode" data-energy-device-type="${escapeHtml(type)}"><article class="energyDeviceCard rhiEnergyCoreAssetCard">
-        ${identity}
-        ${factGrid}
-        ${relationship}
-        ${actions}
-        <div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div>
-      </article>${children}</div>`;
+      return `<div class="energyAssetNode" data-energy-device-type="${escapeHtml(type)}">${card}${children}</div>`;
     }
 
     energyAssetType(asset = {}) {
@@ -3755,13 +3756,22 @@
       const power = asNumber(charger.physical_power_kw);
       const powerText = power === null ? '—' : fmtKw(power);
       const consumerName = consumerId ? String(rt.assetName(consumerId) || '').trim() : '';
-      const relationLabel = consumerName || (consumerId ? 'Connected vehicle' : 'No vehicle connected');
+      const relationLabel = consumerName || (consumerId
+        ? rhiEnergyT(this._hass,'flow.connected_vehicle',{},'Connected vehicle')
+        : rhiEnergyT(this._hass,'flow.no_vehicle_connected',{},'No vehicle connected'));
       const statusLabel = operatingState ? human(operatingState) : connectionState && !/asset[_\s-]?connected/i.test(connectionState) ? human(connectionState) : '';
       const context = [relationLabel, statusLabel].filter(Boolean).join(' · ');
       const visual = rt.resolveVisualRef(charger.visual_ref, 'card');
-      const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
-      return `<div class="flowConnectionCard">${art}<div><b>${escapeHtml(charger.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(context || 'Connection state unavailable')}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+      const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="">` : ''}</div>`;
+      const identity = rhiUxAssetIdentity({
+        title:charger.display_name || rt.assetName(id) || human(id),
+        subtitle:context || rhiEnergyT(this._hass,'flow.connection_unavailable',{},'Connection information unavailable'),
+        visual:art
+      });
+      const facts = rhiUxAssetFactGrid([{label:rhiEnergyT(this._hass,'common.power_now',{},'Power now'),value:powerText}]);
+      return rhiUxAssetCardShell({identity,facts,className:'energyFlowAssetCard flowConnectionCard'});
     }
+
     consumerCard(rt, consumer) {
       const id = consumer.asset_id;
       const power = asNumber(firstDefined(consumer.physical_power_kw, consumer.power_kw, consumer.current_power_kw, consumer.actual_power_kw));
@@ -3770,34 +3780,31 @@
       const active = asBool(firstDefined(consumer.active, rt.value(`${id}.active`, false)));
       const charging = asBool(firstDefined(consumer.charging, rt.value(`${id}.charging`, false))) || /charging/i.test(String(operating || ''));
       const connectionState = String(firstDefined(consumer.connection_state, '') || '').trim().toLowerCase();
-      const connected = asBool(firstDefined(consumer.connected, rt.value(`${id}.connected`, false)))
-        || ['connected','asset_connected'].includes(connectionState);
+      const connected = asBool(firstDefined(consumer.connected, rt.value(`${id}.connected`, false))) || ['connected','asset_connected'].includes(connectionState);
       const available = !/unavailable|offline|disconnected/i.test(String(firstDefined(consumer.availability_state, '')));
-      const charger = firstDefined(
-        consumer.effective_charger,
-        consumer.effective_connection_id,
-        consumer.assigned_connection_id,
-        consumer.physical_connection_id,
-        consumer.charger_asset_id,
-        consumer.connection_asset_id,
-        consumer.execution_target_asset_id,
-        ''
-      );
-      const requested = asNumber(firstDefined(consumer.requested_power_kw_effective, consumer.requested_power_kw));
-      const state = charging ? 'Charging' : active || (power !== null && power > 0.05) ? 'Active' : connected ? 'Connected' : available ? 'Available' : 'Unavailable';
-      const chargerDisplay = String(firstDefined(
-        consumer.effective_charger_display_name,
-        consumer.charger_display_name,
-        consumer.connection_display_name,
-        consumer.physical_connection_display_name,
-        charger ? rt.assetName(charger) : '',
-        ''
-      ) || '').trim();
-      const relation = charger ? (chargerDisplay || 'Charger unavailable') : '';
+      const charger = firstDefined(consumer.effective_charger,consumer.effective_connection_id,consumer.assigned_connection_id,consumer.physical_connection_id,consumer.charger_asset_id,consumer.connection_asset_id,consumer.execution_target_asset_id,'');
+      const state = charging
+        ? rhiEnergyT(this._hass,'state.charging',{},'Charging')
+        : active || (power !== null && power > 0.05)
+          ? rhiEnergyT(this._hass,'state.active',{},'Active')
+          : connected
+            ? rhiEnergyT(this._hass,'state.connected',{},'Connected')
+            : available
+              ? rhiEnergyT(this._hass,'state.available',{},'Available')
+              : rhiEnergyT(this._hass,'common.not_available',{},'Not available');
+      const chargerDisplay = String(firstDefined(consumer.effective_charger_display_name,consumer.charger_display_name,consumer.connection_display_name,consumer.physical_connection_display_name,charger ? rt.assetName(charger) : '','') || '').trim();
+      const relation = charger ? (chargerDisplay || rhiEnergyT(this._hass,'flow.charger_unavailable',{},'Charger unavailable')) : '';
       const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
-      const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
-      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(relation ? `${relation} · ${state}` : state)}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+      const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="">` : ''}</div>`;
+      const identity = rhiUxAssetIdentity({
+        title:consumer.display_name || rt.assetName(id) || human(id),
+        subtitle:relation ? `${relation} · ${state}` : state,
+        visual:art
+      });
+      const facts = rhiUxAssetFactGrid([{label:rhiEnergyT(this._hass,'common.power_now',{},'Power now'),value:powerText}]);
+      return rhiUxAssetCardShell({identity,facts,className:'energyFlowAssetCard flowPhysicalConsumerCard'});
     }
+
     flowConsumers(rt, connectionSnapshot = { rows:[] }) {
       const domain = this.flexibleAssetDomain(rt);
       const snapshotRows = asArray(connectionSnapshot?.rows);
@@ -5874,7 +5881,7 @@
 .overviewSupportFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
 .chargingConnectionGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.chargingConnectionGrid>.empty{grid-column:1/-1}
 .flowDetailsGrid.flowDetailsGridTwoUp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}.flowDetailsGrid.flowDetailsGridTwoUp>.panel{min-width:0;height:100%}
-.flowConnectionCard,.flowPhysicalConsumerCard{display:grid;grid-template-columns:auto minmax(0,1fr) 76px;align-items:center;gap:10px;min-height:64px;padding:9px 10px;margin:6px 0;border:1px solid var(--line);border-radius:10px;background:#fff;box-sizing:border-box}.flowAssetVisual{width:54px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#f5f7fa;overflow:hidden}.flowAssetVisual img{display:block;max-width:50px;max-height:42px;object-fit:contain}.flowConnectionCard>div,.flowPhysicalConsumerCard>div{min-width:0}.flowConnectionCard b,.flowPhysicalConsumerCard b{display:block;font-size:12.5px;line-height:1.2;font-weight:600}.flowConnectionCard span,.flowPhysicalConsumerCard span{display:block;margin-top:3px;font-size:10.5px;line-height:1.25;color:var(--muted);white-space:normal}.flowConnectionCard strong,.flowPhysicalConsumerCard strong{min-width:76px;text-align:right;font-size:12.5px;line-height:1.2;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.flowConnectionCard small{display:block;margin-top:4px;font-size:9.5px;color:var(--muted)}
+.energyFlowAssetCard{margin:6px 0}.energyFlowAssetCard .rhiUxAssetFactGrid{grid-template-columns:minmax(110px,160px)}.flowAssetVisual{width:54px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#f5f7fa;overflow:hidden}.flowAssetVisual img{display:block;max-width:50px;max-height:42px;object-fit:contain}
 .batteryContributorList{display:grid;gap:10px}.batteryContributorCard{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:stretch;min-height:148px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#fff,#fbfcfe);overflow:hidden}.batteryContributorVisual{display:flex;align-items:center;justify-content:center;padding:10px;background:linear-gradient(180deg,#f7f9fb,#eef2f5);overflow:hidden}.batteryContributorVisual .assetVisual{width:88px;height:108px;max-width:88px;max-height:108px;padding:5px;box-sizing:border-box;border:0;background:transparent;overflow:hidden}.batteryContributorVisual .assetVisual img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center center}.batteryContributorBody{min-width:0;padding:13px 14px;display:flex;flex-direction:column;justify-content:center;gap:7px}.batteryContributorHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.batteryContributorHeader>div{min-width:0}.batteryContributorHeader b{display:block;font-size:14px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}.batteryContributorHeader strong{flex:0 0 auto;font-size:22px;line-height:1;font-variant-numeric:tabular-nums}.batteryHealth{display:inline-flex;margin-top:5px;padding:3px 7px;border-radius:999px;background:#eef8f2;color:#2f6d4b;font-size:10px;font-weight:700}.batteryContributorMeta{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#526178}.batteryContributorMeta b{font-size:12px;color:#172033;font-variant-numeric:tabular-nums}.batteryContributorFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.batteryContributorFacts span{min-width:0;padding:6px 7px;border-radius:8px;background:#f8fafc}.batteryContributorFacts small,.batteryContributorFacts b{display:block}.batteryContributorFacts small{font-size:8px;color:#64748b}.batteryContributorFacts b{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.batteryContributorState{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;min-width:0}.batteryContributorState span{font-size:10.5px;font-weight:700;color:#265c3b;white-space:nowrap}.batteryContributorState small{min-width:0;font-size:10px;line-height:1.25;color:var(--muted);white-space:normal}.batteryContributorCard .bar{margin-top:2px}
 @media(max-width:1050px){.overviewCoreGrid{grid-template-columns:1fr 1fr}.overviewDecisionPanel{grid-column:1/-1;grid-row:1}.chargingConnectionGrid{grid-template-columns:1fr}.batteryContributorCard{grid-template-columns:104px minmax(0,1fr)}.batteryContributorVisual .assetVisual{width:80px;height:102px;max-width:80px;max-height:102px}.batteryContributorFacts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.overviewCoreGrid,.overviewSupportFacts{grid-template-columns:1fr}.overviewDecisionPanel{grid-column:auto;grid-row:auto}.overviewHouseHero{height:220px;min-height:220px}.overviewEnergyRow{grid-template-columns:28px minmax(0,1fr) 76px}.overviewEnergyRow>strong{min-width:76px}.overviewEnergyRow.child{margin-left:12px}.batteryContributorCard{grid-template-columns:88px minmax(0,1fr);min-height:126px}.batteryContributorVisual{padding:7px}.batteryContributorVisual .assetVisual{width:68px;height:88px;max-width:68px;max-height:88px;padding:3px}.batteryContributorBody{padding:11px 12px}.batteryContributorHeader b{font-size:13px}.batteryContributorHeader strong{font-size:20px}.batteryContributorState{grid-template-columns:1fr}.batteryContributorState small{font-size:9.5px}.batteryContributorFacts{grid-template-columns:repeat(2,minmax(0,1fr))}.batteryContributorFacts span:last-child:nth-child(odd){grid-column:1/-1}}
