@@ -22,10 +22,15 @@ screen_source = card[screen_start:] if screen_start >= 0 else card
 
 failures = []
 
-# Renderers consume EnergyRuntime/projections, never the raw V2 adapter.
+# Renderers consume EnergyRuntime/projections, never the raw V2 adapter or HA state registry.
 for token in ("this.publicV2()", "readEnergyPublicV2("):
     if token in screen_source:
         failures.append(f"renderer_raw_contract_bypass:{token}")
+for token in ("this._hass?.states", "this._hass.states", "Object.entries(this._hass", "Object.values(this._hass"):
+    if token in screen_source:
+        failures.append(f"renderer_ha_state_discovery_bypass:{token}")
+if "gasTotalEntityId()" in screen_source:
+    failures.append("renderer_gas_entity_discovery_bypass")
 
 # Product source must never regain legacy V1 product authority.
 legacy_product_tokens = [
