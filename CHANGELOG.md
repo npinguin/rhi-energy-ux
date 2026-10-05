@@ -1,3 +1,11 @@
+## 4.3.28 — Target HA UX closure
+
+- scope and deduplicate product actions, including mutually exclusive charging/managed-state actions;
+- fail closed on incomplete live Energy truth instead of showing a positive intelligence conclusion;
+- hide opaque IDs/provider codes from normal product UX;
+- distinguish current gas meter availability from historical statistics availability;
+- remove duplicate Appearance actions and close phone Battery/Gas/Solar layout regressions.
+
 ## 4.3.27 — Canonical V2 Boundary Closure
 
 - enforce `RHI_ENERGY_PUBLIC_CONTRACT_V2` as the sole Energy product-state ingress through the runtime gateway;
