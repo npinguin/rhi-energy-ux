@@ -1,3 +1,11 @@
+## 4.3.30 — Canonical Flexible Power Envelope
+
+- consume Energy E0.15.101 `flexible_loads.available_power_kw` directly from Public V2 Core;
+- remove the hardcoded unavailable state from Solar and Consumers flexible-power cards;
+- preserve legitimate 0 kW versus unavailable semantics;
+- keep D0/D1 planning energy separate from instantaneous power;
+- forbid frontend reconstruction from grid, forecast or battery values.
+
 ## 4.3.29 — Canonical Core Authority Closure
 
 - make Public V2 Core the first and global authority for aggregate Battery, Solar, Grid, Site/Home Consumption and Flexible Loads property keys;
