@@ -368,8 +368,9 @@ function readEnergyPublicV2(gateway) {
       return id ? (propertyByAssetAndKey.get(`${id}::${String(key || '')}`) || null) : (propertyByKey.get(String(key || '')) || null);
     },
     field(key, assetId = '') {
-      if (!assetId && coreByKey.has(String(key || ''))) return coreByKey.get(String(key || ''));
-      return semantic(this.property(key, assetId));
+      if (assetId) return assetField(String(assetId || ''), String(key || ''));
+      if (coreByKey.has(String(key || ''))) return coreByKey.get(String(key || ''));
+      return semantic(this.property(key));
     }
   });
 }
