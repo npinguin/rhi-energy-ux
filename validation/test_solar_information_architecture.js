@@ -102,3 +102,8 @@ assert.match(app,/solarProductionRepresentative/);
 assert.match(app,/energy\.logical\.solar_zone\.generic/);
 assert.match(app,/solarStringVisual/);
 assert.doesNotMatch(app,/solarHardwareSection\(\n\s*'Inverter system'/,"inverters must not be projected in a duplicate standalone section");
+
+const energyCardSource = fs.readFileSync("src/app/energy-card.js","utf8");
+if(!energyCardSource.includes("homeBatteryAggregateCard(rt, system)")) throw new Error("Solar Home Battery must consume canonical current Energy projection");
+if(energyCardSource.includes("this.energyDeviceStatusCard(rt,system,'Battery system')")) throw new Error("Solar Home Battery may not independently project battery-system semantics");
+if(!energyCardSource.includes('data-current-energy-projection="battery"')) throw new Error("canonical battery projection marker missing");
