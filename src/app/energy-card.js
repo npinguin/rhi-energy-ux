@@ -3851,7 +3851,7 @@
         /* 4.3.28 target-HA phone closure: product cards must flow vertically.
            No desktop two-up composition or visual/fact overlay survives below 720px. */
         @media(max-width:720px){
-          .batteryGrid.batteryGridTwoUp{display:grid;grid-template-columns:1fr!important;gap:10px}
+          .batteryGrid.batteryGridTwoUp{display:grid;grid-template-columns:1fr;gap:10px}
           .batteryGrid.batteryGridTwoUp>.panel{width:100%;min-width:0;box-sizing:border-box}
           .batteryContributorCard{grid-template-columns:88px minmax(0,1fr);min-height:0}
           .batteryContributorVisual{min-width:0;padding:8px}
