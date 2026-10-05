@@ -5,7 +5,8 @@
 - remove renderer-owned raw asset fallback aliases; property/direct-field normalization now exists only in the V2 adapter;
 - preserve contributors as detail only and never reconstruct aggregate battery, solar, grid or consumption values from children;
 - make legacy row/value helpers consume the same canonical resolver so older screen code cannot disagree with current-energy projections;
-- add cross-surface architecture gates reproducing the observed “value on one page, unavailable on another” failure.
+- add cross-surface architecture gates reproducing the observed “value on one page, unavailable on another” failure;
+- publish only the deterministic full-tree HACS package generated from this candidate.
 
 Rollback: **v4.3.29**.  
 Known accepted technical debt: **0**.  
