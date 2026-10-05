@@ -107,7 +107,17 @@ function createGridCurrentFlowViewModel(gateway) {
 
 function createSolarCurrentViewModel(gateway) {
   const power = readTypedPropertyContract(gateway, 'solar', 'solar.power_kw');
-  return Object.freeze({ powerKw:power.number, health:power.health, reason:power.reason });
+  const energyToday = readTypedPropertyContract(gateway, 'solar', 'solar.energy_today_kwh');
+  const capacity = readTypedPropertyContract(gateway, 'solar', 'solar.capacity_kwp');
+  const state = readTypedPropertyContract(gateway, 'solar', 'solar.state');
+  return Object.freeze({
+    powerKw:power.number,
+    energyTodayKwh:energyToday.number,
+    capacityKwp:capacity.number,
+    state:String(state.value || ''),
+    health:power.health,
+    reason:power.reason
+  });
 }
 
 function createCurrentEnergyViewModel(gateway) {
