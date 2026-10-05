@@ -1,3 +1,11 @@
+## 4.3.27 — Canonical V2 Boundary Closure
+
+- enforce `RHI_ENERGY_PUBLIC_CONTRACT_V2` as the sole Energy product-state ingress through the runtime gateway;
+- remove screen-level Home Assistant state and contract discovery;
+- make Gas history consume only an explicitly Public-V2-published history/statistics entity reference;
+- fail closed when canonical V2 evidence is absent instead of recovering values from parallel or legacy indexes;
+- strengthen architecture gates against renderer-level `hass.states` discovery.
+
 ## 4.3.26 — UX Core 1.6 / Zero-Debt Closure Candidate
 
 - adopt UX Core 1.6.0 compact shared page, asset and localization foundation;
