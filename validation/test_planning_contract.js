@@ -62,26 +62,30 @@ assert.equal(nullSafe.consumers.find(row => row.participantId === 'home').energy
 assert.equal(nullSafe.boundary.gridExportKwh, null);
 assert.equal(nullSafe.balanceDeltaKwh, null);
 
-const compatible = adaptPlanningBucket({
+const legacyOnly = adaptPlanningBucket({
   bucket_id:'D0-H12', duration_minutes:30, solar_forecast_kwh:4.5, base_demand_forecast_kwh:0.5,
   asset_allocations:[{asset_id:'vehicle_carole',planned_power_kw:4,allocation_state:'advisory'}],
   expected_grid_import_kwh:0.2, expected_grid_export_kwh:0.1
 }, 'R1.79.3_POWER_FEASIBLE_TWO_DAY_PLANNER_CONTRACT');
-assert.equal(compatible.canonicalLanes, false);
-assert.equal(compatible.sources.find(row => row.participantId === 'solar').energyKwh, 4.5);
-assert.equal(compatible.consumers.find(row => row.participantId === 'home').energyKwh, 0.5);
-assert.equal(compatible.consumers.find(row => row.participantId === 'vehicle_carole').energyKwh, 2);
-assert.equal(compatible.sources.find(row => row.participantId === 'grid').energyKwh, 0.2);
-assert.equal(compatible.boundary.gridExportKwh, 0.1);
-const signedGrid = adaptPlanningBucket({
-  bucket_id:'D0-H13', duration_minutes:60, grid_net_kwh:-1.25
-}, 'R1.79.3_POWER_FEASIBLE_TWO_DAY_PLANNER_CONTRACT');
-assert.equal(signedGrid.sources.find(row => row.participantId === 'grid').energyKwh, 0);
-assert.equal(signedGrid.boundary.gridExportKwh, 1.25);
+assert.equal(legacyOnly.contractSupported, false);
+assert.equal(legacyOnly.sources.length, 0);
+assert.equal(legacyOnly.consumers.length, 0);
+assert.equal(legacyOnly.reason, 'canonical_planning_lanes_not_published');
+
+const noEnergyReconstruction = adaptPlanningBucket({
+  bucket_id:'D0-H13', duration_minutes:30,
+  advisory_source_lane:[],
+  advisory_consumer_lane:[{participant_id:'vehicle_carole',planned_power_kw:4}],
+  advisory_boundary_flows:{grid_export_kwh:0},
+  advisory_lane_balance_delta_kwh:0
+}, 'RHI_ENERGY_PUBLIC_CONTRACT_V2');
+assert.equal(noEnergyReconstruction.contractSupported, true);
+assert.equal(noEnergyReconstruction.consumers[0].energyKwh, null, 'UX may not derive kWh from kW × time');
+
 const unsupported = adaptPlanningBucket({solar_forecast_kwh:99}, 'R1.80.0_UNKNOWN_CONTRACT');
 assert.equal(unsupported.contractSupported, false);
 assert.equal(unsupported.sources.length, 0);
-assert.equal(unsupported.reason, 'unsupported_planning_contract');
+assert.equal(unsupported.reason, 'canonical_planning_lanes_not_published');
 
 const fs = require('fs');
 const vm = require('vm');
