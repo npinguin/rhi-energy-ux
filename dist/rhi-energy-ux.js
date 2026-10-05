@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.29';
+  const UX_VERSION = 'R4.3.30';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
@@ -131,7 +131,7 @@ function readEnergyPublicV2(gateway) {
       const value = section[fieldName];
       return semantic({
         value,
-        unit:({power_kw:'kW',net_power_kw:'kW',import_power_kw:'kW',export_power_kw:'kW',attributed_power_kw:'kW',soc_pct:'%',reserve_target_pct:'%',capacity_kwh:'kWh',available_kwh:'kWh'})[fieldName] || null,
+        unit:({power_kw:'kW',net_power_kw:'kW',import_power_kw:'kW',export_power_kw:'kW',attributed_power_kw:'kW',available_power_kw:'kW',soc_pct:'%',reserve_target_pct:'%',capacity_kwh:'kWh',available_kwh:'kWh'})[fieldName] || null,
         status:value === null || value === undefined ? 'UNAVAILABLE' : 'AVAILABLE',
         quality:value === null || value === undefined ? 'UNKNOWN' : 'CANONICAL',
         reason:value === null || value === undefined ? String(section.reason || '') : null
@@ -155,7 +155,8 @@ function readEnergyPublicV2(gateway) {
     ['site_consumption.power_kw', coreField('consumption','power_kw')],
     ['home_consumption.power_kw', coreField('home','power_kw')],
     ['flexible_loads.power_kw', coreField('flexible','power_kw')],
-    ['flexible_loads.attributed_power_kw', coreField('flexible','attributed_power_kw')]
+    ['flexible_loads.attributed_power_kw', coreField('flexible','attributed_power_kw')],
+    ['flexible_loads.available_power_kw', coreField('flexible','available_power_kw')]
   ]);
 
   const coreFlexible = object(core.flexible);
@@ -4432,7 +4433,7 @@ function rhiEnergyVisualPickerStyles() {
     buildPageViewModel(rt, tab) {
       const current = this.currentEnergyModel(rt);
       const solar = current.solar.powerKw;
-      const flexibleLoadBudget = null; // R1.89.22 does not register a canonical public budget field.
+      const flexibleLoadBudget = rt.number('flexible_loads.available_power_kw');
       const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
       const solarForecast = rt.number('forecast.solar_today_kwh');
       const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
