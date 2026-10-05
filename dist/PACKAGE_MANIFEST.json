@@ -10,7 +10,7 @@
     "energy",
     "heroes"
   ],
-  "runtime_sha256": "fda9278cbd56fed03e237f3a70efd970c242c74f2734120601e6e2e729c6ce74",
+  "runtime_sha256": "99c752dceb292ba513528d93df1395a62d0f16e65fd723a2c1e7b446c3ebac3b",
   "files": [
     {
       "path": "assets/energy/battery_system_4_towers.webp",
