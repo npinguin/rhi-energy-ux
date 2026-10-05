@@ -4026,7 +4026,7 @@
         charger ? rt.assetName(charger) : '',
         ''
       ) || '').trim();
-      const relation = charger ? this.userRelationshipLabel(chargerDisplay || rt.assetName(charger), 'Assigned charger') : '';
+      const relation = charger ? this.userRelationshipLabel(chargerDisplay, 'Assigned charger') : '';
       const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
       return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(relation ? `${relation} · ${state}` : state)}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
@@ -4605,7 +4605,7 @@
         asset.physical_connection_display_name,
         ''
       ) || '').trim();
-      const relation = chargerId ? this.userRelationshipLabel(chargerDisplay || rt.assetName(chargerId), 'Assigned charger') : '';
+      const relation = chargerId ? this.userRelationshipLabel(chargerDisplay, 'Assigned charger') : '';
       const requestedRow = this.flexiblePropertyRow(rt,id,['requested_charge_power_kw','requested_power_kw','energy_control_requested_power_kw','target_power_kw','setpoint_power_kw','charge_power_setpoint_kw']);
       const requested = rowValue(requestedRow,null) ?? row.requested_power_kw ?? raw.requested_power_kw ?? null;
       const requestedControl = requestedRow && !requestedRow.missing && this.isWritableRow(requestedRow)
