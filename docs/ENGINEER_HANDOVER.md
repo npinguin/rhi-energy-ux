@@ -1,5 +1,107 @@
 # Engineer handover — RHI Energy UX
 
+## Zero-debt closure baseline
+
+This repository is in the coordinated RHI frontend closure program. The target is **zero accepted technical debt, zero accepted feature debt and zero V1 product/runtime dependency**.
+
+Current candidate context for this handover:
+
+- candidate: `4.3.28`;
+- closure PR: `#181`;
+- public product authority: `RHI_ENERGY_PUBLIC_CONTRACT_V2`;
+- minimum/tested backend baseline: `E0.15.97`;
+- minimum Foundation: `F1.8.38` with `RHI_VISUAL_ASSET_REGISTRY_V2`;
+- vendored UX Core: `1.6.3`;
+- stable promotion: blocked until exact-candidate target Home Assistant qualification passes.
+
+The machine-readable authorities remain `package.json`, `release/RELEASE_STATUS.json`, `release/QUALIFICATION.json` and `governance/BACKEND_GAPS.json`. If this paragraph ever disagrees with them, the machine-readable files win.
+
+### Non-negotiable architecture
+
+```text
+Energy backend public V2 truth
+        ↓
+runtime gateway
+        ↓
+thin Energy projection / presentation model
+        ↓
+RHI UX Core grammar + Energy content
+        ↓
+user
+```
+
+Rules:
+
+1. **V1 is decommissioned.** No V1 product authority, fallback, compatibility read or V1-shaped reconstruction may exist in `src/` or `dist/`.
+2. **Frontend never invents domain truth.** Missing or ambiguous semantics are recorded in `governance/BACKEND_GAPS.json` and fixed in the owning backend/domain.
+3. **One mapping boundary.** Backend fields/semantics are normalized once in runtime/projection. Screens do not probe aliases or rebuild semantics independently.
+4. **Backend owns facts and meaning.** Planning totals, eligibility, relationships, pricing/value semantics, configured/effective policy, reasons, write capability and readback are backend-owned.
+5. **UX is human-first.** Normal product surfaces must not expose contract names, entity IDs, property keys, raw reason codes or implementation terminology.
+6. **Diagnostics is explicit.** Technical evidence may exist only in a deliberate diagnostics/engineering disclosure, never as normal product identity or guidance.
+7. **Multilingual is release scope.** Pilot-visible product copy is EN/NL/FR through the localization layer; machine identifiers remain untranslated.
+8. **Missing truth fails closed.** Unknown/unavailable/not-configured/unsupported remain distinct and are never silently converted to zero or a guessed state.
+9. **Writes require readback.** A service-call success is not product success. Confirmed canonical readback and persistence are required.
+10. **Shared visual grammar belongs to Core.** Energy may own domain-specific diagrams/content but must not fork shared Hero, status, asset, editor, typography or responsive primitives.
+
+### Product UX grammar
+
+Normal users should encounter:
+
+```text
+status / answer
+    ↓
+primary action
+    ↓
+details
+    ↓
+diagnostics (explicit, technical)
+```
+
+The target information architecture is user-language-first:
+
+```text
+ENERGY
+Overview / Solar / Battery / Consumption
+
+INTELLIGENCE
+Plan / Settings
+
+INSIGHTS
+Performance / Value
+```
+
+Operational/tactical/strategic planning capabilities may remain internal subviews beneath Plan. Simplifying navigation must never remove capability.
+
+### Backend-gap ownership
+
+`governance/BACKEND_GAPS.json` is authoritative. A required unmapped semantic is a release blocker, not an invitation for frontend compensation.
+
+At handover time the important tracked ownership gaps include:
+
+- planning reconciliation and canonical D0/D1 totals → Energy backend;
+- Settings / automation / strategy write-readback and persistence → Energy backend;
+- Mobility planning eligibility and producer-command coherence → Energy backend consuming Mobility V2;
+- per-asset period energy/value attribution → Energy backend;
+- Foundation Visual Registry V2 → backend merged, still requires target-runtime qualification.
+
+### Definition of done
+
+A consistent Energy candidate requires all of the following:
+
+- static validation green;
+- zero V1 product/runtime dependencies;
+- zero accepted technical and feature debt;
+- EN/NL/FR key completeness and user-safe copy;
+- no technical jargon leakage on normal surfaces;
+- Core provenance correct;
+- HACS installation proof;
+- desktop/tablet runtime render proof;
+- planning, Settings, pricing and strategy behavior proven against backend truth;
+- write/readback/restart persistence proven;
+- upgrade and rollback proven;
+- every blocking backend gap either closed or the release remains blocked;
+- qualification bound to the exact immutable candidate SHA.
+
 ## Start here
 
 Do not copy current release identity from this document. Authoritative sources are:
