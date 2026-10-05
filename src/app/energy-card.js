@@ -3885,11 +3885,6 @@
 
     solar(rt) {
       const pageVm = this.buildPageViewModel(rt, 'solar');
-      const solarPower = rt.number('solar.power_kw');
-      const forecastToday = rt.number('forecast.solar_today_kwh');
-      const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
-      const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
-      const gridExportToday = rt.number('metering.grid_export_today_kwh');
       return `${this.tabExperienceHeader(rt,'solar',pageVm)}<div class="solarPage solarHardwarePage">
         ${this.solarEnergyStory(rt)}
         ${this.solarHardwareExperience(rt)}
@@ -3907,15 +3902,6 @@
       const disabled = loads.filter(load => assetDomain.byId(load.asset_id)?.isDisabled);
       const cards = participating.map(load => this.operationalLoadCard(rt, load, recommendation, targetId)).join('');
       const disabledCards = disabled.map(load => this.disabledFlexibleAssetCard(rt, load, load.energy_planning || rt.planningOutcomeFor(load.asset_id) || {})).join('');
-      const active = participating.filter(load => (asNumber(load.power_kw) || 0) > 0.05 || /running|charging|executing/i.test(String(load.operating_state || load.current_status || ''))).length;
-      const planned = participating.filter(load => {
-        const p = load.energy_planning || rt.planningOutcomeFor(load.asset_id) || {};
-        return /planned|scheduled|expected today|done today/i.test(String(firstDefined(p.state,p.status,p.today_status,p.expected,'')));
-      }).length;
-      const waiting = participating.filter(load => {
-        const p = load.energy_planning || rt.planningOutcomeFor(load.asset_id) || {};
-        return /waiting|blocked|uncertain|not eligible/i.test(String(firstDefined(p.state,p.status,p.today_status,p.expected,'')));
-      }).length;
       const executionPolicy = this.automationExecutionPolicy(rt);
       const executePlan = rt.commands().find(command => rt.commandRole(command) === 'execute_plan') || null;
       const policyTitle = executionPolicy.configuredMode === 'automatic'
