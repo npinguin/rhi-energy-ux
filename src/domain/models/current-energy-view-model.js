@@ -1,26 +1,20 @@
 // Canonical current-energy view model. Literal contract keys and direction
 // semantics are confined to this adapter so screen renderers cannot drift.
 function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
-  const v2 = readEnergyPublicV2(gateway);
-  const authority = {
+  const v2=readEnergyPublicV2(gateway);
+  const authority={
     battery:['battery_system','home_battery_system'],
     solar:['solar_production'],
     grid:['grid_connection'],
     consumption:['site_consumption'],
-    home:['home_consumption'],
-    flexible:['flexible_loads','flexible_load_aggregate']
+    home:['home_consumption']
   };
-  const projected = v2.aggregateField(authority[String(interfaceKey || '')] || [], propertyKey);
+  const projected=v2.aggregateField(authority[String(interfaceKey||'')]||[],propertyKey);
   return Object.freeze({
-    envelope:v2.envelope,
-    row:projected.raw || {},
-    value:projected.value,
-    number:asNumber(projected.value),
-    text:String(projected.value ?? ''),
-    health:String(projected.status || projected.state || 'UNAVAILABLE').toUpperCase(),
-    quality:String(projected.quality || ''),
-    reason:String(projected.reason || ''),
-    source:projected.source
+    envelope:v2.envelope,row:projected.raw||{},value:projected.value,
+    number:asNumber(projected.value),text:String(projected.value??''),
+    health:String(projected.status||projected.state||'UNAVAILABLE').toUpperCase(),
+    quality:String(projected.quality||''),reason:String(projected.reason||''),source:projected.source
   });
 }
 
@@ -108,17 +102,7 @@ function createGridCurrentFlowViewModel(gateway) {
 
 function createSolarCurrentViewModel(gateway) {
   const power = readTypedPropertyContract(gateway, 'solar', 'solar.power_kw');
-  const energyToday = readTypedPropertyContract(gateway, 'solar', 'solar.energy_today_kwh');
-  const capacity = readTypedPropertyContract(gateway, 'solar', 'solar.capacity_kwp');
-  const state = readTypedPropertyContract(gateway, 'solar', 'solar.state');
-  return Object.freeze({
-    powerKw:power.number,
-    energyTodayKwh:energyToday.number,
-    capacityKwp:capacity.number,
-    state:String(state.value || ''),
-    health:power.health,
-    reason:power.reason
-  });
+  return Object.freeze({ powerKw:power.number, health:power.health, reason:power.reason });
 }
 
 function createCurrentEnergyViewModel(gateway) {
