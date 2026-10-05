@@ -397,7 +397,7 @@
     pricingProjection() { return selectEnergyPricing(this.publicV2()); }
     valueProjection(period = 'today') { return selectEnergyValue(this.publicV2(), period); }
     meteringProjection(period = 'today') { return selectEnergyMetering(this.publicV2(), period); }
-    gasProjection() { return selectEnergyGas(this.publicV2()); }
+    intelligenceProjection() { return selectEnergyIntelligence(this.publicV2()); }
     activityProjection() { return selectEnergyActivity(this.publicV2()); }
     commandProjection(assetId = '') { return selectEnergyCommands(this.publicV2(), assetId); }
     coverage() { return selectEnergyCoverage(this.publicV2()); }
@@ -410,7 +410,7 @@
     asset(assetId) { return this.assets().find(a => String(a.asset_id || '') === String(assetId)) || null; }
     assetName(assetId) { return this.asset(assetId)?.display_name || human(assetId, '—'); }
     assetField(assetId, propertyKey) {
-      return this.publicV2().field(String(propertyKey || ''), String(assetId || ''));
+      return this.publicV2().assetField(String(assetId || ''), String(propertyKey || ''));
     }
     assetValue(assetId, propertyKey, fallback = null) {
       const field = this.assetField(assetId, propertyKey);
@@ -462,22 +462,9 @@
     }
     activity(type) { return this.activities().find(a => String(a.activity_type || '').toLowerCase() === String(type).toLowerCase()) || null; }
     decision() {
-      const d = this.value('energy_intelligence.decision', null);
-      if (d && typeof d === 'object') return d;
-      return {
-        goal: this.value('energy_intelligence.goal', ''),
-        observation: this.value('energy_intelligence.observation', ''),
-        assessment: this.value('energy_intelligence.assessment', ''),
-        recommendation: this.value('energy_intelligence.recommendation', ''),
-        automation_mode: this.value('energy_intelligence.automation_mode', ''),
-        automation_status: this.value('energy_intelligence.automation_status', ''),
-        status: this.value('energy_intelligence.status', ''),
-        reason: this.value('energy_intelligence.reason', ''),
-        confidence: this.value('energy_intelligence.confidence', ''),
-        affected_assets: this.value('energy_intelligence.affected_assets', []),
-        next_review: this.value('energy_intelligence.next_review', '')
-      };
+      return this.intelligenceProjection();
     }
+
     overviewExperience() {
       const projection=this.overviewProjection();
       return projection.available ? { entity_id:this.contractEntityId(), ...projection.raw } : null;
@@ -539,22 +526,22 @@
       return this._consumerMixRows;
     }
     consumerMixSummary() {
-      if (this._consumerMixSummary) return this._consumerMixSummary;
-      const rows=this.consumerMixRows();
-      const power=rows.map(row=>asNumber(row.current_power_kw));
-      const need=rows.map(row=>asNumber(row.energy_need_kwh)).filter(value=>value!==null);
+      if(this._consumerMixSummary)return this._consumerMixSummary;
+      const current=createCurrentEnergyViewModel(this.contractGateway()).consumption;
+      const planning=this.planningProjection('D0');
       this._consumerMixSummary={
-        current_power_kw:power.length && power.every(value=>value!==null) ? power.reduce((sum,value)=>sum+value,0) : null,
-        known_energy_need_kwh:need.length ? need.reduce((sum,value)=>sum+value,0) : null,
-        asset_count:rows.length,
+        current_power_kw:current.flexibleLoadsKw,
+        known_energy_need_kwh:asNumber(firstDefined(planning.lane_totals?.flexible_required_kwh,planning.lane_totals?.required_kwh,null)),
+        asset_count:this.flexibleAssetIndexRows().filter(row=>row.infrastructure_only!==true).length,
         energy_kwh:null,
         energy_by_asset_kwh:{},
-        health:'PARTIAL',
-        reason:'Canonical current flexible-asset truth is available; category/per-asset period energy is not published by the current public contract.',
-        source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.objects']
+        health:current.flexibleStatus||'UNAVAILABLE',
+        reason:current.flexibleReason||'',
+        source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.current','RHI_ENERGY_PUBLIC_CONTRACT_V2.planning']
       };
       return this._consumerMixSummary;
     }
+
     consumerRows() {
       return this.assets().filter(a => String(a.asset_type || '') === 'consumer' && String(a.parent_asset_id || '') === 'consumer').map(asset => {
         const id = asset.asset_id;
@@ -574,95 +561,46 @@
       });
     }
 
-    flexibleRuntimePropertyRow(assetId, names) {
-      const exact = [];
-      names.forEach(name => {
-        exact.push(`${assetId}.${name}`);
-        exact.push(`${assetId}.${name.replace(/^energy_control_/, '')}`);
-      });
-      const direct = exact.map(key => this.row(key)).find(r => r && !r.missing);
-      if (direct) return direct;
-      const rows = this.propertyRows().filter(row => String(row.asset_id || '') === String(assetId));
-      return rows.find(row => names.some(name => String(row.key || row.property_key || '').toLowerCase().endsWith(`.${name.toLowerCase()}`) || String(row.key || row.property_key || '').toLowerCase() === name.toLowerCase())) || { missing: true };
-    }
-    isDeprecatedTargetEnergyAlias(row) {
-      if (!row || row.missing) return false;
-      const text = `${row.key || row.property_key || ''} ${row.quality || ''} ${row.source_type || ''} ${row.resolution_mode || ''} ${row.alias_of || ''} ${row.deprecated_alias_of || ''} ${row.migration_role || ''}`.toLowerCase();
-      return /deprecated|source_alias|derived_alias|alias/.test(text);
-    }
-    targetEnergyForAsset(assetId, sourceRow = {}) {
-      const canonical = this.flexibleRuntimePropertyRow(assetId, ['energy_to_target_kwh']);
-      if (canonical && !canonical.missing) return rowValue(canonical, null);
-      if (sourceRow && sourceRow.energy_to_target_kwh !== undefined) return asNumber(sourceRow.energy_to_target_kwh);
-      const aliases = [this.flexibleRuntimePropertyRow(assetId, ['remaining_energy_kwh']), this.flexibleRuntimePropertyRow(assetId, ['energy_needed_kwh'])];
-      for (const row of aliases) {
-        if (row && !row.missing && this.isDeprecatedTargetEnergyAlias(row)) return rowValue(row, null);
-      }
-      const rowText = `${sourceRow.alias_of || ''} ${sourceRow.deprecated_alias_of || ''} ${sourceRow.migration_role || ''} ${sourceRow.source_type || ''}`.toLowerCase();
-      if (/deprecated|source_alias|derived_alias|alias/.test(rowText)) return asNumber(sourceRow.remaining_energy_kwh ?? sourceRow.energy_needed_kwh);
-      return null;
-    }
     normalizeFlexibleAssetRow(row) {
-      const id = row.asset_id || row.flexible_asset_id || row.target_asset_id;
-      // R1.59.4AKL: active flexible-load/runtime path is canonical-only.
-      // Use power_kw + energy_flow_direction. Legacy actual/current power aliases are not active UX truth.
-      const actual = this.number(`${id}.power_kw`) ?? asNumber(row.power_kw);
-      const targetEnergy = this.targetEnergyForAsset(id, row);
-      const remaining = this.number(`${id}.remaining_energy_kwh`) ?? asNumber(row.remaining_energy_kwh);
-      const required = this.number(`${id}.required_energy_kwh`) ?? asNumber(row.required_energy_kwh);
-      const requestedEffective = this.number(`${id}.requested_power_kw_effective`) ?? this.number(`${id}.requested_power_kw`) ?? asNumber(row.requested_power_kw_effective ?? row.requested_power_kw);
+      const id=String(firstDefined(row.asset_id,row.flexible_asset_id,row.target_asset_id,'')||'');
+      const actual=asNumber(row.power_kw);
+      const targetEnergy=asNumber(row.energy_to_target_kwh);
       return {
         ...row,
-        asset_id: id,
-        display_name: row.display_name || this.assetName(id),
-        ux_asset_type: row.ux_asset_type || row.asset_type || (String(row.flexible_role || '').includes('storage') ? 'storage' : 'flexible_asset'),
-        flexible_role: row.flexible_role || (String(row.asset_type || '').toLowerCase().includes('storage') ? 'storage' : 'load'),
-        cluster_role: row.cluster_role || 'standalone',
-        show_in_primary_ux: row.show_in_primary_ux ?? true,
-        show_in_engineering: row.show_in_engineering ?? false,
-        planning_enabled: row.planning_enabled ?? true,
-        contributor_asset_ids: asArray(row.contributor_asset_ids),
-        actual_power_kw: actual,
-        current_power_kw: actual,
-        power_kw: actual,
-        energy_flow_direction: this.value(`${id}.energy_flow_direction`, row.energy_flow_direction || 'unknown'),
-        power_direction: this.value(`${id}.energy_flow_direction`, row.energy_flow_direction || 'unknown'),
-        energy_to_target_kwh: targetEnergy,
-        remaining_energy_kwh: remaining,
-        required_energy_kwh: required,
-        energy_needed_kwh: targetEnergy,
-        requested_power_kw_effective: requestedEffective,
-        min_power_kw: this.number(`${id}.min_power_kw`) ?? asNumber(row.min_power_kw),
-        max_power_kw: this.number(`${id}.max_power_kw`) ?? asNumber(row.max_power_kw),
-        energy_control_priority: this.value(`${id}.energy_control_priority`, row.energy_control_priority ?? row.priority ?? 'normal'),
-        availability_state: this.value(`${id}.availability_state`, row.availability_state || 'unknown'),
-        availability_reason: this.value(`${id}.availability_reason`, row.availability_reason || ''),
-        operating_state: this.value(`${id}.operating_state`, row.operating_state || 'unknown'),
-        energy_control_hold_state: this.value(`${id}.energy_control_hold_state`, row.energy_control_hold_state || 'none'),
-        energy_control_mode: this.value(`${id}.energy_control_mode`, row.energy_control_mode || row.current_mode || 'advice'),
-        can_execute_energy_action_now: asBool(this.value(`${id}.can_execute_energy_action_now`, row.can_execute_energy_action_now), false),
-        energy_planning: this.planningOutcomeFor(id),
-        // Canonical producer-owned charging relation aliases. These are
-        // presentation conveniences only; the values remain Mobility-owned.
-        effective_charger: firstDefined(
-          row.effective_charger,
-          row.effective_connection_id,
-          row.assigned_connection_id,
-          row.physical_connection_id,
-          row.charger_asset_id,
-          row.connection_asset_id,
-          ''
-        ),
-        charger_asset_id: firstDefined(
-          row.charger_asset_id,
-          row.effective_connection_id,
-          row.assigned_connection_id,
-          row.physical_connection_id,
-          row.connection_asset_id,
-          ''
-        )
+        asset_id:id,
+        display_name:row.display_name||this.assetName(id),
+        ux_asset_type:row.ux_asset_type||row.asset_type||(String(row.flexible_role||'').includes('storage')?'storage':'flexible_asset'),
+        flexible_role:row.flexible_role||(String(row.asset_type||'').toLowerCase().includes('storage')?'storage':'load'),
+        cluster_role:row.cluster_role||'standalone',
+        show_in_primary_ux:row.show_in_primary_ux??true,
+        show_in_engineering:row.show_in_engineering??false,
+        planning_enabled:row.planning_enabled??true,
+        contributor_asset_ids:asArray(row.contributor_asset_ids),
+        actual_power_kw:actual,
+        current_power_kw:actual,
+        power_kw:actual,
+        energy_flow_direction:String(row.energy_flow_direction||'unknown'),
+        power_direction:String(row.energy_flow_direction||'unknown'),
+        energy_to_target_kwh:targetEnergy,
+        remaining_energy_kwh:asNumber(row.remaining_energy_kwh),
+        required_energy_kwh:asNumber(row.required_energy_kwh),
+        energy_needed_kwh:targetEnergy,
+        requested_power_kw_effective:asNumber(firstDefined(row.requested_power_kw_effective,row.requested_power_kw,null)),
+        min_power_kw:asNumber(row.min_power_kw),
+        max_power_kw:asNumber(row.max_power_kw),
+        energy_control_priority:firstDefined(row.energy_control_priority,row.priority,'normal'),
+        availability_state:String(row.availability_state||'unknown'),
+        availability_reason:String(row.availability_reason||''),
+        operating_state:String(row.operating_state||'unknown'),
+        energy_control_hold_state:String(row.energy_control_hold_state||'none'),
+        energy_control_mode:String(firstDefined(row.energy_control_mode,row.current_mode,'advice')),
+        can_execute_energy_action_now:asBool(row.can_execute_energy_action_now,false),
+        energy_planning:this.planningOutcomeFor(id),
+        effective_charger:String(firstDefined(row.effective_charger,row.charger_asset_id,row.connection_asset_id,row.execution_target_asset_id,'')||''),
+        charger_asset_id:String(firstDefined(row.charger_asset_id,row.effective_charger,row.connection_asset_id,row.execution_target_asset_id,'')||'')
       };
     }
+
     flexibleAssetIndexRows() {
       if (this._flexibleAssets) return this._flexibleAssets;
       const v2=this.publicV2();
@@ -2068,7 +2006,7 @@
     }
     energyAutomationMode(rt, d = null) {
       const decision = d || rt.decision();
-      return String(firstDefined(decision.automation_mode, decision.mode, rt.value('energy_intelligence.automation_mode', ''), rt.value('energy_intelligence.mode', '')) || '').toLowerCase();
+      return String(firstDefined(decision.automation_mode, decision.mode, '') || '').toLowerCase();
     }
     isEnergyIntelligenceActive(rt, d = null) {
       const mode = this.energyAutomationMode(rt, d);
@@ -2102,13 +2040,14 @@
       return asNumber(firstDefined(effective.available_above_reserve_kwh, effective.usable_above_reserve_kwh));
     }
     flexibleNeedKwh(rt) {
-      const totals = rt.planningHorizonTotals('D0') || {};
-      return asNumber(firstDefined(totals.flexible_required_kwh, totals.required_kwh, null));
+      const totals=rt.planningHorizonTotals('D0')||{};
+      return asNumber(firstDefined(totals.flexible_required_kwh,totals.required_kwh,null));
     }
     flexiblePowerNowKw(rt) {
-      const value = this.currentEnergyModel(rt).consumption.flexibleLoadsKw;
-      return value === null ? null : Math.abs(value);
+      const value=this.currentEnergyModel(rt).consumption.flexibleLoadsKw;
+      return value===null?null:Math.abs(value);
     }
+
     currentEnergyModel(rt) { return createCurrentEnergyViewModel(rt.contractGateway()); }
     progress(value, max = null) { return this.componentProgressBar(value, max); }
     assetRow(icon, title, label, value, pct) { return this.componentAssetRow({ icon, title, label, value, pct }); }
@@ -2283,89 +2222,60 @@
     }
 
     buildMeteringPeriodViewModel(rt) {
-      const publishedPeriods = rt.meteringPeriods();
-      const defaultPeriods = this.defaultMeteringPeriods();
-      const byPeriodId = new Map(defaultPeriods.map(period => [String(period.period_id).toLowerCase(), period]));
-      publishedPeriods.forEach(period => {
-        const id = String(period.period_id || '').toLowerCase();
-        if (id) byPeriodId.set(id, { ...(byPeriodId.get(id) || {}), ...period });
-      });
-      const periods = [...byPeriodId.values()].sort((a, b) => (asNumber(a.selector_order) || 99) - (asNumber(b.selector_order) || 99));
-      const requested = String(this.selectedMeteringPeriodId || rt.value('metering.selected_period','today') || 'today').toLowerCase();
-      const periodId = requested === 'day' ? 'today' : requested;
-      const period = byPeriodId.get(periodId) || { period_id:periodId, label:this.periodLabel({ period_id:periodId }), graph_support:false, bucket_support:false };
-      const rawPeriod=objectFrom(period);
-      const summary=objectFrom(rawPeriod.summary);
-      const measured=objectFrom(summary.measured);
-      const qualityPayload=objectFrom(summary.quality);
-      const effectivePeriod={ ...rawPeriod, summary:{ ...summary, measured, quality:qualityPayload } };
-      const flexibleLoadRows = this.flexibleLoadMeteringRows(rt, periodId);
-      const rows = this.meteringRowsFromPeriod(effectivePeriod);
-      const recordsHaveValues = this.meteringPeriodRowsAvailable(rows);
-      const summaryHasData = recordsHaveValues || Object.keys(measured).some(key => measured[key] !== null && measured[key] !== undefined);
-      const quality = {
-        ...qualityPayload,
-        health:String(firstDefined(qualityPayload.health,rawPeriod.quality,rawPeriod.measurement_state,'UNAVAILABLE')),
-        measurement_state:String(firstDefined(qualityPayload.measurement_state,rawPeriod.measurement_state,rawPeriod.availability,'UNAVAILABLE')),
-        user_action_required:asBool(firstDefined(qualityPayload.user_action_required,rawPeriod.user_action_required,rawPeriod.baseline_reset_required,false),false)
-      };
-      const normalizeMetricKey = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-      const allRows = Object.values(rows).flat().filter(Boolean);
-      const metricValue = aliases => {
-        const wanted = aliases.map(normalizeMetricKey);
-        const row = allRows.find(candidate => {
-          const keys = [candidate.metric_key, candidate.semantic_key, candidate.fact_key, candidate.property_key, candidate.key].map(normalizeMetricKey).filter(Boolean);
-          return keys.some(key => wanted.some(alias => key === alias || key.endsWith(`_${alias}`)));
-        });
-        return asNumber(row?.value);
-      };
-      const health = normalizeMetricKey(firstDefined(quality.health, quality.status, period.health, 'unavailable'));
-      const verifiedStates = new Set(['trusted','verified','complete','ok','ready']);
-      const verificationStates = new Set(['pending','verification_required','verify','reset_required','untrusted','baseline_untrusted','baseline_required','configuration_required']);
-      const partialStates = new Set(['partial','estimated','incomplete']);
-      const qualityState = verifiedStates.has(health) ? 'verified' : verificationStates.has(health) ? 'verification_required' : partialStates.has(health) ? 'partial' : 'unavailable';
-      const qualityLabel = qualityState === 'verified' ? 'Verified' : qualityState === 'verification_required' ? 'Verification required' : qualityState === 'partial' ? 'Partial' : 'Unavailable';
-      const remediations = rt.meteringRemediationsForPeriod(periodId);
-      const label = this.periodLabel(period);
-      const remediation = remediations[0] || null;
-      const userActionRequired = asBool(firstDefined(quality.user_action_required,effectivePeriod.user_action_required,false),false);
-      const command = remediation && userActionRequired ? (remediation.command || rt.meteringResetCommandFor(remediation, periodId)) : null;
-      const conclusion = qualityState === 'verified'
-        ? { title:`${label} totals are verified`, why:'These totals are measured and ready to use.', recommendation:'No action is needed.', tone:'green' }
-        : qualityState === 'partial'
-          ? { title:`${label} totals are partial`, why:'Measured values are available, but the selected period is not yet complete.', recommendation:'Use the available totals with the shown completeness in mind.', tone:'orange' }
-          : qualityState === 'verification_required'
-            ? { title:`${label} totals need verification`, why:'Measurements exist, but Home Intelligence cannot yet verify the complete period.', recommendation:command ? `Reset ${label.toLowerCase()} once and wait for confirmation.` : 'Wait for Home Intelligence to confirm the measured period.', tone:'orange' }
-            : { title:`${label} totals are unavailable`, why:'Reliable measured totals are not currently published for this period.', recommendation:'The totals will appear when measurements become available.', tone:'blue' };
+      const requested=String(this.selectedMeteringPeriodId||'today').toLowerCase();
+      const periodId=requested==='day'?'today':requested;
+      const projection=rt.meteringProjection(periodId);
+      const period=objectFrom(projection.period||{});
+      const measured=objectFrom(projection.measured||{});
+      const quality=objectFrom(projection.quality||{});
+      const rows=this.meteringRowsFromPeriod(period);
+      const flexibleLoadRows=this.flexibleLoadMeteringRows(rt,periodId);
+      const normalized=String(projection.measurement_state||'UNAVAILABLE').toLowerCase().replace(/[^a-z0-9]+/g,'_');
+      const verified=new Set(['trusted','verified','complete','ok','ready','available']);
+      const verification=new Set(['pending','verification_required','verify','reset_required','untrusted','baseline_untrusted','baseline_required','configuration_required']);
+      const partial=new Set(['partial','estimated','incomplete','attribution_pending']);
+      const qualityState=verified.has(normalized)?'verified':verification.has(normalized)?'verification_required':partial.has(normalized)?'partial':'unavailable';
+      const qualityLabel=qualityState==='verified'?'Verified':qualityState==='verification_required'?'Verification required':qualityState==='partial'?'Partial':'Unavailable';
+      const label=this.periodLabel(period.period_id?period:{period_id:periodId});
+      const remediations=rt.meteringRemediationsForPeriod(periodId);
+      const remediation=remediations[0]||null;
+      const command=remediation&&projection.user_action_required?(remediation.command||rt.meteringResetCommandFor(remediation,periodId)):null;
+      const conclusion=qualityState==='verified'
+        ? {title:`${label} totals are verified`,why:'These totals are measured and ready to use.',recommendation:'No action is needed.',tone:'green'}
+        : qualityState==='partial'
+          ? {title:`${label} totals are partial`,why:'Measured values are available, but the selected period is not yet complete.',recommendation:'Use the available totals with the shown completeness in mind.',tone:'orange'}
+          : qualityState==='verification_required'
+            ? {title:`${label} totals need verification`,why:'Measurements exist, but Home Intelligence cannot yet verify the complete period.',recommendation:command?`Reset ${label.toLowerCase()} once and wait for confirmation.`:'Wait for Home Intelligence to confirm the measured period.',tone:'orange'}
+            : {title:`${label} totals are unavailable`,why:'Reliable measured totals are not currently published for this period.',recommendation:'The totals will appear when measurements become available.',tone:'blue'};
       return {
-        periodId, period, periods, label, rows, quality, health, qualityState, qualityLabel, conclusion, command,
-        available:this.meteringPeriodRowsAvailable(rows), summaryHasData,
-        solar:metricValue(['solar_production_kwh']),
-        consumption:metricValue(['site_consumption_kwh']),
-        homeConsumption:metricValue(['home_consumption_kwh']),
-        gridImport:metricValue(['grid_import_kwh']),
-        gridExport:metricValue(['grid_export_kwh']),
-        batteryCharge:metricValue(['battery_charge_kwh']),
-        batteryDischarge:metricValue(['battery_discharge_kwh']),
-        flexibleLoads:metricValue(['flexible_loads_energy_in_kwh']),
-        sourceRefs:firstDefined(period.summary?.source_refs, period.source_refs, []), flexibleLoadRows, remediations
+        periodId,period,periods:rt.meteringPeriods(),label,rows,quality,health:normalized,qualityState,qualityLabel,conclusion,command,
+        available:projection.available,summaryHasData:Object.values(measured).some(value=>value!==null&&value!==undefined),
+        solar:asNumber(measured.solar_production_kwh),consumption:asNumber(measured.site_consumption_kwh),homeConsumption:asNumber(measured.home_consumption_kwh),
+        gridImport:asNumber(measured.grid_import_kwh),gridExport:asNumber(measured.grid_export_kwh),batteryCharge:asNumber(measured.battery_charge_kwh),
+        batteryDischarge:asNumber(measured.battery_discharge_kwh),flexibleLoads:asNumber(measured.flexible_loads_energy_in_kwh),
+        sourceRefs:firstDefined(period.summary?.source_refs,period.source_refs,[]),flexibleLoadRows,remediations,source:projection.source
       };
     }
+
     meteringHeaderContext(rt) {
       return this.buildMeteringPeriodViewModel(rt);
     }
 
     gasModel(rt) {
-      const projected = rt.gasProjection();
-      const asset = projected.asset ? this.energyAssetContext(rt, projected.asset) : null;
-      const totalEntityId = projected.asset_id ? rt.gasStatisticsEntityId(projected.asset_id) : '';
+      const raw=rt.assets().find(asset=>String(firstDefined(asset?.asset_type,asset?.object_class,'')||'').toLowerCase()==='gas_meter')||null;
+      if(!raw)return Object.freeze({asset:null,totalM3:null,flowM3h:null,health:'UNAVAILABLE',source:'RHI_ENERGY_PUBLIC_CONTRACT_V2',totalEntityId:''});
+      const asset=this.energyAssetContext(rt,raw);
+      const projection=rt.assetProjection(String(raw.asset_id||''));
+      const total=projection?.property?.('gas.total_m3');
+      const flow=projection?.property?.('gas.flow_m3_h');
+      const state=projection?.property?.('gas.state');
       return Object.freeze({
         asset,
-        totalM3:projected.total_m3,
-        flowM3h:projected.flow_m3_h,
-        health:projected.health,
-        source:projected.source,
-        totalEntityId
+        totalM3:total?.resolved===true?asNumber(total.value):null,
+        flowM3h:flow?.resolved===true?asNumber(flow.value):null,
+        health:String(firstDefined(state?.status,projection?.lifecycle?.state,raw.health,'UNAVAILABLE')||'UNAVAILABLE'),
+        source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.objects',
+        totalEntityId:rt.gasStatisticsEntityId(String(raw.asset_id||''))
       });
     }
 
@@ -2413,7 +2323,7 @@
       const current = this.currentEnergyModel(rt);
       const solar = current.solar.powerKw;
       const flexibleLoadBudget = null; // R1.89.22 does not register a canonical public budget field.
-      const solarToday = current.solar.energyTodayKwh;
+      const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
       const solarForecast = rt.number('forecast.solar_today_kwh');
       const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
       const batterySoc = current.battery.socPct;
@@ -2427,8 +2337,8 @@
       const flexPower = this.flexiblePowerNowKw(rt);
       const flexNeed = this.flexibleNeedKwh(rt);
       const decision = rt.decision();
-      const status = this.productStateLabel(decision.status || rt.value('energy_intelligence.status', 'observed'), 'Observed');
-      const recommendation = humanReason(decision.recommendation || rt.value('energy_intelligence.recommendation', 'No action needed'), 'No action needed');
+      const status = this.productStateLabel(decision.status || 'observed', 'Observed');
+      const recommendation = humanReason(decision.recommendation || 'No action needed', 'No action needed');
       const flowValue = current.grid.displayPowerKw;
       const flowState = current.grid.direction === 'exporting' ? 'Exporting surplus' : current.grid.direction === 'importing' ? 'Importing from grid' : 'Balanced locally';
       const batteryPower = current.battery.displayPowerKw;
@@ -2450,24 +2360,32 @@
       const gas = this.gasModel(rt);
       const profiles = {
         overview: { image:hbEnergyHeroAsset('overview'), icon:'✦', eyebrow:'Energy overview', title:'Site Consumption', value:fmtKw(demand,'—'), unit:'current site demand', explanation:`${flowState} · ${fmtKw(solar)} solar · ${fmtKw(current.grid.displayPowerKw)} grid`, tone:'blue', metrics:[['☀','Solar now',fmtKw(solar),solar===null?'Unavailable':solar>0.05?'Producing now':'Not producing'],['▣','Home Battery',fmtPct(batterySoc),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['↗','Solar remaining',fmtKwh(solarRemaining),solarRemaining===null?'Unavailable':'Forecast left today']] },
-        outlook: { image:hbEnergyHeroAsset('outlook'), icon:'↗', eyebrow:'Energy outlook', title:`${contextLabel} outlook`, value:fmtKwh(contextSolar), unit:`solar forecast ${contextLabel.toLowerCase()}`, explanation:human(firstDefined(selectedContext?.summary?.reason, rt.value('energy_intelligence.outlook_reason','Forecast, demand and planning in one view'))), tone:'purple', metrics:[['☀',`${contextLabel} forecast`,fmtKwh(contextSolar),`Expected solar ${contextLabel.toLowerCase()}`],['↗',contextTomorrow?'Expected demand':'Remaining',contextTomorrow?fmtKwh(contextDemandTotal):fmtKwh(contextRemaining),contextTomorrow?'Known demand tomorrow':'Forecast left today'],['⌂','Demand',fmtKwh(contextDemandTotal),'Expected demand'],['✓','Balance',fmtKwh(contextBalanceTotal),'Supply minus demand']] },
+        outlook: { image:hbEnergyHeroAsset('outlook'), icon:'↗', eyebrow:'Energy outlook', title:`${contextLabel} outlook`, value:fmtKwh(contextSolar), unit:`solar forecast ${contextLabel.toLowerCase()}`, explanation:human(firstDefined(selectedContext?.summary?.reason, decision.outlook_reason || 'Forecast, demand and planning in one view')), tone:'purple', metrics:[['☀',`${contextLabel} forecast`,fmtKwh(contextSolar),`Expected solar ${contextLabel.toLowerCase()}`],['↗',contextTomorrow?'Expected demand':'Remaining',contextTomorrow?fmtKwh(contextDemandTotal):fmtKwh(contextRemaining),contextTomorrow?'Known demand tomorrow':'Forecast left today'],['⌂','Demand',fmtKwh(contextDemandTotal),'Expected demand'],['✓','Balance',fmtKwh(contextBalanceTotal),'Supply minus demand']] },
         flow: { image:hbEnergyHeroAsset('flow'), icon:'⚡', eyebrow:'Live energy flow', title:flowState, value:fmtKw(flowValue), unit:current.grid.direction === 'exporting' ? 'to grid' : current.grid.direction === 'importing' ? 'from grid' : 'grid flow', explanation:`${fmtKw(solar)} solar · ${fmtKw(demand)} demand`, tone:'purple', metrics:[['☀','Solar',fmtKw(solar),'Supplying the home'],['▣','Home Battery',fmtKw(batteryPower),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['⌂','Demand',fmtKw(demand),'Home consumption']] },
         solar: { image:hbEnergyHeroAsset('solar-generation'), icon:'☀', eyebrow:'Solar', title:(solar||0)>0.05?'Generating now':'Not generating', value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
         battery: { image:hbEnergyHeroAsset('battery'), icon:'▣', eyebrow:'Home Battery', title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(current.battery.reserveTargetPct),'Protected minimum']] },
-        consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',flexibleLoadBudget===null?rhiEnergyT(this._hass,'common.not_available',{},'Not available'):fmtKw(flexibleLoadBudget),flexibleLoadBudget===null?'Planning budget not published':'Current planning budget'],['◷','Planning',flexibleLoadBudget===null && flexNeed===null?'Incomplete':this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),flexibleLoadBudget===null?'Budget not published':'Planning data available']] },
+        consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',flexibleLoadBudget===null?rhiEnergyT(this._hass,'common.not_available',{},'Not available'):fmtKw(flexibleLoadBudget),flexibleLoadBudget===null?'Planning budget not published':'Current planning budget'],['◷','Planning',flexibleLoadBudget===null && flexNeed===null?'Incomplete':this.productStateLabel(decision.planning_state || 'observed', 'Observed'),flexibleLoadBudget===null?'Budget not published':'Planning data available']] },
         gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:'Gas', title:gas.asset ? 'Gas consumption' : 'Gas meter not connected', value:this.gasVolume(gas.totalM3), unit:'total meter reading', explanation:gas.asset ? 'Measured gas use, meter health and 30-day history.' : 'Connect a gas meter to start measured consumption history.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),gas.flowM3h===null?'Not measured':'Current measured flow'],['◫','Meter total',this.gasVolume(gas.totalM3),gas.totalM3===null?'Not measured':'Cumulative meter reading'],['↺','History',gas.totalEntityId?({week:'7 days',month:'30 days',quarter:'90 days',year:'365 days'}[this.selectedGasHorizonId] || '30 days'):'Not available',gas.totalEntityId?'Daily measured consumption':gas.asset?'Historical statistics not available':'Connect a gas meter'],['✓','Health',gas.asset?human(gas.health):'Not configured',gas.asset?'Gas meter health':'Authoritative source required']] },
-        strategies: { image:hbEnergyHeroAsset('strategies'), icon:'◎', eyebrow:'Settings', title:this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Domain-owned settings, configured intent and effective policy', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
-        'operational-planning': { image:hbEnergyHeroAsset('operational-planning'), icon:'◷', eyebrow:'Operational Planning', title:this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'), value:fmtKw(flexPower), unit:'managed power now', explanation:'Current flexible-load execution and next actions', tone:'purple', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Managed power now'],['⌂','Energy need',fmtKwh(flexNeed),'Known remaining need'],['◷','Planning',this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),'Current operational state'],['◎','Mode',this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'),'Energy control mode']] },
+        strategies: { image:hbEnergyHeroAsset('strategies'), icon:'◎', eyebrow:'Settings', title:this.productStateLabel(decision.automation_mode || 'advice', 'Advice'), value:String(rt.strategyProfileRows().length), unit:'available profiles', explanation:'Domain-owned settings, configured intent and effective policy', tone:'purple', metrics:[['◎','Mode',this.productStateLabel(decision.automation_mode || 'advice', 'Advice'),'Energy control mode'],['◫','Profiles',String(rt.strategyProfileRows().length),'Available choices'],['✓','Effective',String(rt.effectiveStrategyRows().length),'Applied strategies'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
+        'operational-planning': { image:hbEnergyHeroAsset('operational-planning'), icon:'◷', eyebrow:'Operational Planning', title:this.productStateLabel(decision.planning_state || 'observed', 'Observed'), value:fmtKw(flexPower), unit:'managed power now', explanation:'Current flexible-load execution and next actions', tone:'purple', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Managed power now'],['⌂','Energy need',fmtKwh(flexNeed),'Known remaining need'],['◷','Planning',this.productStateLabel(decision.planning_state || 'observed', 'Observed'),'Current operational state'],['◎','Mode',this.productStateLabel(decision.automation_mode || 'advice', 'Advice'),'Energy control mode']] },
         metering: { image:hbEnergyHeroAsset('metering'), icon:'▥', eyebrow:'Metering', title:meteringContext.label, value:meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar), unit:'Solar production', explanation:`Measured energy flows this ${meteringContext.label.toLowerCase()}`, tone:'blue', metrics:[['▥','Consumption',meteringContext.consumption === null ? 'Unavailable' : fmtKwh(meteringContext.consumption),meteringContext.label],['☀','Solar',meteringContext.solar === null ? 'Unavailable' : fmtKwh(meteringContext.solar),meteringContext.label],['↓','Grid import',meteringContext.gridImport === null ? 'Unavailable' : fmtKwh(meteringContext.gridImport),meteringContext.label],['↑','Grid export',meteringContext.gridExport === null ? 'Unavailable' : fmtKwh(meteringContext.gridExport),meteringContext.label]] },
-        intelligence: { image:hbEnergyHeroAsset('intelligence'), icon:'✦', eyebrow:'Home Intelligence', title:status, value:this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'), 'Advice'), unit:'automation mode', explanation:'Your home energy control center', tone:'orange', metrics:[['✓','Status',status,'Current intelligence state'],['✦','Confidence',this.productStateLabel(decision.confidence || rt.value('energy_intelligence.confidence','unknown'), 'Not available'),'Decision confidence'],['◎','Recommendation',recommendation,'What Home Intelligence advises'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
+        intelligence: { image:hbEnergyHeroAsset('intelligence'), icon:'✦', eyebrow:'Home Intelligence', title:status, value:this.productStateLabel(decision.automation_mode || 'advice', 'Advice'), unit:'automation mode', explanation:'Your home energy control center', tone:'orange', metrics:[['✓','Status',status,'Current intelligence state'],['✦','Confidence',this.productStateLabel(decision.confidence || 'unknown', 'Not available'),'Decision confidence'],['◎','Recommendation',recommendation,'What Home Intelligence advises'],['✦','Decision',this.productStateLabel(decision.product_state || decision.status || 'available', 'Available'),'Product decision state']] },
         retrospective: (() => { const review=this.retrospectiveModel(); return { image:hbEnergyHeroAsset('intelligence'), icon:'↺', eyebrow:'Energy retrospective', title:review.rating, value:review.scoreText, unit:'intelligence performance', explanation:review.explanation, tone:'purple', metrics:[['◎','Coverage',review.coverageText,'Measured evidence'],['✦','Confidence',review.confidence,'Assessment confidence'],['↗','Trend',review.trendText,'Compared with previous period'],['✓','Objectives',String(review.kpis.length),'Measured goals']] }; })(),
         value: { image:hbEnergyHeroAsset('value'), icon:'€', eyebrow:'Energy value', title:valueContext.label, value:this.valueMoney(valueContext.net,valueContext.currency,valueContext.state), unit:'net financial result', explanation:valueContext.attention, tone:'green', metrics:[['✓','Result',valueContext.resultCompletenessLabel,'Measured site accounting'],['↓','Import cost',this.valueMoney(valueContext.importCost,valueContext.currency,valueContext.state),valueContext.label],['↑','Export revenue',this.valueMoney(valueContext.exportRevenue,valueContext.currency,valueContext.state),valueContext.label],['€','Net energy cost',this.valueMoney(valueContext.netEnergyCost,valueContext.currency,valueContext.state),valueContext.label]] }
       };
       const profileKey = hbEnergyProfileKey(tab);
       const baseProfile = profiles[profileKey] || profiles.overview;
       const p = { ...baseProfile, image: hbEnergyHeroAsset(tab) };
-      const badgeKey = tab === 'gas' ? '' : tab === 'solar' ? 'solar.power_kw' : tab === 'battery' ? 'battery.soc_pct' : tab === 'flow' ? 'grid.flow_direction' : tab === 'metering' ? 'metering.integrity_state' : tab === 'value' ? 'value_accounting.state' : 'energy_intelligence.status';
-      let rawBadge = badgeKey ? String(this.rowStatus(rt.row(badgeKey)) || '').trim().toLowerCase() : '';
+      const badgeKey = tab === 'gas' ? '' : tab === 'metering' ? 'metering.integrity_state' : tab === 'value' ? 'value_accounting.state' : '';
+      let rawBadge = tab === 'solar'
+        ? String(current.solar.health || '').toLowerCase()
+        : tab === 'battery'
+          ? String(current.battery.health || '').toLowerCase()
+          : tab === 'flow'
+            ? (current.grid.direction === 'unknown' ? 'unavailable' : 'available')
+            : tab === 'intelligence'
+              ? String(decision.status || decision.product_state || '').toLowerCase()
+              : (badgeKey ? String(this.rowStatus(rt.row(badgeKey)) || '').trim().toLowerCase() : '');
       if (tab === 'metering') rawBadge = String(meteringContext.health || rawBadge).toLowerCase();
       if (tab === 'value') rawBadge = String(valueContext.state || rawBadge).toLowerCase();
       const attentionBadgeByTab = {gas:'Gas meter needs attention',overview:'Overview needs attention',outlook:'Forecast needs attention',flow:'Flow needs attention',solar:'Solar needs attention',battery:'Home Battery needs attention',consumers:'Consumers need attention',strategies:'Strategy needs attention',metering:'Measurements need attention',intelligence:'Guidance needs attention',retrospective:'Review needs evidence',value:'Financial setup needs attention'};
@@ -2628,12 +2546,13 @@
       const d = rt.decision();
       const balanceVm = this.canonicalLiveEnergyBalance(rt);
       const batterySoc = balanceVm.battery.socPct;
-      const reasonRaw = firstDefined(objectFrom(d.reason || {}).message, d.reason_label, rt.rawText('energy_intelligence.reason', null));
+      const reasonRaw = firstDefined(objectFrom(d.reason || {}).message,d.reason_label,d.reason);
       const reasonCandidate = reasonRaw ? humanReason(reasonRaw, '') : '';
       const reason = /residual|reconciliation|canonical|bucket|projection|not.?published|completed|unsustainable/i.test(reasonCandidate)
         ? 'Current production, demand and grid exchange are being monitored against the active strategy.'
         : (reasonCandidate || 'Current production, demand and grid exchange are being monitored against the active strategy.');
       const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
+      const reservePct=balanceVm.battery.reserveTargetPct;
       const sourceRows = [];
       if (balanceVm.solarKw !== null && balanceVm.solarKw > 0.05) sourceRows.push(this.overviewEnergyRow({icon:'☀',label:'Solar',subtitle:'Producing now',value:fmtKw(balanceVm.solarKw),progress:this.progress(balanceVm.solarKw)}));
       if (balanceVm.battery.direction === 'out_of_storage' && balanceVm.battery.displayPowerKw !== null) sourceRows.push(this.overviewEnergyRow({icon:'▣',label:'Home Battery',subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}));
@@ -3401,14 +3320,6 @@
             ? field.display
             : (field.value === null || field.value === undefined ? '' : `${field.value}${field.unit ? ` ${field.unit}` : ''}`);
         }
-        if (!value || value === '—') {
-          let direct;
-          for (const path of spec.direct) {
-            const candidate = valueAtPath(asset, path);
-            if (candidate !== undefined && candidate !== null && candidate !== '') { direct = candidate; break; }
-          }
-          if (direct !== undefined) value = formatDirect(direct, spec.formatter);
-        }
         if (!value || value === '—') continue;
         seenLabels.add(spec.label);
         facts.push({ label:spec.label, value, status, key:usedKey });
@@ -3701,30 +3612,30 @@
       return `<div class="solarProductionChildren" id="solar-inverter-detail">${inverterCards}${unresolved}</div>`;
     }
     homeBatteryAggregateCard(rt, system = null) {
-      const battery = this.currentEnergyModel(rt).battery;
-      const enriched = system ? this.energyAssetContext(rt, system) : {};
-      const name = firstDefined(enriched.display_name,enriched.name,'Home Battery System');
-      const identity = rhiUxAssetIdentity({
+      const battery=this.currentEnergyModel(rt).battery;
+      const enriched=system?this.energyAssetContext(rt,system):{};
+      const name=firstDefined(enriched.display_name,enriched.name,'Home Battery System');
+      const identity=rhiUxAssetIdentity({
         eyebrow:'Battery system',
         title:name,
-        subtitle:battery.label === 'Unavailable' ? rhiEnergyT(this._hass,'common.not_available',{},'Not available') : battery.label,
-        visual:system ? this.assetVisual(enriched,{size:'lg',fallbackIcon:'▣',decorative:false}) : ''
+        subtitle:battery.label==='Unavailable'?rhiEnergyT(this._hass,'common.not_available',{},'Not available'):battery.label,
+        visual:system?this.assetVisual(enriched,{size:'lg',fallbackIcon:'▣',decorative:false}):''
       });
-      const factGrid = rhiUxAssetFactGrid([
+      const factGrid=rhiUxAssetFactGrid([
         {label:'Power',value:fmtKw(battery.displayPowerKw,'—')},
         {label:'State of charge',value:fmtPct(battery.socPct)},
         {label:'Capacity',value:fmtKwh(battery.capacityKwh)},
         {label:'Available energy',value:fmtKwh(battery.availableKwh)}
       ]);
-      const details = system ? this.energyAssetDetailDisclosure(rt,enriched) : '';
-      const diagnostics = system ? this.energyAssetDiagnosticsDisclosure(rt,enriched) : '';
+      const details=system?this.energyAssetDetailDisclosure(rt,enriched):'';
+      const diagnostics=system?this.energyAssetDiagnosticsDisclosure(rt,enriched):'';
       return `<div class="energyAssetNode" data-energy-device-type="battery_system"><article class="energyDeviceCard rhiEnergyCoreAssetCard" data-current-energy-projection="battery">${identity}${factGrid}<div class="energyAssetFoldStack">${details}${diagnostics}</div></article></div>`;
     }
 
     solarBatterySystem(rt, systems = [], batteries = []) {
       if (!systems.length && !batteries.length) return '';
       const system = systems[0] || null;
-      const head = this.homeBatteryAggregateCard(rt, system);
+      const head=this.homeBatteryAggregateCard(rt,system);
       const children = batteries.length ? `<div class="solarChildGrid">${batteries.map(asset=>this.batteryChildCard(rt,String(firstDefined(asset.asset_id,asset.id,'') || ''))).join('')}</div>` : '';
       return this.solarHardwareSection(
         'Home Battery',
@@ -3881,12 +3792,7 @@
     }
 
     solar(rt) {
-      const pageVm = this.buildPageViewModel(rt, 'solar');
-      const solarPower = rt.number('solar.power_kw');
-      const forecastToday = rt.number('forecast.solar_today_kwh');
-      const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
-      const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
-      const gridExportToday = rt.number('metering.grid_export_today_kwh');
+      const pageVm=this.buildPageViewModel(rt,'solar');
       return `${this.tabExperienceHeader(rt,'solar',pageVm)}<div class="solarPage solarHardwarePage">
         ${this.solarEnergyStory(rt)}
         ${this.solarHardwareExperience(rt)}
@@ -3896,8 +3802,8 @@
     operationalPlanning(rt) {
       const pageVm = this.buildPageViewModel(rt, 'operational-planning');
       const d = rt.decision();
-      const recommendation = firstDefined(d.recommendation, d.advice, rt.rawText('energy_intelligence.recommendation', null), 'Observe');
-      const targetId = firstDefined(d.recommended_target_asset_id, rt.value('energy_intelligence.recommended_target_asset_id', null), '');
+      const recommendation = firstDefined(d.recommendation, d.advice, 'Observe');
+      const targetId = firstDefined(d.recommended_target_asset_id, '');
       const assetDomain = this.flexibleAssetDomain(rt);
       const loads = assetDomain.consumerFacing().map(vm => vm.raw);
       const participating = loads.filter(load => !assetDomain.byId(load.asset_id)?.isDisabled);
@@ -4007,41 +3913,24 @@
       return `<div class="flowConnectionCard">${art}<div><b>${escapeHtml(charger.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(context || 'Connection state unavailable')}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
     consumerCard(rt, consumer) {
-      const id = consumer.asset_id;
-      const power = asNumber(firstDefined(consumer.physical_power_kw, consumer.power_kw, consumer.current_power_kw, consumer.actual_power_kw));
-      const powerText = power === null ? '—' : fmtKw(power);
-      const operating = firstDefined(consumer.operating_state, consumer.state, rt.value(`${id}.operating_state`, null));
-      const active = asBool(firstDefined(consumer.active, rt.value(`${id}.active`, false)));
-      const charging = asBool(firstDefined(consumer.charging, rt.value(`${id}.charging`, false))) || /charging/i.test(String(operating || ''));
-      const connectionState = String(firstDefined(consumer.connection_state, '') || '').trim().toLowerCase();
-      const connected = asBool(firstDefined(consumer.connected, rt.value(`${id}.connected`, false)))
-        || ['connected','asset_connected'].includes(connectionState);
-      const available = !/unavailable|offline|disconnected/i.test(String(firstDefined(consumer.availability_state, '')));
-      const charger = firstDefined(
-        consumer.effective_charger,
-        consumer.effective_connection_id,
-        consumer.assigned_connection_id,
-        consumer.physical_connection_id,
-        consumer.charger_asset_id,
-        consumer.connection_asset_id,
-        consumer.execution_target_asset_id,
-        ''
-      );
-      const requested = asNumber(firstDefined(consumer.requested_power_kw_effective, consumer.requested_power_kw));
-      const state = charging ? 'Charging' : active || (power !== null && power > 0.05) ? 'Active' : connected ? 'Connected' : available ? 'Available' : 'Unavailable';
-      const chargerDisplay = String(firstDefined(
-        consumer.effective_charger_display_name,
-        consumer.charger_display_name,
-        consumer.connection_display_name,
-        consumer.physical_connection_display_name,
-        charger ? rt.assetName(charger) : '',
-        ''
-      ) || '').trim();
-      const relation = charger ? this.userRelationshipLabel(chargerDisplay, 'Assigned charger') : '';
-      const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
-      const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
-      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(relation ? `${relation} · ${state}` : state)}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+      const id=String(consumer.asset_id||'');
+      const power=asNumber(consumer.physical_power_kw);
+      const powerText=power===null?'—':fmtKw(power);
+      const operating=String(consumer.operating_state||'unknown');
+      const connectionState=String(consumer.connection_state||'').trim().toLowerCase();
+      const connected=['connected','asset_connected'].includes(connectionState);
+      const charging=/charging/i.test(operating);
+      const active=charging || (power!==null&&power>0.05);
+      const available=!/unavailable|offline|disconnected/i.test(String(consumer.availability_state||''));
+      const charger=String(consumer.connection_asset_id||consumer.charger_asset_id||'');
+      const state=charging?'Charging':active?'Active':connected?'Connected':available?'Available':'Unavailable';
+      const chargerDisplay=charger?String(rt.assetName(charger)||'').trim():'';
+      const relation=charger?this.userRelationshipLabel(chargerDisplay,'Assigned charger'):'';
+      const visual=rt.resolveVisualRef(consumer.visual_ref,'card');
+      const art=`<div class="flowAssetVisual">${visual?.url?`<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter||'none')}">`:''}</div>`;
+      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name||rt.assetName(id)||human(id))}</b><span>${escapeHtml(relation?`${relation} · ${state}`:state)}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
     }
+
     flowConsumers(rt, connectionSnapshot = { rows:[] }) {
       const domain = this.flexibleAssetDomain(rt);
       const snapshotRows = asArray(connectionSnapshot?.rows);
@@ -4088,11 +3977,11 @@
         addConsumer({
           ...asset,
           asset_id:consumerId,
-          connection_state:firstDefined(asset.connection_state, connection.connection_state, ''),
-          effective_connection_id:firstDefined(asset.effective_connection_id, connection.connection_asset_id, connection.asset_id, ''),
-          physical_connection_id:firstDefined(asset.physical_connection_id, connection.connection_asset_id, connection.asset_id, ''),
-          visual_ref:firstDefined(asset.visual_ref, connection.connected_consumer_visual_ref, ''),
-          physical_power_kw:firstDefined(asset.physical_power_kw, asset.current_power_kw, asset.actual_power_kw, connection.physical_power_kw, connection.power_kw)
+          connection_state:firstDefined(connection.connection_state,asset.connection_state,''),
+          connection_asset_id:firstDefined(connection.connection_asset_id,connection.asset_id,''),
+          charger_asset_id:firstDefined(connection.connection_asset_id,connection.asset_id,''),
+          visual_ref:firstDefined(connection.connected_consumer_visual_ref,asset.visual_ref,''),
+          physical_power_kw:firstDefined(connection.physical_power_kw,connection.power_kw,null)
         });
       }
 
@@ -4122,119 +4011,16 @@
       return [...byId.values()];
     }
     canonicalConnectionSnapshot(rt) {
-      // Connection materialization is projection-only: consume explicit public
-      // V2 asset links/relationships and asset-scoped measurements. Do not infer
-      // charger assignments from names and do not recalculate Energy aggregates.
-      const rows = new Map();
-      const assetType = asset => String(firstDefined(asset?.asset_type, asset?.object_class, '') || '').trim().toLowerCase();
-      const isCharger = asset => /(^|_)(charger|charging_point|charge_point)(_|$)/.test(assetType(asset));
-      const materialize = (chargerId, consumerId = '', relationship = {}) => {
-        const chargerKey = String(chargerId || '').trim();
-        const consumerKey = String(consumerId || '').trim();
-        if (!chargerKey || rows.has(chargerKey)) return;
-        // One physical charger is one connection row. The producer/public row is
-        // materialized first and remains authoritative over Energy-local fallbacks.
-        const charger = { ...objectFrom(rt.asset(chargerKey) || {}), ...objectFrom(relationship) };
-        const consumer = consumerKey
-          ? (rt.asset(consumerKey) || this.flexibleAssetDomain(rt).byId(consumerKey)?.raw || {})
-          : {};
-        const power = asNumber(firstDefined(
-          charger.actual_power_kw,
-          charger.current_power_kw,
-          charger.power_kw,
-          rt.number(`${chargerKey}.actual_power_kw`),
-          rt.number(`${chargerKey}.current_power_kw`),
-          rt.number(`${chargerKey}.power_kw`)
-        ));
-        const row = {
-          ...charger,
-          asset_id:chargerKey,
-          connection_asset_id:chargerKey,
-          connected_consumer_id:consumerKey,
-          connected_consumer_visual_ref:String(firstDefined(consumer.visual_ref, '') || ''),
-          connection_state:String(firstDefined(
-            relationship.connection_state,
-            relationship.state,
-            charger.connection_state,
-            consumer.connection_state,
-            consumer.connected === true ? 'connected' : ''
-          ) || ''),
-          operating_state:String(firstDefined(
-            charger.operating_state,
-            charger.operation_state,
-            consumer.operating_state,
-            consumer.operation_state,
-            ''
-          ) || ''),
-          physical_power_kw:power,
-          // Preserve producer-owned visual identity from the canonical connection
-          // row; Energy-local projections may only fill it when the producer omitted it.
-          visual_ref:String(firstDefined(relationship.visual_ref, charger.visual_ref, '') || ''),
-          source_relationship_id:String(firstDefined(relationship.relationship_id, relationship.id, '') || '')
-        };
-        rows.set(chargerKey, row);
-      };
-
-      // Prefer the exact producer-owned connection rows published by Energy V2.
-      // This is the canonical cross-domain topology boundary and remains visible
-      // even at 0 kW / idle.
-      asArray(rt.publicV2().connections).forEach(connection => {
-        materialize(
-          firstDefined(connection.asset_id, connection.connection_asset_id, ''),
-          firstDefined(connection.connected_asset_id, connection.connected_consumer_id, ''),
-          connection
-        );
-      });
-
-      // Flexible assets may publish their exact execution/charger target directly.
-      this.flexibleAssetDomain(rt).all()
-        .filter(vm => !vm.isDisabled && !vm.isStorage)
-        .forEach(vm => {
-          const asset = vm.raw || {};
-          const chargerId = firstDefined(
-            asset.effective_charger,
-            asset.effective_connection_id,
-            asset.assigned_connection_id,
-            asset.physical_connection_id,
-            asset.charger_asset_id,
-            asset.connection_asset_id,
-            asset.execution_target_asset_id,
-            ''
-          );
-          if (chargerId) materialize(chargerId, vm.id, { connection_state:asset.connection_state });
-        });
-
-      // Public connected_to relationships remain authoritative when present.
-      rt.connectedRelationships().forEach(relationship => {
-        const fromId = String(firstDefined(relationship.from_asset_id, relationship.source_asset_id, '') || '');
-        const toId = String(firstDefined(relationship.to_asset_id, relationship.target_asset_id, '') || '');
-        if (!fromId || !toId) return;
-        const from = rt.asset(fromId) || {};
-        const to = rt.asset(toId) || {};
-        if (isCharger(from)) materialize(fromId, toId, relationship);
-        else if (isCharger(to)) materialize(toId, fromId, relationship);
-      });
-
-      // Topology is not the same as active power flow: keep published chargers
-      // visible when idle or currently unassigned.
-      rt.assets().filter(isCharger).forEach(charger => {
-        const id=String(charger.asset_id || '');
-        if (!id) return;
-        if (!rows.has(id)) materialize(id, '', charger);
-      });
-
-      const projected = Object.freeze([...rows.values()].map(row => Object.freeze(row)));
-      const observedAt = projected.map(row => String(firstDefined(row.observed_at, row.updated_at, '') || '')).filter(Boolean).sort().pop() || '';
-      return Object.freeze({
-        available:rt.publicV2().available === true,
-        rows:projected,
-        // Deliberately not derived from row power: Energy aggregate truth stays backend-owned.
-        totalPowerKw:null,
-        observedAt,
-        reason:projected.length ? '' : 'No charging connection is currently available.',
-        source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
-      });
+      const rows=asArray(rt.publicV2().connections).map(connection=>{
+        const chargerId=String(firstDefined(connection.asset_id,connection.connection_asset_id,'')||'').trim();
+        const consumerId=String(firstDefined(connection.connected_asset_id,connection.connected_consumer_id,connection.target_asset_id,'')||'').trim();
+        const consumer=consumerId?(rt.asset(consumerId)||this.flexibleAssetDomain(rt).byId(consumerId)?.raw||{}):{};
+        return Object.freeze({...objectFrom(connection),asset_id:chargerId,connection_asset_id:chargerId,connected_consumer_id:consumerId,connected_consumer_visual_ref:String(firstDefined(connection.connected_consumer_visual_ref,consumer.visual_ref,'')||''),physical_power_kw:asNumber(firstDefined(connection.physical_power_kw,connection.power_kw)),visual_ref:String(firstDefined(connection.visual_ref,'')||'')});
+      }).filter(row=>row.connection_asset_id);
+      const observedAt=rows.map(row=>String(firstDefined(row.observed_at,row.updated_at,'')||'')).filter(Boolean).sort().pop()||'';
+      return Object.freeze({available:rt.publicV2().available===true&&Array.isArray(rt.publicV2().connections),rows:Object.freeze(rows),totalPowerKw:null,observedAt,reason:rows.length?'':'No charging connection is currently published.',source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.connections'});
     }
+
     flow(rt) {
       const pageVm = this.buildPageViewModel(rt, 'flow');
       const current = this.currentEnergyModel(rt);
@@ -4550,7 +4336,7 @@
       const available = batteryVm.availableKwh;
       const power = batteryVm.displayPowerKw;
       const state = batteryVm.label;
-      const reserve = batteryVm.reserveTargetPct;
+      const reserve=batteryVm.reserveTargetPct;
       const batterySystem = rt.assets().find(asset => ['battery_system','home_battery_system'].includes(String(asset.asset_type || asset.object_class || '').toLowerCase())) || rt.asset('battery_system');
       const children = batterySystem
         ? rt.childrenOfType(String(batterySystem.asset_id || 'battery_system'), 'battery')
@@ -5139,11 +4925,11 @@
       const planningRows = this.flexibleAssetDomain(rt).planningRows();
       const policies = rt.effectiveStrategyRows();
       const mode = this.automationModeValue(rt, firstDefined(d.mode, d.automation_mode, 'Advice'));
-      const state = this.userStateText(firstDefined(d.product_state,d.status,d.state,rt.value('energy_intelligence.system_state','Monitoring')),'Monitoring');
+      const state = this.userStateText(firstDefined(d.product_state,d.status,d.system_state,'Monitoring'),'Monitoring');
       const reasonObj = objectFrom(d.reason || {});
-      const why = humanReason(firstDefined(reasonObj.message,d.user_reason_label,d.reason_label,reasonObj.code,rt.rawText('energy_intelligence.reason',null)),'Home Intelligence is monitoring current energy conditions.');
-      const recommendation = human(firstDefined(d.advice,d.recommendation,rt.value('energy_intelligence.recommendation',null),rt.rawText('energy_intelligence.recommended_action','Keep monitoring')));
-      const actionId = firstDefined(d.recommended_action_id,rt.value('energy_intelligence.recommended_action_id',null),null);
+      const why = humanReason(firstDefined(reasonObj.message,d.user_reason_label,d.reason_label,reasonObj.code,d.reason),'Home Intelligence is monitoring current energy conditions.');
+      const recommendation = human(firstDefined(d.advice,d.recommendation,d.recommended_action,'Keep monitoring'));
+      const actionId = firstDefined(d.recommended_action_id,null);
       const command = actionId ? rt.commands().find(c=>String(c.command_instance_id||c.command_id||'')===String(actionId)) : null;
       const actions = command ? this.componentActionButton(command,human(rt.commandRole(command)||command.command_id),command.target_asset_id) : '';
       const assetRows = planningRows.slice(0,8).map(row=>{ const id=row.asset_id; const s=this.userStateText(firstDefined(row.product_state,row.status,row.state,row.active?'active':row.waiting?'waiting':row.planned?'planned':'available')); const r=humanReason(firstDefined(row.user_reason_label,row.waiting_reason,row.reason,row.reason_code),'Home Intelligence is monitoring this asset.'); return `<div class="portalStatusRow"><div><b>${escapeHtml(rt.assetName(id)||human(id))}</b><span>${escapeHtml(r)}</span></div><strong>${escapeHtml(s)}</strong></div>`; }).join('');
@@ -5517,7 +5303,7 @@
       const allProperties = topics.flatMap(topic => asArray(topic.properties));
       const automationRow = allProperties.find(row => String(firstDefined(row.property_id,row.property_key,row.key,'') || '') === 'energy.automation_mode') || null;
       const objectiveRow = allProperties.find(row => ['home.primary_objective','strategy.home.primary_objective'].includes(String(firstDefined(row.property_id,row.property_key,row.key,'') || ''))) || null;
-      const mode = automationRow ? valueText(automationRow) : this.productStateLabel(rt.value('energy_intelligence.automation_mode','advice'),'Advice');
+      const mode = automationRow ? valueText(automationRow) : this.productStateLabel(rt.decision().automation_mode || 'advice','Advice');
       const objective = objectiveRow ? valueText(objectiveRow) : '';
       const posture = [mode,objective].filter(value=>value && value!=='Not available').join(' · ');
       const model = {
