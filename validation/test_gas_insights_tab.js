@@ -9,11 +9,12 @@ assert.match(presentation,/id:"consumers", labelKey:"nav\.consumption", fallback
 assert.ok(presentation.includes('gas: "heroes/gas-page-hero-v3.webp"'),"Gas page hero mapping must use approved photographic v3 asset");
 assert.ok(fs.existsSync("src/assets/heroes/gas-page-hero-v3.webp"),"missing approved Gas page hero v3 artwork");
 
-assert.match(app,/gas:\['consumer'\]/);
 assert.match(app,/gas:\['energy','gas'\]/);
 assert.match(app,/this\.view === 'gas' \? this\.gas\(rt\)/);
 assert.match(app,/gasModel\(rt\)/);
-assert.match(app,/gasTotalEntityId\(\)/);
+assert.match(app,/rt\.gasStatisticsEntityId\(String\(asset\?\.asset_id \|\| ''\)\)/);
+assert.doesNotMatch(app,/gasTotalEntityId\(\)/);
+assert.doesNotMatch(app,/logical_object_class[\s\S]{0,200}gas\.total_m3/);
 assert.match(app,/hui-statistics-graph-card/);
 assert.match(app,/stat_types:\['change'\]/);
 assert.match(app,/period:'day'/);
