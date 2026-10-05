@@ -115,6 +115,53 @@ function readEnergyPublicV2(gateway) {
     ['flexible_loads.attributed_power_kw', coreField('flexible','attributed_power_kw')]
   ]);
 
+  const aggregateFieldAliases = Object.freeze({
+    'battery.power_kw':['power_kw','current_power_kw','actual_power_kw','battery_power_kw'],
+    'battery.soc_pct':['soc_pct','battery_soc_pct'],
+    'battery.capacity_kwh':['capacity_kwh','battery_capacity_kwh'],
+    'battery.available_kwh':['available_kwh','battery_available_kwh'],
+    'battery.state':['operating_state','state'],
+    'battery.reserve_target_pct':['reserve_target_pct'],
+    'solar.power_kw':['power_kw','current_power_kw','solar_power_kw'],
+    'grid.net_power_kw':['net_power_kw','power_kw'],
+    'grid_import.power_kw':['import_power_kw','grid_import_power_kw'],
+    'grid_export.power_kw':['export_power_kw','grid_export_power_kw'],
+    'grid.flow_direction':['flow_direction','direction'],
+    'site_consumption.power_kw':['power_kw','current_power_kw','site_consumption_kw'],
+    'home_consumption.power_kw':['power_kw','current_power_kw','home_consumption_kw']
+  });
+  const aggregateObject = types => {
+    const wanted = new Set((Array.isArray(types) ? types : [types]).map(value => String(value || '').toLowerCase()));
+    return objects.find(row => wanted.has(String(row.asset_type || row.object_class || '').toLowerCase())) || null;
+  };
+  const aggregateField = (types, key) => {
+    const aggregate = aggregateObject(types);
+    if (aggregate) {
+      const assetId = String(aggregate.asset_id || '');
+      const scoped = assetId ? propertyByAssetAndKey.get(`${assetId}::${String(key || '')}`) : null;
+      if (scoped) {
+        const projected = semantic(scoped);
+        if (projected.resolved || projected.value !== null) return projected;
+      }
+      for (const alias of aggregateFieldAliases[String(key || '')] || []) {
+        if (Object.prototype.hasOwnProperty.call(aggregate, alias)) {
+          const value = aggregate[alias];
+          if (value !== undefined && value !== null && value !== '') {
+            return semantic({
+              value,
+              status:'AVAILABLE',
+              quality:'CANONICAL',
+              reason:null,
+              source_asset_id:assetId,
+              source_field:alias
+            });
+          }
+        }
+      }
+    }
+    return coreByKey.get(String(key || '')) || semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:'canonical_field_not_published'});
+  };
+
   const coreFlexible = object(core.flexible);
   const flexibleAssets = Object.freeze(
     (array(coreFlexible.assets).length ? array(coreFlexible.assets) : objects.filter(row => {
@@ -251,6 +298,8 @@ function readEnergyPublicV2(gateway) {
     propertyByKey,
     propertyByAssetAndKey,
     coreByKey,
+    aggregateObject,
+    aggregateField,
     object(assetId) { return objectById.get(String(assetId || '')) || null; },
     profile(profileId) { return profileById.get(String(profileId || '')) || null; },
     property(key, assetId = '') {
