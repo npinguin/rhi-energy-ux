@@ -2358,16 +2358,12 @@
       const assets = typeof rt.assets === 'function' ? rt.assets() : [];
       const raw = assets.find(asset => String(firstDefined(asset?.asset_type, asset?.object_class, '') || '').toLowerCase() === 'gas_meter') || null;
       const asset = raw ? this.energyAssetContext(rt, raw) : null;
-      const properties = Array.isArray(asset?.properties) ? asset.properties : [];
-      const propertyValue = key => {
-        const prop = properties.find(row => String(row?.property_key || '') === key);
-        return asNumber(firstDefined(prop?.value, prop?.resolution?.value, null));
-      };
-      const totalM3 = firstDefined(propertyValue('gas.total_m3'), asNumber(asset?.total_m3), asNumber(asset?.gas_total_m3));
-      const flowM3h = firstDefined(propertyValue('gas.flow_m3_h'), asNumber(asset?.flow_m3_h), asNumber(asset?.gas_flow_m3_h));
+      const assetId = String(asset?.asset_id || '');
+      const totalM3 = assetId ? rt.assetNumber(assetId, 'gas.total_m3') : null;
+      const flowM3h = assetId ? rt.assetNumber(assetId, 'gas.flow_m3_h') : null;
       const health = String(firstDefined(asset?.health, asset?.normalization_status, 'UNKNOWN') || 'UNKNOWN');
-      const source = String(firstDefined(asset?.integration_domain, properties.find(row=>row?.integration_domain)?.integration_domain, 'Gas meter') || 'Gas meter');
-      const totalEntityId = rt.gasStatisticsEntityId(String(asset?.asset_id || ''));
+      const source = String(firstDefined(asset?.integration_domain, 'Gas meter') || 'Gas meter');
+      const totalEntityId = rt.gasStatisticsEntityId(assetId);
       return Object.freeze({ asset, totalM3, flowM3h, health, source, totalEntityId });
     }
     gasVolume(value, fallback = '—') {
