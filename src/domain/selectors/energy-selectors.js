@@ -99,37 +99,47 @@ function selectEnergyValue(store, period='today') {
   });
 }
 
-function selectEnergyMetering(store, period='today') {
-  const id=String(period || 'today').toLowerCase();
-  return Object.freeze({
-    available:false,
-    partial:false,
-    period_id:id,
-    metrics:Object.freeze({}),
-    reason:'canonical_period_energy_not_published',
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
-  });
+function selectEnergyMetering(store,period='today'){
+  const metering=store?.metering&&typeof store.metering==='object'?store.metering:{};
+  const id=String(period||metering.selected_period_id||'today').toLowerCase();
+  const periods=metering.periods&&typeof metering.periods==='object'?metering.periods:{};
+  const row=periods[id]&&typeof periods[id]==='object'?periods[id]:{};
+  const summary=row.summary&&typeof row.summary==='object'?row.summary:{};
+  const measured=summary.measured&&typeof summary.measured==='object'?summary.measured:{};
+  const quality=summary.quality&&typeof summary.quality==='object'?summary.quality:{};
+  const state=String(row.measurement_state||row.availability||row.status||quality.measurement_state||quality.health||'UNAVAILABLE').toUpperCase();
+  return Object.freeze({available:store?.available===true&&Object.keys(row).length>0,partial:['PARTIAL','INCOMPLETE','ATTRIBUTION_PENDING'].includes(state),period_id:id,period:row,measured:Object.freeze({...measured}),quality:Object.freeze({...quality}),measurement_state:state,baseline_reset_required:row.baseline_reset_required===true,user_action_required:row.user_action_required===true||quality.user_action_required===true,reason:String(row.reason||quality.reason||''),source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.metering.periods'});
 }
 
-function selectEnergyGas(store) {
-  const objects=Array.isArray(store?.objects) ? store.objects : [];
-  const asset=objects.find(row => String(row?.asset_type || row?.object_class || '').toLowerCase() === 'gas_meter') || null;
-  if(!asset) return Object.freeze({available:false,asset:null,asset_id:'',total_m3:null,flow_m3_h:null,state:'UNAVAILABLE',health:'UNAVAILABLE',source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.objects'});
-  const assetId=String(asset.asset_id || '');
-  const projection=createEnergyAssetProjection(store,assetId);
-  const total=projection?.property?.('gas.total_m3') || {};
-  const flow=projection?.property?.('gas.flow_m3_h') || {};
-  const stateField=projection?.property?.('gas.state') || {};
+function selectEnergyIntelligence(store) {
+  const intelligence=store?.intelligence && typeof store.intelligence === 'object' ? store.intelligence : {};
+  const decision=intelligence.decision && typeof intelligence.decision === 'object' ? intelligence.decision : {};
+  const value=(key,fallback=null) => decision[key] !== undefined ? decision[key] : (intelligence[key] !== undefined ? intelligence[key] : fallback);
   return Object.freeze({
-    available:true,
-    asset,
-    projection,
-    asset_id:assetId,
-    total_m3:asNumber(total.value),
-    flow_m3_h:asNumber(flow.value),
-    state:String(stateField.value || asset.state || ''),
-    health:String(asset.health || asset.status || stateField.status || 'UNKNOWN'),
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.objects'
+    available:store?.available === true && Object.keys(intelligence).length > 0,
+    goal:value('goal',''),
+    observation:value('observation',''),
+    assessment:value('assessment',''),
+    recommendation:value('recommendation', value('advice','')),
+    advice:value('advice', value('recommendation','')),
+    automation_mode:value('automation_mode',''),
+    automation_status:value('automation_status',''),
+    planning_state:value('planning_state',''),
+    status:value('status', value('product_state','')),
+    product_state:value('product_state', value('status','')),
+    system_state:value('system_state',''),
+    reason:value('reason',''),
+    reason_label:value('reason_label',''),
+    confidence:value('confidence',''),
+    affected_assets:value('affected_assets',[]),
+    next_review:value('next_review',''),
+    outlook_reason:value('outlook_reason',''),
+    recommended_target_asset_id:value('recommended_target_asset_id',''),
+    recommended_action:value('recommended_action',''),
+    recommended_action_id:value('recommended_action_id',null),
+    raw:intelligence,
+    decision,
+    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.intelligence'
   });
 }
 
