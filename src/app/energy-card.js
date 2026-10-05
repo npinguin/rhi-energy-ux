@@ -369,6 +369,7 @@
     }
     contractEntityId() { return this.publicV2().envelope.entityId; }
     assetProjection(assetId) { return selectEnergyAsset(this.publicV2(), assetId); }
+    assetPresentation(assetId) { return createEnergyAssetPresentationModel(this.assetProjection(assetId)); }
     overviewProjection() { return selectEnergyOverview(this.publicV2()); }
     planningProjection(horizon = 'D0') { return selectEnergyPlanning(this.publicV2(), horizon); }
     strategyProjection() { return selectEnergyStrategies(this.publicV2()); }
@@ -3199,219 +3200,18 @@
     energyAssetFacts(rt, asset = {}, limit = 4) {
       const id = String(firstDefined(asset.asset_id, asset.id, '') || '');
       if (!id) return [];
-      const projection = rt.assetProjection(id) || {};
-      const publishedKeyFacts = (projection.properties || [])
-        .filter(row => row?.presentation?.role === 'key' && row?.projection?.resolved === true)
-        .map(row => {
-          const field = row.projection || {};
-          let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
-          if (field.unit && value !== '—' && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
-          return {
-            key:String(firstDefined(row.property_key,row.property_id,row.key,'') || ''),
-            keys:[String(firstDefined(row.property_key,row.property_id,row.key,'') || '')],
-            label:String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || ''),
-            value,
-            direct:[],
-            formatter:'published'
-          };
-        })
-        .filter(row => row.label && row.value !== '—')
-        .slice(0, limit);
-      if (publishedKeyFacts.length) return publishedKeyFacts;
-      const type = this.energyAssetType(asset);
-      const fact = (key, label, direct = [], formatter = '') => {
-        const keys = Array.isArray(key) ? key : [key];
-        return { key:keys[0] || '', keys, label, direct, formatter };
-      };
-      const byType = {
-        battery:[
-          fact('battery.soc_pct','State of charge',['battery.soc_pct','soc_pct','battery_soc_pct'],'pct'),
-          fact('battery.power_kw','Power now',['battery.power_kw','power_kw','current_power_kw','actual_power_kw'],'kw'),
-          fact('battery.available_kwh','Available energy',['battery.available_kwh','available_kwh'],'kwh'),
-          fact('battery.capacity_kwh','Capacity',['battery.capacity_kwh','capacity_kwh'],'kwh'),
-          fact('battery.state','State',['battery.state','operating_state','state'],'state'),
-          fact('battery.temperature_c','Temperature',['battery.temperature_c','temperature_c'],'c')
-        ],
-        battery_system:[
-          fact('battery.soc_pct','State of charge',['battery.soc_pct','soc_pct','battery_soc_pct'],'pct'),
-          fact('battery.power_kw','Power now',['battery.power_kw','power_kw','current_power_kw','actual_power_kw'],'kw'),
-          fact('battery.available_kwh','Available energy',['battery.available_kwh','available_kwh'],'kwh'),
-          fact('battery.capacity_kwh','Capacity',['battery.capacity_kwh','capacity_kwh'],'kwh'),
-          fact('battery.reserve_target_pct','Reserve',['battery.reserve_target_pct','reserve_target_pct'],'pct'),
-          fact('battery.state','State',['battery.state','operating_state','state'],'state')
-        ],
-        home_battery_system:[
-          fact('battery.soc_pct','State of charge',['battery.soc_pct','soc_pct','battery_soc_pct'],'pct'),
-          fact('battery.power_kw','Power now',['battery.power_kw','power_kw','current_power_kw','actual_power_kw'],'kw'),
-          fact('battery.available_kwh','Available energy',['battery.available_kwh','available_kwh'],'kwh'),
-          fact('battery.capacity_kwh','Capacity',['battery.capacity_kwh','capacity_kwh'],'kwh'),
-          fact('battery.reserve_target_pct','Reserve',['battery.reserve_target_pct','reserve_target_pct'],'pct'),
-          fact('battery.state','State',['battery.state','operating_state','state'],'state')
-        ],
-        solar_production:[
-          fact('solar.power_kw','Production now',['solar.power_kw','power_kw','current_power_kw'],'kw'),
-          fact('solar.energy_today_kwh','Produced today',['solar.energy_today_kwh','energy_today_kwh'],'kwh'),
-          fact('solar.capacity_kwp','Installed capacity',['solar.capacity_kwp','capacity_kwp'],'kwp'),
-          fact('solar.state','State',['solar.state','operating_state','state'],'state')
-        ],
-        solar_array:[
-          fact('solar.power_kw','Production now',['solar.power_kw','power_kw','current_power_kw'],'kw'),
-          fact('solar.energy_today_kwh','Produced today',['solar.energy_today_kwh','energy_today_kwh'],'kwh'),
-          fact('solar.capacity_kwp','Installed capacity',['solar.capacity_kwp','capacity_kwp'],'kwp'),
-          fact('solar.state','State',['solar.state','operating_state','state'],'state')
-        ],
-        solar_zone:[
-          fact('solar_zone.power_w','Power now',['solar_zone.power_w','power_w'],'w'),
-          fact('solar_zone.energy_kwh','Lifetime energy',['solar_zone.energy_kwh','energy_kwh'],'kwh'),
-          fact('solar_zone.status','Status',['solar_zone.status','status','operating_state','state'],'state'),
-          fact('solar_zone.child_count','Optimizers',['solar_zone.child_count','child_count'],'count'),
-          fact('solar_zone.last_measurement','Last measurement',['solar_zone.last_measurement','last_measurement'],'state'),
-          fact('solar_zone.voltage_average_v','Average voltage',['solar_zone.voltage_average_v','voltage_average_v'],'v'),
-          fact('solar_zone.current_average_a','Average current',['solar_zone.current_average_a','current_average_a'],'a')
-        ],
-        solar_panel:[
-          fact('solar.power_kw','Production now',['solar.power_kw','power_kw','current_power_kw'],'kw'),
-          fact('solar.energy_today_kwh','Produced today',['solar.energy_today_kwh','energy_today_kwh'],'kwh'),
-          fact('solar.state','State',['solar.state','operating_state','state'],'state')
-        ],
-        solar_optimizer:[
-          fact('solar_optimizer.power_w','Power now',['solar_optimizer.power_w','optimizer.power_w','power_w','current_power_w'],'w'),
-          fact('solar_optimizer.energy_kwh','Lifetime energy',['solar_optimizer.energy_kwh','optimizer.energy_kwh','energy_kwh'],'kwh'),
-          fact('solar_optimizer.status','Status',['solar_optimizer.status','optimizer.status','status','operating_state','state'],'state'),
-          fact('solar_optimizer.last_measurement','Last measurement',['solar_optimizer.last_measurement','optimizer.last_measurement','last_measurement'],'state'),
-          fact('solar_optimizer.optimizer_voltage_v','Optimizer voltage',['solar_optimizer.optimizer_voltage_v','optimizer_voltage_v'],'v'),
-          fact('solar_optimizer.panel_voltage_v','Panel voltage',['solar_optimizer.panel_voltage_v','panel_voltage_v'],'v'),
-          fact('solar_optimizer.current_a','Current',['solar_optimizer.current_a','optimizer.current_a','current_a'],'a'),
-          fact('solar_optimizer.temperature_c','Temperature',['solar_optimizer.temperature_c','temperature_c'],'c'),
-          fact('solar_optimizer.panel_identity','Panel',['solar_optimizer.panel_identity','panel_identity'],'state')
-        ],
-        solar_inverter:[
-          fact(['solar.power_kw','inverter.power_kw'],'Power now',['solar.power_kw','inverter.power_kw','power_kw','current_power_kw','actual_power_kw'],'kw'),
-          fact('inverter.efficiency_pct','Efficiency',['inverter.efficiency_pct','efficiency_pct'],'pct'),
-          fact(['inverter.state','operating_state'],'State',['inverter.state','operating_state','state'],'state')
-        ],
-        inverter:[
-          fact('inverter.power_kw','Power now',['inverter.power_kw','power_kw','current_power_kw','actual_power_kw'],'kw'),
-          fact('solar.power_kw','Solar power',['solar.power_kw','solar_power_kw'],'kw'),
-          fact('inverter.efficiency_pct','Efficiency',['inverter.efficiency_pct','efficiency_pct'],'pct'),
-          fact('inverter.state','State',['inverter.state','operating_state','state'],'state')
-        ],
-        grid_connection:[
-          fact('grid.net_power_kw','Grid power',['grid.net_power_kw','net_power_kw','power_kw'],'kw'),
-          fact('grid_import.power_kw','Import',['grid_import.power_kw','import_power_kw','grid_import_power_kw'],'kw'),
-          fact('grid_export.power_kw','Export',['grid_export.power_kw','export_power_kw','grid_export_power_kw'],'kw'),
-          fact('grid.flow_direction','Direction',['grid.flow_direction','flow_direction','direction'],'state')
-        ],
-        gas_meter:[
-          fact('gas.flow_m3_h','Flow now',['gas.flow_m3_h','flow_m3_h'],'m3h'),
-          fact('gas.total_m3','Meter total',['gas.total_m3','total_m3'],'m3'),
-          fact('gas.state','State',['gas.state','measurement_state','state'],'state')
-        ],
-        flexible_load:[
-          fact(['flexible_load.power_kw','power_kw'],'Power now',['flexible_load.power_kw','power_kw','current_power_kw','actual_power_kw'],'kw'),
-          fact(['flexible_load.energy_to_target_kwh','energy_to_target_kwh','energy_needed_kwh','remaining_energy_kwh'],'Energy needed',['flexible_load.energy_to_target_kwh','energy_to_target_kwh','energy_needed_kwh','remaining_energy_kwh'],'kwh'),
-          fact(['flexible_load.state','operating_state'],'State',['flexible_load.state','operating_state','state'],'state'),
-          fact(['flexible_load.automation_mode','automation_mode'],'Automation',['flexible_load.automation_mode','automation_mode'],'state')
-        ],
-        flexible_asset:[
-          fact(['flexible_load.power_kw','power_kw'],'Power now',['flexible_load.power_kw','power_kw','current_power_kw','actual_power_kw'],'kw'),
-          fact(['flexible_load.energy_to_target_kwh','energy_to_target_kwh','energy_needed_kwh','remaining_energy_kwh'],'Energy needed',['flexible_load.energy_to_target_kwh','energy_to_target_kwh','energy_needed_kwh','remaining_energy_kwh'],'kwh'),
-          fact(['flexible_load.state','operating_state'],'State',['flexible_load.state','operating_state','state'],'state'),
-          fact(['flexible_load.automation_mode','automation_mode'],'Automation',['flexible_load.automation_mode','automation_mode'],'state')
-        ],
-        consumer:[
-          fact('consumer.power_kw','Power now',['consumer.power_kw','power_kw','current_power_kw','actual_power_kw'],'kw'),
-          fact('consumer.energy_today_kwh','Energy today',['consumer.energy_today_kwh','energy_today_kwh'],'kwh'),
-          fact('consumer.state','State',['consumer.state','operating_state','state'],'state')
-        ],
-        vehicle:[
-          fact('vehicle.power_kw','Charging power',['vehicle.power_kw','charging_power_kw','current_power_kw','actual_power_kw','power_kw'],'kw'),
-          fact('vehicle.energy_to_target_kwh','Energy needed',['vehicle.energy_to_target_kwh','energy_to_target_kwh','energy_needed_kwh','remaining_energy_kwh'],'kwh'),
-          fact('vehicle.soc_pct','State of charge',['vehicle.soc_pct','soc_pct'],'pct'),
-          fact('vehicle.state','State',['vehicle.state','charging_state','operating_state','state'],'state')
-        ],
-        charger:[
-          fact('charger.power_kw','Power now',['charger.power_kw','current_power_kw','actual_power_kw','power_kw'],'kw'),
-          fact('charger.requested_power_kw','Requested power',['charger.requested_power_kw','requested_power_kw'],'kw'),
-          fact('charger.state','State',['charger.state','connection_state','operating_state','state'],'state')
-        ],
-        charging_point:[
-          fact('charger.power_kw','Power now',['charger.power_kw','current_power_kw','actual_power_kw','power_kw'],'kw'),
-          fact('charger.requested_power_kw','Requested power',['charger.requested_power_kw','requested_power_kw'],'kw'),
-          fact('charger.state','State',['charger.state','connection_state','operating_state','state'],'state')
-        ],
-        site_consumption:[
-          fact(['site_consumption.power_kw','consumption.power_kw'],'Power now',['site_consumption.power_kw','consumption.power_kw','power_kw','current_power_kw'],'kw'),
-          fact(['site_consumption.energy_today_kwh','consumption.energy_today_kwh'],'Energy today',['site_consumption.energy_today_kwh','consumption.energy_today_kwh','energy_today_kwh'],'kwh'),
-          fact(['site_consumption.state','consumption.state'],'State',['site_consumption.state','consumption.state','measurement_state','state'],'state')
-        ],
-        home_consumption:[
-          fact(['home_consumption.power_kw','consumption.power_kw'],'Power now',['home_consumption.power_kw','consumption.power_kw','power_kw','current_power_kw'],'kw'),
-          fact(['home_consumption.energy_today_kwh','consumption.energy_today_kwh'],'Energy today',['home_consumption.energy_today_kwh','consumption.energy_today_kwh','energy_today_kwh'],'kwh'),
-          fact(['home_consumption.state','consumption.state'],'State',['home_consumption.state','consumption.state','measurement_state','state'],'state')
-        ],
-        backup_interface:[
-          fact('backup.power_kw','Power now',['backup.power_kw','power_kw','current_power_kw'],'kw'),
-          fact('backup.state','State',['backup.state','operating_state','state'],'state'),
-          fact('backup.grid_state','Grid state',['backup.grid_state','grid_state'],'state')
-        ],
-        energy_system:[
-          fact('energy.net_power_kw','Net power',['energy.net_power_kw','net_power_kw','power_kw'],'kw'),
-          fact('energy.state','State',['energy.state','operating_state','state'],'state')
-        ],
-        home_bus:[
-          fact('energy.net_power_kw','Net power',['energy.net_power_kw','net_power_kw','power_kw'],'kw'),
-          fact('energy.state','State',['energy.state','operating_state','state'],'state')
-        ]
-      };
-      const candidates = byType[type] || [];
-      const facts = [];
-      const seenLabels = new Set();
-      const formatDirect = (value, formatter) => {
-        const n = asNumber(value);
-        if (formatter === 'kw') return n === null ? human(value,'—') : fmtKw(n);
-        if (formatter === 'w') return n === null ? human(value,'—') : `${Math.round(n)} W`;
-        if (formatter === 'kwh') return n === null ? human(value,'—') : fmtKwh(n);
-        if (formatter === 'pct') return n === null ? human(value,'—') : fmtPct(n);
-        if (formatter === 'kwp') return n === null ? human(value,'—') : `${n.toFixed(1)} kWp`;
-        if (formatter === 'm3h') return n === null ? human(value,'—') : `${n.toFixed(2)} m³/h`;
-        if (formatter === 'm3') return n === null ? human(value,'—') : `${n.toFixed(1)} m³`;
-        if (formatter === 'v') return n === null ? human(value,'—') : `${n.toFixed(1)} V`;
-        if (formatter === 'a') return n === null ? human(value,'—') : `${n.toFixed(2)} A`;
-        if (formatter === 'c') return n === null ? human(value,'—') : `${n.toFixed(1)} °C`;
-        if (formatter === 'count') return n === null ? human(value,'—') : String(Math.round(n));
-        return human(value,'—');
-      };
-      for (const spec of candidates) {
-        if (seenLabels.has(spec.label)) continue;
-        let field = null;
-        let usedKey = spec.key;
-        for (const key of spec.keys || [spec.key]) {
-          const candidate = rt.assetField(id, key);
-          if (!field) field = candidate;
-          if (candidate?.resolved) { field = candidate; usedKey = key; break; }
-        }
-        let value = '';
-        let status = field?.status || field?.quality || 'AVAILABLE';
-        if (field?.resolved) {
-          value = field.display && field.display !== '—'
-            ? field.display
-            : (field.value === null || field.value === undefined ? '' : `${field.value}${field.unit ? ` ${field.unit}` : ''}`);
-        }
-        if (!value || value === '—') {
-          let direct;
-          for (const path of spec.direct) {
-            const candidate = valueAtPath(asset, path);
-            if (candidate !== undefined && candidate !== null && candidate !== '') { direct = candidate; break; }
-          }
-          if (direct !== undefined) value = formatDirect(direct, spec.formatter);
-        }
-        if (!value || value === '—') continue;
-        seenLabels.add(spec.label);
-        facts.push({ label:spec.label, value, status, key:usedKey });
-        if (facts.length >= limit) break;
-      }
-      return facts;
+      const model = rt.assetPresentation(id);
+      return (model?.keyFacts || [])
+        .filter(row => row.label && row.display !== '—')
+        .slice(0, limit)
+        .map(row => ({
+          key:row.key,
+          keys:[row.key],
+          label:row.label,
+          value:row.display,
+          status:row.resolved ? 'AVAILABLE' : 'UNAVAILABLE',
+          formatter:'published'
+        }));
     }
 
     energyAssetAreaLabel(asset = {}) {
@@ -3458,31 +3258,24 @@
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       if (!id) return '';
-      const profile = objectFrom(enriched.profile || {});
-      const projection = rt.assetProjection(id) || {};
+      const model = rt.assetPresentation(id);
+      const profile = objectFrom(model?.profile || enriched.profile || {});
       const parentId = this.energyAssetParentId(enriched);
       const parentName = parentId ? String(rt.assetName(parentId) || '').trim() : '';
       const area = this.energyAssetAreaLabel(enriched);
       const rows = [
-        area ? ['Area',area] : null,
-        parentName ? ['Part of',parentName] : null,
-        firstDefined(profile.display_name,profile.label,profile.name,'') ? ['Profile',firstDefined(profile.display_name,profile.label,profile.name,'')] : null
+        area ? [rhiEnergyT(this._hass,'asset.area',{},'Area'),area] : null,
+        parentName ? [rhiEnergyT(this._hass,'asset.part_of',{},'Part of'),parentName] : null,
+        firstDefined(profile.display_name,profile.label,profile.name,'')
+          ? [rhiEnergyT(this._hass,'asset.profile',{},'Profile'),firstDefined(profile.display_name,profile.label,profile.name,'')]
+          : null,
+        ...(model?.details || []).map(row => row.label && row.display !== '—' ? [row.label,row.display] : null)
       ].filter(Boolean);
-      const properties = (projection?.properties || [])
-        .filter(row => row?.presentation?.role === 'detail')
-        .map(row => {
-          const field = row?.projection || {};
-          if (!field.resolved) return null;
-          const label = String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || '');
-          if (!label) return null;
-          let value = field.display && field.display !== '—' ? String(field.display) : String(field.value ?? '—');
-          if (value === '—') return null;
-          if (field.unit && !value.toLowerCase().includes(String(field.unit).toLowerCase())) value += ` ${field.unit}`;
-          return [label,value];
-        }).filter(Boolean);
-      const all = [...rows,...properties];
-      if (!all.length) return '';
-      return `<details class="energyAssetDisclosure energyAssetDetails"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.details',{},'Details'))}</summary><div class="energyAssetFoldBody"><small class="energyAssetPublishedLabel">More information</small><div class="energyAssetDetailGrid">${all.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></div></details>`;
+      if (!rows.length) return '';
+      return rhiUxAssetDisclosure({
+        title:rhiEnergyT(this._hass,'common.details',{},'Details'),
+        content:`<div class="energyAssetDetailGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div>`
+      });
     }
 
     energyAssetDiagnosticsDisclosure(rt, asset = {}) {
@@ -3490,33 +3283,36 @@
       const enriched = this.energyAssetContext(rt, asset);
       const id = String(firstDefined(enriched.asset_id,enriched.id,'') || '');
       if (!id) return '';
-      const publication = objectFrom(enriched.publication || {});
-      const projection = rt.assetProjection(id) || {};
-      const lifecycle = objectFrom(projection.lifecycle || {});
+      const model = rt.assetPresentation(id);
+      const publication = objectFrom(model?.lifecycle?.publication || enriched.publication || {});
       const telemetry = publication.resolution_complete === false ? 'Incomplete'
         : publication.complete === false ? 'Partial'
         : publication.complete === true ? 'Complete' : 'Unknown';
       const source = firstDefined(enriched.integration_domain,enriched.source_domain,enriched.source,'');
-      const missing = Array.isArray(publication.missing) ? publication.missing : Array.isArray(publication.missing_fields) ? publication.missing_fields : [];
-      const propertyRows = (projection?.properties || [])
-        .filter(row => row?.presentation?.role === 'diagnostics')
-        .map(row => {
-          const field = row?.projection || {};
-          const label = String(firstDefined(row.display_name,row.label,human(row.property_key || row.key || 'Property')) || '');
-          const value = field.resolved
-            ? (field.display && field.display !== '—' ? field.display : firstDefined(field.value,'—'))
-            : humanReason(firstDefined(field.reason,row.reason_code,row.resolution?.reason_code,'Unavailable'),'Unavailable');
-          return label ? [label,String(value)] : null;
-        }).filter(Boolean);
+      const missing = Array.isArray(publication.missing_required_property_keys)
+        ? publication.missing_required_property_keys
+        : Array.isArray(publication.unresolved_required_property_keys)
+          ? publication.unresolved_required_property_keys
+          : [];
       const rows = [
-        ['Asset id',id],
-        source ? ['Source', source] : null,
-        ['Lifecycle',firstDefined(lifecycle.state,enriched.health,enriched.status,'Unknown')],
-        ['Telemetry', telemetry],
-        missing.length ? ['Missing publication fields',missing.join(' · ')] : null,
-        ...propertyRows
+        [rhiEnergyT(this._hass,'diagnostics.asset_id',{},'Asset id'),id],
+        source ? [rhiEnergyT(this._hass,'diagnostics.source',{},'Source'),source] : null,
+        [rhiEnergyT(this._hass,'diagnostics.lifecycle',{},'Lifecycle'),model?.lifecycle?.state || 'Unknown'],
+        [rhiEnergyT(this._hass,'diagnostics.telemetry',{},'Telemetry'),telemetry],
+        missing.length ? [rhiEnergyT(this._hass,'diagnostics.missing_fields',{},'Missing fields'),missing.join(' · ')] : null,
+        ...(model?.diagnostics || []).map(row => [
+          row.label || row.key || 'Property',
+          row.resolved ? row.display : humanReason(row.reason,'Unavailable')
+        ]),
+        ...(model?.unmapped || []).map(row => [
+          'Presentation metadata',
+          `${row.key || 'property'} · role missing`
+        ])
       ].filter(Boolean);
-      return `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.diagnostics',{},'Diagnostics'))}</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div></details>`;
+      return rhiUxAssetDisclosure({
+        title:rhiEnergyT(this._hass,'common.diagnostics',{},'Diagnostics'),
+        content:`<div class="energyAssetDiagnosticGrid">${rows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(String(value))}</b></span>`).join('')}</div>`
+      });
     }
 
     energyAppearanceAction(rt, asset = {}) {
