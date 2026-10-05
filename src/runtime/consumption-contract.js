@@ -2,8 +2,8 @@
 // Energy owns all balance semantics; the UX only selects already-resolved core values.
 function readLiveConsumptionContract(gateway) {
   const v2 = readEnergyPublicV2(gateway);
-  const site = v2.field('site_consumption.power_kw');
-  const home = v2.field('home_consumption.power_kw');
+  const site = v2.canonicalField('site_consumption.power_kw');
+  const home = v2.canonicalField('home_consumption.power_kw');
   const flexible = v2.field('flexible_loads.power_kw');
   const attributed = v2.field('flexible_loads.attributed_power_kw');
   const contributors = (v2.flexibleAssets || [])
