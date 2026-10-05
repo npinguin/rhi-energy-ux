@@ -1242,14 +1242,11 @@
       const has=(key,fallback=true)=>Object.prototype.hasOwnProperty.call(presence,key)
         ? presence[key] === true
         : fallback;
-      const showConsumers=has('flexible_loads', false);
       const showValue=has('pricing', false);
       return hbEnergyNavigation(this._hass).map(section=>({
         ...section,
         items:section.items.filter(item=>{
           if(item.id === 'battery') return has('battery', false);
-          if(item.id === 'gas') return has('gas', false);
-          if(item.id === 'consumers') return showConsumers;
           if(item.id === 'value') return showValue;
           return true;
         })
@@ -1261,10 +1258,10 @@
       const byItem = bySection?.items.find(item => item.id === String(itemId || ''));
       if (bySection && byItem) return { section:bySection.id, item:byItem.id, view:byItem.view };
       const legacy = {
-        overview:['energy','overview'], flow:['energy','flow'], battery:['energy','battery'], consumers:['energy','consumers'], gas:['energy','gas'],
+        overview:['energy','overview'], flow:['energy','overview'], battery:['energy','battery'], consumers:['energy','consumers'], gas:['energy','consumers'],
         strategies:['intelligence','settings'], intelligence:['intelligence','settings'], solar:['energy','solar'], 'operational-planning':['intelligence','plan'],
         planning:['intelligence','plan'], outlook:['intelligence','plan'],
-        metering:['insights','metering'], value:['insights','value'], retrospective:['insights','retrospective'],
+        metering:['insights','metering'], value:['insights','value'], retrospective:['insights','metering'],
         'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','plan']
       };
       const [fallbackSection,fallbackItem] = legacy[String(legacyView || '')] || ['energy','overview'];
@@ -1298,10 +1295,10 @@
     navigateToView(view) {
       const target = this.resolveNavigation('', '', view);
       const requested = String(view || target.view || '');
-      const planningViews = new Set(['operational-planning','planning','outlook','strategic-planning']);
+      const internalViews = new Set(['flow','gas','retrospective','operational-planning','planning','outlook','strategic-planning']);
       this.navSection = target.section;
       this.navItem = target.item;
-      this.view = planningViews.has(requested) ? requested : target.view;
+      this.view = internalViews.has(requested) ? requested : target.view;
       this.navSelectionBySection = { ...(this.navSelectionBySection || {}), [target.section]:target.item };
       this.persistView();
       this._forceRender = true;
@@ -2136,9 +2133,27 @@
 
 
     pageContextControls(rt, tab) {
+      if (['overview','flow'].includes(tab)) return this.componentSegmentedControl([
+        { value:'overview', label:rhiEnergyT(this._hass,'nav.overview',{},'Overview'), attrs:{'data-tab-target':'overview'} },
+        { value:'flow', label:rhiEnergyT(this._hass,'nav.flow',{},'Flow'), attrs:{'data-tab-target':'flow'} }
+      ], tab, 'overviewViewSelector');
+      if (['consumers','gas'].includes(tab)) {
+        const items=[{ value:'consumers', label:rhiEnergyT(this._hass,'nav.consumption',{},'Consumption'), attrs:{'data-tab-target':'consumers'} }];
+        if (rt.experiencePresence()?.gas === true) items.push({ value:'gas', label:rhiEnergyT(this._hass,'nav.gas',{},'Gas'), attrs:{'data-tab-target':'gas'} });
+        const selector=this.componentSegmentedControl(items,tab,'consumptionViewSelector');
+        if (tab === 'gas') return selector;
+        return selector + `<label class="hiQuickSelect"><span>${rhiEnergyT(this._hass,'common.group',{},'Group')}</span><select data-consumer-filter-select>${this.consumerFilterOptions().map(([id,label])=>`<option value="${id}"${this.consumerFilter===id?' selected':''}>${label}</option>`).join('')}</select></label><label class="hiQuickSelect"><span>${rhiEnergyT(this._hass,'common.sort',{},'Sort')}</span><select data-consumer-sort-select>${this.consumerSortOptions().map(([id,label])=>`<option value="${id}"${this.consumerSort===id?' selected':''}>${label}</option>`).join('')}</select></label>`;
+      }
+      if (['metering','retrospective'].includes(tab)) {
+        const selector=this.componentSegmentedControl([
+          { value:'metering', label:rhiEnergyT(this._hass,'nav.performance',{},'Performance'), attrs:{'data-tab-target':'metering'} },
+          { value:'retrospective', label:rhiEnergyT(this._hass,'nav.retrospective',{},'Retrospective'), attrs:{'data-tab-target':'retrospective'} }
+        ],tab,'performanceViewSelector');
+        return tab === 'metering'
+          ? selector + this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId) + this.componentMeteringSort()
+          : selector;
+      }
       if (tab === 'outlook') return this.componentHorizonSelector('outlook', rt.outlookHorizons(), this.selectedOutlookHorizonId);
-      if (tab === 'consumers') return `<label class="hiQuickSelect"><span>Group</span><select data-consumer-filter-select>${this.consumerFilterOptions().map(([id,label])=>`<option value="${id}"${this.consumerFilter===id?' selected':''}>${label}</option>`).join('')}</select></label><label class="hiQuickSelect"><span>Sort</span><select data-consumer-sort-select>${this.consumerSortOptions().map(([id,label])=>`<option value="${id}"${this.consumerSort===id?' selected':''}>${label}</option>`).join('')}</select></label>`;
-      if (tab === 'metering') return this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId) + this.componentMeteringSort();
       if (['operational-planning','planning','strategic-planning'].includes(tab)) {
         const selector = this.componentSegmentedControl([
           { value:'operational-planning', label:rhiEnergyT(this._hass,'nav.operational_plan',{},'Now'), attrs:{'data-tab-target':'operational-planning'} },
