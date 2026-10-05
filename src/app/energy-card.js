@@ -2161,7 +2161,7 @@
           { value:'strategic-planning', label:rhiEnergyT(this._hass,'nav.strategic_plan',{},'Long term'), attrs:{'data-tab-target':'strategic-planning'} }
         ], tab, 'planningViewSelector');
         const horizon = tab === 'planning'
-          ? `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">Today</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">Tomorrow</button></div>`
+          ? `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">${escapeHtml(rhiEnergyT(this._hass,'common.today',{},'Today'))}</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">${escapeHtml(rhiEnergyT(this._hass,'common.tomorrow',{},'Tomorrow'))}</button></div>`
           : '';
         return selector + horizon;
       }
@@ -2173,7 +2173,8 @@
       const controls = this.pageContextControls(rt, tab);
       if (!controls) return '';
       const aria = controlsId ? ` aria-controls="${escapeHtml(controlsId)}"` : '';
-      return `<section class="rhiUxContextBar" aria-label="View"${aria}><small>View</small><div class="rhiUxContextControls">${controls}</div></section>`;
+      const label=rhiEnergyT(this._hass,'common.view',{},'View');
+      return `<section class="rhiUxContextBar" aria-label="${escapeHtml(label)}"${aria}><small>${escapeHtml(label)}</small><div class="rhiUxContextControls">${controls}</div></section>`;
     }
 
     valueStateLabel(state) {
