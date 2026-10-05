@@ -120,7 +120,7 @@ for (const needle of [
   "userRelationshipLabel(value, fallback = 'Assigned charger')",
   "coherentCommandModels(models = [], stateHint = '')",
   "4.3.28 target-HA phone closure",
-  ".batteryGrid.batteryGridTwoUp{display:grid;grid-template-columns:1fr!important"
+  ".batteryGrid.batteryGridTwoUp{display:grid;grid-template-columns:1fr"
 ]) assert.ok(app.includes(needle), "target-HA UX closure missing: "+needle);
 assert.ok(!app.includes("Configured · physical identity not proven"), "Energy normal UX must not expose technical physical-identity wording");
 console.log("PASS target-HA product-safe actions, Gas capability copy and phone flow closure");
