@@ -1,17 +1,15 @@
-# RHI Energy UX 4.3.29 — canonical Core authority closure candidate
+# RHI Energy UX 4.3.30 — canonical flexible power envelope candidate
 
-Target Home Assistant showed canonical aggregate truth available on Energy logical objects while some product surfaces still rendered aggregate values unavailable.
+Energy UX now consumes the backend-owned current flexible-load power envelope published by Energy E0.15.101.
 
-4.3.29 closes the frontend authority ordering defect:
+- `flexible_loads.available_power_kw` is read from Public V2 Core;
+- valid 0 kW remains available and renders as zero;
+- missing backend evidence remains unavailable;
+- no grid/forecast/battery calculation exists in the frontend;
+- D0/D1 planned/still-to-plan totals remain separate kWh planning semantics.
 
-- Public V2 `core` is inserted before generic object/configuration rows for global current-home property access;
-- duplicate aggregate object keys can no longer shadow Core;
-- asset-detail pages retain exact asset-scoped values through `asset_id + property_key`;
-- Battery/Solar/Grid/Site/Home aggregate semantics remain backend-owned and are never reconstructed;
-- a release-blocking source-order regression prevents the authority inversion from returning.
-
-Tested backend candidate: **E0.15.100**.  
-Rollback: **v4.3.28**.  
+Tested backend candidate: **E0.15.101**.  
+Rollback: **v4.3.29**.  
 Known accepted technical debt: **0**.  
 Known accepted feature debt: **0**.
 
