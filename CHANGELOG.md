@@ -1,3 +1,11 @@
+## 4.3.29 — Single projection authority closure
+
+- route live Battery, Solar, Grid, Site Consumption and Home Consumption through one canonical Public V2 aggregate resolver;
+- make Overview, Flow, Solar, Home Battery and Consumption consume the same current-energy projection;
+- remove screen-side aggregate/property fallbacks and frontend flexible-load total reconstruction;
+- keep asset-specific contributors/detail projections separate without allowing them to become a second aggregate authority;
+- preserve 4.3.28 target-HA UX and responsive fixes.
+
 ## 4.3.28 — Target HA UX closure
 
 - scope and deduplicate product actions, including mutually exclusive charging/managed-state actions;
