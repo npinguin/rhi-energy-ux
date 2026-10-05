@@ -1,16 +1,17 @@
-# RHI Energy UX 4.3.28 — target Home Assistant UX closure candidate
+# RHI Energy UX 4.3.29 — canonical Core authority closure candidate
 
-- keep page-level actions product-scoped so ambiguous asset Start/Stop and repeated per-device commands no longer leak into headers;
-- deduplicate commands and suppress contradictory Start/Stop or Pause/Resume combinations based on published state;
-- fail closed in Overview intelligence when the canonical live Energy balance is incomplete;
-- keep opaque IDs, provider states and technical relationship wording out of normal product UX;
-- distinguish an available current gas meter from unavailable historical statistics;
-- remove duplicate Appearance actions;
-- make Battery, Gas and Solar asset compositions flow correctly on phone widths without presentation debt.
+Target Home Assistant showed canonical aggregate truth available on Energy logical objects while some product surfaces still rendered aggregate values unavailable.
 
-No Energy measurements are reconstructed in the frontend. Missing Public V2 truth remains unavailable.
+4.3.29 closes the frontend authority ordering defect:
 
-Rollback: **v4.3.27**.  
+- Public V2 `core` is inserted before generic object/configuration rows for global current-home property access;
+- duplicate aggregate object keys can no longer shadow Core;
+- asset-detail pages retain exact asset-scoped values through `asset_id + property_key`;
+- Battery/Solar/Grid/Site/Home aggregate semantics remain backend-owned and are never reconstructed;
+- a release-blocking source-order regression prevents the authority inversion from returning.
+
+Tested backend candidate: **E0.15.100**.  
+Rollback: **v4.3.28**.  
 Known accepted technical debt: **0**.  
 Known accepted feature debt: **0**.
 
