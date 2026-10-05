@@ -409,7 +409,7 @@
     asset(assetId) { return this.assets().find(a => String(a.asset_id || '') === String(assetId)) || null; }
     assetName(assetId) { return this.asset(assetId)?.display_name || human(assetId, '—'); }
     assetField(assetId, propertyKey) {
-      return this.publicV2().field(String(propertyKey || ''), String(assetId || ''));
+      return this.publicV2().assetField(String(assetId || ''), String(propertyKey || ''));
     }
     assetValue(assetId, propertyKey, fallback = null) {
       const field = this.assetField(assetId, propertyKey);
