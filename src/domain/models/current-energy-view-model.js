@@ -1,14 +1,11 @@
 // Canonical current-energy view model. Literal contract keys and direction
 // semantics are confined to this adapter so screen renderers cannot drift.
 function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
-  // interfaceKey is retained in the signature for call-site stability while the
-  // canonical source is exclusively RHI_ENERGY_PUBLIC_CONTRACT_V2.
   const v2 = readEnergyPublicV2(gateway);
-  const row = v2.property(propertyKey);
-  const projected = v2.field(propertyKey);
+  const projected = v2.currentField(propertyKey);
   return Object.freeze({
     envelope:v2.envelope,
-    row:row || projected.raw || {},
+    row:projected.raw || {},
     value:projected.value,
     number:asNumber(projected.value),
     text:String(projected.value ?? ''),
