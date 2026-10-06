@@ -2107,13 +2107,10 @@
       return values.reduce((sum, value) => sum + Math.max(0, value), 0);
     }
     flexiblePowerNowKw(rt) {
-      // Live Flexible Loads power is physical connection truth owned by Energy core.
-      // Do not re-sum planning participants: infrastructure may consume power without being a planning target.
+      // Aggregate managed power is backend-owned current truth. Never rebuild it
+      // from participant rows, which are a different semantic population.
       const physical = rt.number('flexible_loads.power_kw');
-      if (physical !== null) return Math.abs(physical);
-      const values = this.flexibleAssetDomain(rt).planningParticipants().map(vm => asNumber(firstDefined(vm.raw.power_kw, vm.raw.current_power_kw, vm.raw.actual_power_kw))).filter(value => value !== null);
-      if (!values.length) return null;
-      return values.reduce((sum, value) => sum + Math.abs(value), 0);
+      return physical === null ? null : Math.abs(physical);
     }
     currentEnergyModel(rt) { return createCurrentEnergyViewModel(rt.contractGateway()); }
     progress(value, max = null) { return this.componentProgressBar(value, max); }
@@ -2132,7 +2129,7 @@
         <div class="solarPath"></div><div class="batteryPath"></div><div class="gridPath"></div>
         <div class="house"><div class="roof"></div><div class="wall"><i></i><i></i><i></i></div><div class="panels"><i></i><i></i><i></i><i></i><i></i></div></div>
         <div class="car"></div>
-        <div class="float solar"><span>Solar</span><b>${fmtKw(solar)}</b><small>Producing</small></div>
+        <div class="float solar"><span>Solar</span><b>${fmtKw(solar)}</b><small>${solar === null ? 'Unavailable' : solar > 0.005 ? 'Producing' : 'Idle'}</small></div>
         <div class="float battery"><span>Home Battery</span><b>${fmtKw(batteryShown)}</b><small>${escapeHtml(batteryLabel)}</small></div>
         <div class="float grid"><span>Grid</span><b>${fmtKw(gridShown)}</b><small>${escapeHtml(gridLabel)}</small></div>
         <div class="float export">↔ ${fmtKw(gridExport, '0.0 kW')}</div>
@@ -3717,12 +3714,32 @@
         : '';
       return `<div class="solarProductionChildren" id="solar-inverter-detail">${inverterCards}${unresolved}</div>`;
     }
+    homeBatteryAggregateCard(rt, system = null) {
+      const battery = this.currentEnergyModel(rt).battery;
+      const enriched = system ? this.energyAssetContext(rt, system) : {};
+      const name = firstDefined(enriched.display_name,enriched.name,'Home Battery System');
+      const identity = rhiUxAssetIdentity({
+        eyebrow:'Battery system',
+        title:name,
+        subtitle:battery.label || rhiEnergyT(this._hass,'common.not_available',{},'Not available'),
+        visual:system ? this.assetVisual(enriched,{size:'lg',fallbackIcon:'▣',decorative:false}) : ''
+      });
+      const factGrid = rhiUxAssetFactGrid([
+        {label:'Power now',value:fmtKw(battery.displayPowerKw,'—')},
+        {label:'State of charge',value:fmtPct(battery.socPct)},
+        {label:'Capacity',value:fmtKwh(battery.capacityKwh)},
+        {label:'Available energy',value:fmtKwh(battery.availableKwh)}
+      ]);
+      const folds = system
+        ? `<div class="energyAssetFoldStack">${this.energyAssetConfigurationDisclosure(rt,enriched)}${this.energyAssetDetailDisclosure(rt,enriched)}${this.energyAssetDiagnosticsDisclosure(rt,enriched)}</div>`
+        : '';
+      return `<div class="energyAssetNode" data-current-energy-projection="battery"><article class="energyDeviceCard rhiEnergyCoreAssetCard">${identity}${factGrid}${folds}</article></div>`;
+    }
+
     solarBatterySystem(rt, systems = [], batteries = []) {
       if (!systems.length && !batteries.length) return '';
       const system = systems[0] || null;
-      const head = system
-        ? this.energyDeviceStatusCard(rt,system,'Battery system')
-        : `<div class="solarSystemSummary"><div><small>BATTERY SYSTEM</small><h3>Home Battery System</h3><p>A combined battery summary is not available; individual batteries are shown below.</p></div><div class="solarAggregateFacts"><span><small>Batteries</small><b>${batteries.length}</b></span></div></div>`;
+      const head = this.homeBatteryAggregateCard(rt, system);
       const children = batteries.length ? `<div class="solarChildGrid">${batteries.map(asset=>this.batteryChildCard(rt,String(firstDefined(asset.asset_id,asset.id,'') || ''))).join('')}</div>` : '';
       return this.solarHardwareSection(
         'Home Battery',
@@ -3782,11 +3799,12 @@
       let productionBody = inverterSection;
       if (aggregate) {
         const enriched = this.energyAssetContext(rt,aggregate);
-        const aggregateFacts = this.energyAssetFacts(rt,enriched,5).filter(row=>!/^(state|status)$/i.test(String(row.label || ''))).slice(0,4);
-        const aggregateStateFact = this.energyAssetFacts(rt,enriched,6).find(row=>/^(state|status)$/i.test(String(row.label || ''))) || null;
-        const aggregatePower = this.measuredAssetPower(enriched);
-        const aggregateFallbackState = aggregatePower !== null ? (aggregatePower > 0.005 ? 'Producing' : 'Idle') : '';
-        const aggregateState = this.userSafeProductText(aggregateStateFact?.value, aggregateFallbackState) || aggregateFallbackState;
+        const currentSolar = this.currentEnergyModel(rt).solar;
+        const secondaryFacts = this.energyAssetFacts(rt,enriched,8)
+          .filter(row=>!/^(state|status|power now|production now)$/i.test(String(row.label || '')))
+          .slice(0,3);
+        const aggregateFacts = [{label:'Production now',value:fmtKw(currentSolar.powerKw,'—')}, ...secondaryFacts];
+        const aggregateState = currentSolar.powerKw === null ? 'Unavailable' : currentSolar.powerKw > 0.005 ? 'Producing' : 'Idle';
         const children = inverterSection
           ? `<details class="energyAssetChildrenSibling solarProductionChildrenDisclosure"><summary>Children · ${inverters.length}</summary><div class="energyAssetChildrenStack">${inverterSection}</div></details>`
           : '';
@@ -4543,10 +4561,7 @@
       const available = batteryVm.availableKwh;
       const power = batteryVm.displayPowerKw;
       const state = batteryVm.label;
-      const reserve = asNumber(firstDefined(
-        rt.value('battery.reserve_target_pct', null),
-        rt.value('battery.reserve_pct', null)
-      ));
+      const reserve = batteryVm.reserveTargetPct;
       const batterySystem = rt.assets().find(asset => ['battery_system','home_battery_system'].includes(String(asset.asset_type || asset.object_class || '').toLowerCase())) || rt.asset('battery_system');
       const children = batterySystem
         ? rt.childrenOfType(String(batterySystem.asset_id || 'battery_system'), 'battery')
