@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.30';
+  const UX_VERSION = 'R4.3.31';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
@@ -238,6 +238,62 @@ function readEnergyPublicV2(gateway) {
     }
   }
 
+  const currentAggregateTypes = Object.freeze({
+    'battery.power_kw':['battery_system','home_battery_system'],
+    'battery.soc_pct':['battery_system','home_battery_system'],
+    'battery.capacity_kwh':['battery_system','home_battery_system'],
+    'battery.available_kwh':['battery_system','home_battery_system'],
+    'battery.state':['battery_system','home_battery_system'],
+    'battery.reserve_target_pct':['battery_system','home_battery_system'],
+    'solar.power_kw':['solar_production'],
+    'grid.net_power_kw':['grid_connection'],
+    'grid_import.power_kw':['grid_connection'],
+    'grid_export.power_kw':['grid_connection'],
+    'grid.flow_direction':['grid_connection'],
+    'site_consumption.power_kw':['site_consumption'],
+    'home_consumption.power_kw':['home_consumption']
+  });
+  const currentFieldAliases = Object.freeze({
+    'battery.power_kw':['power_kw','current_power_kw','actual_power_kw','battery_power_kw'],
+    'battery.soc_pct':['soc_pct','battery_soc_pct'],
+    'battery.capacity_kwh':['capacity_kwh','battery_capacity_kwh'],
+    'battery.available_kwh':['available_kwh','battery_available_kwh'],
+    'battery.state':['operating_state','state'],
+    'battery.reserve_target_pct':['reserve_target_pct'],
+    'solar.power_kw':['power_kw','current_power_kw','solar_power_kw'],
+    'grid.net_power_kw':['net_power_kw','power_kw'],
+    'grid_import.power_kw':['import_power_kw','grid_import_power_kw'],
+    'grid_export.power_kw':['export_power_kw','grid_export_power_kw'],
+    'grid.flow_direction':['flow_direction','direction'],
+    'site_consumption.power_kw':['power_kw','current_power_kw','site_consumption_kw'],
+    'home_consumption.power_kw':['power_kw','current_power_kw','home_consumption_kw']
+  });
+  const currentAggregateObject = key => {
+    const wanted = new Set((currentAggregateTypes[String(key || '')] || []).map(v=>String(v).toLowerCase()));
+    return wanted.size ? (objects.find(row=>wanted.has(String(row.asset_type || row.object_class || '').toLowerCase())) || null) : null;
+  };
+  const currentField = key => {
+    const wanted=String(key || '');
+    const coreFieldValue=coreByKey.get(wanted) || null;
+    if (coreFieldValue?.resolved === true) return coreFieldValue;
+    const aggregate=currentAggregateObject(wanted);
+    if (aggregate) {
+      const assetId=String(aggregate.asset_id || '');
+      const scoped=assetId ? propertyByAssetAndKey.get(`${assetId}::${wanted}`) : null;
+      if (scoped) {
+        const projected=semantic(scoped);
+        if (projected.resolved === true) return projected;
+      }
+      for (const alias of currentFieldAliases[wanted] || []) {
+        if (!Object.prototype.hasOwnProperty.call(aggregate,alias)) continue;
+        const value=aggregate[alias];
+        if (value === undefined || value === null || value === '') continue;
+        return semantic({value,status:'AVAILABLE',quality:'CANONICAL',source_asset_id:assetId,source_field:alias});
+      }
+    }
+    return coreFieldValue || semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:'canonical_current_field_not_published'});
+  };
+
   const publicContractOk = envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2';
   const corePresent = Object.keys(core).length > 0;
   const capabilities = Object.freeze({
@@ -294,6 +350,8 @@ function readEnergyPublicV2(gateway) {
     propertyByKey,
     propertyByAssetAndKey,
     coreByKey,
+    currentAggregateObject,
+    currentField,
     object(assetId) { return objectById.get(String(assetId || '')) || null; },
     profile(profileId) { return profileById.get(String(profileId || '')) || null; },
     property(key, assetId = '') {
@@ -762,8 +820,8 @@ function energyAssetPublicationGap(gateway, assetId = "") {
 // Energy owns all balance semantics; the UX only selects already-resolved core values.
 function readLiveConsumptionContract(gateway) {
   const v2 = readEnergyPublicV2(gateway);
-  const site = v2.field('site_consumption.power_kw');
-  const home = v2.field('home_consumption.power_kw');
+  const site = v2.currentField('site_consumption.power_kw');
+  const home = v2.currentField('home_consumption.power_kw');
   const flexible = v2.field('flexible_loads.power_kw');
   const attributed = v2.field('flexible_loads.attributed_power_kw');
   const contributors = (v2.flexibleAssets || [])
@@ -802,14 +860,11 @@ function readLiveConsumptionContract(gateway) {
 // Canonical current-energy view model. Literal contract keys and direction
 // semantics are confined to this adapter so screen renderers cannot drift.
 function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
-  // interfaceKey is retained in the signature for call-site stability while the
-  // canonical source is exclusively RHI_ENERGY_PUBLIC_CONTRACT_V2.
   const v2 = readEnergyPublicV2(gateway);
-  const row = v2.property(propertyKey);
-  const projected = v2.field(propertyKey);
+  const projected = v2.currentField(propertyKey);
   return Object.freeze({
     envelope:v2.envelope,
-    row:row || projected.raw || {},
+    row:projected.raw || {},
     value:projected.value,
     number:asNumber(projected.value),
     text:String(projected.value ?? ''),
@@ -4119,13 +4174,10 @@ function rhiEnergyVisualPickerStyles() {
       return values.reduce((sum, value) => sum + Math.max(0, value), 0);
     }
     flexiblePowerNowKw(rt) {
-      // Live Flexible Loads power is physical connection truth owned by Energy core.
-      // Do not re-sum planning participants: infrastructure may consume power without being a planning target.
+      // Aggregate managed power is backend-owned current truth. Never rebuild it
+      // from participant rows, which are a different semantic population.
       const physical = rt.number('flexible_loads.power_kw');
-      if (physical !== null) return Math.abs(physical);
-      const values = this.flexibleAssetDomain(rt).planningParticipants().map(vm => asNumber(firstDefined(vm.raw.power_kw, vm.raw.current_power_kw, vm.raw.actual_power_kw))).filter(value => value !== null);
-      if (!values.length) return null;
-      return values.reduce((sum, value) => sum + Math.abs(value), 0);
+      return physical === null ? null : Math.abs(physical);
     }
     currentEnergyModel(rt) { return createCurrentEnergyViewModel(rt.contractGateway()); }
     progress(value, max = null) { return this.componentProgressBar(value, max); }
@@ -4144,7 +4196,7 @@ function rhiEnergyVisualPickerStyles() {
         <div class="solarPath"></div><div class="batteryPath"></div><div class="gridPath"></div>
         <div class="house"><div class="roof"></div><div class="wall"><i></i><i></i><i></i></div><div class="panels"><i></i><i></i><i></i><i></i><i></i></div></div>
         <div class="car"></div>
-        <div class="float solar"><span>Solar</span><b>${fmtKw(solar)}</b><small>Producing</small></div>
+        <div class="float solar"><span>Solar</span><b>${fmtKw(solar)}</b><small>${solar === null ? 'Unavailable' : solar > 0.005 ? 'Producing' : 'Idle'}</small></div>
         <div class="float battery"><span>Home Battery</span><b>${fmtKw(batteryShown)}</b><small>${escapeHtml(batteryLabel)}</small></div>
         <div class="float grid"><span>Grid</span><b>${fmtKw(gridShown)}</b><small>${escapeHtml(gridLabel)}</small></div>
         <div class="float export">↔ ${fmtKw(gridExport, '0.0 kW')}</div>
@@ -5729,12 +5781,32 @@ function rhiEnergyVisualPickerStyles() {
         : '';
       return `<div class="solarProductionChildren" id="solar-inverter-detail">${inverterCards}${unresolved}</div>`;
     }
+    homeBatteryAggregateCard(rt, system = null) {
+      const battery = this.currentEnergyModel(rt).battery;
+      const enriched = system ? this.energyAssetContext(rt, system) : {};
+      const name = firstDefined(enriched.display_name,enriched.name,'Home Battery System');
+      const identity = rhiUxAssetIdentity({
+        eyebrow:'Battery system',
+        title:name,
+        subtitle:battery.label || rhiEnergyT(this._hass,'common.not_available',{},'Not available'),
+        visual:system ? this.assetVisual(enriched,{size:'lg',fallbackIcon:'▣',decorative:false}) : ''
+      });
+      const factGrid = rhiUxAssetFactGrid([
+        {label:'Power now',value:fmtKw(battery.displayPowerKw,'—')},
+        {label:'State of charge',value:fmtPct(battery.socPct)},
+        {label:'Capacity',value:fmtKwh(battery.capacityKwh)},
+        {label:'Available energy',value:fmtKwh(battery.availableKwh)}
+      ]);
+      const folds = system
+        ? `<div class="energyAssetFoldStack">${this.energyAssetConfigurationDisclosure(rt,enriched)}${this.energyAssetDetailDisclosure(rt,enriched)}${this.energyAssetDiagnosticsDisclosure(rt,enriched)}</div>`
+        : '';
+      return `<div class="energyAssetNode" data-current-energy-projection="battery"><article class="energyDeviceCard rhiEnergyCoreAssetCard">${identity}${factGrid}${folds}</article></div>`;
+    }
+
     solarBatterySystem(rt, systems = [], batteries = []) {
       if (!systems.length && !batteries.length) return '';
       const system = systems[0] || null;
-      const head = system
-        ? this.energyDeviceStatusCard(rt,system,'Battery system')
-        : `<div class="solarSystemSummary"><div><small>BATTERY SYSTEM</small><h3>Home Battery System</h3><p>A combined battery summary is not available; individual batteries are shown below.</p></div><div class="solarAggregateFacts"><span><small>Batteries</small><b>${batteries.length}</b></span></div></div>`;
+      const head = this.homeBatteryAggregateCard(rt, system);
       const children = batteries.length ? `<div class="solarChildGrid">${batteries.map(asset=>this.batteryChildCard(rt,String(firstDefined(asset.asset_id,asset.id,'') || ''))).join('')}</div>` : '';
       return this.solarHardwareSection(
         'Home Battery',
@@ -5794,11 +5866,12 @@ function rhiEnergyVisualPickerStyles() {
       let productionBody = inverterSection;
       if (aggregate) {
         const enriched = this.energyAssetContext(rt,aggregate);
-        const aggregateFacts = this.energyAssetFacts(rt,enriched,5).filter(row=>!/^(state|status)$/i.test(String(row.label || ''))).slice(0,4);
-        const aggregateStateFact = this.energyAssetFacts(rt,enriched,6).find(row=>/^(state|status)$/i.test(String(row.label || ''))) || null;
-        const aggregatePower = this.measuredAssetPower(enriched);
-        const aggregateFallbackState = aggregatePower !== null ? (aggregatePower > 0.005 ? 'Producing' : 'Idle') : '';
-        const aggregateState = this.userSafeProductText(aggregateStateFact?.value, aggregateFallbackState) || aggregateFallbackState;
+        const currentSolar = this.currentEnergyModel(rt).solar;
+        const secondaryFacts = this.energyAssetFacts(rt,enriched,8)
+          .filter(row=>!/^(state|status|power now|production now)$/i.test(String(row.label || '')))
+          .slice(0,3);
+        const aggregateFacts = [{label:'Production now',value:fmtKw(currentSolar.powerKw,'—')}, ...secondaryFacts];
+        const aggregateState = currentSolar.powerKw === null ? 'Unavailable' : currentSolar.powerKw > 0.005 ? 'Producing' : 'Idle';
         const children = inverterSection
           ? `<details class="energyAssetChildrenSibling solarProductionChildrenDisclosure"><summary>Children · ${inverters.length}</summary><div class="energyAssetChildrenStack">${inverterSection}</div></details>`
           : '';
@@ -5887,11 +5960,6 @@ function rhiEnergyVisualPickerStyles() {
 
     solar(rt) {
       const pageVm = this.buildPageViewModel(rt, 'solar');
-      const solarPower = rt.number('solar.power_kw');
-      const forecastToday = rt.number('forecast.solar_today_kwh');
-      const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
-      const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
-      const gridExportToday = rt.number('metering.grid_export_today_kwh');
       return `${this.tabExperienceHeader(rt,'solar',pageVm)}<div class="solarPage solarHardwarePage">
         ${this.solarEnergyStory(rt)}
         ${this.solarHardwareExperience(rt)}
@@ -6555,10 +6623,7 @@ function rhiEnergyVisualPickerStyles() {
       const available = batteryVm.availableKwh;
       const power = batteryVm.displayPowerKw;
       const state = batteryVm.label;
-      const reserve = asNumber(firstDefined(
-        rt.value('battery.reserve_target_pct', null),
-        rt.value('battery.reserve_pct', null)
-      ));
+      const reserve = batteryVm.reserveTargetPct;
       const batterySystem = rt.assets().find(asset => ['battery_system','home_battery_system'].includes(String(asset.asset_type || asset.object_class || '').toLowerCase())) || rt.asset('battery_system');
       const children = batterySystem
         ? rt.childrenOfType(String(batterySystem.asset_id || 'battery_system'), 'battery')
