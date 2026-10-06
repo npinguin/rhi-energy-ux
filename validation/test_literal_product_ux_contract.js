@@ -18,7 +18,8 @@ const required=[
   "behavior_topics",
   "userSafeProductText(value, fallback = '')",
   "rhiUxAssetIdentity({",
-  "rhiUxAssetFactGrid("
+  "rhiUxAssetFactGrid(",
+  "rt.value('energy_intelligence.recommendation', null)"
 ];
 for(const token of required){
   if(!source.includes(token)) throw new Error("literal UX contract missing: "+token);
@@ -39,7 +40,8 @@ for(const forbidden of [
   "frontend defect guard",
   "No charging topology published",
   "Canonical Tactical plan projected without frontend recalculation",
-  "Strategy configuration is the authority for longer-term intent"
+  "Strategy configuration is the authority for longer-term intent",
+  "rt.value('energy_intelligence.recommendation', 'No action needed')"
 ]){
   if(source.includes(forbidden)) throw new Error("forbidden UX drift returned: "+forbidden);
 }
