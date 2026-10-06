@@ -1,17 +1,16 @@
-# RHI Energy UX 4.3.29 — canonical Core authority closure candidate
+# RHI Energy UX 4.3.30 — target-HA semantic presentation closure candidate
 
-Target Home Assistant showed canonical aggregate truth available on Energy logical objects while some product surfaces still rendered aggregate values unavailable.
+4.3.30 closes the remaining frontend semantic presentation gaps observed during target Home Assistant review:
 
-4.3.29 closes the frontend authority ordering defect:
-
-- Public V2 `core` is inserted before generic object/configuration rows for global current-home property access;
-- duplicate aggregate object keys can no longer shadow Core;
-- asset-detail pages retain exact asset-scoped values through `asset_id + property_key`;
-- Battery/Solar/Grid/Site/Home aggregate semantics remain backend-owned and are never reconstructed;
-- a release-blocking source-order regression prevents the authority inversion from returning.
+- unknown Solar production remains unavailable instead of being presented as “Not generating”;
+- unknown Grid flow remains unavailable instead of being presented as “Balanced locally”;
+- missing Home Intelligence recommendation remains unavailable instead of defaulting to “No action needed”;
+- the Solar screen no longer implies a serial physical path Solar → Battery ↔ Home ↔ Grid;
+- Solar, Battery, Home and Grid are presented as independent current-balance positions;
+- existing 4.3.28/4.3.29 fixes for product-safe actions, mobile composition and canonical Core authority remain unchanged.
 
 Tested backend candidate: **E0.15.100**.  
-Rollback: **v4.3.28**.  
+Rollback: **v4.3.29**.  
 Known accepted technical debt: **0**.  
 Known accepted feature debt: **0**.
 
