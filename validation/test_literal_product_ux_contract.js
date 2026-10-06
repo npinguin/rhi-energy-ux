@@ -18,7 +18,8 @@ const required=[
   "behavior_topics",
   "userSafeProductText(value, fallback = '')",
   "rhiUxAssetIdentity({",
-  "rhiUxAssetFactGrid("
+  "rhiUxAssetFactGrid(",
+  "rt.value('energy_intelligence.recommendation', null)"
 ];
 for(const token of required){
   if(!source.includes(token)) throw new Error("literal UX contract missing: "+token);
@@ -39,7 +40,8 @@ for(const forbidden of [
   "frontend defect guard",
   "No charging topology published",
   "Canonical Tactical plan projected without frontend recalculation",
-  "Strategy configuration is the authority for longer-term intent"
+  "Strategy configuration is the authority for longer-term intent",
+  "rt.value('energy_intelligence.recommendation', 'No action needed')"
 ]){
   if(source.includes(forbidden)) throw new Error("forbidden UX drift returned: "+forbidden);
 }
@@ -76,5 +78,14 @@ const strategic=source.slice(strategicStart,strategicEnd);
 if(strategic.includes("Goals & policy") || strategic.includes("Constraints & resilience")){
   throw new Error("Strategic Planning must not mirror raw Settings policy tables");
 }
+
+
+if(source.includes("(solar||0)>0.05")) throw new Error("unknown solar must not be coerced to zero");
+if(source.includes(" : 'Balanced locally'")) throw new Error("unknown grid direction must not become a balanced conclusion");
+for(const requiredTruthGuard of [
+  "solar===null?'Solar production unavailable'",
+  "flowValue === null",
+  "'Grid flow unavailable'"
+]) if(!source.includes(requiredTruthGuard)) throw new Error("current-truth fail-closed guard missing: "+requiredTruthGuard);
 
 console.log("PASS literal product UX contract");
