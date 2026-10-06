@@ -195,6 +195,62 @@ function readEnergyPublicV2(gateway) {
     }
   }
 
+  const currentAggregateTypes = Object.freeze({
+    'battery.power_kw':['battery_system','home_battery_system'],
+    'battery.soc_pct':['battery_system','home_battery_system'],
+    'battery.capacity_kwh':['battery_system','home_battery_system'],
+    'battery.available_kwh':['battery_system','home_battery_system'],
+    'battery.state':['battery_system','home_battery_system'],
+    'battery.reserve_target_pct':['battery_system','home_battery_system'],
+    'solar.power_kw':['solar_production'],
+    'grid.net_power_kw':['grid_connection'],
+    'grid_import.power_kw':['grid_connection'],
+    'grid_export.power_kw':['grid_connection'],
+    'grid.flow_direction':['grid_connection'],
+    'site_consumption.power_kw':['site_consumption'],
+    'home_consumption.power_kw':['home_consumption']
+  });
+  const currentFieldAliases = Object.freeze({
+    'battery.power_kw':['power_kw','current_power_kw','actual_power_kw','battery_power_kw'],
+    'battery.soc_pct':['soc_pct','battery_soc_pct'],
+    'battery.capacity_kwh':['capacity_kwh','battery_capacity_kwh'],
+    'battery.available_kwh':['available_kwh','battery_available_kwh'],
+    'battery.state':['operating_state','state'],
+    'battery.reserve_target_pct':['reserve_target_pct'],
+    'solar.power_kw':['power_kw','current_power_kw','solar_power_kw'],
+    'grid.net_power_kw':['net_power_kw','power_kw'],
+    'grid_import.power_kw':['import_power_kw','grid_import_power_kw'],
+    'grid_export.power_kw':['export_power_kw','grid_export_power_kw'],
+    'grid.flow_direction':['flow_direction','direction'],
+    'site_consumption.power_kw':['power_kw','current_power_kw','site_consumption_kw'],
+    'home_consumption.power_kw':['power_kw','current_power_kw','home_consumption_kw']
+  });
+  const currentAggregateObject = key => {
+    const wanted = new Set((currentAggregateTypes[String(key || '')] || []).map(v=>String(v).toLowerCase()));
+    return wanted.size ? (objects.find(row=>wanted.has(String(row.asset_type || row.object_class || '').toLowerCase())) || null) : null;
+  };
+  const currentField = key => {
+    const wanted=String(key || '');
+    const coreFieldValue=coreByKey.get(wanted) || null;
+    if (coreFieldValue?.resolved === true) return coreFieldValue;
+    const aggregate=currentAggregateObject(wanted);
+    if (aggregate) {
+      const assetId=String(aggregate.asset_id || '');
+      const scoped=assetId ? propertyByAssetAndKey.get(`${assetId}::${wanted}`) : null;
+      if (scoped) {
+        const projected=semantic(scoped);
+        if (projected.resolved === true) return projected;
+      }
+      for (const alias of currentFieldAliases[wanted] || []) {
+        if (!Object.prototype.hasOwnProperty.call(aggregate,alias)) continue;
+        const value=aggregate[alias];
+        if (value === undefined || value === null || value === '') continue;
+        return semantic({value,status:'AVAILABLE',quality:'CANONICAL',source_asset_id:assetId,source_field:alias});
+      }
+    }
+    return coreFieldValue || semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:'canonical_current_field_not_published'});
+  };
+
   const publicContractOk = envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2';
   const corePresent = Object.keys(core).length > 0;
   const capabilities = Object.freeze({
@@ -251,6 +307,8 @@ function readEnergyPublicV2(gateway) {
     propertyByKey,
     propertyByAssetAndKey,
     coreByKey,
+    currentAggregateObject,
+    currentField,
     object(assetId) { return objectById.get(String(assetId || '')) || null; },
     profile(profileId) { return profileById.get(String(profileId || '')) || null; },
     property(key, assetId = '') {

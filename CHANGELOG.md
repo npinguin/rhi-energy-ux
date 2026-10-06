@@ -1,3 +1,10 @@
+## 4.3.31 — Canonical Cross-Surface Projection Closure
+
+- use one Core-first current-energy projection across Overview, Flow, Solar, Home Battery and Consumption;
+- allow only a published aggregate Public V2 object to supply a current fact when the corresponding Core field is unresolved;
+- remove independent aggregate Battery/Solar screen projections and Flexible Loads participant re-summing;
+- add release-blocking cross-surface authority and target-HA aggregate/Core divergence regressions.
+
 ## 4.3.30 — Target-HA Semantic Presentation Closure
 
 - keep unknown Solar production unavailable instead of coercing it to “Not generating”;
