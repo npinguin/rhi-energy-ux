@@ -3893,11 +3893,6 @@
 
     solar(rt) {
       const pageVm = this.buildPageViewModel(rt, 'solar');
-      const solarPower = rt.number('solar.power_kw');
-      const forecastToday = rt.number('forecast.solar_today_kwh');
-      const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
-      const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
-      const gridExportToday = rt.number('metering.grid_export_today_kwh');
       return `${this.tabExperienceHeader(rt,'solar',pageVm)}<div class="solarPage solarHardwarePage">
         ${this.solarEnergyStory(rt)}
         ${this.solarHardwareExperience(rt)}
