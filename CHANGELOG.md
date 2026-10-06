@@ -1,3 +1,11 @@
+## 4.3.30 — Target-HA Semantic Presentation Closure
+
+- keep unknown Solar production unavailable instead of coercing it to “Not generating”;
+- keep unknown Grid flow unavailable instead of presenting an unsupported “Balanced locally” state;
+- remove the positive “No action needed” default when no Home Intelligence recommendation is published;
+- replace the misleading serial Solar → Battery ↔ Home ↔ Grid diagram with independent current-balance positions;
+- add release-blocking regressions for unknown-as-zero and serial-flow presentation drift.
+
 ## 4.3.29 — Canonical Core Authority Closure
 
 - make Public V2 Core the first and global authority for aggregate Battery, Solar, Grid, Site/Home Consumption and Flexible Loads property keys;
