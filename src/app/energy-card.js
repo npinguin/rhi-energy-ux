@@ -2436,7 +2436,7 @@
       const flexNeed = this.flexibleNeedKwh(rt);
       const decision = rt.decision();
       const status = this.productStateLabel(decision.status || rt.value('energy_intelligence.status', 'observed'), 'Observed');
-      const recommendation = humanReason(decision.recommendation || rt.value('energy_intelligence.recommendation', 'No action needed'), 'No action needed');
+      const recommendation = humanReason(decision.recommendation || rt.value('energy_intelligence.recommendation', null), 'Not available');
       const flowValue = current.grid.displayPowerKw;
       const flowState = flowValue === null
         ? 'Grid flow unavailable'
