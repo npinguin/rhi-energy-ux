@@ -38,7 +38,17 @@ const forbiddenPilotLiterals=[
   "<h2>Home Battery state</h2>","<h2>Home Battery contributors</h2>","<h2>Flexible loads</h2>",
   "<h2>Automation</h2>","<h2>What do you want to adjust?</h2>","<h2>Measurement period</h2>",
   "<h2>Financial result</h2>","<h2>Pricing settings</h2>","<h2>Managed flexible assets</h2>",
-  "title:\"Choose appearance\"","description:\"Choose the representative image."
+  "title:\"Choose appearance\"","description:\"Choose the representative image.",
+  "<small>Recommendation</small>",
+  "<span>Pause mode</span>",
+  "<b>⚙ Strategy settings</b>",
+  "<span>Not managed by Home Intelligence</span>",
+  "<small>SOLAR PANEL</small>",
+  "<small>OPTIMIZER / PANEL</small>",
+  "<small>SOLAR PRODUCTION</small>",
+  "<span>Main Switchboard</span>",
+  "<small>REVIEW PREREQUISITES</small>",
+  "<b>Collecting evidence</b>"
 ];
 for(const file of pilotFiles){
   const source=fs.readFileSync(file,"utf8");
