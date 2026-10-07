@@ -1,6 +1,6 @@
 # Energy Physical Visual Coverage
 
-Status: **physical visual library candidate on Energy UX 4.3.18**
+Status: **product visual library released on Energy UX 4.3.19; generic fallback completion in progress**
 
 This matrix mirrors `governance/energy-visual-manifest.json`.
 
@@ -25,8 +25,9 @@ asset images.
 | `gas_meter` | FLONIDAN UniFlo G4 | FLONIDAN |
 | `grid_meter` | Sagemcom T211-D3 | Sagemcom |
 
-The temporary default rule is deterministic: exact configured/profile match first,
-otherwise the first selectable entry of the same `asset_type`, otherwise no image.
+Current runtime rule: exact configured/profile match first, otherwise the first selectable entry of the same `asset_type`, otherwise no image.
+
+Target closure rule: exact configured/profile match first, otherwise the dedicated generic fallback of the same physical `asset_type`, otherwise no image. Product artwork must never impersonate a generic fallback.
 
 ## Explicitly outside the asset image catalog
 
@@ -46,12 +47,20 @@ Hero assets remain valid for dashboards such as Overview, Solar, Battery, Meteri
 Planning and Outlook. No `heroes/` path is allowed in the physical asset catalog or
 physical backend visual registry.
 
+## Generic fallback closure
+
+Published generic fallbacks: `battery_system`, `solar_zone`.
+
+Still required as dedicated generic artwork: `battery`, `solar_panel`, `solar_inverter`, `solar_optimizer`, `backup_interface`, `gas_meter`, `grid_meter`.
+
+The manifest contains exactly one generic fallback record for every supported physical type. CI keeps `migration_complete=false` until all nine are `published_approved` and present byte-identically in `src/assets` and `dist/assets`.
+
 ## Completion criteria
 
-1. all physical catalog paths exist in both `src/assets` and `dist/assets`;
-2. source/dist bytes are identical;
-3. `solar_zone_generic.webp` is present at 1600×1200 with transparency;
+1. every supported physical `asset_type` has one dedicated generic fallback;
+2. all published physical catalog paths exist in both `src/assets` and `dist/assets`;
+3. source/dist bytes are identical;
 4. no dashboard hero is used as an asset fallback;
-5. no cross-concept fallback is possible;
+5. no cross-concept or product-as-generic fallback is possible;
 6. backend product profiles contain only verified reusable data;
 7. full UX validation is green.
