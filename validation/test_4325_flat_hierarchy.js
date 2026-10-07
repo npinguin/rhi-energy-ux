@@ -16,7 +16,7 @@ const hardwareStart=source.indexOf("solarHardwareExperience(rt)");
 const hardwareEnd=source.indexOf("solarEnergyStory(rt)",hardwareStart);
 const hardware=source.slice(hardwareStart,hardwareEnd);
 
-if(!hardware.includes("this.solarHardwareSection(\n            'Solar Production'")){
+if(!hardware.includes("this.solarHardwareSection(\n            rhiEnergyT(this._hass,'solar.production_title',{},'Solar Production')")){
   throw new Error("Solar Production must use the same top-level section shell as Home Battery");
 }
 if(hardware.includes('<section class="solarRootObject"')){

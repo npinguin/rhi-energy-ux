@@ -32,7 +32,7 @@ for (const required of [
   assert.ok(story.includes(required), 'compact solar value flow missing: ' + required);
 }
 assert.ok(app.includes('solarProductionObject'), 'solar production root object remains available');
-assert.ok(app.includes("solarHardwareSection(\n            'Solar Production'"), 'solar production uses the same top-level section shell as Home Battery');
+assert.ok(app.includes("rhiEnergyT(this._hass,'solar.production_title',{},'Solar Production')"), 'solar production uses localized product copy in the shared top-level section shell');
 assert.ok(!story.includes('data-scroll-target="solar-inverter-detail"'), 'inverter must not be a primary flow node');
 for (const forbidden of ['<i>→</i>','<i>←</i>','<i>↔</i>','batteryDirection','gridDirection']) {
   assert.ok(!story.includes(forbidden), 'current balance must not imply a serial physical path: ' + forbidden);

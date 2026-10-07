@@ -50,8 +50,10 @@ Cross-domain physical loads preserve their producer-owned `visual_ref`.
 1. registered producer/domain `visual_ref` when present;
 2. configured Energy UX visual for the same physical type;
 3. exact backend product/profile visual when available;
-4. first selectable catalog entry for the exact same physical `asset_type`;
+4. dedicated generic fallback for the exact same physical `asset_type`;
 5. no image / neutral icon.
+
+Until the remaining generic binaries are published, the runtime may temporarily use the first selectable same-type product entry. That temporary behavior is not the target contract and may not be treated as completed generic coverage.
 
 Cross-concept fallback is forbidden.
 
@@ -78,7 +80,9 @@ CI proves:
 
 - manifest and catalog expose only the physical catalog type set;
 - no `heroes/` path occurs in the physical catalog;
-- every catalog path exists in source and dist;
+- every supported physical type has exactly one generic fallback manifest row;
+- `migration_complete` can become true only when every generic fallback is published;
+- every published catalog path exists in source and dist;
 - source/dist bytes match;
 - logical concepts do not acquire asset fallbacks;
 - producer-domain visual refs remain authoritative;

@@ -1,3 +1,11 @@
+## 4.3.32 — Pilot Localization and Core Convergence
+
+- adopt RHI UX Core 1.6.3 as the exact build-time presentation baseline;
+- localize primary Energy pilot surfaces for English, Dutch and French;
+- enforce a pilot-visible localization boundary against raw embedded English copy;
+- reset runtime qualification after Core and presentation changes;
+- preserve canonical V2 Energy projection ownership from 4.3.31.
+
 ## 4.3.31 — Canonical Cross-Surface Projection Closure
 
 - use one Core-first current-energy projection across Overview, Flow, Solar, Home Battery and Consumption;

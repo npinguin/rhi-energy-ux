@@ -83,7 +83,7 @@ if(strategic.includes("Goals & policy") || strategic.includes("Constraints & res
 if(source.includes("(solar||0)>0.05")) throw new Error("unknown solar must not be coerced to zero");
 if(source.includes(" : 'Balanced locally'")) throw new Error("unknown grid direction must not become a balanced conclusion");
 for(const requiredTruthGuard of [
-  "solar===null?'Solar production unavailable'",
+  "solar===null?rhiEnergyT(this._hass,'hero.solar_unavailable',{},'Solar production unavailable')",
   "flowValue === null",
   "'Grid flow unavailable'"
 ]) if(!source.includes(requiredTruthGuard)) throw new Error("current-truth fail-closed guard missing: "+requiredTruthGuard);

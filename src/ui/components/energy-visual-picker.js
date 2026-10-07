@@ -37,9 +37,9 @@ class HomeBrainEnergyVisualPicker {
 
     return typeof rhiUxVisualPickerShell === "function"
       ? rhiUxVisualPickerShell({
-          eyebrow:`Appearance · ${human(type)}`,
-          title:"Choose appearance",
-          description:"Choose the representative image. The selection is persisted by the owning domain and confirmed by readback.",
+          eyebrow:`${rhiEnergyT(this.hass,"common.appearance",{},"Appearance")} · ${human(type)}`,
+          title:rhiEnergyT(this.hass,"common.choose_appearance",{},"Choose appearance"),
+          description:rhiEnergyT(this.hass,"appearance.description",{},"Choose the representative image. The selection is persisted by the owning domain and confirmed by readback."),
           filtersHtml,
           choicesHtml,
           resetHtml,
