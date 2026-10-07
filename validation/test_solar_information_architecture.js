@@ -94,7 +94,7 @@ assert.match(app,/data-energy-visual-open/);
 
 assert.doesNotMatch(app,/solarHardwareSection\(\n\s*'Inverter system'/);
 assert.match(app,/solarProductionNode/);
-assert.match(hardware,/this\.solarHardwareSection\(\s*'Solar Production'/);
+assert.match(hardware,/this\.solarHardwareSection\(\s*rhiEnergyT\(this\._hass,'solar\.production_title',\{\},'Solar Production'\)/);
 assert.doesNotMatch(hardware,/<section class="solarRootObject"/);
 
 
