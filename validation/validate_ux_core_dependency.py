@@ -9,6 +9,10 @@ if core.get("runtime_dependency") is not False: errors.append("UX Core must rema
 if core.get("branding_owner")!="rhi-ux-core": errors.append("shared branding owner must be rhi-ux-core")
 vendor=ROOT/"src/vendor/rhi-ux-core.js"
 if not vendor.is_file() or vendor.stat().st_size==0: errors.append("pinned UX Core vendor missing")
+else:
+ vendor_text=vendor.read_text(encoding="utf-8")
+ if "function rhiUxCoreStyles(" not in vendor_text: errors.append("complete Core CSS snapshot missing from vendor")
+ if ".rhiUxPageHeroArt{position:absolute" not in vendor_text: errors.append("Core page-hero CSS missing from vendor snapshot")
 compat=json.loads((ROOT/"COMPATIBILITY.json").read_text()).get("ux_core") or {}
 manifest=json.loads((ROOT/"RELEASE_MANIFEST.json").read_text()).get("ux_core") or {}
 for label,data in (("compatibility",compat),("manifest",manifest)):
