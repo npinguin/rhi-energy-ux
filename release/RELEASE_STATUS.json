@@ -21,7 +21,7 @@
   "ux_core": {
     "package": "rhi-ux-core",
     "version": "1.6.3",
-    "source_commit": "56560ba61893089b3e0ab8b6535fd777a799066b",
+    "source_commit": "2eff5c50408e32ec604fc2877cf9a404808ecaab",
     "runtime_dependency": false,
     "branding_owner": "rhi-ux-core"
   },
