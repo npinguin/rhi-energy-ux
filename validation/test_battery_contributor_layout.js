@@ -12,7 +12,7 @@ assert.match(app,/batteryContributorFacts\{display:grid/);
 assert.match(app,/energyAssetQuickActions/);
 
 // Body-only correction: the Home Battery hero contract remains unchanged.
-assert.match(app,/battery: \{ image:hbEnergyHeroAsset\('battery'\), icon:'▣', eyebrow:'Home Battery', title:batteryState/);
+assert.match(app,/battery: \{ image:hbEnergyHeroAsset\('battery'\), icon:'▣', eyebrow:rhiEnergyT\(this\._hass,'nav\.battery',\{\},'Home Battery'\), title:batteryState/);
 assert.match(app,/image:hbEnergyHeroAsset\('battery'\)/);
 
 
