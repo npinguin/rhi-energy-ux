@@ -31,4 +31,26 @@ for(const locale of ["en","nl","fr"]){
     for(const rx of machineTokens) if(rx.test(String(value))) throw new Error(`${locale}:${key} leaks machine terminology: ${value}`);
   }
 }
-console.log("PASS Energy localization: complete EN/NL/FR keys, HA locale fallback and user-safe copy");
+const pilotFiles=["src/app/energy-card.js","src/ui/components/energy-visual-picker.js"];
+const forbiddenPilotLiterals=[
+  "<h2>Production & supply</h2>","<h2>Physical Energy Flow</h2>","<h2>Charging connections</h2>",
+  "<h2>Physical consumers</h2>","<h2>Gas meter</h2>","<h2>Connect your gas meter</h2>",
+  "<h2>Home Battery state</h2>","<h2>Home Battery contributors</h2>","<h2>Flexible loads</h2>",
+  "<h2>Automation</h2>","<h2>What do you want to adjust?</h2>","<h2>Measurement period</h2>",
+  "<h2>Financial result</h2>","<h2>Pricing settings</h2>","<h2>Managed flexible assets</h2>",
+  "title:\"Choose appearance\"","description:\"Choose the representative image."
+];
+for(const file of pilotFiles){
+  const source=fs.readFileSync(file,"utf8");
+  for(const token of forbiddenPilotLiterals){
+    if(source.includes(token)) throw new Error(`pilot-visible literal bypasses localization in ${file}: ${token}`);
+  }
+}
+for(const key of [
+  "section.production_supply","flow.physical","flow.charging_connections","gas.meter","battery.state",
+  "section.flexible_loads","settings.automation","settings.adjust","metering.period","value.financial_result",
+  "planning.tactical","planning.strategic","appearance.description"
+]){
+  for(const locale of ["en","nl","fr"]) if(!resources[locale][key]) throw new Error(`missing pilot localization ${locale}:${key}`);
+}
+console.log("PASS Energy localization: complete EN/NL/FR keys, HA locale fallback, pilot-surface enforcement and user-safe copy");
