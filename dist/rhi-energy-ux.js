@@ -86,6 +86,7 @@ class EnergyCanonicalPropertyIndex {
     this.byFamily = new Map();
     this.stateRefs = new Map();
     this._stateCount = 0;
+    this._hassRef = null;
     this.discover(hass);
   }
 
@@ -110,12 +111,14 @@ class EnergyCanonicalPropertyIndex {
     this.byFamily.clear();
     this.stateRefs.clear();
     const states = hass?.states || {};
+    this._hassRef = hass;
     this._stateCount = Object.keys(states).length;
     for (const [entityId,state] of Object.entries(states)) this._index(canonicalEnergyPropertyRow(entityId,state),state);
     return this;
   }
 
   refresh(hass = {}) {
+    if (hass === this._hassRef) return new Set();
     const states = hass?.states || {};
     if (Object.keys(states).length !== this._stateCount) {
       const before = new Map(this.stateRefs);
@@ -147,7 +150,41 @@ class EnergyCanonicalPropertyIndex {
       this.byFamily.set(row.presentation_family,(this.byFamily.get(row.presentation_family)||[]).map(candidate=>candidate.entity_id===entityId?row:candidate));
       this.stateRefs.set(entityId,current);
     }
+    this._hassRef = hass;
     return changed;
+  }
+
+  changedRows(entityIds = []) {
+    return [...entityIds].map(id=>this.byEntity.get(id)).filter(Boolean);
+  }
+
+  uniqueProductRows() {
+    return [...this.byPropertyKey.values()]
+      .filter(rows=>rows.length === 1)
+      .map(rows=>rows[0])
+      .filter(row=>row.presentation_complete === true && row.presentation_technical !== true);
+  }
+
+  hasProductTruthForSurfaces(surfaces = []) {
+    const wanted = new Set((surfaces || []).map(String));
+    if (!wanted.size) return false;
+    return [...this.byEntity.values()].some(row=>
+      row.presentation_complete === true &&
+      row.presentation_technical !== true &&
+      wanted.has(row.presentation_surface)
+    );
+  }
+
+  affectedComponents(entityIds = []) {
+    return this.changedRows(entityIds).map(row=>Object.freeze({
+      entity_id:row.entity_id,
+      asset_id:row.asset_id,
+      property_key:row.property_key,
+      surface:row.presentation_surface,
+      role:row.presentation_role,
+      family:row.presentation_family,
+      component_key:`${row.asset_id}::${row.property_key}`
+    }));
   }
 
   get size() { return this.byEntity.size; }
@@ -1538,7 +1575,7 @@ function readEnergyCommandContract(gateway) {
       // Direct canonical property entities are the preferred product truth.
       // Public V2 below is a compatibility fallback only for properties not yet
       // published through RHI_ENERGY_CANONICAL_PROPERTY_V1.
-      for (const row of (this.canonicalIndex?.productRows?.() || [])) add(row);
+      for (const row of (this.canonicalIndex?.uniqueProductRows?.() || [])) add(row);
 
       // Transitional aggregate fallback. add() preserves the canonical row when
       // the same property key is already present.
@@ -3409,6 +3446,7 @@ function rhiEnergyVisualPickerStyles() {
       this.planningScrollTop = Number(interaction.planningScrollTop) || 0;
       this._renderTimer = null;
       this._canonicalIndex = null;
+      this._deferredCanonicalSurfaces = new Set();
       this._lastRuntimeSignature = '';
       this._lastMarkup = '';
       this._forceRender = true;
@@ -3473,9 +3511,18 @@ function rhiEnergyVisualPickerStyles() {
       // complete Energy view. Public V2 remains a compatibility fallback only.
       if (previous && this.canonicalRuntimeActive() && canonicalChanged) {
         const relevant = new Set(this.relevantEntityIds());
-        const relevantChanged = [...canonicalChanged].some(entityId => relevant.has(entityId));
+        const affected = this._canonicalIndex.affectedComponents(canonicalChanged)
+          .filter(item => relevant.has(item.entity_id));
         const localeChanged = rhiEnergyLocale(previous) !== rhiEnergyLocale(hass);
-        if (!relevantChanged && !localeChanged && !this._forceRender) return;
+        if (!affected.length && !localeChanged && !this._forceRender) return;
+
+        if (!localeChanged && !this._forceRender && affected.length) {
+          const visible = affected.filter(item => this.isCanonicalSurfaceVisible(item.surface));
+          if (!visible.length) {
+            affected.forEach(item => this._deferredCanonicalSurfaces.add(item.surface));
+            return;
+          }
+        }
       }
 
       this.reconcileWriteFeedback();
@@ -3536,8 +3583,23 @@ function rhiEnergyVisualPickerStyles() {
       if (['metering','value','retrospective'].includes(this.view)) return ['key_properties','details'];
       return [];
     }
+    canonicalAuthoritySurfaces() {
+      if (['strategies','intelligence'].includes(this.view)) return ['configuration'];
+      if (['overview','flow','solar','battery','consumers','gas','metering','value','retrospective'].includes(this.view)) return ['key_properties'];
+      return [];
+    }
     canonicalRuntimeActive() {
-      return !!this._canonicalIndex?.hasCanonicalTruth?.() && this.activeCanonicalSurfaces().length > 0;
+      return !!this._canonicalIndex?.hasProductTruthForSurfaces?.(this.canonicalAuthoritySurfaces());
+    }
+    isCanonicalSurfaceVisible(surface = '') {
+      const value = String(surface || '');
+      if (value === 'key_properties') return true;
+      if (value === 'details') return !!this.shadowRoot?.querySelector('.energyAssetDetails[open]');
+      if (value === 'configuration') return !!this.editSession || !!this.shadowRoot?.querySelector('.energyAssetConfiguration[open]');
+      if (value === 'diagnostics') return this.config?.show_diagnostics === true && !!this.shadowRoot?.querySelector('.energyAssetDiagnostics[open]');
+      if (value === 'history' || value === 'metering') return ['metering','value','retrospective'].includes(this.view);
+      if (value === 'planning') return ['planning','operational-planning','strategic-planning'].includes(this.view);
+      return true;
     }
     navigationModel() {
       const presence=this.runtime().experiencePresence();
@@ -3907,6 +3969,16 @@ function rhiEnergyVisualPickerStyles() {
       if (!details) return;
       const key = details.dataset.persistKey || details.querySelector('summary')?.dataset.detailId || '';
       if (key) { this.disclosureOpen[key] = details.open; this.persistInteractionContext(); }
+      if (!details.open) return;
+      const surface = details.classList.contains('energyAssetDiagnostics') ? 'diagnostics'
+        : details.classList.contains('energyAssetConfiguration') ? 'configuration'
+        : details.classList.contains('energyAssetDetails') ? 'details'
+        : '';
+      if (surface && this._deferredCanonicalSurfaces.has(surface)) {
+        this._deferredCanonicalSurfaces.delete(surface);
+        this._forceRender = true;
+        this.scheduleRender(true);
+      }
     }
     restoreInteractionState() {
       const details = [...this.shadowRoot.querySelectorAll('details')];
