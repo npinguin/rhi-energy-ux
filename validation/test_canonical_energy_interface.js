@@ -44,7 +44,7 @@ const states = {
     entity_id:'sensor.energy_battery_system_battery_soc_pct',
     state:'41',
     attributes:{
-      canonical_contract:'RHI_ENERGY_CANONICAL_PROPERTY_V1',
+      canonical_contract:'RHI_ENERGY_CANONICAL_PROPERTY_V2',
       asset_id:'battery_system',
       logical_object_class:'battery_system',
       property_key:'battery.soc_pct',
@@ -64,7 +64,7 @@ const states = {
     entity_id:'sensor.energy_battery_system_status',
     state:'OK',
     attributes:{
-      canonical_contract:'RHI_ENERGY_CANONICAL_OBJECT_V1',
+      canonical_contract:'RHI_ENERGY_CANONICAL_OBJECT_V2',
       asset_id:'battery_system',
       logical_object_class:'battery_system',
       display_name:'Home Battery',
@@ -85,7 +85,7 @@ if (gateway.canonicalObjectRows().length !== 1) throw new Error('canonical objec
 
 const soc = store.currentField('battery.soc_pct');
 if (!soc.resolved || soc.value !== 41) throw new Error('canonical property did not outrank aggregate Public V2');
-if (soc.source !== 'RHI_ENERGY_CANONICAL_PROPERTY_V1') throw new Error('wrong canonical property authority');
+if (soc.source !== 'RHI_ENERGY_CANONICAL_PROPERTY_V2') throw new Error('wrong canonical property authority');
 if (store.canonicalPropertyRows[0].presentation_family !== 'storage') throw new Error('presentation metadata lost');
 if (store.canonicalPropertyRows[0].presentation_role !== 'key') throw new Error('presentation role lost');
 
