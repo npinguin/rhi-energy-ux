@@ -24,6 +24,38 @@ const UX_INTERFACES = Object.freeze({
       return cache.get(id);
     };
     const attrs = contractKey => state(contractKey)?.attributes || {};
+    const canonicalStates = (contractId = '') => {
+      const wanted = String(contractId || '').trim().toUpperCase();
+      if (!wanted) return [];
+      return Object.values(host.hass?.states || {}).filter(row =>
+        String(row?.attributes?.canonical_contract || '').trim().toUpperCase() === wanted
+      );
+    };
+    const canonicalPropertyRows = () => canonicalStates('RHI_ENERGY_CANONICAL_PROPERTY_V2').map(row => {
+      const a = row?.attributes || {};
+      return Object.freeze({
+        ...a,
+        entity_id:String(row?.entity_id || ''),
+        asset_id:String(a.asset_id || ''),
+        object_class:String(a.logical_object_class || ''),
+        property_key:String(a.property_key || ''),
+        value:Object.prototype.hasOwnProperty.call(a, 'value') ? a.value : row?.state,
+        display_name:String(a.display_name || a.friendly_name || ''),
+        unit:String(a.unit || a.unit_of_measurement || ''),
+        availability:String(a.availability || (row?.state === 'unavailable' ? 'UNAVAILABLE' : 'AVAILABLE')).toUpperCase()
+      });
+    }).filter(row => row.asset_id && row.property_key);
+    const canonicalObjectRows = () => canonicalStates('RHI_ENERGY_CANONICAL_OBJECT_V2').map(row => {
+      const a = row?.attributes || {};
+      return Object.freeze({
+        ...a,
+        entity_id:String(row?.entity_id || ''),
+        asset_id:String(a.asset_id || ''),
+        object_class:String(a.logical_object_class || ''),
+        display_name:String(a.display_name || a.friendly_name || a.asset_id || ''),
+        state:row?.state ?? null
+      });
+    }).filter(row => row.asset_id);
     const contract = contractKey => {
       const id = entityId(contractKey);
       const current = state(contractKey);
@@ -37,12 +69,18 @@ const UX_INTERFACES = Object.freeze({
         available: !!current
       };
     };
-    return Object.freeze({ entityId, state, attrs, contract });
+    return Object.freeze({
+      entityId, state, attrs, contract,
+      canonicalStates,
+      canonicalPropertyRows,
+      canonicalObjectRows
+    });
   }
 
 // ---- src/runtime/energy-v2-contract.js ----
-// Canonical Energy V2 reader. This is the only UX adapter allowed to interpret
-// sensor.rhi_energy_public_contract_v2. Screens consume projections derived here.
+// Energy UX domain reader. Canonical object/property entities are the primary
+// current-truth authority. Public V2 remains a temporary compatibility surface
+// for composed capabilities that have not yet moved to their own canonical view.
 function readEnergyPublicV2(gateway) {
   const envelope = gateway.contract('publicV2');
   const attrs = envelope.attributes || {};
@@ -110,7 +148,7 @@ function readEnergyPublicV2(gateway) {
       normalization_status:sourceStatus && !['AVAILABLE','UNAVAILABLE'].includes(sourceStatus) ? sourceStatus : '',
       resolution_status:resolutionStatus,
       reason:String(source.reason || resolution.reason_code || source.reason_code || source.reason_text || ''),
-      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
+      source:String(source.canonical_contract || 'RHI_ENERGY_PUBLIC_CONTRACT_V2'),
       editable:source.write_supported === true || source.editable === true,
       editor:source.editor || null,
       constraints:source.constraints && typeof source.constraints === 'object' ? source.constraints : {},
@@ -173,6 +211,25 @@ function readEnergyPublicV2(gateway) {
   const propertyByKey = new Map();
   const propertyByAssetAndKey = new Map();
   const configurationRows = [];
+
+  // Canonical HA property entities are the first authority for live domain truth.
+  // They already carry backend-owned availability, quality and presentation
+  // metadata, so the frontend must not infer any of these semantics.
+  const canonicalPropertyRows = Object.freeze(
+    (gateway.canonicalPropertyRows?.() || []).map(raw => Object.freeze({
+      ...raw,
+      property_id:String(raw.property_id || raw.property_key || ''),
+      property_key:String(raw.property_key || ''),
+      key:String(raw.property_key || ''),
+      canonical_contract:'RHI_ENERGY_CANONICAL_PROPERTY_V2'
+    }))
+  );
+  for (const row of canonicalPropertyRows) {
+    if (!row.asset_id || !row.property_key) continue;
+    propertyRows.push(row);
+    if (!propertyByKey.has(row.property_key)) propertyByKey.set(row.property_key, row);
+    propertyByAssetAndKey.set(`${row.asset_id}::${row.property_key}`, row);
+  }
   const addConfigurationRows = (configurationKind, rows) => {
     for (const raw of array(rows)) {
       const key = String(raw.property_key || raw.property_id || raw.key || '');
@@ -202,9 +259,13 @@ function readEnergyPublicV2(gateway) {
       const key = String(raw.property_key || raw.property_id || raw.key || '');
       if (!key) continue;
       const row = Object.freeze({ asset_id:assetId, ...raw, property_key:key, key });
-      propertyRows.push(row);
+      // Public V2 is compatibility-only here; never overwrite a canonical HA
+      // property row for the same asset/property.
+      if (!propertyByAssetAndKey.has(`${assetId}::${key}`)) propertyRows.push(row);
       if (!propertyByKey.has(key)) propertyByKey.set(key, row);
-      if (assetId) propertyByAssetAndKey.set(`${assetId}::${key}`, row);
+      if (assetId && !propertyByAssetAndKey.has(`${assetId}::${key}`)) {
+        propertyByAssetAndKey.set(`${assetId}::${key}`, row);
+      }
     }
 
     // Appearance is product presentation metadata, not a semantic measurement.
@@ -274,6 +335,12 @@ function readEnergyPublicV2(gateway) {
   };
   const currentField = key => {
     const wanted=String(key || '');
+    // Prefer direct canonical property entities. For aggregate keys, the
+    // canonical runtime object is already the semantic endpoint.
+    const direct = propertyByKey.get(wanted) || null;
+    if (direct && String(direct.canonical_contract || '') === 'RHI_ENERGY_CANONICAL_PROPERTY_V2') {
+      return semantic(direct);
+    }
     const coreFieldValue=coreByKey.get(wanted) || null;
     if (coreFieldValue?.resolved === true) return coreFieldValue;
     const aggregate=currentAggregateObject(wanted);
@@ -317,6 +384,8 @@ function readEnergyPublicV2(gateway) {
     available:publicContractOk,
     publicContractOk,
     corePresent,
+    canonicalPropertyRows,
+    canonicalObjectRows:Object.freeze(gateway.canonicalObjectRows?.() || []),
     capabilities,
     compatibilityReason,
     contractVersion:String(attrs.contract_version || envelope.contractVersion || ''),
@@ -1282,7 +1351,15 @@ function readEnergyCommandContract(gateway) {
     rawState(entityId) { return this.hass?.states?.[entityId] || null; }
     subscriptionEntityIds() {
       const registryEntity = String(this.visualRegistry()?.entityId || '');
-      return [...new Set([UX_INTERFACES.publicV2, registryEntity].filter(Boolean))];
+      const gateway = this.contractGateway();
+      const canonicalProperties = (gateway.canonicalPropertyRows?.() || []).map(row => String(row.entity_id || '')).filter(Boolean);
+      const canonicalObjects = (gateway.canonicalObjectRows?.() || []).map(row => String(row.entity_id || '')).filter(Boolean);
+      return [...new Set([
+        UX_INTERFACES.publicV2,
+        registryEntity,
+        ...canonicalObjects,
+        ...canonicalProperties
+      ].filter(Boolean))];
     }
     entitySignature(entityIds = []) {
       return (entityIds || []).map(id => {
