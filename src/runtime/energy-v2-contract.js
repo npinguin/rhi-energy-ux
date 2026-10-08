@@ -141,7 +141,7 @@ function readEnergyPublicV2(gateway) {
       property_id:String(raw.property_id || raw.property_key || ''),
       property_key:String(raw.property_key || ''),
       key:String(raw.property_key || ''),
-      canonical_contract:'RHI_ENERGY_CANONICAL_PROPERTY_V1'
+      canonical_contract:'RHI_ENERGY_CANONICAL_PROPERTY_V2'
     }))
   );
   for (const row of canonicalPropertyRows) {
@@ -258,7 +258,7 @@ function readEnergyPublicV2(gateway) {
     // Prefer direct canonical property entities. For aggregate keys, the
     // canonical runtime object is already the semantic endpoint.
     const direct = propertyByKey.get(wanted) || null;
-    if (direct && String(direct.canonical_contract || '') === 'RHI_ENERGY_CANONICAL_PROPERTY_V1') {
+    if (direct && String(direct.canonical_contract || '') === 'RHI_ENERGY_CANONICAL_PROPERTY_V2') {
       return semantic(direct);
     }
     const coreFieldValue=coreByKey.get(wanted) || null;
