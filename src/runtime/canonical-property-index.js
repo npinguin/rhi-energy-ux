@@ -75,6 +75,7 @@ class EnergyCanonicalPropertyIndex {
     this.byFamily = new Map();
     this.stateRefs = new Map();
     this._stateCount = 0;
+    this._hassRef = null;
     this.discover(hass);
   }
 
@@ -99,12 +100,14 @@ class EnergyCanonicalPropertyIndex {
     this.byFamily.clear();
     this.stateRefs.clear();
     const states = hass?.states || {};
+    this._hassRef = hass;
     this._stateCount = Object.keys(states).length;
     for (const [entityId,state] of Object.entries(states)) this._index(canonicalEnergyPropertyRow(entityId,state),state);
     return this;
   }
 
   refresh(hass = {}) {
+    if (hass === this._hassRef) return new Set();
     const states = hass?.states || {};
     if (Object.keys(states).length !== this._stateCount) {
       const before = new Map(this.stateRefs);
@@ -136,7 +139,41 @@ class EnergyCanonicalPropertyIndex {
       this.byFamily.set(row.presentation_family,(this.byFamily.get(row.presentation_family)||[]).map(candidate=>candidate.entity_id===entityId?row:candidate));
       this.stateRefs.set(entityId,current);
     }
+    this._hassRef = hass;
     return changed;
+  }
+
+  changedRows(entityIds = []) {
+    return [...entityIds].map(id=>this.byEntity.get(id)).filter(Boolean);
+  }
+
+  uniqueProductRows() {
+    return [...this.byPropertyKey.values()]
+      .filter(rows=>rows.length === 1)
+      .map(rows=>rows[0])
+      .filter(row=>row.presentation_complete === true && row.presentation_technical !== true);
+  }
+
+  hasProductTruthForSurfaces(surfaces = []) {
+    const wanted = new Set((surfaces || []).map(String));
+    if (!wanted.size) return false;
+    return [...this.byEntity.values()].some(row=>
+      row.presentation_complete === true &&
+      row.presentation_technical !== true &&
+      wanted.has(row.presentation_surface)
+    );
+  }
+
+  affectedComponents(entityIds = []) {
+    return this.changedRows(entityIds).map(row=>Object.freeze({
+      entity_id:row.entity_id,
+      asset_id:row.asset_id,
+      property_key:row.property_key,
+      surface:row.presentation_surface,
+      role:row.presentation_role,
+      family:row.presentation_family,
+      component_key:`${row.asset_id}::${row.property_key}`
+    }));
   }
 
   get size() { return this.byEntity.size; }
