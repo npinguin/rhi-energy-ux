@@ -20,7 +20,7 @@
         String(row?.attributes?.canonical_contract || '').trim().toUpperCase() === wanted
       );
     };
-    const canonicalPropertyRows = () => canonicalStates('RHI_ENERGY_CANONICAL_PROPERTY_V1').map(row => {
+    const canonicalPropertyRows = () => canonicalStates('RHI_ENERGY_CANONICAL_PROPERTY_V2').map(row => {
       const a = row?.attributes || {};
       return Object.freeze({
         ...a,
@@ -34,7 +34,7 @@
         availability:String(a.availability || (row?.state === 'unavailable' ? 'UNAVAILABLE' : 'AVAILABLE')).toUpperCase()
       });
     }).filter(row => row.asset_id && row.property_key);
-    const canonicalObjectRows = () => canonicalStates('RHI_ENERGY_CANONICAL_OBJECT_V1').map(row => {
+    const canonicalObjectRows = () => canonicalStates('RHI_ENERGY_CANONICAL_OBJECT_V2').map(row => {
       const a = row?.attributes || {};
       return Object.freeze({
         ...a,
