@@ -1,3 +1,13 @@
+## 4.3.33 — Canonical Domain Interface
+
+- make direct canonical Energy property entities the primary current-truth authority;
+- preserve canonical object identity and backend-owned presentation metadata;
+- subscribe only to the actual canonical object/property states plus remaining compatibility contracts;
+- keep Public V2 as a bounded compatibility surface during composed-capability migration;
+- add a release-blocking authority regression proving canonical property truth outranks aggregate Public V2;
+- require Energy E0.15.109, Foundation F1.8.42 and Mobility M0.10.41;
+- retain zero accepted technical and feature debt.
+
 ## 4.3.32 — Pilot Localization and Core Convergence
 
 - adopt RHI UX Core 1.6.3 as the exact build-time presentation baseline;
