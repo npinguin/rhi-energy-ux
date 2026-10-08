@@ -47,10 +47,15 @@ if(!soc || soc.value!=="57" || soc.presentation_surface!=="key_properties") thro
 if(index.productRows().some(row=>row.property_key==="battery.version")) throw new Error("technical property leaked into product rows");
 if(index.technicalRows().length!==1) throw new Error("diagnostics classification must use backend metadata");
 if(index.entityIdsForSurfaces(["key_properties"]).join("|")!=="sensor.battery_soc") throw new Error("surface subscription must be metadata-driven");
+if(!index.hasProductTruthForSurfaces(["key_properties"])) throw new Error("key surface authority must be explicit");
+if(index.hasProductTruthForSurfaces(["configuration"])) throw new Error("missing configuration surface must not become canonical authority");
+if(index.uniqueProductRows().length!==1 || index.uniqueProductRows()[0].property_key!=="battery.soc_pct") throw new Error("unique canonical property projection drifted");
 
 const next={states:{...hass.states,"sensor.battery_soc":{...hass.states["sensor.battery_soc"],state:"58"}}};
 const changed=index.refresh(next);
 if(!changed.has("sensor.battery_soc") || index.row("battery_home","battery.soc_pct").value!=="58") throw new Error("incremental canonical property refresh failed");
+const affected=index.affectedComponents(changed);
+if(affected.length!==1 || affected[0].component_key!=="battery_home::battery.soc_pct" || affected[0].surface!=="key_properties") throw new Error("asset/property dirty component index failed");
 
 for(const forbidden of ["includes(\"soc\")","includes('soc')","guessSection","familyFromPropertyName","fallbackUxFamily"]){
   if(source.includes(forbidden)) throw new Error("property-name placement heuristic present: "+forbidden);
