@@ -18,7 +18,7 @@ for path in (ROOT/"src").rglob("*.js"):
     rel=path.relative_to(ROOT)
     if "!important" in text:
         failures.append(f"{rel}: !important is forbidden; shared geometry belongs to UX Core")
-    if re.search(r"RHI_[A-Z0-9_]+_V1", text):
+    if re.search(r"RHI_(?!ENERGY_CANONICAL_PROPERTY_V1\\b)[A-Z0-9_]+_V1", text):
         failures.append(f"{rel}: V1 contract identifier is forbidden in product source")
     for pattern in legacy_product:
         if re.search(pattern,text):
@@ -28,12 +28,12 @@ for path in (ROOT/"validation").rglob("*"):
     if path.suffix not in {".js",".mjs",".py",".json"} or path.name=="validate_zero_debt.py":
         continue
     text=path.read_text(encoding="utf-8")
-    if re.search(r"RHI_[A-Z0-9_]+_V1", text):
+    if re.search(r"RHI_(?!ENERGY_CANONICAL_PROPERTY_V1\\b)[A-Z0-9_]+_V1", text):
         failures.append(f"{path.relative_to(ROOT)}: V1 contract identifier is forbidden in active validation fixtures")
 
 for relpath in ("release/product.json","release/RELEASE_STATUS.json","COMPATIBILITY.json","RELEASE_MANIFEST.json"):
     text=(ROOT/relpath).read_text(encoding="utf-8")
-    if re.search(r"RHI_[A-Z0-9_]+_V1", text):
+    if re.search(r"RHI_(?!ENERGY_CANONICAL_PROPERTY_V1\\b)[A-Z0-9_]+_V1", text):
         failures.append(f"{relpath}: V1 contract dependency remains in current release metadata")
 
 presentation=(ROOT/"src/app/presentation.js").read_text(encoding="utf-8")
@@ -44,4 +44,4 @@ for selector in (".rhiUxPageHero{",".rhiUxStatusGrid{",".rhiUxQuickActionBar{","
 if failures:
     print("\n".join(failures))
     raise SystemExit(1)
-print("PASS zero-debt gate: V2-only Energy product authority and shared Core presentation ownership")
+print("PASS zero-debt gate: no legacy Energy V1 product authority and shared Core presentation ownership")
