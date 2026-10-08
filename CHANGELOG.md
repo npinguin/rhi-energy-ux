@@ -1,3 +1,13 @@
+## 4.3.33 — Canonical Runtime Performance
+
+- index direct RHI_ENERGY_CANONICAL_PROPERTY_V1 entities and prefer canonical asset/property truth over aggregate Public V2 when available;
+- suppress irrelevant Home Assistant updates before rebuilding Energy runtime/view models;
+- make canonical authority surface-aware so missing canonical coverage continues to use the transitional Public V2 compatibility path;
+- index dirty updates as asset_id + property_key + presentation surface and defer closed Details, Configuration and Diagnostics refreshes until those surfaces are opened;
+- avoid ambiguous global property projection when the same property_key exists on multiple canonical assets;
+- preserve fail-closed availability semantics and backend-owned planning totals;
+- retain EN/NL/FR pilot localization, RHI UX Core 1.6.3 and immutable HACS delivery.
+
 ## 4.3.32 — Pilot Localization and Core Convergence
 
 - adopt RHI UX Core 1.6.3 as the exact build-time presentation baseline;
