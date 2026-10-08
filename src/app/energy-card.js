@@ -183,7 +183,15 @@
     rawState(entityId) { return this.hass?.states?.[entityId] || null; }
     subscriptionEntityIds() {
       const registryEntity = String(this.visualRegistry()?.entityId || '');
-      return [...new Set([UX_INTERFACES.publicV2, registryEntity].filter(Boolean))];
+      const gateway = this.contractGateway();
+      const canonicalProperties = (gateway.canonicalPropertyRows?.() || []).map(row => String(row.entity_id || '')).filter(Boolean);
+      const canonicalObjects = (gateway.canonicalObjectRows?.() || []).map(row => String(row.entity_id || '')).filter(Boolean);
+      return [...new Set([
+        UX_INTERFACES.publicV2,
+        registryEntity,
+        ...canonicalObjects,
+        ...canonicalProperties
+      ].filter(Boolean))];
     }
     entitySignature(entityIds = []) {
       return (entityIds || []).map(id => {
