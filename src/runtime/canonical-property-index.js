@@ -146,7 +146,7 @@ class EnergyCanonicalPropertyIndex {
   rowsForProperty(propertyKey) { return [...(this.byPropertyKey.get(String(propertyKey||'')) || [])]; }
   rowsForSurface(surface) { return [...(this.bySurface.get(String(surface||'')) || [])]; }
   rowsForFamily(family) { return [...(this.byFamily.get(String(family||'')) || [])]; }
-  productRows() { return [...this.byEntity.values()].filter(row=>row.presentation_complete && row.presentation_technical !== true); }
+  productRows() { return [...this.byEntity.values()].filter(row=>row.presentation_complete === true && row.presentation_technical !== true); }
   technicalRows() { return [...this.byEntity.values()].filter(row=>row.presentation_technical === true || row.presentation_surface === 'diagnostics'); }
   contractGaps() { return [...this.byEntity.values()].filter(row=>!row.presentation_complete && row.presentation_technical !== true); }
 
