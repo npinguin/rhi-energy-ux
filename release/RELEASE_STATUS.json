@@ -1,21 +1,23 @@
 {
   "product": "rhi-energy-ux",
-  "source_candidate_version": "4.3.32",
+  "source_candidate_version": "4.3.33",
   "stage": "test_candidate",
   "publication_authority": "github_releases",
   "publication_status": "derive_from_github_release",
   "github_release_prerelease": false,
   "hacs_visibility": "normal_release_visible_without_beta_toggle",
   "contract": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-  "minimum_backend": "E0.15.87",
+  "minimum_backend": "E0.15.109",
   "static_validation": "required_before_publication",
   "hacs_validation": "required_before_publication",
   "target_runtime_proof": "see release/QUALIFICATION.json",
   "rollback": "immutable GitHub/HACS version selection",
   "stable_promotion": "blocked_until_qualification_pass",
-  "tested_backend": "E0.15.100",
+  "tested_backend": "E0.15.109",
   "required_contracts": [
     "RHI_ENERGY_PUBLIC_CONTRACT_V2",
+    "RHI_ENERGY_CANONICAL_OBJECT_V2",
+    "RHI_ENERGY_CANONICAL_PROPERTY_V2",
     "RHI_VISUAL_ASSET_REGISTRY_V2"
   ],
   "ux_core": {
@@ -25,6 +27,6 @@
     "runtime_dependency": false,
     "branding_owner": "rhi-ux-core"
   },
-  "minimum_foundation": "F1.8.38",
-  "minimum_mobility_for_cross_domain_visuals": "M0.10.25"
+  "minimum_foundation": "F1.8.42",
+  "minimum_mobility_for_cross_domain_visuals": "M0.10.41"
 }
