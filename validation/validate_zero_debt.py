@@ -3,6 +3,11 @@ import re
 
 ROOT=Path(__file__).resolve().parents[1]
 failures=[]
+CANONICAL_PROPERTY_CONTRACT="RHI_ENERGY_CANONICAL_PROPERTY_V1"
+LEGACY_V1=re.compile(r"RHI_[A-Z0-9_]+_V1")
+
+def contains_legacy_v1(text: str) -> bool:
+    return bool(LEGACY_V1.search(text.replace(CANONICAL_PROPERTY_CONTRACT, "")))
 
 legacy_product=[
     r"sensor\.energy_asset_index(?![a-z0-9_])",
@@ -18,7 +23,7 @@ for path in (ROOT/"src").rglob("*.js"):
     rel=path.relative_to(ROOT)
     if "!important" in text:
         failures.append(f"{rel}: !important is forbidden; shared geometry belongs to UX Core")
-    if re.search(r"RHI_[A-Z0-9_]+_V1", text):
+    if contains_legacy_v1(text):
         failures.append(f"{rel}: V1 contract identifier is forbidden in product source")
     for pattern in legacy_product:
         if re.search(pattern,text):
@@ -28,12 +33,12 @@ for path in (ROOT/"validation").rglob("*"):
     if path.suffix not in {".js",".mjs",".py",".json"} or path.name=="validate_zero_debt.py":
         continue
     text=path.read_text(encoding="utf-8")
-    if re.search(r"RHI_[A-Z0-9_]+_V1", text):
+    if contains_legacy_v1(text):
         failures.append(f"{path.relative_to(ROOT)}: V1 contract identifier is forbidden in active validation fixtures")
 
 for relpath in ("release/product.json","release/RELEASE_STATUS.json","COMPATIBILITY.json","RELEASE_MANIFEST.json"):
     text=(ROOT/relpath).read_text(encoding="utf-8")
-    if re.search(r"RHI_[A-Z0-9_]+_V1", text):
+    if contains_legacy_v1(text):
         failures.append(f"{relpath}: V1 contract dependency remains in current release metadata")
 
 presentation=(ROOT/"src/app/presentation.js").read_text(encoding="utf-8")
@@ -44,4 +49,4 @@ for selector in (".rhiUxPageHero{",".rhiUxStatusGrid{",".rhiUxQuickActionBar{","
 if failures:
     print("\n".join(failures))
     raise SystemExit(1)
-print("PASS zero-debt gate: V2-only Energy product authority and shared Core presentation ownership")
+print("PASS zero-debt gate: no legacy Energy V1 product authority and shared Core presentation ownership")

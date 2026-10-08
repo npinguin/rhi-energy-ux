@@ -6,6 +6,7 @@
       "placeholder": "// __RHI_RUNTIME_MODULES__",
       "modules": [
         "runtime/public-interface-registry.js",
+        "runtime/canonical-property-index.js",
         "runtime/energy-contract-gateway.js",
         "runtime/energy-v2-contract.js",
         "domain/selectors/energy-selectors.js",

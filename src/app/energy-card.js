@@ -158,8 +158,9 @@
       && !!String(firstDefined(write.readback_property, row.readback_property, row.property_id, row.key, '') || '');
   }
   class EnergyRuntime {
-    constructor(hass) {
+    constructor(hass, canonicalIndex = null) {
       this.hass = hass || {};
+      this.canonicalIndex = canonicalIndex || null;
       rhiEnergySetLocaleFromHass(this.hass);
       this._allowed = null;
       this._rows = null;
@@ -181,9 +182,13 @@
       this._visualRegistry = null;
     }
     rawState(entityId) { return this.hass?.states?.[entityId] || null; }
-    subscriptionEntityIds() {
+    subscriptionEntityIds(surfaces = []) {
       const registryEntity = String(this.visualRegistry()?.entityId || '');
-      return [...new Set([UX_INTERFACES.publicV2, registryEntity].filter(Boolean))];
+      const canonicalIds = this.canonicalIndex?.hasCanonicalTruth?.()
+        ? (surfaces.length ? this.canonicalIndex.entityIdsForSurfaces(surfaces) : this.canonicalIndex.entityIds())
+        : [];
+      const productAuthority = canonicalIds.length ? canonicalIds : [UX_INTERFACES.publicV2];
+      return [...new Set([...productAuthority, registryEntity].filter(Boolean))];
     }
     entitySignature(entityIds = []) {
       return (entityIds || []).map(id => {
@@ -267,10 +272,13 @@
           key
         });
       };
-      // Core is the only authority for current home-energy facts. Insert Core
-      // before object/configuration rows because add() intentionally preserves the
-      // first owner of a global property key. Asset-specific detail remains
-      // available through propertyByAssetAndKey and assetField().
+      // Direct canonical property entities are the preferred product truth.
+      // Public V2 below is a compatibility fallback only for properties not yet
+      // published through RHI_ENERGY_CANONICAL_PROPERTY_V1.
+      for (const row of (this.canonicalIndex?.productRows?.() || [])) add(row);
+
+      // Transitional aggregate fallback. add() preserves the canonical row when
+      // the same property key is already present.
       for (const [key, field] of (v2.coreByKey || new Map()).entries()) {
         add({
           asset_id:'core',
@@ -310,8 +318,12 @@
         || { key:wanted, property_id:wanted, property_key:wanted, value:null, unit:'', health:'NOT_PUBLISHED', quality:'missing', missing:true };
     }
     editablePropertyRows() {
-      return (this.publicV2().allPropertyRows || [])
+      const direct = (this.canonicalIndex?.productRows?.() || [])
+        .filter(row => row?.editable === true || row?.write_supported === true || row?.write?.supported === true);
+      const seen = new Set(direct.map(row => String(row.property_key || '')));
+      const fallback = (this.publicV2().allPropertyRows || [])
         .filter(row => row?.editable === true || row?.write_supported === true || row?.write?.supported === true)
+        .filter(row => !seen.has(String(row.property_key || row.property_id || row.key || '')))
         .map(row => ({
           entity_id:this.publicV2().envelope.entityId,
           ...row,
@@ -319,6 +331,7 @@
           property_key:String(row.property_key || row.property_id || row.key || ''),
           property_id:String(row.property_id || row.property_key || row.key || '')
         }));
+      return [...direct, ...fallback];
     }
     editableProperty(propertyId) {
       const wanted=String(propertyId || '');
@@ -410,6 +423,19 @@
     asset(assetId) { return this.assets().find(a => String(a.asset_id || '') === String(assetId)) || null; }
     assetName(assetId) { return this.asset(assetId)?.display_name || human(assetId, '—'); }
     assetField(assetId, propertyKey) {
+      const direct = this.canonicalIndex?.row?.(String(assetId || ''), String(propertyKey || ''));
+      if (direct) {
+        return Object.freeze({
+          resolved:direct.availability !== 'UNAVAILABLE',
+          value:direct.value,
+          unit:direct.unit,
+          status:direct.availability,
+          quality:direct.quality,
+          reason:direct.reason,
+          source:direct.source,
+          raw:direct
+        });
+      }
       return this.publicV2().field(String(propertyKey || ''), String(assetId || ''));
     }
     assetValue(assetId, propertyKey, fallback = null) {
@@ -1131,6 +1157,7 @@
       this.planningScrollLeft = Number(interaction.planningScrollLeft) || 0;
       this.planningScrollTop = Number(interaction.planningScrollTop) || 0;
       this._renderTimer = null;
+      this._canonicalIndex = null;
       this._lastRuntimeSignature = '';
       this._lastMarkup = '';
       this._forceRender = true;
@@ -1182,8 +1209,24 @@
     }
     setConfig(config) { this.config = config || {}; }
     set hass(hass) {
+      const previous = this._hass;
       this._hass = hass;
       rhiEnergySetLocaleFromHass(hass);
+
+      let canonicalChanged = null;
+      if (!this._canonicalIndex) this._canonicalIndex = createEnergyCanonicalPropertyIndex(hass);
+      else canonicalChanged = this._canonicalIndex.refresh(hass);
+
+      // Once direct canonical properties exist for the active product surface,
+      // unrelated HA updates and aggregate Public V2 churn must not rebuild the
+      // complete Energy view. Public V2 remains a compatibility fallback only.
+      if (previous && this.canonicalRuntimeActive() && canonicalChanged) {
+        const relevant = new Set(this.relevantEntityIds());
+        const relevantChanged = [...canonicalChanged].some(entityId => relevant.has(entityId));
+        const localeChanged = rhiEnergyLocale(previous) !== rhiEnergyLocale(hass);
+        if (!relevantChanged && !localeChanged && !this._forceRender) return;
+      }
+
       this.reconcileWriteFeedback();
       this.reconcilePendingAppearances();
       this.syncMeteringPeriodFromRuntime();
@@ -1205,7 +1248,7 @@
       }, immediate ? 0 : 350);
     }
     relevantEntityIds() {
-      return this.runtime().subscriptionEntityIds();
+      return this.runtime().subscriptionEntityIds(this.activeCanonicalSurfaces());
     }
     runtimeSignature() {
       const rt = this.runtime();
@@ -1234,7 +1277,17 @@
       this.persistInteractionContext();
       this.requestPropertyWrite('metering.selected_period', period, { source });
     }
-    runtime() { return new EnergyRuntime(this._hass || {}); }
+    runtime() { return new EnergyRuntime(this._hass || {}, this._canonicalIndex); }
+    activeCanonicalSurfaces() {
+      if (['overview','flow'].includes(this.view)) return ['key_properties'];
+      if (['solar','battery','consumers','gas'].includes(this.view)) return ['key_properties','details','configuration'];
+      if (['strategies','intelligence'].includes(this.view)) return ['configuration'];
+      if (['metering','value','retrospective'].includes(this.view)) return ['key_properties','details'];
+      return [];
+    }
+    canonicalRuntimeActive() {
+      return !!this._canonicalIndex?.hasCanonicalTruth?.() && this.activeCanonicalSurfaces().length > 0;
+    }
     navigationModel() {
       const presence=this.runtime().experiencePresence();
       const has=(key,fallback=true)=>Object.prototype.hasOwnProperty.call(presence,key)
