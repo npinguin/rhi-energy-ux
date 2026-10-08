@@ -1,13 +1,14 @@
-# v4.3.32 — pilot localization and Core convergence
+# v4.3.33 — canonical domain interface
 
-- converge Energy UX on the current shared RHI UX Core 1.6.3 commit `56560ba61893089b3e0ab8b6535fd777a799066b`;
-- expand EN/NL/FR product localization across the primary pilot surfaces: Overview, Flow, Gas, Home Battery, Flexible Loads, Settings, Metering, Value and Planning;
-- route primary pilot-visible copy through stable localization keys instead of embedded English literals;
-- add a release-blocking source guard for key pilot-visible literals bypassing localization;
-- preserve the 4.3.31 canonical Energy projection and fail-closed V2 ownership model;
-- reset target-Home-Assistant qualification because shared Core and rendered product copy changed.
+- consume **RHI_ENERGY_CANONICAL_PROPERTY_V2** as the first authority for live Energy property truth;
+- consume **RHI_ENERGY_CANONICAL_OBJECT_V2** for direct canonical object identity;
+- preserve backend-owned availability, quality, write and presentation metadata on the direct property surface;
+- subscribe the dashboard to canonical object/property entities so live updates no longer depend solely on the giant Public V2 state;
+- keep **RHI_ENERGY_PUBLIC_CONTRACT_V2** temporarily for Planning, Metering, Retrospective and other composed capabilities not yet cut over;
+- fail closed and never infer presentation from property names;
+- qualify against Energy **E0.15.109**, Foundation **F1.8.42** and Mobility **M0.10.41**.
 
-Rollback: **v4.3.31**.
+Rollback: **v4.3.32**.
 Known accepted technical debt: **0**.
 Known accepted feature debt: **0**.
-Target-runtime qualification remains required before stable promotion.
+Target-runtime functional and CPU qualification remains required before stable promotion.
