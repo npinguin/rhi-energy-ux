@@ -1,3 +1,11 @@
+## 4.3.34 — Canonical-Only Zero-Debt Frontend
+
+- require Energy E0.15.109 canonical object/property V2 contracts;
+- remove aggregate Public V2 scalar-property fallback and duplicate frontend precedence logic;
+- fail closed on missing canonical property truth instead of reconstructing or backfilling values;
+- keep presentation placement backend-metadata-driven and preserve zero/default separation;
+- retain multilingual EN/NL/FR UX and zero accepted technical/feature debt.
+
 ## 4.3.33 — Canonical Runtime Performance
 
 - index direct RHI_ENERGY_CANONICAL_PROPERTY_V2 entities and prefer canonical asset/property truth over aggregate Public V2 when available;
