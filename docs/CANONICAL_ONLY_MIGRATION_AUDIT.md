@@ -28,3 +28,15 @@ Energy #240 and #241 must publish exact canonical native HA identifiers, attribu
 
 ## Release gate
 No candidate promotion before actual backend candidate publication and same-instance HA integration/performance/rollback evidence. Zero accepted technical and feature debt. This audit is **not** runtime proof.
+
+## Coordinated P0 release gates — blocking
+Six issue program: Foundation #109/#111; Mobility #246/#247; Energy #240/#242.
+
+1. Domain model first: normalized property changes must update domain model, canonical catalog, HA materialization and bidirectional Validate canaries in the same backend PR.
+2. Backend complete: exact public native entity/unique IDs, attributes, typed state/quality/freshness, placement, invoke and terminal readback; missing capability stays open at owning backend issue.
+3. Backend validated: Foundation, Mobility and Energy CI PASS, no active retired aggregate transport in UX/HA hot path, no shadow semantic authority.
+4. Backend released: immutable tested backend tags, full SHA and baseline-adoption manifests for all three domains; confirm identities rather than assuming.
+5. UX validated: all critical screens and actions use native canonical entities only; absent backend truth is visible contract gap.
+6. Joint qualified: one HA instance, install/upgrade, dynamic asset lifecycle, reload/restart, outages, write/readback, rollback, iPhone/iPad/desktop and measured event→gateway→component processing. Backend CPU ≤25% target must be assessed in same qualification.
+
+**No premature closure:** backend CI green alone is not product acceptance. Keep WIP backend decommission PRs blocked until canonical replacement is proven. Technical debt acceptance = 0; feature debt acceptance = 0. Never substitute frontend logic for missing backend semantics.
