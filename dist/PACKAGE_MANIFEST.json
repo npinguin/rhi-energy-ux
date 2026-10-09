@@ -10,7 +10,7 @@
     "energy",
     "heroes"
   ],
-  "runtime_sha256": "738f9efca78b8cda48275ec939ec8c84a00cd4f1913ceeaa7ef642d3a44a4680",
+  "runtime_sha256": "df786eb17a6cebf6f2d55d802a95ec9ca2d6f23560a7467c1c2be23bfd4d935a",
   "files": [
     {
       "path": "assets/energy/battery_system_4_towers.webp",
@@ -162,7 +162,7 @@
     },
     {
       "path": "rhi-energy-ux.js",
-      "bytes": 872338
+      "bytes": 872815
     },
     {
       "path": "rhi-energy-ux.js.sha256",
