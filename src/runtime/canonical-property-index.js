@@ -211,7 +211,7 @@ function createEnergyCanonicalPropertyIndex(hass = {}) {
 }
 
 /**
- * Native Energy metric authority (E0.15.110 candidate).
+ * Native Energy metric authority (domain-owned HA contract).
  * Select by backend-published metric_key, not an assumed HA entity_id.
  * Ambiguous/missing/unavailable publication fails closed; zero is preserved.
  */
