@@ -113,7 +113,12 @@ class EnergyCanonicalPropertyIndex {
   refresh(hass = {}) {
     if (hass === this._hassRef) return new Set();
     const states = hass?.states || {};
-    if (Object.keys(states).length !== this._stateCount) {
+    // Entity replacement can preserve the total HA state count; membership must
+    // be checked explicitly or stale canonical rows remain visible.
+    const membershipChanged = [...this.stateRefs.keys()].some(id => !Object.prototype.hasOwnProperty.call(states,id)) ||
+      Object.entries(states).some(([id,state]) =>
+        !this.stateRefs.has(id) && canonicalEnergyPropertyRow(id,state) !== null);
+    if (Object.keys(states).length !== this._stateCount || membershipChanged) {
       const before = new Map(this.stateRefs);
       this.discover(hass);
       const changed = new Set();
@@ -132,7 +137,10 @@ class EnergyCanonicalPropertyIndex {
       if (!row || row.asset_id !== this.byEntity.get(entityId)?.asset_id ||
           row.property_key !== this.byEntity.get(entityId)?.property_key ||
           row.presentation_surface !== this.byEntity.get(entityId)?.presentation_surface ||
-          row.presentation_family !== this.byEntity.get(entityId)?.presentation_family) {
+          row.presentation_family !== this.byEntity.get(entityId)?.presentation_family ||
+          row.presentation_role !== this.byEntity.get(entityId)?.presentation_role ||
+          row.presentation_primary !== this.byEntity.get(entityId)?.presentation_primary ||
+          row.presentation_technical !== this.byEntity.get(entityId)?.presentation_technical) {
         this.discover(hass);
         return changed;
       }
