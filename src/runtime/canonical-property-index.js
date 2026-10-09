@@ -1,11 +1,11 @@
 // Canonical Energy property index.
 //
-// RHI_ENERGY_CANONICAL_PROPERTY_V1 property entities are the preferred product
+// RHI_ENERGY_CANONICAL_PROPERTY_V2 property entities are the preferred product
 // truth. Aggregate Public V2 remains a bounded compatibility fallback only.
 //
 // This index deliberately uses backend-published presentation metadata literally.
 // It never derives family/role/surface from property_key or object_class.
-const RHI_ENERGY_CANONICAL_PROPERTY_V1 = 'RHI_ENERGY_CANONICAL_PROPERTY_V1';
+const RHI_ENERGY_CANONICAL_PROPERTY_V2 = 'RHI_ENERGY_CANONICAL_PROPERTY_V2';
 
 function normalizeCanonicalEnergyAvailability(state = null, attributes = {}) {
   const explicit = String(attributes.availability ?? attributes.status ?? attributes.quality ?? '').trim().toUpperCase();
@@ -16,7 +16,7 @@ function normalizeCanonicalEnergyAvailability(state = null, attributes = {}) {
 
 function canonicalEnergyPropertyRow(entityId, state) {
   const attributes = state?.attributes || {};
-  if (String(attributes.canonical_contract || '') !== RHI_ENERGY_CANONICAL_PROPERTY_V1) return null;
+  if (String(attributes.canonical_contract || '') !== RHI_ENERGY_CANONICAL_PROPERTY_V2) return null;
 
   const assetId = String(attributes.asset_id || '').trim();
   const objectClass = String(attributes.logical_object_class || attributes.object_class || '').trim();
@@ -39,7 +39,7 @@ function canonicalEnergyPropertyRow(entityId, state) {
 
   return Object.freeze({
     entity_id:String(entityId || ''),
-    canonical_contract:RHI_ENERGY_CANONICAL_PROPERTY_V1,
+    canonical_contract:RHI_ENERGY_CANONICAL_PROPERTY_V2,
     asset_id:assetId,
     logical_object_class:objectClass,
     object_class:objectClass,

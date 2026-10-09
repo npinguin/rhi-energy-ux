@@ -10,7 +10,7 @@ const hass={states:{
   "sensor.battery_soc":{
     state:"57",
     attributes:{
-      canonical_contract:"RHI_ENERGY_CANONICAL_PROPERTY_V1",
+      canonical_contract:"RHI_ENERGY_CANONICAL_PROPERTY_V2",
       asset_id:"battery_home",
       logical_object_class:"battery",
       property_key:"battery.soc_pct",
@@ -26,7 +26,7 @@ const hass={states:{
   "sensor.battery_version":{
     state:"1.2.3",
     attributes:{
-      canonical_contract:"RHI_ENERGY_CANONICAL_PROPERTY_V1",
+      canonical_contract:"RHI_ENERGY_CANONICAL_PROPERTY_V2",
       asset_id:"battery_home",
       logical_object_class:"battery",
       property_key:"battery.version",
