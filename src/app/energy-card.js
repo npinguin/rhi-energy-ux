@@ -181,7 +181,7 @@
       this._meteringRemediations = null;
       this._visualRegistry = null;
     }
-    // Domain-native read surface. No Public V2 reconstruction or compatibility fallback.
+    // Read domain-owned native HA evidence only; never reconstruct aggregate semantics.
     nativePlanningTotals(horizonId = 'D0') {
       return readNativeEnergyPlanningTotals(this.hass, horizonId);
     }
