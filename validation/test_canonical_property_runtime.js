@@ -130,4 +130,12 @@ const partial=nativeTotals({states:{"sensor.planning_required_kwh":planningState
 if(partial.available || partial.missing.length!==5 || partial.values.planned_kwh.value!==null) throw new Error("partial native planning totals must fail closed without frontend reconstruction");
 if(nativeTotals(planningStates,"D2").available) throw new Error("unsupported horizon must fail closed");
 
+const runtimeNativeStart=card.indexOf("    nativePlanningTotals(horizonId = 'D0') {");
+const runtimeNativeEnd=card.indexOf("    rawState(entityId)",runtimeNativeStart);
+if(runtimeNativeStart<0 || runtimeNativeEnd<0) throw new Error("native Energy Planning totals are not exposed through the runtime");
+const runtimeNative=card.slice(runtimeNativeStart,runtimeNativeEnd);
+if(!runtimeNative.includes("readNativeEnergyPlanningTotals(this.hass, horizonId)") ||
+   !runtimeNative.includes("readNativeEnergyMetric(this.hass, metricKey)") ||
+   runtimeNative.includes("publicV2")) throw new Error("native Energy runtime must consume canonical HA evidence only");
+
 console.log("PASS canonical Energy property metadata, fail-closed lookup and incremental indexing");
