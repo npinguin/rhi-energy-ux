@@ -2823,6 +2823,15 @@ class FlexibleAssetDomainModel {
       contractVersion:'ENERGY_NATIVE_PLANNING',
       available:selected.available,
       attrs:Object.freeze({}),
+      planId:published ? horizonDetails.plan_id ?? null : null,
+      providerId:published ? horizonDetails.provider_id ?? null : null,
+      providerPlanReference:published ? horizonDetails.provider_plan_ref ?? null : null,
+      generatedAt:published ? horizonDetails.generated_at ?? null : null,
+      sourceLanes:Object.freeze(planningObject(horizonDetails.source_lanes)),
+      consumerLanes:Object.freeze(planningObject(horizonDetails.consumer_lanes)),
+      balance:Object.freeze(planningObject(horizonDetails.balance)),
+      batteryLedger:Object.freeze(planningObject(horizonDetails.battery_ledger)),
+      policyEvidence:Object.freeze(planningObject(horizonDetails.policy_evidence)),
       planningAssets:Object.freeze(planningAssets),
       planningAssetsById:Object.freeze(Object.fromEntries(planningAssets
         .filter(row=>row && String(row.asset_id || '').trim())
