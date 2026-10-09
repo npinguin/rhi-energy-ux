@@ -185,6 +185,20 @@
     nativePlanningTotals(horizonId = 'D0') {
       return readNativeEnergyPlanningTotals(this.hass, horizonId);
     }
+    nativePlanningHorizon(horizonId = 'D0') {
+      const horizon=String(horizonId || '').toUpperCase();
+      if (horizon !== 'D0' && horizon !== 'D1') return Object.freeze({available:false,details:null});
+      const matches=Object.values(this.hass?.states || {}).filter(state=>
+        state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1' &&
+        state?.attributes?.canonical_source === 'rhi_energy.runtime' &&
+        state?.attributes?.horizon_id === horizon);
+      if (matches.length !== 1) return Object.freeze({available:false,details:null});
+      const state=matches[0], attrs=state.attributes || {};
+      if (!['AVAILABLE','COMPLETE'].includes(String(attrs.availability || '').toUpperCase()) ||
+          !Array.isArray(attrs.buckets)) return Object.freeze({available:false,details:null});
+      return Object.freeze({available:true,details:attrs});
+    }
+
     nativeMetric(metricKey = '') {
       return readNativeEnergyMetric(this.hass, metricKey);
     }
@@ -198,7 +212,8 @@
       // explicitly so D0/D1 planning and financial states refresh on HA updates.
       const nativeMetrics = Object.entries(this.hass?.states || {})
         .filter(([,state])=>String(state?.attributes?.canonical_source || '') === 'rhi_energy.runtime'
-          && !!String(state?.attributes?.metric_key || '').trim())
+          && (!!String(state?.attributes?.metric_key || '').trim() ||
+            state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1'))
         .map(([entityId])=>entityId);
       return [...new Set([...canonicalIds, ...nativeMetrics, registryEntity].filter(Boolean))];
     }
