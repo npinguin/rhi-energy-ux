@@ -130,6 +130,14 @@ const partial=nativeTotals({states:{"sensor.planning_required_kwh":planningState
 if(partial.available || partial.missing.length!==5 || partial.values.planned_kwh.value!==null) throw new Error("partial native planning totals must fail closed without frontend reconstruction");
 if(nativeTotals(planningStates,"D2").available) throw new Error("unsupported horizon must fail closed");
 
+const subscriptionsStart=card.indexOf("    subscriptionEntityIds(surfaces = []) {");
+const subscriptionsEnd=card.indexOf("    entitySignature(entityIds = [])",subscriptionsStart);
+if(subscriptionsStart<0 || subscriptionsEnd<0) throw new Error("Energy runtime subscription boundary not found");
+const subscriptions=card.slice(subscriptionsStart,subscriptionsEnd);
+if(!subscriptions.includes("canonical_source") || !subscriptions.includes("metric_key") ||
+   !subscriptions.includes("nativeMetrics") || !subscriptions.includes("...nativeMetrics"))
+  throw new Error("native Energy Planning metrics are not included in HA state subscriptions");
+
 const runtimeNativeStart=card.indexOf("    nativePlanningTotals(horizonId = 'D0') {");
 const runtimeNativeEnd=card.indexOf("    rawState(entityId)",runtimeNativeStart);
 if(runtimeNativeStart<0 || runtimeNativeEnd<0) throw new Error("native Energy Planning totals are not exposed through the runtime");
