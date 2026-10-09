@@ -5,11 +5,17 @@ const start = source.indexOf('allRows() {');
 const end = source.indexOf('propertyRows()', start);
 if (start < 0 || end < 0) throw new Error('EnergyRuntime.allRows not found');
 const block = source.slice(start,end);
-const core = block.indexOf('for (const [key, field] of (v2.coreByKey || new Map()).entries())');
-const objects = block.indexOf('(v2.allPropertyRows || []).forEach(add)');
-if (core < 0 || objects < 0) throw new Error('core/object row projection anchors missing');
-if (core > objects) throw new Error('canonical Public V2 Core must precede generic object/configuration rows');
-if (!block.includes("asset_id:'core'") || !block.includes("source_type:'canonical_v2_core'")) {
-  throw new Error('canonical Core row identity missing');
+
+if (!block.includes('this.canonicalIndex?.uniqueProductRows?.()')) {
+  throw new Error('canonical property index must be the sole Energy row authority');
 }
-console.log('PASS Public V2 Core has global aggregate property precedence');
+for (const forbidden of [
+  'v2.coreByKey',
+  'v2.allPropertyRows',
+  "asset_id:'core'",
+  "source_type:'canonical_v2_core'",
+  'this.publicV2()'
+]) {
+  if (block.includes(forbidden)) throw new Error('aggregate Public V2 row fallback remains: '+forbidden);
+}
+console.log('PASS canonical Energy properties are the sole row authority; aggregate Core/object rows cannot backfill product truth');
