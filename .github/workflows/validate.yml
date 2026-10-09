@@ -39,6 +39,8 @@ jobs:
         run: npm run validate
       - name: Verify committed package matches first validated build
         run: node tools/check-committed-dist.mjs
+      - name: Release identity and documentation governance
+        run: npm run release:check
       - name: Deterministic two-build proof
         shell: bash
         run: |
