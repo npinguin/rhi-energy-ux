@@ -115,4 +115,19 @@ if(readMetric({states:{"sensor.planning_today_planned":metric("4","UNAVAILABLE")
 if(readMetric({states:{"sensor.a":metric("4"),"sensor.b":metric("5")}},"planning_today_planned_kwh").reason!=="duplicate_native_energy_metric") throw new Error("duplicate native metric must fail closed");
 if(readMetric({states:{"sensor.rogue":{state:"7",attributes:{metric_key:"planning_today_planned_kwh"}}}},"planning_today_planned_kwh").available) throw new Error("unowned metric must not be accepted");
 
+vm.runInContext("globalThis.readNativeEnergyPlanningTotals=readNativeEnergyPlanningTotals;",context);
+const nativeTotals=context.readNativeEnergyPlanningTotals;
+const planningKeys=["required_kwh","planned_kwh","still_to_plan_kwh","flexible_required_kwh","flexible_planned_kwh","flexible_still_to_plan_kwh"];
+const planningStates={states:Object.fromEntries(planningKeys.map((field,i)=>[
+  "sensor.planning_"+field,{state:i===0?"0":String(i),attributes:{
+    canonical_source:"rhi_energy.runtime",metric_key:"planning_today_"+field,
+    availability:"AVAILABLE",unit_of_measurement:"kWh"
+  }}
+]))};
+const complete=nativeTotals(planningStates,"D0");
+if(!complete.available || complete.missing.length || complete.values.required_kwh.value!=="0") throw new Error("native D0 totals must preserve explicit zero and complete evidence");
+const partial=nativeTotals({states:{"sensor.planning_required_kwh":planningStates.states["sensor.planning_required_kwh"]}},"D0");
+if(partial.available || partial.missing.length!==5 || partial.values.planned_kwh.value!==null) throw new Error("partial native planning totals must fail closed without frontend reconstruction");
+if(nativeTotals(planningStates,"D2").available) throw new Error("unsupported horizon must fail closed");
+
 console.log("PASS canonical Energy property metadata, fail-closed lookup and incremental indexing");
