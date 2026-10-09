@@ -221,6 +221,38 @@ function createEnergyCanonicalPropertyIndex(hass = {}) {
   return new EnergyCanonicalPropertyIndex(hass);
 }
 
+/**
+ * Native Energy metric authority (E0.15.110 candidate).
+ * Select by backend-published metric_key, not an assumed HA entity_id.
+ * Ambiguous/missing/unavailable publication fails closed; zero is preserved.
+ */
+function readNativeEnergyMetric(hass = {}, metricKey = '') {
+  const key = String(metricKey || '').trim();
+  const matches = Object.entries(hass?.states || {}).filter(([,state]) =>
+    String(state?.attributes?.metric_key || '') === key &&
+    String(state?.attributes?.canonical_source || '') === 'rhi_energy.runtime'
+  );
+  if (!key || matches.length !== 1) return Object.freeze({
+    available:false, value:null, entity_id:null,
+    reason:matches.length > 1 ? 'duplicate_native_energy_metric' : 'native_energy_metric_not_published'
+  });
+  const [entityId,state] = matches[0];
+  const attrs = state.attributes || {};
+  const availability = String(attrs.availability || '').toUpperCase();
+  const invalid = ['unknown','unavailable','none','null',''].includes(String(state.state ?? '').toLowerCase());
+  const available = availability === 'AVAILABLE' && !invalid;
+  return Object.freeze({
+    available,
+    entity_id:entityId,
+    value:available ? state.state : null,
+    unit:String(attrs.unit_of_measurement || ''),
+    quality:attrs.quality ?? null,
+    provenance:attrs.provenance ?? null,
+    reason:available ? null : String(attrs.reason_code || (availability || 'native_energy_metric_unavailable')),
+    metric_key:key
+  });
+}
+
 // ---- src/runtime/energy-contract-gateway.js ----
 // Single backend-access owner for Energy UX public product contracts.
   function createEnergyContractGateway(host) {
