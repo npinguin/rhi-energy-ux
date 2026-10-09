@@ -31,6 +31,8 @@
       ? runtime.nativePlanningHorizon(normalized) : null;
     const published = nativeHorizon?.available === true ? nativeHorizon : null;
     const horizonDetails = published?.details || {};
+    const planningAssets = published && Array.isArray(horizonDetails.planning_assets)
+      ? horizonDetails.planning_assets : [];
 
     const totals=reader=>Object.fromEntries(Object.entries(reader.values).map(([key,row])=>
       [key,row.available ? Number(row.value) : null]));
@@ -47,8 +49,10 @@
       contractVersion:'ENERGY_NATIVE_PLANNING',
       available:selected.available,
       attrs:Object.freeze({}),
-      planningAssets:Object.freeze([]),
-      planningAssetsById:Object.freeze({}),
+      planningAssets:Object.freeze(planningAssets),
+      planningAssetsById:Object.freeze(Object.fromEntries(planningAssets
+        .filter(row=>row && String(row.asset_id || '').trim())
+        .map(row=>[String(row.asset_id),row]))),
       planningTodayTotals:Object.freeze(todayTotals),
       planningTomorrowTotals:Object.freeze(tomorrowTotals),
       planningCombinedTotals:Object.freeze({}),
@@ -60,7 +64,8 @@
       currentActionIntent:Object.freeze({}),
       missingContractCapabilities:Object.freeze([
         ...(!published ? ['native_planning_buckets'] : []),
-        'native_planning_assets','native_planning_actions'
+        ...(!published || !Array.isArray(horizonDetails.planning_assets) ? ['native_planning_assets'] : []),
+        'native_planning_actions'
       ]),
       totalsSource:'rhi_energy.runtime/native_metric'
     });
