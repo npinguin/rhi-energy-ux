@@ -274,7 +274,7 @@
       };
       // Direct canonical property entities are the preferred product truth.
       // Public V2 below is a compatibility fallback only for properties not yet
-      // published through RHI_ENERGY_CANONICAL_PROPERTY_V1.
+      // published through RHI_ENERGY_CANONICAL_PROPERTY_V2.
       for (const row of (this.canonicalIndex?.uniqueProductRows?.() || [])) add(row);
 
       // Transitional aggregate fallback. add() preserves the canonical row when
