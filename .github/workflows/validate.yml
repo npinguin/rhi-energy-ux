@@ -35,15 +35,10 @@ jobs:
           python-version: '3.12'
       - name: Install locked dependencies
         run: npm ci
-      - name: Fail fast on source syntax and committed package drift
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run build
-          npm run check:syntax
-          node tools/check-committed-dist.mjs
       - name: Full validation
         run: npm run validate
+      - name: Verify committed package matches first validated build
+        run: node tools/check-committed-dist.mjs
       - name: Deterministic two-build proof
         shell: bash
         run: |
