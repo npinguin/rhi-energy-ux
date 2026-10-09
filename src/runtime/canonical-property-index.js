@@ -241,3 +241,27 @@ function readNativeEnergyMetric(hass = {}, metricKey = '') {
     metric_key:key
   });
 }
+
+/** Published planning totals only. No frontend total arithmetic or Public V2 fallback. */
+function readNativeEnergyPlanningTotals(hass = {}, horizonId = 'D0') {
+  const horizon=String(horizonId || '').toUpperCase();
+  if (!['D0','D1'].includes(horizon)) return Object.freeze({
+    available:false,horizon,values:Object.freeze({}),missing:Object.freeze(['unsupported_planning_horizon'])
+  });
+  const prefix=horizon==='D0' ? 'planning_today_' : 'planning_tomorrow_';
+  const fields=['required_kwh','planned_kwh','still_to_plan_kwh',
+    'flexible_required_kwh','flexible_planned_kwh','flexible_still_to_plan_kwh'];
+  const values={};
+  const missing=[];
+  for (const field of fields) {
+    const metric=readNativeEnergyMetric(hass,prefix+field);
+    values[field]=metric;
+    if (!metric.available) missing.push(field);
+  }
+  return Object.freeze({
+    available:missing.length===0,
+    horizon,
+    values:Object.freeze(values),
+    missing:Object.freeze(missing)
+  });
+}
