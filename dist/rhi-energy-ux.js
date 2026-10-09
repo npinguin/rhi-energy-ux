@@ -1572,6 +1572,7 @@ function readEnergyCommandContract(gateway) {
           !Array.isArray(attrs.buckets)) return Object.freeze({available:false,details:null});
       return Object.freeze({available:true,details:attrs});
     }
+
     nativeMetric(metricKey = '') {
       return readNativeEnergyMetric(this.hass, metricKey);
     }
@@ -2804,6 +2805,7 @@ class FlexibleAssetDomainModel {
       ? runtime.nativePlanningHorizon(normalized) : null;
     const published = nativeHorizon?.available === true ? nativeHorizon : null;
     const horizonDetails = published?.details || {};
+
     const totals=reader=>Object.fromEntries(Object.entries(reader.values).map(([key,row])=>
       [key,row.available ? Number(row.value) : null]));
     const horizon=Object.freeze({
