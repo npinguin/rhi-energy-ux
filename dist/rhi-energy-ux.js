@@ -2782,7 +2782,10 @@ class FlexibleAssetDomainModel {
     const normalized=String(horizonId || '').toUpperCase();
     const today=runtime.nativePlanningTotals('D0');
     const tomorrow=runtime.nativePlanningTotals('D1');
-    const selected=normalized==='D1' ? tomorrow : today;
+    const supported=normalized==='D0' || normalized==='D1';
+    const selected=supported ? (normalized==='D1' ? tomorrow : today) : {
+      available:false, missing:['unsupported_planning_horizon'], values:{}
+    };
     const totals=reader=>Object.fromEntries(Object.entries(reader.values).map(([key,row])=>
       [key,row.available ? Number(row.value) : null]));
     const horizon=Object.freeze({
