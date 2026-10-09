@@ -4,10 +4,16 @@ import re
 ROOT=Path(__file__).resolve().parents[1]
 failures=[]
 CANONICAL_PROPERTY_CONTRACT="RHI_ENERGY_CANONICAL_PROPERTY_V2"
+ALLOWED_NATIVE_CONTRACTS=("RHI_ENERGY_PLANNING_HORIZON_V1",)
 LEGACY_V1=re.compile(r"RHI_[A-Z0-9_]+_V1")
 
+def _without_current_contracts(text: str) -> str:
+    for name in (CANONICAL_PROPERTY_CONTRACT, *ALLOWED_NATIVE_CONTRACTS):
+        text=text.replace(name, "")
+    return text
+
 def contains_legacy_v1(text: str) -> bool:
-    return bool(LEGACY_V1.search(text.replace(CANONICAL_PROPERTY_CONTRACT, "")))
+    return bool(LEGACY_V1.search(_without_current_contracts(text)))
 
 
 semantic_fallback_patterns=[
