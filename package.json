@@ -22,7 +22,7 @@
     "check:hacs-package": "python validation/validate_hacs_package.py",
     "check:documentation-drift": "python validation/validate_documentation_drift.py",
     "test:hacs-install": "python validation/test_hacs_install.py",
-    "preflight": "npm run validate",
+    "preflight": "npm run validate && node tools/check-committed-dist.mjs",
     "check:shared-visual-ownership": "python validation/validate_shared_visual_ownership.py",
     "check:ux-core": "python validation/validate_ux_core_dependency.py",
     "release:check": "npm run test:release",
