@@ -1500,9 +1500,7 @@ function readEnergyCommandContract(gateway) {
       }).join('|');
     }
     gasStatisticsEntityId(assetId = '') {
-      const row = this.canonicalIndex?.row?.(String(assetId || ''), 'gas.total_m3')
-        || this.canonicalIndex?.rowsForProperty?.('gas.total_m3')?.[0]
-        || null;
+      const row = this.canonicalIndex?.row?.(String(assetId || ''), 'gas.total_m3') || null;
       if (!row) return '';
       return String(firstDefined(
         row.statistics_entity_id,
@@ -1722,7 +1720,12 @@ function readEnergyCommandContract(gateway) {
       if (!this._commandContract) this._commandContract = readEnergyCommandContract(this.contractGateway());
       return this._commandContract;
     }
-    commands() { return this.commandProjection().rows.map(row => this.commandContract().rows.find(candidate => candidate.command_id === row.command_id && candidate.target_asset_id === row.target_asset_id) || row); }
+    commands() {
+      const authority = this.commandContract().rows;
+      return this.commandProjection().rows
+        .map(row => authority.find(candidate => candidate.command_id === row.command_id && candidate.target_asset_id === row.target_asset_id) || null)
+        .filter(Boolean);
+    }
     commandVisible(command) { return !!command && command.command_resolved === true && command.visible === true; }
     commandResolved(command) { return !!command && command.command_resolved === true; }
     commandApplicable(command) { return !!command && command.currently_applicable === true; }
