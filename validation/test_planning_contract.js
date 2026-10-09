@@ -113,6 +113,18 @@ assert.equal(d0Contract.totalsSource,'rhi_energy.runtime/native_metric');
 assert.equal(d0Contract.planningTodayTotals.required_kwh,0);
 assert.equal(d1Contract.planningTomorrowTotals.flexible_planned_kwh,5);
 assert.equal(d0Contract.buckets.length,0);
+const nativeBucket={bucket_id:'D0-H12',asset_allocations:[{asset_id:'vehicle_carole',planned_energy_kwh:2}]};
+const withNativeDetail={
+  ...runtime,
+  nativePlanningHorizon(horizon){return {available:horizon==='D0',details:horizon==='D0'
+    ? {buckets:[nativeBucket],availability:'AVAILABLE'} : null};}
+};
+const publishedD0=readPlanningContract(withNativeDetail,'D0');
+assert.equal(publishedD0.buckets.length,1);
+assert.equal(publishedD0.buckets[0].asset_allocations[0].planned_energy_kwh,2);
+assert.equal(publishedD0.missingContractCapabilities.includes('native_planning_buckets'),false);
+assert.equal(readPlanningContract(withNativeDetail,'D1').buckets.length,0);
+
 assert.equal(d0Contract.planningAssets.length,0);
 assert.ok(d0Contract.missingContractCapabilities.includes('native_planning_buckets'));
 assert.deepEqual(Object.keys(d0Contract.planningCombinedTotals),[]);
