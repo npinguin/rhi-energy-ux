@@ -1,3 +1,11 @@
+## 4.3.33 — Canonical Property Performance Architecture
+
+- consume direct canonical Energy property entities before transitional Public V2 aggregate fields;
+- persistently index canonical properties and use backend presentation metadata literally for surface ownership;
+- prevent irrelevant Home Assistant updates and aggregate V2 churn from forcing full active-view reconstruction when canonical property truth is available;
+- keep planning calculations, availability and health backend-owned and fail closed on missing truth;
+- preserve multilingual EN/NL/FR product UX and RHI UX Core 1.6.3 ownership.
+
 ## 4.3.32 — Pilot Localization and Core Convergence
 
 - adopt RHI UX Core 1.6.3 as the exact build-time presentation baseline;
