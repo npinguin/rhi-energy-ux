@@ -1559,6 +1559,19 @@ function readEnergyCommandContract(gateway) {
     nativePlanningTotals(horizonId = 'D0') {
       return readNativeEnergyPlanningTotals(this.hass, horizonId);
     }
+    nativePlanningHorizon(horizonId = 'D0') {
+      const horizon=String(horizonId || '').toUpperCase();
+      if (horizon !== 'D0' && horizon !== 'D1') return Object.freeze({available:false,details:null});
+      const matches=Object.values(this.hass?.states || {}).filter(state=>
+        state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1' &&
+        state?.attributes?.canonical_source === 'rhi_energy.runtime' &&
+        state?.attributes?.horizon_id === horizon);
+      if (matches.length !== 1) return Object.freeze({available:false,details:null});
+      const state=matches[0], attrs=state.attributes || {};
+      if (!['AVAILABLE','COMPLETE'].includes(String(attrs.availability || '').toUpperCase()) ||
+          !Array.isArray(attrs.buckets)) return Object.freeze({available:false,details:null});
+      return Object.freeze({available:true,details:attrs});
+    }
     nativeMetric(metricKey = '') {
       return readNativeEnergyMetric(this.hass, metricKey);
     }
@@ -1572,7 +1585,8 @@ function readEnergyCommandContract(gateway) {
       // explicitly so D0/D1 planning and financial states refresh on HA updates.
       const nativeMetrics = Object.entries(this.hass?.states || {})
         .filter(([,state])=>String(state?.attributes?.canonical_source || '') === 'rhi_energy.runtime'
-          && !!String(state?.attributes?.metric_key || '').trim())
+          && (!!String(state?.attributes?.metric_key || '').trim() ||
+            state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1'))
         .map(([entityId])=>entityId);
       return [...new Set([...canonicalIds, ...nativeMetrics, registryEntity].filter(Boolean))];
     }
@@ -2786,6 +2800,10 @@ class FlexibleAssetDomainModel {
     const selected=supported ? (normalized==='D1' ? tomorrow : today) : {
       available:false, missing:['unsupported_planning_horizon'], values:{}
     };
+    const nativeHorizon = supported && typeof runtime.nativePlanningHorizon === 'function'
+      ? runtime.nativePlanningHorizon(normalized) : null;
+    const published = nativeHorizon?.available === true ? nativeHorizon : null;
+    const horizonDetails = published?.details || {};
     const totals=reader=>Object.fromEntries(Object.entries(reader.values).map(([key,row])=>
       [key,row.available ? Number(row.value) : null]));
     const horizon=Object.freeze({
@@ -2809,11 +2827,12 @@ class FlexibleAssetDomainModel {
       horizonsById:Object.freeze({D0:todayTotals,D1:tomorrowTotals}),
       horizonId:normalized,horizon,summary:horizon,
       laneTotals:Object.freeze(totals(selected)),
-      buckets:Object.freeze([]),
+      buckets:Object.freeze(Array.isArray(horizonDetails.buckets) ? horizonDetails.buckets : []),
       currentPlanningBucket:Object.freeze({}),
       currentActionIntent:Object.freeze({}),
       missingContractCapabilities:Object.freeze([
-        'native_planning_buckets','native_planning_assets','native_planning_actions'
+        ...(!published ? ['native_planning_buckets'] : []),
+        'native_planning_assets','native_planning_actions'
       ]),
       totalsSource:'rhi_energy.runtime/native_metric'
     });
