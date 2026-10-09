@@ -1,3 +1,11 @@
+## 4.3.35 — Zero-Debt Canonical Property Release
+
+- make RHI_ENERGY_CANONICAL_PROPERTY_V2 the sole frontend property truth;
+- remove final Public V2 property fallbacks and compatibility semantics;
+- fail closed on missing canonical properties instead of reconstructing values;
+- retain only explicit producer-owned aggregate/capability contracts where they are genuine domain boundaries;
+- add zero-debt ratchets preventing semantic fallback paths from returning.
+
 ## 4.3.34 — Canonical V2 Zero-Debt Candidate
 
 - publish canonical V2 + performance + zero-debt runtime under a new immutable version;
