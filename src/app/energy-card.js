@@ -5391,7 +5391,7 @@
       // stay outside this product view.
       const assets = this.flexibleAssetDomain(rt).consumerFacing().map(vm => vm.raw);
       const storage = domainAssets.find(vm => vm.isStorage && !vm.isDisabled)?.raw || null;
-      return createPlanningViewModel({ gateway: rt.contractGateway(), horizonId, flexibleAssets: assets, storage });
+      return createPlanningViewModel({ runtime: rt, horizonId, flexibleAssets: assets, storage });
     }
 
     planningParticipant(row, lane, participantId) {
