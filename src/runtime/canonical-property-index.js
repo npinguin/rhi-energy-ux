@@ -1,7 +1,7 @@
 // Canonical Energy property index.
 //
-// RHI_ENERGY_CANONICAL_PROPERTY_V2 property entities are the preferred product
-// truth. Aggregate Public V2 remains a bounded compatibility fallback only.
+// RHI_ENERGY_CANONICAL_PROPERTY_V2 property entities are the product-property
+// truth. Missing canonical properties are contract gaps and fail closed.
 //
 // This index deliberately uses backend-published presentation metadata literally.
 // It never derives family/role/surface from property_key or object_class.
@@ -56,6 +56,10 @@ function canonicalEnergyPropertyRow(entityId, state) {
     write_supported:attributes.write_supported === true,
     write:attributes.write || null,
     source:attributes.source || attributes.provenance || null,
+    statistics_entity_id:String(attributes.statistics_entity_id || ''),
+    history_entity_id:String(attributes.history_entity_id || ''),
+    source_entity_id:String(attributes.source_entity_id || attributes.source?.entity_id || ''),
+    capability_ref:String(attributes.capability_ref || ''),
     presentation_family:family,
     presentation_role:role,
     presentation_surface:surface,
