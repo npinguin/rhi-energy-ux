@@ -99,4 +99,20 @@ const assetFieldBody=card.slice(assetFieldStart,assetFieldEnd);
 if(assetFieldBody.includes("publicV2")) throw new Error("Energy assetField still falls back to aggregate Public V2");
 if(!assetFieldBody.includes("canonical_property_not_published")) throw new Error("missing Energy canonical property must fail closed");
 
+
+vm.runInContext("globalThis.readNativeEnergyMetric=readNativeEnergyMetric;",context);
+const readMetric=context.readNativeEnergyMetric;
+const metric=(value,availability="AVAILABLE")=>({state:value,attributes:{
+  canonical_source:"rhi_energy.runtime",metric_key:"planning_today_planned_kwh",
+  availability,unit_of_measurement:"kWh",provenance:"planning.horizons.D0"
+}});
+const metricStates={states:{"sensor.planning_today_planned":metric("0")}};
+const zeroMetric=readMetric(metricStates,"planning_today_planned_kwh");
+if(zeroMetric.value!=="0" || !zeroMetric.available) throw new Error("zero native metric must remain available and must not become null");
+if(readMetric(metricStates,"planning_tomorrow_planned_kwh").available) throw new Error("missing native metric must fail closed");
+if(readMetric({states:{"sensor.planning_today_planned":metric("unknown")}},"planning_today_planned_kwh").available) throw new Error("unknown native metric must fail closed");
+if(readMetric({states:{"sensor.planning_today_planned":metric("4","UNAVAILABLE")}},"planning_today_planned_kwh").available) throw new Error("backend unavailable must override numeric state");
+if(readMetric({states:{"sensor.a":metric("4"),"sensor.b":metric("5")}},"planning_today_planned_kwh").reason!=="duplicate_native_energy_metric") throw new Error("duplicate native metric must fail closed");
+if(readMetric({states:{"sensor.rogue":{state:"7",attributes:{metric_key:"planning_today_planned_kwh"}}}},"planning_today_planned_kwh").available) throw new Error("unowned metric must not be accepted");
+
 console.log("PASS canonical Energy property metadata, fail-closed lookup and incremental indexing");
