@@ -117,11 +117,13 @@ const nativeBucket={bucket_id:'D0-H12',asset_allocations:[{asset_id:'vehicle_car
 const withNativeDetail={
   ...runtime,
   nativePlanningHorizon(horizon){return {available:horizon==='D0',details:horizon==='D0'
-    ? {buckets:[nativeBucket],planning_assets:[{asset_id:'vehicle_carole',planned_today_kwh:2}],availability:'AVAILABLE'} : null};}
+    ? {buckets:[nativeBucket],planning_assets:[{asset_id:'vehicle_carole',planned_today_kwh:2}],execution_policy:{configured_mode:'advice',manual_plan_execution_allowed:true},availability:'AVAILABLE'} : null};}
 };
 const publishedD0=readPlanningContract(withNativeDetail,'D0');
 assert.equal(publishedD0.buckets.length,1);
 assert.equal(publishedD0.planningAssets.length,1);
+assert.equal(publishedD0.currentActionIntent.configured_mode,'advice');
+assert.equal(publishedD0.currentActionIntent.manual_plan_execution_allowed,true);
 assert.equal(publishedD0.planningAssetsById.vehicle_carole.planned_today_kwh,2);
 assert.equal(publishedD0.missingContractCapabilities.includes('native_planning_assets'),false);
 assert.equal(publishedD0.buckets[0].asset_allocations[0].planned_energy_kwh,2);
