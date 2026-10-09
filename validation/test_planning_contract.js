@@ -102,6 +102,12 @@ const runtime={
 };
 const d0Contract=readPlanningContract(runtime,'D0');
 const d1Contract=readPlanningContract(runtime,'D1');
+const unsupportedHorizon=readPlanningContract(runtime,'D2');
+assert.equal(unsupportedHorizon.available,false);
+assert.equal(unsupportedHorizon.horizon.status,'INCOMPLETE');
+assert.ok(unsupportedHorizon.horizon.quality.missing.includes('unsupported_planning_horizon'));
+assert.equal(unsupportedHorizon.horizon.required_kwh,undefined);
+
 assert.equal(d0Contract.contractVersion,'ENERGY_NATIVE_PLANNING');
 assert.equal(d0Contract.totalsSource,'rhi_energy.runtime/native_metric');
 assert.equal(d0Contract.planningTodayTotals.required_kwh,0);
