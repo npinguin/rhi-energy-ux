@@ -66,10 +66,19 @@ const states = {
 
 const host={state:id=>states[id]||null};
 const gateway=context.createEnergyContractGateway(host);
-const contract=context.readPlanningContract(gateway,'D1');
-if(contract.entityId!=='sensor.rhi_energy_public_contract_v2') throw new Error('wrong V2 owner');
-if(contract.totalsSource!=='RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons') throw new Error('wrong totals source');
-if(contract.horizon.required_kwh!==16.0 || contract.horizon.planned_kwh!==10.0) throw new Error('canonical D1 totals lost');
-if(contract.horizon.still_to_plan_kwh!==6.0 || contract.horizon.flexible_still_to_plan_kwh!==6.0) throw new Error('canonical planning gap lost');
-if(contract.planningTodayTotals.required_kwh!==21.0 || contract.planningTomorrowTotals.required_kwh!==16.0) throw new Error('D0/D1 totals lost');
-console.log('PASS Energy V2 gateway and planning horizons contract');
+const nativeMetric=(key,value)=>({available:true,value:String(value),metric_key:key});
+const keys=['required_kwh','planned_kwh','still_to_plan_kwh','flexible_required_kwh','flexible_planned_kwh','flexible_still_to_plan_kwh'];
+const values={D0:[21,18,3,8,5,3],D1:[16,10,6,7,1,6]};
+const runtime={
+  nativePlanningTotals(horizon){
+    return {available:true,horizon,missing:[],values:Object.fromEntries(keys.map((key,i)=>[key,nativeMetric(key,values[horizon][i])]))};
+  }
+};
+const contract=context.readPlanningContract(runtime,'D1');
+if(contract.contractVersion!=='ENERGY_NATIVE_PLANNING') throw new Error('native planning contract missing');
+if(contract.totalsSource!=='rhi_energy.runtime/native_metric') throw new Error('wrong native totals owner');
+if(contract.horizon.required_kwh!==16 || contract.horizon.planned_kwh!==10) throw new Error('native D1 totals lost');
+if(contract.horizon.still_to_plan_kwh!==6 || contract.horizon.flexible_still_to_plan_kwh!==6) throw new Error('native planning gap lost');
+if(contract.planningTodayTotals.required_kwh!==21 || contract.planningTomorrowTotals.required_kwh!==16) throw new Error('native D0/D1 totals lost');
+if(gateway.contract('publicV2').entityId!=='sensor.rhi_energy_public_contract_v2') throw new Error('existing gateway regression');
+console.log('PASS Energy native planning contract and existing gateway regression');
