@@ -239,8 +239,14 @@ function readNativeEnergyMetric(hass = {}, metricKey = '') {
   const [entityId,state] = matches[0];
   const attrs = state.attributes || {};
   const availability = String(attrs.availability || '').toUpperCase();
-  const invalid = ['unknown','unavailable','none','null',''].includes(String(state.state ?? '').toLowerCase());
-  const available = availability === 'AVAILABLE' && !invalid;
+  const raw = String(state.state ?? '').trim();
+  const invalid = ['unknown','unavailable','none','null',''].includes(raw.toLowerCase());
+  // Native Energy metrics are numeric. Reject non-finite or malformed readings,
+  // even when their HA availability metadata is incorrectly marked AVAILABLE.
+  // Number('') is zero, so check empty/unknown before numeric conversion.
+  const numericValue = invalid ? null : Number(raw);
+  const validNumber = numericValue !== null && Number.isFinite(numericValue);
+  const available = availability === 'AVAILABLE' && validNumber;
   return Object.freeze({
     available,
     entity_id:entityId,
@@ -248,7 +254,7 @@ function readNativeEnergyMetric(hass = {}, metricKey = '') {
     unit:String(attrs.unit_of_measurement || ''),
     quality:attrs.quality ?? null,
     provenance:attrs.provenance ?? null,
-    reason:available ? null : String(attrs.reason_code || (availability || 'native_energy_metric_unavailable')),
+    reason:available ? null : String(attrs.reason_code || (availability === 'AVAILABLE' && !validNumber ? 'invalid_native_energy_metric' : (availability || 'native_energy_metric_unavailable'))),
     metric_key:key
   });
 }
