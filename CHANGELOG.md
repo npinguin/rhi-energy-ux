@@ -1,3 +1,11 @@
+## 4.3.34 — Canonical V2 Zero-Debt Candidate
+
+- publish canonical V2 + performance + zero-debt runtime under a new immutable version;
+- canonical Energy property V2 remains primary live truth;
+- Public V2 remains compatibility/composed-capability fallback only;
+- retain surface-scoped invalidation and lazy deep surfaces;
+- require E0.15.109 / F1.8.42 / M0.10.41.
+
 ## 4.3.33 — Canonical Runtime Performance
 
 - index direct RHI_ENERGY_CANONICAL_PROPERTY_V2 entities and prefer canonical asset/property truth over aggregate Public V2 when available;
