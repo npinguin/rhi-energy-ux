@@ -89,51 +89,37 @@ const v2Source = fs.readFileSync('src/runtime/energy-v2-contract.js','utf8');
 const planningSource = fs.readFileSync('src/domain/planning/planning-contract.js','utf8');
 const planningContext = { firstDefined, asNumber, parseMaybeJson, objectFrom, Object, Array, Map, Set, String, Number, Boolean, JSON };
 vm.createContext(planningContext);
-vm.runInContext(v2Source + '\n' + planningSource + '\nthis.readPlanningContract=readPlanningContract; this.normalizePlanningLaneTotals=normalizePlanningLaneTotals;', planningContext);
+vm.runInContext(planningSource + '\nthis.readPlanningContract=readPlanningContract; this.normalizePlanningLaneTotals=normalizePlanningLaneTotals;', planningContext);
 const { readPlanningContract, normalizePlanningLaneTotals } = planningContext;
 
-const planningGateway = {
-  contract:key=>{
-    if(key!=='publicV2') throw new Error('legacy planning contract access:'+key);
-    return {
-      entityId:'sensor.rhi_energy_public_contract_v2',
-      contractVersion:'2.0.0',
-      available:true,
-      attributes:{
-        contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
-        contract_version:'2.0.0',
-        objects:[], profiles:[], relationships:[], commands:[], configuration:{}, intelligence:{}, overview:{}, activity:[], value_accounting:{}, layers:{planning_objects:[]},
-        planning:{
-          horizons:{
-            D0:{ horizon_id:'D0', required_kwh:12.4, planned_kwh:9.8, still_to_plan_kwh:2.6, flexible_required_kwh:5.8, flexible_planned_kwh:3.2, flexible_still_to_plan_kwh:2.6, status:'AVAILABLE', execution_status:'NOT_MEASURED',
-              summary:{lane_totals:{sources:{solar_kwh:7.0,battery_out_kwh:1.0,grid_in_kwh:2.0},consumers:{home_kwh:6.8,flexible_loads_kwh:3.2,flexible_assets:[{asset_id:'vehicle_id4',planned_energy_kwh:3.2}]},boundary:{grid_out_kwh:0.0},source_total_kwh:10.0,use_total_kwh:10.0,balance_delta_kwh:0}},
-              buckets:[{bucket_id:'D0-H20',start_time:'2026-09-27T20:00:00+02:00',duration_minutes:60,advisory_source_lane:[{participant_id:'grid',planned_supply_kwh:3.9}],advisory_consumer_lane:[{participant_id:'home',planned_demand_kwh:0},{participant_id:'vehicle_id4',planned_demand_kwh:3.9}],advisory_boundary_flows:{grid_export_kwh:0},advisory_lane_balance_delta_kwh:0}] },
-            D1:{ horizon_id:'D1', required_kwh:14.1, planned_kwh:11.6, still_to_plan_kwh:2.5, flexible_required_kwh:7.2, flexible_planned_kwh:4.7, flexible_still_to_plan_kwh:2.5, status:'AVAILABLE' }
-          }
-        }
-      }
-    };
+const mk=(key, value, available=true)=>({available,value:available?String(value):null,metric_key:key});
+const keys=['required_kwh','planned_kwh','still_to_plan_kwh','flexible_required_kwh','flexible_planned_kwh','flexible_still_to_plan_kwh'];
+const runtime={
+  nativePlanningTotals(horizon){
+    const vals=Object.fromEntries(keys.map((key,i)=>[key,mk(key,i===0?0:i+1)]));
+    return {available:true,horizon,values:vals,missing:[]};
   }
 };
-const d1Contract = readPlanningContract(planningGateway, 'D1');
-assert.equal(normalizePlanningLaneTotals(d1Contract.planningTodayTotals).flexibleLoadsKwh, 3.2);
-assert.equal(normalizePlanningLaneTotals(d1Contract.planningTomorrowTotals).flexibleLoadsKwh, 4.7);
-assert.deepEqual(Object.keys(d1Contract.planningCombinedTotals), []);
-assert.equal(normalizePlanningLaneTotals(d1Contract.laneTotals).flexibleLoadsKwh, 4.7);
-
-console.log('PASS canonical V2 planning horizons without frontend total derivation');
-
-assert.equal(d1Contract.planningTodayTotals.buckets.length,1);
-const d0Contract = readPlanningContract(planningGateway, 'D0');
-assert.equal(d0Contract.buckets.length,1,'Tactical buckets must survive Public V2');
-const d0LaneTotals = normalizePlanningLaneTotals(d0Contract.laneTotals);
-assert.equal(d0LaneTotals.solarKwh,7.0);
-assert.equal(d0LaneTotals.gridInKwh,2.0);
-assert.equal(d0LaneTotals.homeKwh,6.8);
-assert.equal(d0LaneTotals.flexibleLoadsKwh,3.2);
-assert.equal(d0LaneTotals.sourceTotalKwh,10.0);
-assert.equal(d0LaneTotals.useTotalKwh,10.0);
-assert.equal(d0Contract.buckets[0].advisory_consumer_lane[1].participant_id,'vehicle_id4');
+const d0Contract=readPlanningContract(runtime,'D0');
+const d1Contract=readPlanningContract(runtime,'D1');
+assert.equal(d0Contract.contractVersion,'ENERGY_NATIVE_PLANNING');
+assert.equal(d0Contract.totalsSource,'rhi_energy.runtime/native_metric');
+assert.equal(d0Contract.planningTodayTotals.required_kwh,0);
+assert.equal(d1Contract.planningTomorrowTotals.flexible_planned_kwh,5);
+assert.equal(d0Contract.buckets.length,0);
+assert.equal(d0Contract.planningAssets.length,0);
+assert.ok(d0Contract.missingContractCapabilities.includes('native_planning_buckets'));
+assert.deepEqual(Object.keys(d0Contract.planningCombinedTotals),[]);
+assert.equal(normalizePlanningLaneTotals(d1Contract.laneTotals).flexibleLoadsKwh,5);
+const unavailableRuntime={nativePlanningTotals(horizon){
+  const data=runtime.nativePlanningTotals(horizon);
+  return {available:false,horizon,values:{...data.values,planned_kwh:mk('planned_kwh',null,false)},missing:['planned_kwh']};
+}};
+const unavailableContract=readPlanningContract(unavailableRuntime,'D0');
+assert.equal(unavailableContract.available,false);
+assert.equal(unavailableContract.laneTotals.planned_kwh,null);
+assert.equal(unavailableContract.horizon.status,'INCOMPLETE');
+console.log('PASS native Energy D0/D1 planning reader with explicit missing capabilities, zero and unavailable');
 
 
 const card = fs.readFileSync('src/app/energy-card.js','utf8');
