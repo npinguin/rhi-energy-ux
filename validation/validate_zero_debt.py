@@ -16,6 +16,8 @@ semantic_fallback_patterns=[
     r"canonicalIds\.length\s*\?\s*canonicalIds\s*:\s*\[UX_INTERFACES\.publicV2\]",
     r"return\s+this\.publicV2\(\)\.field\(",
     r"const\s+fallback\s*=\s*\(this\.publicV2\(\)\.allPropertyRows",
+    r"rowsForProperty\?\.\('gas\.total_m3'\)",
+    r"commandContract\(\)\.rows\.find\([^\n]+\)\s*\|\|\s*row",
 ]
 
 legacy_product=[
