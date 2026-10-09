@@ -1,6 +1,6 @@
 ## 4.3.33 — Canonical Runtime Performance
 
-- index direct RHI_ENERGY_CANONICAL_PROPERTY_V1 entities and prefer canonical asset/property truth over aggregate Public V2 when available;
+- index direct RHI_ENERGY_CANONICAL_PROPERTY_V2 entities and prefer canonical asset/property truth over aggregate Public V2 when available;
 - suppress irrelevant Home Assistant updates before rebuilding Energy runtime/view models;
 - make canonical authority surface-aware so missing canonical coverage continues to use the transitional Public V2 compatibility path;
 - index dirty updates as asset_id + property_key + presentation surface and defer closed Details, Configuration and Diagnostics refreshes until those surfaces are opened;
