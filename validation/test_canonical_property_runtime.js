@@ -2,6 +2,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 
 const source=fs.readFileSync("src/runtime/canonical-property-index.js","utf8");
+const card=fs.readFileSync("src/app/energy-card.js","utf8");
 const context={Object,Array,String,Map,Set,console};
 vm.createContext(context);
 vm.runInContext(source+"\nglobalThis.createEnergyCanonicalPropertyIndex=createEnergyCanonicalPropertyIndex;",context);
@@ -60,4 +61,21 @@ if(affected.length!==1 || affected[0].component_key!=="battery_home::battery.soc
 for(const forbidden of ["includes(\"soc\")","includes('soc')","guessSection","familyFromPropertyName","fallbackUxFamily"]){
   if(source.includes(forbidden)) throw new Error("property-name placement heuristic present: "+forbidden);
 }
-console.log("PASS canonical Energy property metadata and incremental indexing");
+
+for(const forbidden of [
+  "compatibility fallback",
+  "Transitional aggregate fallback",
+  "canonicalIds.length ? canonicalIds : [UX_INTERFACES.publicV2]",
+  "return this.publicV2().field(",
+  "const fallback = (this.publicV2().allPropertyRows"
+]){
+  if(card.includes(forbidden)) throw new Error("Energy semantic compatibility fallback remains: "+forbidden);
+}
+const assetFieldStart=card.indexOf("    assetField(assetId, propertyKey) {");
+const assetFieldEnd=card.indexOf("    assetValue(assetId, propertyKey",assetFieldStart);
+if(assetFieldStart<0 || assetFieldEnd<0) throw new Error("Energy assetField contract missing");
+const assetFieldBody=card.slice(assetFieldStart,assetFieldEnd);
+if(assetFieldBody.includes("publicV2")) throw new Error("Energy assetField still falls back to aggregate Public V2");
+if(!assetFieldBody.includes("canonical_property_not_published")) throw new Error("missing Energy canonical property must fail closed");
+
+console.log("PASS canonical Energy property metadata, fail-closed lookup and incremental indexing");
