@@ -3,11 +3,20 @@ import re
 
 ROOT=Path(__file__).resolve().parents[1]
 failures=[]
-CANONICAL_PROPERTY_CONTRACT="RHI_ENERGY_CANONICAL_PROPERTY_V1"
+CANONICAL_PROPERTY_CONTRACT="RHI_ENERGY_CANONICAL_PROPERTY_V2"
 LEGACY_V1=re.compile(r"RHI_[A-Z0-9_]+_V1")
 
 def contains_legacy_v1(text: str) -> bool:
     return bool(LEGACY_V1.search(text.replace(CANONICAL_PROPERTY_CONTRACT, "")))
+
+
+semantic_fallback_patterns=[
+    r"compatibility fallback",
+    r"Transitional aggregate fallback",
+    r"canonicalIds\.length\s*\?\s*canonicalIds\s*:\s*\[UX_INTERFACES\.publicV2\]",
+    r"return\s+this\.publicV2\(\)\.field\(",
+    r"const\s+fallback\s*=\s*\(this\.publicV2\(\)\.allPropertyRows",
+]
 
 legacy_product=[
     r"sensor\.energy_asset_index(?![a-z0-9_])",
@@ -28,6 +37,9 @@ for path in (ROOT/"src").rglob("*.js"):
     for pattern in legacy_product:
         if re.search(pattern,text):
             failures.append(f"{rel}: legacy Energy product API remains: {pattern}")
+    for pattern in semantic_fallback_patterns:
+        if re.search(pattern,text,re.IGNORECASE):
+            failures.append(f"{rel}: semantic compatibility fallback remains: {pattern}")
 
 for path in (ROOT/"validation").rglob("*"):
     if path.suffix not in {".js",".mjs",".py",".json"} or path.name=="validate_zero_debt.py":
@@ -49,4 +61,4 @@ for selector in (".rhiUxPageHero{",".rhiUxStatusGrid{",".rhiUxQuickActionBar{","
 if failures:
     print("\n".join(failures))
     raise SystemExit(1)
-print("PASS zero-debt gate: no legacy Energy V1 product authority and shared Core presentation ownership")
+print("PASS zero-debt gate: canonical Energy properties fail closed; no semantic compatibility fallback, legacy product authority or shared Core presentation debt")
