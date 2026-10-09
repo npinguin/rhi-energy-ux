@@ -1,13 +1,10 @@
-# v4.3.35 — zero-debt canonical property release
+# v4.3.36-rc.1 — experimental Energy HACS native-planning candidate
 
-- **RHI_ENERGY_CANONICAL_PROPERTY_V2** is the sole frontend authority for product-visible Energy properties;
-- missing canonical properties fail closed as contract gaps and are never reconstructed from Public V2;
-- remove the final Public V2 property fallback paths and stale compatibility semantics;
-- keep aggregate/capability contracts only where they are explicit producer-owned domain contracts, never as substitute property truth;
-- preserve surface-scoped invalidation, lazy deep surfaces, EN/NL/FR localization and RHI UX Core ownership;
-- enforce CI ratchets that reject semantic compatibility fallbacks.
+This is an **installable test prerelease, not stable or target-HA qualified**. It targets the selectable EMHASS / deterministic Energy backend E0.15.112. HACS beta versions must be enabled.
 
-Rollback: **v4.3.34**.
-Known accepted technical debt: **0**.
-Known accepted feature debt: **0**.
-Target-runtime functional and CPU qualification remains required before stable promotion.
+- Native D0/D1 total metrics preserve zero, reject malformed data and fail closed for unsupported horizons.
+- A provider-neutral canonical horizon reader consumes buckets, planning assets, lane/balance evidence, plan identity and execution policy only when the backend publishes the optional RHI_ENERGY_PLANNING_HORIZON_V1 contract.
+- Backend publication of full horizon details is proposed separately in Energy backend PR #249 and is **not included in E0.15.112**. Until deployed, the UX marks missing planning-detail capabilities explicitly.
+- Public V2 compatibility consumers remain in this candidate; canonical-only cutover, full configuration UX, live Home Assistant acceptance and rollback proof are open P0 gates. This candidate makes no stable-qualification claim.
+
+Rollback: **v4.3.35**. No GitHub release assets; HACS installs the immutable tag `dist/` tree.
