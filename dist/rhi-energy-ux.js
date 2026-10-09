@@ -11,8 +11,8 @@ const UX_INTERFACES = Object.freeze({
 // ---- src/runtime/canonical-property-index.js ----
 // Canonical Energy property index.
 //
-// RHI_ENERGY_CANONICAL_PROPERTY_V2 property entities are the preferred product
-// truth. Aggregate Public V2 remains a bounded compatibility fallback only.
+// RHI_ENERGY_CANONICAL_PROPERTY_V2 property entities are the product-property
+// truth. Missing canonical properties are contract gaps and fail closed.
 //
 // This index deliberately uses backend-published presentation metadata literally.
 // It never derives family/role/surface from property_key or object_class.
@@ -67,6 +67,10 @@ function canonicalEnergyPropertyRow(entityId, state) {
     write_supported:attributes.write_supported === true,
     write:attributes.write || null,
     source:attributes.source || attributes.provenance || null,
+    statistics_entity_id:String(attributes.statistics_entity_id || ''),
+    history_entity_id:String(attributes.history_entity_id || ''),
+    source_entity_id:String(attributes.source_entity_id || attributes.source?.entity_id || ''),
+    capability_ref:String(attributes.capability_ref || ''),
     presentation_family:family,
     presentation_role:role,
     presentation_surface:surface,
@@ -1487,8 +1491,7 @@ function readEnergyCommandContract(gateway) {
       const canonicalIds = this.canonicalIndex?.hasCanonicalTruth?.()
         ? (surfaces.length ? this.canonicalIndex.entityIdsForSurfaces(surfaces) : this.canonicalIndex.entityIds())
         : [];
-      const productAuthority = canonicalIds.length ? canonicalIds : [UX_INTERFACES.publicV2];
-      return [...new Set([...productAuthority, registryEntity].filter(Boolean))];
+      return [...new Set([...canonicalIds, registryEntity].filter(Boolean))];
     }
     entitySignature(entityIds = []) {
       return (entityIds || []).map(id => {
@@ -1497,14 +1500,14 @@ function readEnergyCommandContract(gateway) {
       }).join('|');
     }
     gasStatisticsEntityId(assetId = '') {
-      const v2 = this.publicV2();
-      const row = v2.property('gas.total_m3', assetId) || v2.property('gas.total_m3');
-      if (!row || typeof row !== 'object') return '';
+      const row = this.canonicalIndex?.row?.(String(assetId || ''), 'gas.total_m3')
+        || this.canonicalIndex?.rowsForProperty?.('gas.total_m3')?.[0]
+        || null;
+      if (!row) return '';
       return String(firstDefined(
         row.statistics_entity_id,
         row.history_entity_id,
         row.source_entity_id,
-        row.source?.entity_id,
         ''
       ) || '').trim();
     }
@@ -1559,55 +1562,18 @@ function readEnergyCommandContract(gateway) {
     }
     allRows() {
       if (this._rows) return this._rows;
-      const v2 = this.publicV2();
       const result = new Map();
-      const add = row => {
-        const key = String(row?.property_id || row?.property_key || row?.key || '');
-        if (!key || result.has(key)) return;
+      for (const row of (this.canonicalIndex?.uniqueProductRows?.() || [])) {
+        const key = String(row?.property_key || '');
+        if (!key) continue;
         result.set(key, {
-          entity_id:v2.envelope.entityId,
           ...row,
-          property_id:String(row.property_id || key),
+          entity_id:row.entity_id,
+          property_id:key,
           property_key:key,
           key
         });
-      };
-      // Direct canonical property entities are the preferred product truth.
-      // Public V2 below is a compatibility fallback only for properties not yet
-      // published through RHI_ENERGY_CANONICAL_PROPERTY_V2.
-      for (const row of (this.canonicalIndex?.uniqueProductRows?.() || [])) add(row);
-
-      // Transitional aggregate fallback. add() preserves the canonical row when
-      // the same property key is already present.
-      for (const [key, field] of (v2.coreByKey || new Map()).entries()) {
-        add({
-          asset_id:'core',
-          property_id:key,
-          property_key:key,
-          key,
-          value:field.value,
-          unit:field.unit,
-          availability:field.status,
-          status:field.status,
-          quality:field.quality,
-          reason:field.reason,
-          source_type:'canonical_v2_core'
-        });
       }
-      (v2.allPropertyRows || []).forEach(add);
-
-      // Preserve the existing view API without creating another truth source:
-      // intelligence fields are direct projections of the canonical V2 object.
-      Object.entries(v2.intelligence || {}).forEach(([key,value]) => add({
-        asset_id:'energy_intelligence',
-        property_id:`energy_intelligence.${key}`,
-        property_key:`energy_intelligence.${key}`,
-        key:`energy_intelligence.${key}`,
-        value,
-        availability:value === undefined || value === null ? 'UNAVAILABLE' : 'AVAILABLE',
-        quality:'authoritative',
-        source_type:'canonical_v2_intelligence'
-      }));
       this._rows = result;
       return result;
     }
@@ -1618,20 +1584,8 @@ function readEnergyCommandContract(gateway) {
         || { key:wanted, property_id:wanted, property_key:wanted, value:null, unit:'', health:'NOT_PUBLISHED', quality:'missing', missing:true };
     }
     editablePropertyRows() {
-      const direct = (this.canonicalIndex?.productRows?.() || [])
+      return (this.canonicalIndex?.productRows?.() || [])
         .filter(row => row?.editable === true || row?.write_supported === true || row?.write?.supported === true);
-      const seen = new Set(direct.map(row => String(row.property_key || '')));
-      const fallback = (this.publicV2().allPropertyRows || [])
-        .filter(row => row?.editable === true || row?.write_supported === true || row?.write?.supported === true)
-        .filter(row => !seen.has(String(row.property_key || row.property_id || row.key || '')))
-        .map(row => ({
-          entity_id:this.publicV2().envelope.entityId,
-          ...row,
-          key:String(row.property_id || row.property_key || row.key || ''),
-          property_key:String(row.property_key || row.property_id || row.key || ''),
-          property_id:String(row.property_id || row.property_key || row.key || '')
-        }));
-      return [...direct, ...fallback];
     }
     editableProperty(propertyId) {
       const wanted=String(propertyId || '');
@@ -1656,18 +1610,16 @@ function readEnergyCommandContract(gateway) {
       };
     }
     backendStatus() {
-      // Product trust is owned by the canonical public V2 transport. Optional
-      // diagnostic/release entities must never create a product-facing error.
-      const v2 = this.publicV2();
+      const canonicalReady = this.canonicalIndex?.hasCanonicalTruth?.() === true;
       return {
-        runtimeTrusted: v2.available === true,
-        showMainWarning: false,
-        failedHardGates: [],
+        runtimeTrusted: canonicalReady,
+        showMainWarning: !canonicalReady,
+        failedHardGates: canonicalReady ? [] : ['canonical_property_contract'],
         diagnosticsNotes: [],
-        statusText: v2.available
-          ? 'Canonical Energy contract active'
-          : (v2.compatibilityReason || 'Canonical Energy contract unavailable'),
-        warningText: ''
+        statusText: canonicalReady
+          ? 'Canonical Energy property contract active'
+          : 'Canonical Energy property contract unavailable',
+        warningText: canonicalReady ? '' : 'Canonical Energy properties are unavailable.'
       };
     }
     footerModel() {
@@ -1724,19 +1676,28 @@ function readEnergyCommandContract(gateway) {
     assetName(assetId) { return this.asset(assetId)?.display_name || human(assetId, '—'); }
     assetField(assetId, propertyKey) {
       const direct = this.canonicalIndex?.row?.(String(assetId || ''), String(propertyKey || ''));
-      if (direct) {
+      if (!direct) {
         return Object.freeze({
-          resolved:direct.availability !== 'UNAVAILABLE',
-          value:direct.value,
-          unit:direct.unit,
-          status:direct.availability,
-          quality:direct.quality,
-          reason:direct.reason,
-          source:direct.source,
-          raw:direct
+          resolved:false,
+          value:null,
+          unit:'',
+          status:'UNAVAILABLE',
+          quality:'missing',
+          reason:'canonical_property_not_published',
+          source:null,
+          raw:null
         });
       }
-      return this.publicV2().field(String(propertyKey || ''), String(assetId || ''));
+      return Object.freeze({
+        resolved:direct.availability !== 'UNAVAILABLE',
+        value:direct.value,
+        unit:direct.unit,
+        status:direct.availability,
+        quality:direct.quality,
+        reason:direct.reason,
+        source:direct.source,
+        raw:direct
+      });
     }
     assetValue(assetId, propertyKey, fallback = null) {
       const field = this.assetField(assetId, propertyKey);
@@ -3506,9 +3467,8 @@ function rhiEnergyVisualPickerStyles() {
       if (!this._canonicalIndex) this._canonicalIndex = createEnergyCanonicalPropertyIndex(hass);
       else canonicalChanged = this._canonicalIndex.refresh(hass);
 
-      // Once direct canonical properties exist for the active product surface,
-      // unrelated HA updates and aggregate Public V2 churn must not rebuild the
-      // complete Energy view. Public V2 remains a compatibility fallback only.
+      // Direct canonical property revisions own normal telemetry invalidation.
+      // Aggregate capability contracts must not dirty canonical property surfaces.
       if (previous && this.canonicalRuntimeActive() && canonicalChanged) {
         const relevant = new Set(this.relevantEntityIds());
         const affected = this._canonicalIndex.affectedComponents(canonicalChanged)
