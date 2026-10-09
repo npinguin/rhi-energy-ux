@@ -1549,6 +1549,13 @@ function readEnergyCommandContract(gateway) {
       this._meteringRemediations = null;
       this._visualRegistry = null;
     }
+    // Domain-native read surface. No Public V2 reconstruction or compatibility fallback.
+    nativePlanningTotals(horizonId = 'D0') {
+      return readNativeEnergyPlanningTotals(this.hass, horizonId);
+    }
+    nativeMetric(metricKey = '') {
+      return readNativeEnergyMetric(this.hass, metricKey);
+    }
     rawState(entityId) { return this.hass?.states?.[entityId] || null; }
     subscriptionEntityIds(surfaces = []) {
       const registryEntity = String(this.visualRegistry()?.entityId || '');
