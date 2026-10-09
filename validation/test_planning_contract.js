@@ -139,3 +139,24 @@ for (const forbidden of [
 ]) if (card.includes(forbidden)) throw new Error('unsafe Automatic fallback remains '+forbidden);
 
 console.log('PASS Advice / Automatic / Disabled execution-authority UX contract');
+
+
+// Native metric evidence must reject malformed numeric states even when HA reports AVAILABLE.
+const nativeMetricContext = {Object,Array,Map,Set,String,Number,Boolean,JSON};
+vm.createContext(nativeMetricContext);
+vm.runInContext(fs.readFileSync('src/runtime/canonical-property-index.js','utf8') +
+  '\nthis.readNativeEnergyMetric=readNativeEnergyMetric;', nativeMetricContext);
+const readMetric=nativeMetricContext.readNativeEnergyMetric;
+const metricState=(value, availability='AVAILABLE')=>({
+  'sensor.metric':{state:value,attributes:{metric_key:'planning_today_required_kwh',
+    canonical_source:'rhi_energy.runtime',availability}}
+});
+assert.equal(readMetric({states:metricState('0')},'planning_today_required_kwh').available,true);
+assert.equal(readMetric({states:metricState('0')},'planning_today_required_kwh').value,'0');
+for (const invalid of ['NaN','Infinity','-Infinity','garbage','','unknown','unavailable']) {
+  const result=readMetric({states:metricState(invalid)},'planning_today_required_kwh');
+  assert.equal(result.available,false,'must reject invalid native metric '+invalid);
+  assert.equal(result.value,null);
+}
+assert.equal(readMetric({states:metricState('17.5','STALE')},'planning_today_required_kwh').available,false);
+console.log('PASS native metric numeric integrity, zero and availability');
