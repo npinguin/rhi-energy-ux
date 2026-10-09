@@ -27,6 +27,11 @@
     const selected=supported ? (normalized==='D1' ? tomorrow : today) : {
       available:false, missing:['unsupported_planning_horizon'], values:{}
     };
+    const nativeHorizon = supported && typeof runtime.nativePlanningHorizon === 'function'
+      ? runtime.nativePlanningHorizon(normalized) : null;
+    const published = nativeHorizon?.available === true ? nativeHorizon : null;
+    const horizonDetails = published?.details || {};
+
     const totals=reader=>Object.fromEntries(Object.entries(reader.values).map(([key,row])=>
       [key,row.available ? Number(row.value) : null]));
     const horizon=Object.freeze({
@@ -50,11 +55,12 @@
       horizonsById:Object.freeze({D0:todayTotals,D1:tomorrowTotals}),
       horizonId:normalized,horizon,summary:horizon,
       laneTotals:Object.freeze(totals(selected)),
-      buckets:Object.freeze([]),
+      buckets:Object.freeze(Array.isArray(horizonDetails.buckets) ? horizonDetails.buckets : []),
       currentPlanningBucket:Object.freeze({}),
       currentActionIntent:Object.freeze({}),
       missingContractCapabilities:Object.freeze([
-        'native_planning_buckets','native_planning_assets','native_planning_actions'
+        ...(!published ? ['native_planning_buckets'] : []),
+        'native_planning_assets','native_planning_actions'
       ]),
       totalsSource:'rhi_energy.runtime/native_metric'
     });
