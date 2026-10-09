@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.34';
+  const UX_VERSION = 'R4.3.35';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
