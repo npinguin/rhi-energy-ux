@@ -61,7 +61,7 @@
       laneTotals:Object.freeze(totals(selected)),
       buckets:Object.freeze(Array.isArray(horizonDetails.buckets) ? horizonDetails.buckets : []),
       currentPlanningBucket:Object.freeze({}),
-      currentActionIntent:Object.freeze({}),
+      currentActionIntent:Object.freeze(published && horizonDetails.execution_policy && typeof horizonDetails.execution_policy === 'object' ? horizonDetails.execution_policy : {}),
       missingContractCapabilities:Object.freeze([
         ...(!published ? ['native_planning_buckets'] : []),
         ...(!published || !Array.isArray(horizonDetails.planning_assets) ? ['native_planning_assets'] : []),
