@@ -1562,7 +1562,13 @@ function readEnergyCommandContract(gateway) {
       const canonicalIds = this.canonicalIndex?.hasCanonicalTruth?.()
         ? (surfaces.length ? this.canonicalIndex.entityIdsForSurfaces(surfaces) : this.canonicalIndex.entityIds())
         : [];
-      return [...new Set([...canonicalIds, registryEntity].filter(Boolean))];
+      // Native Energy metric sensors are not canonical property rows; subscribe
+      // explicitly so D0/D1 planning and financial states refresh on HA updates.
+      const nativeMetrics = Object.entries(this.hass?.states || {})
+        .filter(([,state])=>String(state?.attributes?.canonical_source || '') === 'rhi_energy.runtime'
+          && !!String(state?.attributes?.metric_key || '').trim())
+        .map(([entityId])=>entityId);
+      return [...new Set([...canonicalIds, ...nativeMetrics, registryEntity].filter(Boolean))];
     }
     entitySignature(entityIds = []) {
       return (entityIds || []).map(id => {
