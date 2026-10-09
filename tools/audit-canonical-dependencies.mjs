@@ -8,7 +8,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const root = process.cwd();
+const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const strict = process.argv.includes('--fail-on-legacy');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'src/manifest.json'), 'utf8'));
 const modules = Array.isArray(manifest.modules)
   ? manifest.modules
@@ -41,4 +42,8 @@ const result = {
   counts,
   matches:hits
 };
-process.stdout.write(JSON.stringify(result,null,2)+'\n');
+process.stdout.write(JSON.stringify({...result, strict_mode:strict},null,2)+'\n');
+if (strict && (counts.energy_public_v2 || counts.mobility_runtime_v2 || counts.aggregate_snapshot)) {
+  console.error('FAIL canonical-only dependency gate: retired aggregate references remain in bundled source');
+  process.exitCode = 1;
+}
