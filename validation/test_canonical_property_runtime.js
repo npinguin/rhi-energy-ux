@@ -58,6 +58,27 @@ if(!changed.has("sensor.battery_soc") || index.row("battery_home","battery.soc_p
 const affected=index.affectedComponents(changed);
 if(affected.length!==1 || affected[0].component_key!=="battery_home::battery.soc_pct" || affected[0].surface!=="key_properties") throw new Error("asset/property dirty component index failed");
 
+
+const swapped={states:{
+  "sensor.new_soc":{...next.states["sensor.battery_soc"],state:"61"},
+  "sensor.battery_version":next.states["sensor.battery_version"],
+  "sensor.unrelated":next.states["sensor.unrelated"]
+}};
+const membershipChanged=index.refresh(swapped);
+if(!membershipChanged.has("sensor.new_soc") || !membershipChanged.has("sensor.battery_soc")) throw new Error("same-count HA entity replacement must invalidate canonical index");
+if(index.byEntity.has("sensor.battery_soc") || index.row("battery_home","battery.soc_pct")?.entity_id!=="sensor.new_soc") throw new Error("stale canonical state retained after HA entity replacement");
+const presentationChanged={states:{...swapped.states,
+  "sensor.new_soc":{...swapped.states["sensor.new_soc"],attributes:{
+    ...swapped.states["sensor.new_soc"].attributes,
+    presentation_role:"secondary",
+    presentation_primary:false,
+    presentation_technical:true
+  }}
+}};
+const presentationDirty=index.refresh(presentationChanged);
+if(!presentationDirty.has("sensor.new_soc") || index.row("battery_home","battery.soc_pct")?.presentation_technical!==true) throw new Error("backend-owned presentation change not reflected");
+if(index.productRows().some(row=>row.entity_id==="sensor.new_soc")) throw new Error("technical reclassification leaked into product surface");
+
 for(const forbidden of ["includes(\"soc\")","includes('soc')","guessSection","familyFromPropertyName","fallbackUxFamily"]){
   if(source.includes(forbidden)) throw new Error("property-name placement heuristic present: "+forbidden);
 }
