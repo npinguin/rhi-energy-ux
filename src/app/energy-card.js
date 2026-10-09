@@ -1175,9 +1175,8 @@
       if (!this._canonicalIndex) this._canonicalIndex = createEnergyCanonicalPropertyIndex(hass);
       else canonicalChanged = this._canonicalIndex.refresh(hass);
 
-      // Once direct canonical properties exist for the active product surface,
-      // unrelated HA updates and aggregate Public V2 churn must not rebuild the
-      // complete Energy view. Public V2 remains a compatibility fallback only.
+      // Direct canonical property revisions own normal telemetry invalidation.
+      // Aggregate capability contracts must not dirty canonical property surfaces.
       if (previous && this.canonicalRuntimeActive() && canonicalChanged) {
         const relevant = new Set(this.relevantEntityIds());
         const affected = this._canonicalIndex.affectedComponents(canonicalChanged)
