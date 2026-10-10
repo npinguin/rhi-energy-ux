@@ -3,6 +3,11 @@ import vm from "node:vm";
 
 const source=fs.readFileSync("src/runtime/canonical-property-index.js","utf8");
 const card=fs.readFileSync("src/app/energy-card.js","utf8");
+const adapter=fs.readFileSync("src/runtime/energy-v2-contract.js","utf8");
+for(const retired of ["currentAggregateTypes","currentFieldAliases","source_field:alias","aggregate[alias]"]){
+  if(adapter.includes(retired))
+    throw new Error("retired Energy aggregate current-value reconstruction remains: "+retired);
+}
 const context={Object,Array,String,Map,Set,console};
 vm.createContext(context);
 vm.runInContext(source+"\nglobalThis.createEnergyCanonicalPropertyIndex=createEnergyCanonicalPropertyIndex;",context);
