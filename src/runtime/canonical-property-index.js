@@ -136,7 +136,8 @@ class EnergyCanonicalPropertyIndex {
       const before = new Map(this.stateRefs);
       this.discover(hass);
       const changed = new Set();
-      for (const [id,ref] of this.stateRefs.entries()) if (before.get(id) !== ref) changed.add(id);
+      for (const [id,ref] of this.stateRefs.entries())
+        if (!before.has(id) || before.get(id) !== ref) changed.add(id);
       for (const id of before.keys()) if (!this.stateRefs.has(id)) changed.add(id);
       return changed;
     }
