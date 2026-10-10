@@ -32,8 +32,14 @@ function canonicalEnergyPropertyRow(entityId, state) {
 
   const availability = normalizeCanonicalEnergyAvailability(state, attributes);
   const rawState = state?.state;
-  const unavailable = availability === 'UNAVAILABLE' || ['unknown','unavailable'].includes(String(rawState ?? '').toLowerCase());
-  const value = unavailable
+  // HA state and backend quality must both permit a product value. A stale,
+  // invalid or unknown state cannot be made healthy by an AVAILABLE attribute.
+  const invalidStates = new Set(['unknown','unavailable','none','null','']);
+  const invalidQualities = new Set(['STALE','INVALID','UNKNOWN']);
+  const rawInvalid = invalidStates.has(String(rawState ?? '').trim().toLowerCase());
+  const effectiveAvailability = rawInvalid || invalidQualities.has(String(attributes.quality || '').toUpperCase())
+    ? 'UNAVAILABLE' : availability;
+  const value = effectiveAvailability !== 'AVAILABLE'
     ? null
     : (Object.prototype.hasOwnProperty.call(attributes,'value') ? attributes.value : rawState);
 
@@ -48,8 +54,8 @@ function canonicalEnergyPropertyRow(entityId, state) {
     key:propertyKey,
     value,
     unit:String(attributes.unit ?? attributes.unit_of_measurement ?? ''),
-    availability,
-    status:String(attributes.status ?? availability),
+    availability:effectiveAvailability,
+    status:String(effectiveAvailability),
     quality:String(attributes.quality ?? ''),
     reason:String(attributes.reason ?? attributes.reason_code ?? ''),
     editable:attributes.editable === true,
