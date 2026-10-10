@@ -6141,7 +6141,9 @@
         if (viewport) queueMicrotask(() => window.scrollTo(viewport.x, viewport.y));
         return;
       }
-      this.shadowRoot.innerHTML = markup;
+      const nextMarkup = document.createElement('template');
+      nextMarkup.innerHTML = markup;
+      this.shadowRoot.replaceChildren(nextMarkup.content.cloneNode(true));
       this._renderedView = this.view;
       this._renderedNavSection = this.navSection;
       this._renderedNavItem = this.navItem;
