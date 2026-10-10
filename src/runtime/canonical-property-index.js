@@ -140,31 +140,35 @@ class EnergyCanonicalPropertyIndex {
       for (const id of before.keys()) if (!this.stateRefs.has(id)) changed.add(id);
       return changed;
     }
+    // Decide whether a full rebuild is needed before mutating any secondary
+    // index. A metadata change in a later entity must not leave earlier rows
+    // partially updated, or omit their changes from the invalidation set.
     const changed = new Set();
+    let rebuild = false;
+    const updates = [];
     for (const [entityId,previous] of this.stateRefs.entries()) {
       const current = states[entityId];
       if (current === previous) continue;
       changed.add(entityId);
       const row = canonicalEnergyPropertyRow(entityId,current);
-      const previousRow = this.byEntity.get(entityId);
-      // Duplicate publishers must be re-indexed together, never replaced as
-      // an incremental winner of an ambiguous asset/property pair.
-      if (previousRow && this.ambiguousAssetKeys.has(`${previousRow.asset_id}::${previousRow.property_key}`)) {
-        this.discover(hass);
-        return changed;
-      }
-      // Metadata changes are rare and semantically significant; rebuild indexes
-      // rather than trying to mutate secondary indexes in place.
-      if (!row || row.asset_id !== this.byEntity.get(entityId)?.asset_id ||
-          row.property_key !== this.byEntity.get(entityId)?.property_key ||
-          row.presentation_surface !== this.byEntity.get(entityId)?.presentation_surface ||
-          row.presentation_family !== this.byEntity.get(entityId)?.presentation_family ||
-          row.presentation_role !== this.byEntity.get(entityId)?.presentation_role ||
-          row.presentation_primary !== this.byEntity.get(entityId)?.presentation_primary ||
-          row.presentation_technical !== this.byEntity.get(entityId)?.presentation_technical) {
-        this.discover(hass);
-        return changed;
-      }
+      const before = this.byEntity.get(entityId);
+      if (!row || !before ||
+          this.ambiguousAssetKeys.has(`${before.asset_id}::${before.property_key}`) ||
+          row.asset_id !== before.asset_id ||
+          row.property_key !== before.property_key ||
+          row.logical_object_class !== before.logical_object_class ||
+          row.presentation_surface !== before.presentation_surface ||
+          row.presentation_family !== before.presentation_family ||
+          row.presentation_role !== before.presentation_role ||
+          row.presentation_primary !== before.presentation_primary ||
+          row.presentation_technical !== before.presentation_technical) rebuild = true;
+      updates.push([entityId,current,row]);
+    }
+    if (rebuild) {
+      this.discover(hass);
+      return changed;
+    }
+    for (const [entityId,current,row] of updates) {
       this.byEntity.set(entityId,row);
       this.byAssetAndKey.set(`${row.asset_id}::${row.property_key}`,row);
       this.byPropertyKey.set(row.property_key,(this.byPropertyKey.get(row.property_key)||[]).map(candidate=>candidate.entity_id===entityId?row:candidate));
