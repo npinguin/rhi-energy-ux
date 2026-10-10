@@ -181,13 +181,41 @@
       this._meteringRemediations = null;
       this._visualRegistry = null;
     }
+    // Read domain-owned native HA evidence only; never reconstruct aggregate semantics.
+    nativePlanningTotals(horizonId = 'D0') {
+      return readNativeEnergyPlanningTotals(this.hass, horizonId);
+    }
+    nativePlanningHorizon(horizonId = 'D0') {
+      const horizon=String(horizonId || '').toUpperCase();
+      if (horizon !== 'D0' && horizon !== 'D1') return Object.freeze({available:false,details:null});
+      const matches=Object.values(this.hass?.states || {}).filter(state=>
+        state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1' &&
+        state?.attributes?.canonical_source === 'rhi_energy.runtime' &&
+        state?.attributes?.horizon_id === horizon);
+      if (matches.length !== 1) return Object.freeze({available:false,details:null});
+      const state=matches[0], attrs=state.attributes || {};
+      if (!['AVAILABLE','COMPLETE'].includes(String(attrs.availability || '').toUpperCase()) ||
+          !Array.isArray(attrs.buckets)) return Object.freeze({available:false,details:null});
+      return Object.freeze({available:true,details:attrs});
+    }
+
+    nativeMetric(metricKey = '') {
+      return readNativeEnergyMetric(this.hass, metricKey);
+    }
     rawState(entityId) { return this.hass?.states?.[entityId] || null; }
     subscriptionEntityIds(surfaces = []) {
       const registryEntity = String(this.visualRegistry()?.entityId || '');
       const canonicalIds = this.canonicalIndex?.hasCanonicalTruth?.()
         ? (surfaces.length ? this.canonicalIndex.entityIdsForSurfaces(surfaces) : this.canonicalIndex.entityIds())
         : [];
-      return [...new Set([...canonicalIds, registryEntity].filter(Boolean))];
+      // Native Energy metric sensors are not canonical property rows; subscribe
+      // explicitly so D0/D1 planning and financial states refresh on HA updates.
+      const nativeMetrics = Object.entries(this.hass?.states || {})
+        .filter(([,state])=>String(state?.attributes?.canonical_source || '') === 'rhi_energy.runtime'
+          && (!!String(state?.attributes?.metric_key || '').trim() ||
+            state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1'))
+        .map(([entityId])=>entityId);
+      return [...new Set([...canonicalIds, ...nativeMetrics, registryEntity].filter(Boolean))];
     }
     entitySignature(entityIds = []) {
       return (entityIds || []).map(id => {
@@ -257,9 +285,19 @@
     allRows() {
       if (this._rows) return this._rows;
       const result = new Map();
+      const ambiguousKeys = new Set();
+      // Unscoped lookups cannot choose a physical asset. Preserve multiple
+      // assets in the canonical index, but never silently let the last asset
+      // overwrite another asset's semantic value in a global projection.
       for (const row of (this.canonicalIndex?.uniqueProductRows?.() || [])) {
         const key = String(row?.property_key || '');
         if (!key) continue;
+        if (result.has(key)) {
+          ambiguousKeys.add(key);
+          result.delete(key);
+          continue;
+        }
+        if (ambiguousKeys.has(key)) continue;
         result.set(key, {
           ...row,
           entity_id:row.entity_id,
@@ -362,8 +400,25 @@
     coverage() { return selectEnergyCoverage(this.publicV2()); }
     assets() {
       if (this._assets) return this._assets;
-      const v2 = this.publicV2();
-      this._assets = v2.available ? [...v2.objects] : [];
+      const grouped=new Map();
+      // Backend canonical logical property rows are the inventory authority.
+      // Grouping is a presentation operation, never a semantic recomputation.
+      for (const row of (this.canonicalIndex?.productRows?.() || [])) {
+        const assetId=String(row.asset_id || '').trim();
+        const objectClass=String(row.logical_object_class || '').trim();
+        if (!assetId || !objectClass) continue;
+        if (!grouped.has(assetId)) grouped.set(assetId,{
+          asset_id:assetId,asset_type:objectClass,object_class:objectClass,
+          parent_asset_id:row.parent_asset_id || null,
+          display_name:String(row.asset_display_name || assetId),
+          integration_domain:row.integration_domain || null,
+          properties:[]
+        });
+        grouped.get(assetId).properties.push(row);
+      }
+      this._assets=[...grouped.values()].map(asset=>Object.freeze({
+        ...asset,properties:Object.freeze(asset.properties)
+      }));
       return this._assets;
     }
     asset(assetId) { return this.assets().find(a => String(a.asset_id || '') === String(assetId)) || null; }
@@ -2406,20 +2461,35 @@
     }
 
     gasModel(rt) {
-      const assets = typeof rt.assets === 'function' ? rt.assets() : [];
-      const raw = assets.find(asset => String(firstDefined(asset?.asset_type, asset?.object_class, '') || '').toLowerCase() === 'gas_meter') || null;
-      const asset = raw ? this.energyAssetContext(rt, raw) : null;
-      const properties = Array.isArray(asset?.properties) ? asset.properties : [];
-      const propertyValue = key => {
-        const prop = properties.find(row => String(row?.property_key || '') === key);
-        return asNumber(firstDefined(prop?.value, prop?.resolution?.value, null));
+      const index=rt.canonicalIndex;
+      // Only the backend-published gas_meter object owns these facts.
+      const rows=index && typeof index.rowsForProperty === 'function' ? index.rowsForProperty('gas.total_m3') : [];
+      const candidates=rows.filter(row=>row.logical_object_class==='gas_meter');
+      const root=candidates.length===1 ? candidates[0] : null;
+      const assetId=String(root?.asset_id || '');
+      const owned=(key)=>{
+        if (!assetId) return null;
+        const matches=(index && typeof index.rowsForProperty === 'function' ? index.rowsForProperty(key) : []).filter(row=>
+          row.logical_object_class==='gas_meter' && String(row.asset_id)===assetId);
+        return matches.length===1 && matches[0].availability==='AVAILABLE' ? matches[0] : null;
       };
-      const totalM3 = firstDefined(propertyValue('gas.total_m3'), asNumber(asset?.total_m3), asNumber(asset?.gas_total_m3));
-      const flowM3h = firstDefined(propertyValue('gas.flow_m3_h'), asNumber(asset?.flow_m3_h), asNumber(asset?.gas_flow_m3_h));
-      const health = String(firstDefined(asset?.health, asset?.normalization_status, 'UNKNOWN') || 'UNKNOWN');
-      const source = String(firstDefined(asset?.integration_domain, properties.find(row=>row?.integration_domain)?.integration_domain, 'Gas meter') || 'Gas meter');
-      const totalEntityId = rt.gasStatisticsEntityId(String(asset?.asset_id || ''));
-      return Object.freeze({ asset, totalM3, flowM3h, health, source, totalEntityId });
+      const total=owned('gas.total_m3');
+      const flow=owned('gas.flow_m3_h');
+      const totalM3=total ? asNumber(total.value) : null;
+      const flowM3h=flow ? asNumber(flow.value) : null;
+      const asset=root ? Object.freeze({
+        asset_id:assetId,
+        asset_type:'gas_meter',
+        object_class:'gas_meter',
+        display_name:String(root.asset_display_name || assetId),
+        integration_domain:String(root.integration_domain || '')
+      }) : null;
+      return Object.freeze({
+        asset,totalM3,flowM3h,
+        health:total?.availability || 'UNAVAILABLE',
+        source:String(root?.integration_domain || 'Gas meter'),
+        totalEntityId:total?.entity_id || null
+      });
     }
     gasVolume(value, fallback = '—') {
       const number = asNumber(value);
@@ -5384,7 +5454,7 @@
       // stay outside this product view.
       const assets = this.flexibleAssetDomain(rt).consumerFacing().map(vm => vm.raw);
       const storage = domainAssets.find(vm => vm.isStorage && !vm.isDisabled)?.raw || null;
-      return createPlanningViewModel({ gateway: rt.contractGateway(), horizonId, flexibleAssets: assets, storage });
+      return createPlanningViewModel({ runtime: rt, horizonId, flexibleAssets: assets, storage });
     }
 
     planningParticipant(row, lane, participantId) {
@@ -6081,7 +6151,9 @@
         if (viewport) queueMicrotask(() => window.scrollTo(viewport.x, viewport.y));
         return;
       }
-      this.shadowRoot.innerHTML = markup;
+      const nextMarkup = document.createElement('template');
+      nextMarkup.innerHTML = markup;
+      this.shadowRoot.replaceChildren(nextMarkup.content.cloneNode(true));
       this._renderedView = this.view;
       this._renderedNavSection = this.navSection;
       this._renderedNavItem = this.navItem;

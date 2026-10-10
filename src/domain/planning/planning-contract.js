@@ -19,53 +19,64 @@
     }
     return planningObject(parsed);
   }
-  function readPlanningContract(gateway, horizonId = 'D0') {
-    const normalized = String(horizonId || 'D0').toUpperCase();
-    const v2 = readEnergyPublicV2(gateway);
-    const planning = planningObject(v2.planning);
-    const horizonsById = planningById(planning.horizons);
-    const horizon = planningObject(horizonsById[normalized] || horizonsById[normalized.toLowerCase()]);
-    const summary = horizon;
-    const canonicalLaneTotals = planningObject(planningObject(horizon.summary).lane_totals || horizon.lane_totals);
-    const laneTotals = planningObject({
-      ...canonicalLaneTotals,
-      required_kwh:horizon.required_kwh,
-      planned_kwh:horizon.planned_kwh,
-      executed_kwh:horizon.executed_kwh,
-      still_to_plan_kwh:horizon.still_to_plan_kwh,
-      flexible_required_kwh:horizon.flexible_required_kwh,
-      flexible_planned_kwh:horizon.flexible_planned_kwh,
-      flexible_executed_kwh:horizon.flexible_executed_kwh,
-      flexible_still_to_plan_kwh:horizon.flexible_still_to_plan_kwh
+  function readPlanningContract(runtime, horizonId = 'D0') {
+    const normalized=String(horizonId || '').toUpperCase();
+    const today=runtime.nativePlanningTotals('D0');
+    const tomorrow=runtime.nativePlanningTotals('D1');
+    const supported=normalized==='D0' || normalized==='D1';
+    const selected=supported ? (normalized==='D1' ? tomorrow : today) : {
+      available:false, missing:['unsupported_planning_horizon'], values:{}
+    };
+    const nativeHorizon = supported && typeof runtime.nativePlanningHorizon === 'function'
+      ? runtime.nativePlanningHorizon(normalized) : null;
+    const published = nativeHorizon?.available === true ? nativeHorizon : null;
+    const horizonDetails = published?.details || {};
+    const planningAssets = published && Array.isArray(horizonDetails.planning_assets)
+      ? horizonDetails.planning_assets : [];
+
+    const totals=reader=>Object.fromEntries(Object.entries(reader.values).map(([key,row])=>
+      [key,row.available ? Number(row.value) : null]));
+    const horizon=Object.freeze({
+      horizon_id:normalized,
+      ...totals(selected),
+      status:selected.available ? 'AVAILABLE' : 'INCOMPLETE',
+      quality:Object.freeze({availability:selected.available ? 'AVAILABLE' : 'INCOMPLETE',
+        missing:selected.missing})
     });
-    const buckets = planningRows(firstDefined(horizon.buckets, horizon.timeline, horizon.rows))
-      .map((row,index)=>({ bucket_id:row?.bucket_id || row?.id || `bucket_${index+1}`, ...planningObject(row) }));
-    const planningAssets = planningRows(planning.assets)
-      .filter(row => String(row.asset_id || row.target_asset_id || ''));
-    const planningAssetsById = Object.fromEntries(planningAssets.map(row => [String(row.asset_id || row.target_asset_id), planningObject(row)]));
-    const d0 = planningObject(horizonsById.D0);
-    const d1 = planningObject(horizonsById.D1);
-    const d0Totals = planningObject(d0);
-    const d1Totals = planningObject(d1);
+    const todayTotals=totals(today),tomorrowTotals=totals(tomorrow);
     return Object.freeze({
-      entityId:v2.envelope.entityId,
-      contractVersion:v2.contractVersion,
-      available:v2.available,
-      attrs:planning,
-      planningAssets,
-      planningAssetsById,
-      planningTodayTotals:d0Totals,
-      planningTomorrowTotals:d1Totals,
-      planningCombinedTotals:{},
-      horizonsById,
-      horizonId:normalized,
-      horizon,
-      summary,
-      laneTotals,
-      buckets,
-      currentPlanningBucket:{},
-      currentActionIntent:{},
-      totalsSource:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons'
+      entityId:null,
+      contractVersion:'ENERGY_NATIVE_PLANNING',
+      available:selected.available,
+      attrs:Object.freeze({}),
+      planId:published ? horizonDetails.plan_id ?? null : null,
+      providerId:published ? horizonDetails.provider_id ?? null : null,
+      providerPlanReference:published ? horizonDetails.provider_plan_ref ?? null : null,
+      generatedAt:published ? horizonDetails.generated_at ?? null : null,
+      sourceLanes:Object.freeze(planningObject(horizonDetails.source_lanes)),
+      consumerLanes:Object.freeze(planningObject(horizonDetails.consumer_lanes)),
+      balance:Object.freeze(planningObject(horizonDetails.balance)),
+      batteryLedger:Object.freeze(planningObject(horizonDetails.battery_ledger)),
+      policyEvidence:Object.freeze(planningObject(horizonDetails.policy_evidence)),
+      planningAssets:Object.freeze(planningAssets),
+      planningAssetsById:Object.freeze(Object.fromEntries(planningAssets
+        .filter(row=>row && String(row.asset_id || '').trim())
+        .map(row=>[String(row.asset_id),row]))),
+      planningTodayTotals:Object.freeze(todayTotals),
+      planningTomorrowTotals:Object.freeze(tomorrowTotals),
+      planningCombinedTotals:Object.freeze({}),
+      horizonsById:Object.freeze({D0:todayTotals,D1:tomorrowTotals}),
+      horizonId:normalized,horizon,summary:horizon,
+      laneTotals:Object.freeze(totals(selected)),
+      buckets:Object.freeze(Array.isArray(horizonDetails.buckets) ? horizonDetails.buckets : []),
+      currentPlanningBucket:Object.freeze({}),
+      currentActionIntent:Object.freeze(published && horizonDetails.execution_policy && typeof horizonDetails.execution_policy === 'object' ? horizonDetails.execution_policy : {}),
+      missingContractCapabilities:Object.freeze([
+        ...(!published ? ['native_planning_buckets'] : []),
+        ...(!published || !Array.isArray(horizonDetails.planning_assets) ? ['native_planning_assets'] : []),
+        'native_planning_actions'
+      ]),
+      totalsSource:'rhi_energy.runtime/native_metric'
     });
   }
 

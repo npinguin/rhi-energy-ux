@@ -1,3 +1,11 @@
+## 4.3.36-rc.1 — Experimental canonical planning HACS candidate
+
+- target E0.15.112 selectable deterministic/EMHASS backend with no planner-specific UX semantics;
+- consume backend-owned native D0/D1 horizon details when available; retain explicit contract-gap states where unavailable;
+- expose canonical planning asset evidence, lanes, provider provenance and execution policy without recomputing planner truth;
+- harden invalid metric handling and unsupported horizon rejection;
+- ship a distinct installable experimental HACS prerelease; stable remains blocked by target-runtime validation and legacy consumer migration.
+
 ## 4.3.35 — Zero-Debt Canonical Property Release
 
 - make RHI_ENERGY_CANONICAL_PROPERTY_V2 the sole frontend property truth;

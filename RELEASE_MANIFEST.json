@@ -1,12 +1,12 @@
 {
   "product": "rhi-energy-ux",
-  "version": "4.3.35",
+  "version": "4.3.36-rc.1",
   "stage": "test_candidate",
   "publication_authority": "github_releases",
   "publication_status": "installable_candidate_until_qualified",
   "license": "GPL-3.0-only",
   "energy_contract": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-  "minimum_backend": "E0.15.109",
+  "minimum_backend": "E0.15.112",
   "runtime_artifact": "dist/rhi-energy-ux.js",
   "hacs_repository_type": "dashboard",
   "hacs_validation_category": "plugin",
@@ -16,7 +16,7 @@
   "known_accepted_feature_debt": 0,
   "target_runtime_proof": "pending",
   "rollback_proof": "pending",
-  "github_release_prerelease": false,
+  "github_release_prerelease": true,
   "runtime_checksum_artifact": "dist/rhi-energy-ux.js.sha256",
   "package_manifest": "dist/PACKAGE_MANIFEST.json",
   "hacs_package_root": "dist",
@@ -37,5 +37,5 @@
   },
   "minimum_foundation": "F1.8.42",
   "minimum_mobility_for_cross_domain_visuals": "M0.10.41",
-  "tested_backend_baseline": "E0.15.109"
+  "tested_backend_baseline": "E0.15.112"
 }
