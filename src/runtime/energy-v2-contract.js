@@ -1,7 +1,7 @@
 // Canonical Energy V2 reader. This is the only UX adapter allowed to interpret
 // sensor.rhi_energy_public_contract_v2. Screens consume projections derived here.
 function readEnergyCanonicalProjection(gateway) {
-  const envelope = gateway.contract('canonicalProperties');
+  const envelope = gateway.contract('publicV2');
   const attrs = envelope.attributes || {};
   const array = value => {
     const parsed = parseMaybeJson(value, value);
