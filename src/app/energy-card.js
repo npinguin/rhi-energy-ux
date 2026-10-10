@@ -2434,20 +2434,35 @@
     }
 
     gasModel(rt) {
-      const assets = typeof rt.assets === 'function' ? rt.assets() : [];
-      const raw = assets.find(asset => String(firstDefined(asset?.asset_type, asset?.object_class, '') || '').toLowerCase() === 'gas_meter') || null;
-      const asset = raw ? this.energyAssetContext(rt, raw) : null;
-      const properties = Array.isArray(asset?.properties) ? asset.properties : [];
-      const propertyValue = key => {
-        const prop = properties.find(row => String(row?.property_key || '') === key);
-        return asNumber(firstDefined(prop?.value, prop?.resolution?.value, null));
+      const index=rt.canonicalIndex;
+      // Only the backend-published gas_meter object owns these facts.
+      const rows=index?.rowsForProperty?.('gas.total_m3') || [];
+      const candidates=rows.filter(row=>row.logical_object_class==='gas_meter');
+      const root=candidates.length===1 ? candidates[0] : null;
+      const assetId=String(root?.asset_id || '');
+      const owned=(key)=>{
+        if (!assetId) return null;
+        const matches=(index?.rowsForProperty?.(key) || []).filter(row=>
+          row.logical_object_class==='gas_meter' && String(row.asset_id)===assetId);
+        return matches.length===1 && matches[0].availability==='AVAILABLE' ? matches[0] : null;
       };
-      const totalM3 = firstDefined(propertyValue('gas.total_m3'), asNumber(asset?.total_m3), asNumber(asset?.gas_total_m3));
-      const flowM3h = firstDefined(propertyValue('gas.flow_m3_h'), asNumber(asset?.flow_m3_h), asNumber(asset?.gas_flow_m3_h));
-      const health = String(firstDefined(asset?.health, asset?.normalization_status, 'UNKNOWN') || 'UNKNOWN');
-      const source = String(firstDefined(asset?.integration_domain, properties.find(row=>row?.integration_domain)?.integration_domain, 'Gas meter') || 'Gas meter');
-      const totalEntityId = rt.gasStatisticsEntityId(String(asset?.asset_id || ''));
-      return Object.freeze({ asset, totalM3, flowM3h, health, source, totalEntityId });
+      const total=owned('gas.total_m3');
+      const flow=owned('gas.flow_m3_h');
+      const totalM3=total ? asNumber(total.value) : null;
+      const flowM3h=flow ? asNumber(flow.value) : null;
+      const asset=root ? Object.freeze({
+        asset_id:assetId,
+        asset_type:'gas_meter',
+        object_class:'gas_meter',
+        display_name:String(root.asset_display_name || assetId),
+        integration_domain:String(root.integration_domain || '')
+      }) : null;
+      return Object.freeze({
+        asset,totalM3,flowM3h,
+        health:total?.availability || 'UNAVAILABLE',
+        source:String(root?.integration_domain || 'Gas meter'),
+        totalEntityId:total?.entity_id || null
+      });
     }
     gasVolume(value, fallback = '—') {
       const number = asNumber(value);
