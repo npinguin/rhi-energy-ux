@@ -79,6 +79,13 @@ const secondBattery={states:{...hass.states,
     state:"42",attributes:{...hass.states["sensor.battery_soc"].attributes,asset_id:"battery_guest"}
   }
 }};
+// Unscoped UX lookups must never select the last physical asset for a
+// semantic key shared by two valid assets. Scoped lookups remain valid.
+const cardRuntimeSource=card.slice(card.indexOf("    allRows() {"),card.indexOf("    editablePropertyRows() {"));
+if(!cardRuntimeSource.includes("ambiguousKeys.add(key)") ||
+   !cardRuntimeSource.includes("result.delete(key)") ||
+   !cardRuntimeSource.includes("if (ambiguousKeys.has(key)) continue"))
+  throw new Error("Energy global property projection must reject multi-asset ambiguity");
 const multiAsset=vm.runInContext("createEnergyCanonicalPropertyIndex",context)(secondBattery);
 if(multiAsset.uniqueProductRows().length!==2 || multiAsset.contractGaps().length!==0)
   throw new Error("distinct batteries with the same property key must both be visible");
