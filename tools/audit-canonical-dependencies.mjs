@@ -40,6 +40,12 @@ const result = {
   manifest:'src/manifest.json',
   scanned_modules: modules.filter(x=>!x.startsWith('vendor/')).length,
   counts,
+  affected_files:[...new Set(hits.map(hit=>hit.module))].sort(),
+  counts_by_file:Object.fromEntries([...new Set(hits.map(hit=>hit.module))].sort().map(file=>[
+    file,Object.fromEntries(patterns.map(([category])=>[
+      category,hits.filter(hit=>hit.module===file && hit.category===category).length
+    ]))
+  ])),
   matches:hits
 };
 process.stdout.write(JSON.stringify({...result, strict_mode:strict},null,2)+'\n');
