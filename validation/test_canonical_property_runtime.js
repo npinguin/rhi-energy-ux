@@ -115,6 +115,21 @@ if(!atomicChanged.has("sensor.battery_soc") || !atomicChanged.has("sensor.batter
    atomic.row("battery_home","battery.version")?.presentation_surface!=="engineering")
   throw new Error("mixed value and metadata refresh must invalidate both entities");
 
+// Membership changes must report a newly published entity even when the
+// canonical state reference is undefined in the previous index.
+const additionIndex=vm.runInContext("createEnergyCanonicalPropertyIndex",context)(hass);
+const addedState={states:{...hass.states,
+  "sensor.second_battery_soc":secondBattery.states["sensor.second_battery_soc"]
+}};
+const addedIds=additionIndex.refresh(addedState);
+if(!addedIds.has("sensor.second_battery_soc") ||
+   additionIndex.row("battery_guest","battery.soc_pct")?.value!=="42")
+  throw new Error("new canonical publisher must invalidate and become visible");
+const removedIds=additionIndex.refresh(hass);
+if(!removedIds.has("sensor.second_battery_soc") ||
+   additionIndex.row("battery_guest","battery.soc_pct")!==null)
+  throw new Error("removed canonical publisher must invalidate and disappear");
+
 const next={states:{...hass.states,"sensor.battery_soc":{...hass.states["sensor.battery_soc"],state:"58"}}};
 const changed=index.refresh(next);
 if(!changed.has("sensor.battery_soc") || index.row("battery_home","battery.soc_pct").value!=="58") throw new Error("incremental canonical property refresh failed");
