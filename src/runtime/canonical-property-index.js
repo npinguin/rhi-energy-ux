@@ -13,6 +13,8 @@ function normalizeCanonicalEnergyAvailability(state = null, attributes = {}) {
   const explicit = String(attributes.availability ?? '').trim().toUpperCase();
   if (['AVAILABLE','UNAVAILABLE','STALE','INVALID','UNKNOWN'].includes(explicit))
     return explicit === 'AVAILABLE' ? 'AVAILABLE' : 'UNAVAILABLE';
+  // Unknown explicit availability is not proof of a valid value.
+  if (explicit) return 'UNAVAILABLE';
   const raw = String(state?.state ?? '').trim().toLowerCase();
   return ['unknown','unavailable','none','null',''].includes(raw) ? 'UNAVAILABLE' : 'AVAILABLE';
 }
