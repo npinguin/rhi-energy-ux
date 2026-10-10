@@ -37,6 +37,8 @@ jobs:
         run: npm ci
       - name: Full validation
         run: npm run validate
+      - name: Reject retired runtime aggregates (canonical-only, zero fallback)
+        run: node tools/audit-canonical-dependencies.mjs --fail-on-legacy
       - name: Verify committed package matches first validated build
         run: node tools/check-committed-dist.mjs
       - name: Release identity and documentation governance
