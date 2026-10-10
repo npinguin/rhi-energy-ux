@@ -26,5 +26,5 @@
         available: !!current
       };
     };
-    return Object.freeze({ entityId, state, attrs, contract });
+    return Object.freeze({ host, entityId, state, attrs, contract });
   }
