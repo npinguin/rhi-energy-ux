@@ -1,10 +1,23 @@
 // Canonical current-energy view model. Literal contract keys and direction
 // semantics are confined to this adapter so screen renderers cannot drift.
 function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
-  const v2 = readEnergyPublicV2(gateway);
-  const projected = v2.currentField(propertyKey);
+  // Canonical property entities are the only authority for live current values.
+  // No Public V2 or source-integration fallback. Ambiguity is a contract gap.
+  const index = gateway.host?.canonicalIndex;
+  const candidates = index?.rowsForProperty?.(propertyKey) || [];
+  const usable = candidates.filter(row => row?.availability === 'AVAILABLE' && row?.value !== null && row?.value !== undefined);
+  const primary = usable.filter(row => row?.presentation_primary === true);
+  const valid = primary.length === 1 ? primary[0] : (primary.length === 0 && usable.length === 1 ? usable[0] : null);
+  const projected = valid ? {
+    raw:valid,value:valid.value,status:valid.availability,quality:valid.quality,reason:valid.reason,
+    source:valid.entity_id
+  } : {
+    raw:{},value:null,status:'UNAVAILABLE',quality:'CONTRACT_GAP',
+    reason:candidates.length > 1 ? 'ambiguous_canonical_property' : 'canonical_property_not_available',
+    source:null
+  };
   return Object.freeze({
-    envelope:v2.envelope,
+    envelope:{source:'RHI_ENERGY_CANONICAL_PROPERTY_V2'},
     row:projected.raw || {},
     value:projected.value,
     number:asNumber(projected.value),
