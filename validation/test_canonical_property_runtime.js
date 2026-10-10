@@ -190,6 +190,13 @@ if(zeroMetric.value!=="0" || !zeroMetric.available) throw new Error("zero native
 if(readMetric(metricStates,"planning_tomorrow_planned_kwh").available) throw new Error("missing native metric must fail closed");
 if(readMetric({states:{"sensor.planning_today_planned":metric("unknown")}},"planning_today_planned_kwh").available) throw new Error("unknown native metric must fail closed");
 if(readMetric({states:{"sensor.planning_today_planned":metric("4","UNAVAILABLE")}},"planning_today_planned_kwh").available) throw new Error("backend unavailable must override numeric state");
+for(const quality of ["STALE","INVALID","UNKNOWN"]){
+  const stale=metric("4");
+  stale.attributes.quality=quality;
+  if(readMetric({states:{"sensor.planning_today_planned":stale}},"planning_today_planned_kwh").available)
+    throw new Error("native numeric metric with "+quality+" quality must fail closed");
+}
+
 if(readMetric({states:{"sensor.a":metric("4"),"sensor.b":metric("5")}},"planning_today_planned_kwh").reason!=="duplicate_native_energy_metric") throw new Error("duplicate native metric must fail closed");
 if(readMetric({states:{"sensor.rogue":{state:"7",attributes:{metric_key:"planning_today_planned_kwh"}}}},"planning_today_planned_kwh").available) throw new Error("unowned metric must not be accepted");
 
