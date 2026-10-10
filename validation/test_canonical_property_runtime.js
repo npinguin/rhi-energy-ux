@@ -71,6 +71,25 @@ if(ambiguous.uniqueProductRows().some(row=>row.asset_id==="battery_home" && row.
    !ambiguous.contractGaps().some(row=>row.reason==="duplicate_canonical_property"))
   throw new Error("duplicate canonical property on the same asset must fail closed");
 
+if(ambiguous.productRows().some(row=>row.asset_id==="battery_home" && row.property_key==="battery.soc_pct"))
+  throw new Error("duplicate property leaked through productRows");
+if(!ambiguous.hasProductTruthForSurfaces(["key_properties"]) && ambiguous.productRows().length!==1)
+  throw new Error("unambiguous second battery must remain available");
+const onlyDuplicate=vm.runInContext("createEnergyCanonicalPropertyIndex",context)({states:{
+  "sensor.battery_soc":hass.states["sensor.battery_soc"],
+  "sensor.duplicate_battery_soc":duplicateAsset.states["sensor.duplicate_battery_soc"]
+}});
+if(onlyDuplicate.hasProductTruthForSurfaces(["key_properties"]))
+  throw new Error("ambiguous publication cannot prove product surface truth");
+const duplicateRefresh=onlyDuplicate.refresh({states:{
+  "sensor.battery_soc":hass.states["sensor.battery_soc"],
+  "sensor.duplicate_battery_soc":{...duplicateAsset.states["sensor.duplicate_battery_soc"],state:"100"}
+}});
+if(!duplicateRefresh.has("sensor.duplicate_battery_soc") ||
+   onlyDuplicate.row("battery_home","battery.soc_pct")!==null ||
+   onlyDuplicate.productRows().length!==0)
+  throw new Error("incremental duplicate update must remain fail closed");
+
 const next={states:{...hass.states,"sensor.battery_soc":{...hass.states["sensor.battery_soc"],state:"58"}}};
 const changed=index.refresh(next);
 if(!changed.has("sensor.battery_soc") || index.row("battery_home","battery.soc_pct").value!=="58") throw new Error("incremental canonical property refresh failed");
