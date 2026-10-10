@@ -285,9 +285,19 @@
     allRows() {
       if (this._rows) return this._rows;
       const result = new Map();
+      const ambiguousKeys = new Set();
+      // Unscoped lookups cannot choose a physical asset. Preserve multiple
+      // assets in the canonical index, but never silently let the last asset
+      // overwrite another asset's semantic value in a global projection.
       for (const row of (this.canonicalIndex?.uniqueProductRows?.() || [])) {
         const key = String(row?.property_key || '');
         if (!key) continue;
+        if (result.has(key)) {
+          ambiguousKeys.add(key);
+          result.delete(key);
+          continue;
+        }
+        if (ambiguousKeys.has(key)) continue;
         result.set(key, {
           ...row,
           entity_id:row.entity_id,
