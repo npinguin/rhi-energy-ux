@@ -174,10 +174,12 @@ class EnergyCanonicalPropertyIndex {
   }
 
   uniqueProductRows() {
-    return [...this.byPropertyKey.values()]
-      .filter(rows=>rows.length === 1)
-      .map(rows=>rows[0])
-      .filter(row=>row.presentation_complete === true && row.presentation_technical !== true);
+    // Property keys describe semantics, not globally unique physical assets.
+    // Two batteries may both publish battery.soc_pct; only a duplicate for
+    // the same asset/property pair is ambiguous and must fail closed.
+    return [...this.byEntity.values()].filter(row =>
+      !this.ambiguousAssetKeys.has(`${row.asset_id}::${row.property_key}`) &&
+      row.presentation_complete === true && row.presentation_technical !== true);
   }
 
   hasProductTruthForSurfaces(surfaces = []) {

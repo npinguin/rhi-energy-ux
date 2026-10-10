@@ -52,6 +52,25 @@ if(!index.hasProductTruthForSurfaces(["key_properties"])) throw new Error("key s
 if(index.hasProductTruthForSurfaces(["configuration"])) throw new Error("missing configuration surface must not become canonical authority");
 if(index.uniqueProductRows().length!==1 || index.uniqueProductRows()[0].property_key!=="battery.soc_pct") throw new Error("unique canonical property projection drifted");
 
+// Same semantic property on two different physical assets must remain visible.
+const secondBattery={states:{...hass.states,
+  "sensor.second_battery_soc":{
+    state:"42",attributes:{...hass.states["sensor.battery_soc"].attributes,asset_id:"battery_guest"}
+  }
+}};
+const multiAsset=vm.runInContext("createEnergyCanonicalPropertyIndex",context)(secondBattery);
+if(multiAsset.uniqueProductRows().length!==2 || multiAsset.contractGaps().length!==0)
+  throw new Error("distinct batteries with the same property key must both be visible");
+const duplicateAsset={states:{...secondBattery.states,
+  "sensor.duplicate_battery_soc":{
+    state:"99",attributes:{...hass.states["sensor.battery_soc"].attributes}
+  }
+}};
+const ambiguous=vm.runInContext("createEnergyCanonicalPropertyIndex",context)(duplicateAsset);
+if(ambiguous.uniqueProductRows().some(row=>row.asset_id==="battery_home" && row.property_key==="battery.soc_pct") ||
+   !ambiguous.contractGaps().some(row=>row.reason==="duplicate_canonical_property"))
+  throw new Error("duplicate canonical property on the same asset must fail closed");
+
 const next={states:{...hass.states,"sensor.battery_soc":{...hass.states["sensor.battery_soc"],state:"58"}}};
 const changed=index.refresh(next);
 if(!changed.has("sensor.battery_soc") || index.row("battery_home","battery.soc_pct").value!=="58") throw new Error("incremental canonical property refresh failed");
