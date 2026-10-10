@@ -71,6 +71,16 @@ if(ambiguous.uniqueProductRows().some(row=>row.asset_id==="battery_home" && row.
    !ambiguous.contractGaps().some(row=>row.reason==="duplicate_canonical_property"))
   throw new Error("duplicate canonical property on the same asset must fail closed");
 
+for(const selectorRows of [
+  ambiguous.rowsForProperty("battery.soc_pct"),
+  ambiguous.rowsForSurface("key_properties"),
+  ambiguous.rowsForFamily("storage")
+]){
+  if(selectorRows.some(row=>row.asset_id==="battery_home"))
+    throw new Error("ambiguous canonical publication leaked through secondary selector");
+  if(selectorRows.length!==1 || selectorRows[0].asset_id!=="battery_guest")
+    throw new Error("valid second asset lost when first asset has a duplicate");
+}
 if(ambiguous.productRows().some(row=>row.asset_id==="battery_home" && row.property_key==="battery.soc_pct"))
   throw new Error("duplicate property leaked through productRows");
 if(!ambiguous.hasProductTruthForSurfaces(["key_properties"]) || ambiguous.productRows().length!==1)
