@@ -74,6 +74,7 @@ class EnergyCanonicalPropertyIndex {
   constructor(hass = {}) {
     this.byEntity = new Map();
     this.byAssetAndKey = new Map();
+    this.ambiguousAssetKeys = new Set();
     this.byPropertyKey = new Map();
     this.bySurface = new Map();
     this.byFamily = new Map();
@@ -86,7 +87,9 @@ class EnergyCanonicalPropertyIndex {
   _index(row, stateRef) {
     if (!row) return;
     this.byEntity.set(row.entity_id,row);
-    this.byAssetAndKey.set(`${row.asset_id}::${row.property_key}`,row);
+    const compound = `${row.asset_id}::${row.property_key}`;
+    if (this.byAssetAndKey.has(compound)) this.ambiguousAssetKeys.add(compound);
+    else this.byAssetAndKey.set(compound,row);
     if (!this.byPropertyKey.has(row.property_key)) this.byPropertyKey.set(row.property_key,[]);
     this.byPropertyKey.get(row.property_key).push(row);
     if (!this.bySurface.has(row.presentation_surface)) this.bySurface.set(row.presentation_surface,[]);
@@ -99,6 +102,7 @@ class EnergyCanonicalPropertyIndex {
   discover(hass = {}) {
     this.byEntity.clear();
     this.byAssetAndKey.clear();
+    this.ambiguousAssetKeys.clear();
     this.byPropertyKey.clear();
     this.bySurface.clear();
     this.byFamily.clear();
@@ -111,7 +115,6 @@ class EnergyCanonicalPropertyIndex {
   }
 
   refresh(hass = {}) {
-    if (hass === this._hassRef) return new Set();
     const states = hass?.states || {};
     // Entity replacement can preserve the total HA state count; membership must
     // be checked explicitly or stale canonical rows remain visible.
@@ -191,13 +194,21 @@ class EnergyCanonicalPropertyIndex {
   get size() { return this.byEntity.size; }
   hasCanonicalTruth() { return this.size > 0; }
   entityIds() { return [...this.byEntity.keys()]; }
-  row(assetId, propertyKey) { return this.byAssetAndKey.get(`${String(assetId||'')}::${String(propertyKey||'')}`) || null; }
+  row(assetId, propertyKey) {
+    const key = `${String(assetId||'')}::${String(propertyKey||'')}`;
+    return this.ambiguousAssetKeys.has(key) ? null : (this.byAssetAndKey.get(key) || null);
+  }
   rowsForProperty(propertyKey) { return [...(this.byPropertyKey.get(String(propertyKey||'')) || [])]; }
   rowsForSurface(surface) { return [...(this.bySurface.get(String(surface||'')) || [])]; }
   rowsForFamily(family) { return [...(this.byFamily.get(String(family||'')) || [])]; }
   productRows() { return [...this.byEntity.values()].filter(row=>row.presentation_complete === true && row.presentation_technical !== true); }
   technicalRows() { return [...this.byEntity.values()].filter(row=>row.presentation_technical === true || row.presentation_surface === 'diagnostics'); }
-  contractGaps() { return [...this.byEntity.values()].filter(row=>!row.presentation_complete && row.presentation_technical !== true); }
+  contractGaps() {
+    return [
+      ...[...this.byEntity.values()].filter(row=>!row.presentation_complete && row.presentation_technical !== true),
+      ...[...this.ambiguousAssetKeys].sort().map(key=>Object.freeze({key,reason:'duplicate_canonical_property'}))
+    ];
+  }
 
   entityIdsForSurfaces(surfaces = []) {
     const ids = new Set();
