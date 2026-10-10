@@ -42,11 +42,14 @@ function canonicalEnergyPropertyRow(entityId, state) {
   const invalidStates = new Set(['unknown','unavailable','none','null','']);
   const invalidQualities = new Set(['STALE','INVALID','UNKNOWN']);
   const rawInvalid = invalidStates.has(String(rawState ?? '').trim().toLowerCase());
-  const effectiveAvailability = rawInvalid || invalidQualities.has(String(attributes.quality || '').toUpperCase())
+  const publishedValue = Object.prototype.hasOwnProperty.call(attributes,'value') ? attributes.value : rawState;
+  const invalidPublishedValue = publishedValue === null || publishedValue === undefined ||
+    (typeof publishedValue === 'string' &&
+      invalidStates.has(publishedValue.trim().toLowerCase()));
+  const effectiveAvailability = rawInvalid || invalidPublishedValue ||
+    invalidQualities.has(String(attributes.quality || '').toUpperCase())
     ? 'UNAVAILABLE' : availability;
-  const value = effectiveAvailability !== 'AVAILABLE'
-    ? null
-    : (Object.prototype.hasOwnProperty.call(attributes,'value') ? attributes.value : rawState);
+  const value = effectiveAvailability === 'AVAILABLE' ? publishedValue : null;
 
   return Object.freeze({
     entity_id:String(entityId || ''),
