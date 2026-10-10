@@ -193,8 +193,9 @@ if(readMetric({states:{"sensor.planning_today_planned":metric("4","UNAVAILABLE")
 for(const quality of ["STALE","INVALID","UNKNOWN"]){
   const stale=metric("4");
   stale.attributes.quality=quality;
-  if(readMetric({states:{"sensor.planning_today_planned":stale}},"planning_today_planned_kwh").available)
-    throw new Error("native numeric metric with "+quality+" quality must fail closed");
+  const invalidMetric=readMetric({states:{"sensor.planning_today_planned":stale}},"planning_today_planned_kwh");
+  if(invalidMetric.available || invalidMetric.reason!=="invalid_native_energy_metric_quality")
+    throw new Error("native numeric metric with "+quality+" quality must fail closed with diagnostic reason");
 }
 
 if(readMetric({states:{"sensor.a":metric("4"),"sensor.b":metric("5")}},"planning_today_planned_kwh").reason!=="duplicate_native_energy_metric") throw new Error("duplicate native metric must fail closed");
