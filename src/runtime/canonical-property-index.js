@@ -223,9 +223,15 @@ class EnergyCanonicalPropertyIndex {
     const key = `${String(assetId||'')}::${String(propertyKey||'')}`;
     return this.ambiguousAssetKeys.has(key) ? null : (this.byAssetAndKey.get(key) || null);
   }
-  rowsForProperty(propertyKey) { return [...(this.byPropertyKey.get(String(propertyKey||'')) || [])]; }
-  rowsForSurface(surface) { return [...(this.bySurface.get(String(surface||'')) || [])]; }
-  rowsForFamily(family) { return [...(this.byFamily.get(String(family||'')) || [])]; }
+  // All public row selectors share the same fail-closed identity boundary.
+  // Secondary indexes retain every publisher for diagnostics and invalidation,
+  // but never expose a conflicting asset/property pair as product truth.
+  unambiguousRows(rows = []) {
+    return rows.filter(row => !this.ambiguousAssetKeys.has(`${row.asset_id}::${row.property_key}`));
+  }
+  rowsForProperty(propertyKey) { return this.unambiguousRows(this.byPropertyKey.get(String(propertyKey||'')) || []); }
+  rowsForSurface(surface) { return this.unambiguousRows(this.bySurface.get(String(surface||'')) || []); }
+  rowsForFamily(family) { return this.unambiguousRows(this.byFamily.get(String(family||'')) || []); }
   productRows() { return this.uniqueProductRows(); }
   technicalRows() { return [...this.byEntity.values()].filter(row=>row.presentation_technical === true || row.presentation_surface === 'diagnostics'); }
   contractGaps() {
