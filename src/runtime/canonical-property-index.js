@@ -279,8 +279,8 @@ function readNativeEnergyMetric(hass = {}, metricKey = '') {
   const numericValue = invalid ? null : Number(raw);
   const validNumber = numericValue !== null && Number.isFinite(numericValue);
   const quality = String(attrs.quality || '').trim().toUpperCase();
-  const available = availability === 'AVAILABLE' && validNumber &&
-    !['STALE','INVALID','UNKNOWN'].includes(quality);
+  const invalidQuality = ['STALE','INVALID','UNKNOWN'].includes(quality);
+  const available = availability === 'AVAILABLE' && validNumber && !invalidQuality;
   return Object.freeze({
     available,
     entity_id:entityId,
@@ -288,7 +288,10 @@ function readNativeEnergyMetric(hass = {}, metricKey = '') {
     unit:String(attrs.unit_of_measurement || ''),
     quality:attrs.quality ?? null,
     provenance:attrs.provenance ?? null,
-    reason:available ? null : String(attrs.reason_code || (availability === 'AVAILABLE' && !validNumber ? 'invalid_native_energy_metric' : (availability || 'native_energy_metric_unavailable'))),
+    reason:available ? null : String(attrs.reason_code ||
+      (invalidQuality ? 'invalid_native_energy_metric_quality' :
+       (availability === 'AVAILABLE' && !validNumber ? 'invalid_native_energy_metric' :
+        (availability || 'native_energy_metric_unavailable')))),
     metric_key:key
   });
 }
