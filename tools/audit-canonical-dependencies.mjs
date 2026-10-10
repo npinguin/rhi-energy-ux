@@ -36,14 +36,14 @@ for (const relative of [...new Set(modules)]) {
 }
 const counts = Object.fromEntries(patterns.map(([key])=>[key,hits.filter(hit=>hit.category===key).length]));
 const result = {
-  status:'INVENTORY_ONLY_NOT_A_MIGRATION_GATE',
+  status:strict ? (hits.length===0 ? 'PASS_CANONICAL_ONLY' : 'BLOCKED_TECH_DEBT') : 'INVENTORY_ONLY',
   manifest:'src/manifest.json',
   scanned_modules: modules.filter(x=>!x.startsWith('vendor/')).length,
   counts,
   matches:hits
 };
 process.stdout.write(JSON.stringify({...result, strict_mode:strict},null,2)+'\n');
-if (strict && (counts.energy_public_v2 || counts.mobility_runtime_v2 || counts.aggregate_snapshot)) {
-  console.error('FAIL canonical-only dependency gate: retired aggregate references remain in bundled source');
+if (strict && (counts.energy_public_v2 || counts.mobility_runtime_v2 || counts.aggregate_snapshot || counts.global_dom_replacement)) {
+  console.error('FAIL zero-debt UX gate: retired contracts or unsafe root DOM replacement remain in bundled source');
   process.exitCode = 1;
 }
