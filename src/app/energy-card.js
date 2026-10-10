@@ -390,8 +390,25 @@
     coverage() { return selectEnergyCoverage(this.publicV2()); }
     assets() {
       if (this._assets) return this._assets;
-      const v2 = this.publicV2();
-      this._assets = v2.available ? [...v2.objects] : [];
+      const grouped=new Map();
+      // Backend canonical logical property rows are the inventory authority.
+      // Grouping is a presentation operation, never a semantic recomputation.
+      for (const row of (this.canonicalIndex?.productRows?.() || [])) {
+        const assetId=String(row.asset_id || '').trim();
+        const objectClass=String(row.logical_object_class || '').trim();
+        if (!assetId || !objectClass) continue;
+        if (!grouped.has(assetId)) grouped.set(assetId,{
+          asset_id:assetId,asset_type:objectClass,object_class:objectClass,
+          parent_asset_id:row.parent_asset_id || null,
+          display_name:String(row.asset_display_name || assetId),
+          integration_domain:row.integration_domain || null,
+          properties:[]
+        });
+        grouped.get(assetId).properties.push(row);
+      }
+      this._assets=[...grouped.values()].map(asset=>Object.freeze({
+        ...asset,properties:Object.freeze(asset.properties)
+      }));
       return this._assets;
     }
     asset(assetId) { return this.assets().find(a => String(a.asset_id || '') === String(assetId)) || null; }
