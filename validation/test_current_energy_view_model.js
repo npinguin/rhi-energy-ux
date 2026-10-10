@@ -11,6 +11,8 @@ const context={
 vm.createContext(context);
 vm.runInContext(fs.readFileSync('src/domain/models/current-energy-view-model.js','utf8')+
   '\nthis.readTypedPropertyContract=readTypedPropertyContract;this.createBatteryCurrentFlowViewModel=createBatteryCurrentFlowViewModel;this.createSolarCurrentViewModel=createSolarCurrentViewModel;',context);
+vm.runInContext(fs.readFileSync('src/runtime/consumption-contract.js','utf8')+
+  '\nthis.readLiveConsumptionContract=readLiveConsumptionContract;',context);
 const property=(asset,type,key,value,availability='AVAILABLE')=>({
   asset_id:asset,logical_object_class:type,property_key:key,value,availability,quality:'CANONICAL',entity_id:'sensor.'+asset+'_'+key,reason:''
 });
@@ -35,6 +37,12 @@ assert.equal(read('battery.soc_pct').number,8.935);
 assert.equal(read('solar.power_kw').number,3.7159);
 assert.equal(read('grid.net_power_kw').number,-0.021);
 assert.equal(read('home_consumption.power_kw').number,0.878);
+const consumption=context.readLiveConsumptionContract(gateway);
+assert.equal(consumption.homeConsumptionKw,0.878);
+assert.equal(consumption.siteConsumptionKw,null);
+assert.equal(consumption.source,'RHI_ENERGY_CANONICAL_PROPERTY_V2');
+assert.equal(consumption.flexibleLoadsKw,null);
+
 assert.equal(read('battery.capacity_kwh').value,null);
 assert.equal(read('battery.capacity_kwh').reason,'canonical_property_not_available');
 const duplicate=fromRows([...rows,property('battery_system_copy','battery_system','battery.power_kw',999)]);
