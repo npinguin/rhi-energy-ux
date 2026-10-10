@@ -4,7 +4,8 @@ const current=fs.readFileSync('src/domain/models/current-energy-view-model.js','
 const v2=fs.readFileSync('src/runtime/energy-v2-contract.js','utf8');
 const consumption=fs.readFileSync('src/runtime/consumption-contract.js','utf8');
 
-for(const token of ["v2.currentField(propertyKey)","currentField","currentAggregateObject"]) if(!current.includes(token) && !v2.includes(token)) throw new Error('missing canonical current projection '+token);
+for(const token of ["gateway.host?.canonicalIndex","rowsForProperty?.(propertyKey)","expectedClass","candidates.length === 1"]) if(!current.includes(token)) throw new Error('missing strict canonical current projection '+token);
+if(current.includes('readEnergyPublicV2(') || current.includes('v2.currentField(')) throw new Error('retired V2 current projection is forbidden');
 for(const token of ["homeBatteryAggregateCard(rt, system)","data-current-energy-projection=\"battery\"","const currentSolar = this.currentEnergyModel(rt).solar"]) if(!app.includes(token)) throw new Error('screen does not reuse canonical current projection: '+token);
 if(app.includes("this.energyDeviceStatusCard(rt,system,'Battery system')")) throw new Error('Solar has parallel Home Battery semantic path');
 for(const forbidden of [
