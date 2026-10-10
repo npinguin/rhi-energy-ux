@@ -13,6 +13,9 @@ for(const forbidden of [
   "rt.number('grid.net_power_kw')","rt.number('site_consumption.power_kw')","rt.number('home_consumption.power_kw')",
   "rt.value('battery.reserve_target_pct'"
 ]) if(app.includes(forbidden)) throw new Error('screen bypasses canonical current projection: '+forbidden);
-if(!consumption.includes("v2.currentField('site_consumption.power_kw')") || !consumption.includes("v2.currentField('home_consumption.power_kw')")) throw new Error('consumption uses parallel current path');
+if (!consumption.includes("readTypedPropertyContract(gateway,'consumption','site_consumption.power_kw')") ||
+    !consumption.includes("readTypedPropertyContract(gateway,'consumption','home_consumption.power_kw')"))
+  throw new Error('consumption must use backend canonical properties');
+if(consumption.includes('readEnergyPublicV2(')) throw new Error('retired aggregate consumption reader');
 if(!app.includes("return physical === null ? null : Math.abs(physical);")) throw new Error('Flexible power may not be reconstructed from participant rows');
 console.log('PASS one canonical current Energy projection drives all current-value surfaces');
