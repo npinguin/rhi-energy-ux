@@ -17,7 +17,9 @@ function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
     'grid_export.power_kw':'grid_connection',
     'grid.flow_direction':'grid_connection',
     'site_consumption.power_kw':'site_consumption',
-    'home_consumption.power_kw':'home_consumption'
+    'home_consumption.power_kw':'home_consumption',
+    'flexible_loads.power_kw':'flexible_loads',
+    'flexible_loads.attributed_power_kw':'flexible_loads'
   })[propertyKey];
   const candidates = expectedClass
     ? (index?.rowsForProperty?.(propertyKey) || []).filter(row=>row.logical_object_class===expectedClass)
