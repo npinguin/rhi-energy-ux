@@ -21,7 +21,7 @@ const patterns = [
   ['global_dom_replacement', /shadowRoot\.innerHTML\s*=|this\.shadowRoot\.innerHTML\s*=/gi]
 ];
 const hits = [];
-for (const relative of [...new Set(modules)]) {
+for (const relative of [...new Set([...modules, ...(manifest.template ? [manifest.template] : [])])]) {
   if (relative.startsWith('vendor/')) continue;
   const filename = path.join(root, 'src', relative);
   if (!fs.existsSync(filename)) throw new Error('manifest module missing: '+relative);
