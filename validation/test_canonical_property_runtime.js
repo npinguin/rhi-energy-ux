@@ -82,10 +82,21 @@ const secondBattery={states:{...hass.states,
 // Unscoped UX lookups must never select the last physical asset for a
 // semantic key shared by two valid assets. Scoped lookups remain valid.
 const cardRuntimeSource=card.slice(card.indexOf("    allRows() {"),card.indexOf("    editablePropertyRows() {"));
-if(!cardRuntimeSource.includes("ambiguousKeys.add(key)") ||
-   !cardRuntimeSource.includes("result.delete(key)") ||
-   !cardRuntimeSource.includes("if (ambiguousKeys.has(key)) continue"))
-  throw new Error("Energy global property projection must reject multi-asset ambiguity");
+const allRowsBody=cardRuntimeSource.slice(cardRuntimeSource.indexOf("    allRows() {"),cardRuntimeSource.indexOf("    propertyRows()"));
+const createAllRows=new Function("return function allRows() {"+allRowsBody.split("    allRows() {")[1].replace(/}\s*$/,"")+"}").call(null);
+const fakeRuntime={
+  canonicalIndex:{uniqueProductRows:()=>[
+    {asset_id:"battery_home",property_key:"battery.soc_pct",value:57,entity_id:"sensor.home"},
+    {asset_id:"battery_guest",property_key:"battery.soc_pct",value:24,entity_id:"sensor.guest"},
+    {asset_id:"solar_roof",property_key:"solar.power_kw",value:4,entity_id:"sensor.solar"}
+  ]},
+  _rows:null
+};
+const projected=createAllRows.call(fakeRuntime);
+if(projected.has("battery.soc_pct") || projected.get("solar.power_kw")?.value!==4)
+  throw new Error("unscoped projection must reject ambiguous batteries and preserve unique solar");
+if(fakeRuntime._rows!==projected || createAllRows.call(fakeRuntime)!==projected)
+  throw new Error("global canonical projection cache must remain stable");
 const multiAsset=vm.runInContext("createEnergyCanonicalPropertyIndex",context)(secondBattery);
 if(multiAsset.uniqueProductRows().length!==2 || multiAsset.contractGaps().length!==0)
   throw new Error("distinct batteries with the same property key must both be visible");
