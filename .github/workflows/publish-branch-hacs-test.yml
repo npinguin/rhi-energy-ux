@@ -59,6 +59,21 @@ jobs:
         uses: hacs/action@885037da508419fd08c13515967aec868dfdee2d
         with:
           category: plugin
+      - name: Require actual HA qualification before publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          q = json.loads(Path("release/QUALIFICATION.json").read_text())
+          def passed(value):
+              return str(value).strip().upper() in {"PASS", "PASSED", "SUCCESS", "QUALIFIED"}
+          required = ["runtime_proof", "rollback_proof", "hacs_install"]
+          missing = [key for key in required if not passed(q.get(key))]
+          if missing:
+              raise SystemExit("BLOCKED: target HA qualification missing: " + ", ".join(missing))
+          PY
       - name: Publish asset-free prerelease from validated tag tree
         shell: bash
         env:
