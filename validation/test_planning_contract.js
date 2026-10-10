@@ -188,3 +188,29 @@ for (const invalid of ['NaN','Infinity','-Infinity','garbage','','unknown','unav
 }
 assert.equal(readMetric({states:metricState('17.5','STALE')},'planning_today_required_kwh').available,false);
 console.log('PASS native metric numeric integrity, zero and availability');
+
+
+const indexContext={Object,Array,Map,Set,String,Number,Boolean,JSON};
+vm.createContext(indexContext);
+vm.runInContext(fs.readFileSync('src/runtime/canonical-property-index.js','utf8')+
+  '\nthis.EnergyCanonicalPropertyIndex=EnergyCanonicalPropertyIndex;',indexContext);
+const EnergyIndex=indexContext.EnergyCanonicalPropertyIndex;
+const property=(value)=>({state:String(value),attributes:{
+  canonical_contract:'RHI_ENERGY_CANONICAL_PROPERTY_V2',
+  asset_id:'battery_a',logical_object_class:'battery_system',
+  property_key:'battery.soc_pct',availability:'AVAILABLE',
+  presentation_family:'battery',presentation_role:'key',
+  presentation_surface:'overview'
+}});
+const duplicateIndex=new EnergyIndex({states:{
+  'sensor.soc_a':property(50),'sensor.soc_b':property(55)
+}});
+assert.equal(duplicateIndex.row('battery_a','battery.soc_pct'),null);
+assert.ok(duplicateIndex.contractGaps().some(row=>row.reason==='duplicate_canonical_property'));
+const sameHost={states:{'sensor.soc_a':property(50)}};
+const refreshIndex=new EnergyIndex(sameHost);
+sameHost.states['sensor.soc_a']=property(60);
+const changes=refreshIndex.refresh(sameHost);
+assert.ok(changes.has('sensor.soc_a'));
+assert.equal(refreshIndex.row('battery_a','battery.soc_pct').value,'60');
+console.log('PASS native Energy duplicate authority and same-host state revision');
