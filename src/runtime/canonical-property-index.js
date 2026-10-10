@@ -8,8 +8,11 @@
 const RHI_ENERGY_CANONICAL_PROPERTY_V2 = 'RHI_ENERGY_CANONICAL_PROPERTY_V2';
 
 function normalizeCanonicalEnergyAvailability(state = null, attributes = {}) {
-  const explicit = String(attributes.availability ?? attributes.status ?? attributes.quality ?? '').trim().toUpperCase();
-  if (explicit) return explicit;
+  // Availability and quality are distinct backend dimensions. A quality label
+  // such as CANONICAL is not an availability state; neither is RESOLVED.
+  const explicit = String(attributes.availability ?? '').trim().toUpperCase();
+  if (['AVAILABLE','UNAVAILABLE','STALE','INVALID','UNKNOWN'].includes(explicit))
+    return explicit === 'AVAILABLE' ? 'AVAILABLE' : 'UNAVAILABLE';
   const raw = String(state?.state ?? '').trim().toLowerCase();
   return ['unknown','unavailable','none','null',''].includes(raw) ? 'UNAVAILABLE' : 'AVAILABLE';
 }
