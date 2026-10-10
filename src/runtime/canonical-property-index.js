@@ -278,7 +278,9 @@ function readNativeEnergyMetric(hass = {}, metricKey = '') {
   // Number('') is zero, so check empty/unknown before numeric conversion.
   const numericValue = invalid ? null : Number(raw);
   const validNumber = numericValue !== null && Number.isFinite(numericValue);
-  const available = availability === 'AVAILABLE' && validNumber;
+  const quality = String(attrs.quality || '').trim().toUpperCase();
+  const available = availability === 'AVAILABLE' && validNumber &&
+    !['STALE','INVALID','UNKNOWN'].includes(quality);
   return Object.freeze({
     available,
     entity_id:entityId,
