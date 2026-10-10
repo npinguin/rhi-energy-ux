@@ -146,6 +146,13 @@ class EnergyCanonicalPropertyIndex {
       if (current === previous) continue;
       changed.add(entityId);
       const row = canonicalEnergyPropertyRow(entityId,current);
+      const previousRow = this.byEntity.get(entityId);
+      // Duplicate publishers must be re-indexed together, never replaced as
+      // an incremental winner of an ambiguous asset/property pair.
+      if (previousRow && this.ambiguousAssetKeys.has(`${previousRow.asset_id}::${previousRow.property_key}`)) {
+        this.discover(hass);
+        return changed;
+      }
       // Metadata changes are rare and semantically significant; rebuild indexes
       // rather than trying to mutate secondary indexes in place.
       if (!row || row.asset_id !== this.byEntity.get(entityId)?.asset_id ||
@@ -188,6 +195,7 @@ class EnergyCanonicalPropertyIndex {
     return [...this.byEntity.values()].some(row=>
       row.presentation_complete === true &&
       row.presentation_technical !== true &&
+      !this.ambiguousAssetKeys.has(`${row.asset_id}::${row.property_key}`) &&
       wanted.has(row.presentation_surface)
     );
   }
@@ -214,7 +222,7 @@ class EnergyCanonicalPropertyIndex {
   rowsForProperty(propertyKey) { return [...(this.byPropertyKey.get(String(propertyKey||'')) || [])]; }
   rowsForSurface(surface) { return [...(this.bySurface.get(String(surface||'')) || [])]; }
   rowsForFamily(family) { return [...(this.byFamily.get(String(family||'')) || [])]; }
-  productRows() { return [...this.byEntity.values()].filter(row=>row.presentation_complete === true && row.presentation_technical !== true); }
+  productRows() { return this.uniqueProductRows(); }
   technicalRows() { return [...this.byEntity.values()].filter(row=>row.presentation_technical === true || row.presentation_surface === 'diagnostics'); }
   contractGaps() {
     return [
