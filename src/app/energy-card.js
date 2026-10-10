@@ -2436,13 +2436,13 @@
     gasModel(rt) {
       const index=rt.canonicalIndex;
       // Only the backend-published gas_meter object owns these facts.
-      const rows=index?.rowsForProperty?.('gas.total_m3') || [];
+      const rows=index && typeof index.rowsForProperty === 'function' ? index.rowsForProperty('gas.total_m3') : [];
       const candidates=rows.filter(row=>row.logical_object_class==='gas_meter');
       const root=candidates.length===1 ? candidates[0] : null;
       const assetId=String(root?.asset_id || '');
       const owned=(key)=>{
         if (!assetId) return null;
-        const matches=(index?.rowsForProperty?.(key) || []).filter(row=>
+        const matches=(index && typeof index.rowsForProperty === 'function' ? index.rowsForProperty(key) : []).filter(row=>
           row.logical_object_class==='gas_meter' && String(row.asset_id)===assetId);
         return matches.length===1 && matches[0].availability==='AVAILABLE' ? matches[0] : null;
       };
