@@ -46,6 +46,22 @@ const hass={states:{
   },
   "sensor.unrelated":{state:"1",attributes:{friendly_name:"Unrelated"}}
 }};
+for(const invalid of [null,undefined,"unknown","unavailable",""]){
+  const state={...hass.states["sensor.battery_soc"],attributes:{
+    ...hass.states["sensor.battery_soc"].attributes,value:invalid
+  }};
+  const result=vm.runInContext("createEnergyCanonicalPropertyIndex",context)({states:{"sensor.invalid":state}})
+    .row("battery_home","battery.soc_pct");
+  if(result?.availability!=="UNAVAILABLE" || result.value!==null)
+    throw new Error("missing backend-owned canonical value must fail closed");
+}
+const zeroState={...hass.states["sensor.battery_soc"],attributes:{
+  ...hass.states["sensor.battery_soc"].attributes,value:0
+}};
+const zeroResult=vm.runInContext("createEnergyCanonicalPropertyIndex",context)({states:{"sensor.zero":zeroState}})
+  .row("battery_home","battery.soc_pct");
+if(zeroResult?.availability!=="AVAILABLE" || zeroResult.value!==0)
+  throw new Error("valid backend-owned canonical zero must survive");
 const index=vm.runInContext("createEnergyCanonicalPropertyIndex",context)(hass);
 if(index.size!==2) throw new Error("canonical property discovery must index only canonical Energy properties");
 const soc=index.row("battery_home","battery.soc_pct");
