@@ -4,10 +4,26 @@ function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
   // Canonical property entities are the only authority for live current values.
   // No Public V2 or source-integration fallback. Ambiguity is a contract gap.
   const index = gateway.host?.canonicalIndex;
-  const candidates = index?.rowsForProperty?.(propertyKey) || [];
+  const expectedClass = ({
+    'battery.power_kw':'battery_system',
+    'battery.soc_pct':'battery_system',
+    'battery.capacity_kwh':'battery_system',
+    'battery.available_kwh':'battery_system',
+    'battery.state':'battery_system',
+    'battery.reserve_target_pct':'battery_system',
+    'solar.power_kw':'solar_production',
+    'grid.net_power_kw':'grid_connection',
+    'grid_import.power_kw':'grid_connection',
+    'grid_export.power_kw':'grid_connection',
+    'grid.flow_direction':'grid_connection',
+    'site_consumption.power_kw':'site_consumption',
+    'home_consumption.power_kw':'home_consumption'
+  })[propertyKey];
+  const candidates = expectedClass
+    ? (index?.rowsForProperty?.(propertyKey) || []).filter(row=>row.logical_object_class===expectedClass)
+    : [];
   const usable = candidates.filter(row => row?.availability === 'AVAILABLE' && row?.value !== null && row?.value !== undefined);
-  const primary = usable.filter(row => row?.presentation_primary === true);
-  const valid = primary.length === 1 ? primary[0] : (primary.length === 0 && usable.length === 1 ? usable[0] : null);
+  const valid = candidates.length === 1 && usable.length === 1 ? usable[0] : null;
   const projected = valid ? {
     raw:valid,value:valid.value,status:valid.availability,quality:valid.quality,reason:valid.reason,
     source:valid.entity_id
