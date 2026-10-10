@@ -12,7 +12,7 @@ assert.ok(fs.existsSync("src/assets/heroes/gas-page-hero-v3.webp"),"missing appr
 assert.match(app,/gas:\['energy','gas'\]/);
 assert.match(app,/this\.view === 'gas' \? this\.gas\(rt\)/);
 assert.match(app,/gasModel\(rt\)/);
-assert.match(app,/rowsForProperty\?\.\('gas.total_m3'\)/);
+assert.match(app,/index\.rowsForProperty\('gas.total_m3'\)/);
 assert.match(app,/total\?\.entity_id \|\| null/);
 assert.doesNotMatch(app,/gasTotalEntityId\(\)/);
 assert.match(app,/row\.logical_object_class==='gas_meter'/);
