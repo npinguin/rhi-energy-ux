@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "principle": "one invariant, one test owner",
+  "active_owners": {
+    "architecture_boundary": "validation/validate_contract_gateway_architecture.py",
+    "release_identity": "validation/validate_release_governance.py",
+    "source_structure": "validation/validate_source_ownership.py",
+    "asset_package": "validation/validate_asset_policy.py",
+    "hacs_package": "validation/validate_hacs_package.py",
+    "branding": "validation/validate_branding_assets.py",
+    "renderer_integrity": "validation/validate_renderer_reference_integrity.py",
+    "public_v2_projection": "validation/test_energy_v2_projection.js",
+    "current_energy_model": "validation/test_current_energy_view_model.js",
+    "planning_contract": "validation/test_planning_contract.js",
+    "command_contract": "validation/test_command_contract.js",
+    "asset_profile_contract": "validation/test_asset_profile_contract.js",
+    "visual_catalog": "validation/test_energy_visual_catalog.js",
+    "gas_experience": "validation/test_gas_insights_tab.js",
+    "ux_core_integration": "validation/validate_ux_core_integration.py",
+    "asset_visual_runtime_scope": "validation/test_asset_visual_runtime_scope.js"
+  },
+  "policy": {
+    "source_inspection": "negative_architecture_boundaries_only",
+    "positive_implementation_shape_tests": "forbidden_in_active_release_gate",
+    "historical_regression_files": "may_remain_for_forensics_but_are_not_release_authority"
+  }
+}
