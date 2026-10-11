@@ -241,3 +241,55 @@ assert.equal(qualityOnlyIndex.row('battery_a','battery.soc_pct').value,'45');
 console.log('PASS Energy canonical quality and resolution status are not availability substitutes');
 console.log('PASS stale and unknown native properties cannot masquerade as available');
 console.log('PASS native Energy duplicate authority and same-host state revision');
+
+
+// Backend producer fixture: custom_components/rhi_energy/runtime/planning_publication.py
+// publishes the horizon itself under attributes.details; the top-level metadata
+// owns completeness, quality, plan, provider and effective/baseline selection.
+const nativeReaderMatch = card.match(/    nativePlanningHorizon\(horizonId = 'D0'\) \{[\s\S]*?\n    \}\n\n    nativeMetric/);
+assert.ok(nativeReaderMatch, 'native reader must be present in source');
+const nativeReader = vm.runInNewContext(
+  '({' + nativeReaderMatch[0].replace(/\n\n    nativeMetric$/, '') + '}).nativePlanningHorizon'
+);
+const producerDetails={
+  horizon_id:'D0',required_kwh:4,planned_kwh:0,still_to_plan_kwh:4,
+  flexible_required_kwh:2,flexible_planned_kwh:0,flexible_still_to_plan_kwh:2,
+  buckets:[{bucket_id:'D0-H10',asset_allocations:[{asset_id:'ev_q8',planned_energy_kwh:0}]}],
+  planning_assets:[{asset_id:'ev_q8',planned_today_kwh:0}],
+  source_lanes:{solar:0},consumer_lanes:{home:4},
+  execution_policy:{configured_mode:'advice',manual_plan_execution_allowed:false}
+};
+const producerAttributes={
+  canonical_contract:'RHI_ENERGY_PLANNING_HORIZON_V1',
+  canonical_source:'rhi_energy.runtime',
+  horizon_id:'D0',variant:'effective',
+  availability:'AVAILABLE',totals_complete:true,
+  plan_id:'effective-42',provider_id:'rhi_deterministic',
+  generated_at:'2026-10-11T00:00:00+00:00',
+  details:producerDetails
+};
+const states=attrs=>({'sensor.native_horizon':{state:'available',attributes:attrs}});
+const accepted=nativeReader.call({hass:{states:states(producerAttributes)}},'D0');
+assert.equal(accepted.available,true);
+assert.equal(accepted.details.buckets[0].bucket_id,'D0-H10');
+assert.equal(accepted.metadata.plan_id,'effective-42');
+const selectedContract=readPlanningContract({
+  ...runtime,nativePlanningHorizon(id){return nativeReader.call({hass:{states:states(producerAttributes)}},id);}
+},'D0');
+assert.equal(selectedContract.planId,'effective-42');
+assert.equal(selectedContract.providerId,'rhi_deterministic');
+assert.equal(selectedContract.buckets.length,1);
+assert.equal(selectedContract.currentActionIntent.manual_plan_execution_allowed,false);
+assert.equal(selectedContract.missingContractCapabilities.includes('native_planning_actions'),false);
+assert.equal(selectedContract.planningAssetsById.ev_q8.planned_today_kwh,0);
+const nativeUnavailable=attributes=>nativeReader.call({hass:{states:states(attributes)}},'D0');
+assert.equal(nativeUnavailable({...producerAttributes,availability:'INCOMPLETE'}).available,false);
+assert.equal(nativeUnavailable({...producerAttributes,totals_complete:false}).available,false);
+assert.equal(nativeUnavailable({...producerAttributes,details:{...producerDetails,buckets:null}}).available,false);
+assert.equal(nativeUnavailable({...producerAttributes,variant:'baseline',
+  canonical_contract:'RHI_ENERGY_BASELINE_PLANNING_HORIZON_V1'}).available,false);
+assert.equal(nativeReader.call({hass:{states:{
+  ...states(producerAttributes),'sensor.native_duplicate':{state:'available',attributes:producerAttributes}
+}}},'D0').available,false);
+assert.equal(nativeReader.call({hass:{states:states(producerAttributes)}},'D1').available,false);
+console.log('PASS native producer attributes.details schema, D0/D1 identity, duplicate, incomplete, baseline, zero and readback policy');
