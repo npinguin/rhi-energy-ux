@@ -1614,6 +1614,13 @@
       if (consumerFilter && !consumerFilter.disabled) { this.consumerFilter = consumerFilter.dataset.consumerFilter || 'all'; this.render(); return; }
       const profilePick = event.target.closest('[data-strategy-profile-id]');
       if (profilePick && !profilePick.disabled) { this.selectedStrategyProfileId = profilePick.dataset.strategyProfileId || ''; this.render(); return; }
+      const energyHistoryPeriod = event.target.closest('[data-energy-history-period]');
+      if (energyHistoryPeriod && !energyHistoryPeriod.disabled) {
+        this.selectedEnergyHistoryPeriodId = energyHistoryPeriod.dataset.energyHistoryPeriod || 'day';
+        this._forceRender = true;
+        this.render();
+        return;
+      }
       const gasHorizon = event.target.closest('[data-gas-horizon]');
       if (gasHorizon && !gasHorizon.disabled) {
         this.selectedGasHorizonId = gasHorizon.dataset.gasHorizon || 'month';
@@ -2543,6 +2550,62 @@
       const number = asNumber(value);
       return number === null ? fallback : `${number.toLocaleString(undefined,{maximumFractionDigits:3})} m³/h`;
     }
+    // Historical charts never infer energy totals from live power. They use only
+    // uniquely resolved, available canonical HA numeric sensor entities.
+    canonicalEnergyHistorySensor(rt, propertyKey, objectClass) {
+      const candidates = (rt.canonicalIndex?.rowsForProperty?.(propertyKey) || [])
+        .filter(row => row.logical_object_class === objectClass);
+      if (candidates.length !== 1) return '';
+      const row = candidates[0];
+      const id = String(row?.entity_id || '').trim();
+      if (row.availability !== 'AVAILABLE' || !/^sensor\.[a-z0-9_]+$/.test(id)) return '';
+      if (!this._hass?.states?.[id]) return '';
+      return id;
+    }
+    energyHistorySection(rt, kind) {
+      const battery = kind === 'battery';
+      const key = battery ? 'battery.soc_pct' : 'solar.power_kw';
+      const cls = battery ? 'battery_system' : 'solar_production';
+      const title = battery ? 'Battery state of charge history' : 'Solar production power history';
+      const description = battery
+        ? 'Recorded battery state of charge (%), from Home Assistant sensor history.'
+        : 'Measured solar power (kW), from Home Assistant sensor history. This is not a produced-energy total.';
+      const entityId = this.canonicalEnergyHistorySensor(rt,key,cls);
+      const period = ['day','week','month'].includes(this.selectedEnergyHistoryPeriodId) ? this.selectedEnergyHistoryPeriodId : 'day';
+      const controls = entityId ? `<div class="scopeSelector energyHistorySelector" aria-label="${escapeHtml(title)} period">${[['day','Today'],['week','Week'],['month','Month']].map(([id,label])=>`<button type="button" class="scopeOption ${period===id?'active':''}" data-energy-history-period="${id}" aria-pressed="${period===id?'true':'false'}">${label}</button>`).join('')}</div>` : '';
+      const body = entityId
+        ? `<div class="rhiUxChartViewport energyHistoryHost" data-energy-history-host data-entity-id="${escapeHtml(entityId)}" data-history-kind="${kind}" data-hours-to-show="${({day:24,week:168,month:720})[period]}"></div>`
+        : '<div class="empty compact"><b>Measured history unavailable</b><span>No unique, available canonical Home Assistant sensor is published for this history. No values are estimated.</span></div>';
+      return `<section class="panel rhiUxChartPanel energyHistoryPanel" id="${battery?'battery-history':'solar-history'}"><div class="rhiUxSectionHead rhiUxChartHeader"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${controls}</div>${body}</section>`;
+    }
+    async mountEnergyHistoryGraphs() {
+      if (!['solar','battery'].includes(this.view)) return;
+      const host = this.shadowRoot?.querySelector('[data-energy-history-host]');
+      if (!host || host.firstElementChild || host.dataset.loading === 'true') return;
+      const entityId = String(host.dataset.entityId || '');
+      const hours = Number(host.dataset.hoursToShow);
+      const kind = String(host.dataset.historyKind || '');
+      if (!/^sensor\.[a-z0-9_]+$/.test(entityId) || ![24,168,720].includes(hours)) return;
+      host.dataset.loading = 'true';
+      try {
+        if (typeof window.loadCardHelpers !== 'function') throw new Error('Home Assistant card helpers unavailable');
+        const helpers = await window.loadCardHelpers();
+        if (!host.isConnected || this.view !== kind && !(this.view === 'solar' && kind === 'solar')) return;
+        const card = await helpers.createCardElement({
+          type:'history-graph',
+          entities:[entityId],
+          hours_to_show:hours,
+          show_names:false
+        });
+        card.hass = this._hass;
+        if (host.isConnected) host.replaceChildren(card);
+      } catch (_) {
+        if (host.isConnected) host.innerHTML = '<div class="empty compact"><b>History temporarily unavailable</b><span>Home Assistant could not load this sensor history.</span></div>';
+      } finally {
+        delete host.dataset.loading;
+      }
+    }
+
     async mountGasStatisticsGraph() {
       if (this.view !== 'gas') return;
       const host = this.shadowRoot?.querySelector('[data-gas-statistics-host]');
@@ -4020,7 +4083,7 @@
 
     energyHardwareStyles() {
       return `
-        .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasHistoryControls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.gasHistoryControls>span{font-size:9px;color:#64748b}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceGrid{display:grid;grid-template-columns:minmax(0,1fr);width:100%}.gasMeterPanel .energyDeviceCard{width:100%;max-width:none;min-width:0;grid-template-columns:96px minmax(0,1fr);align-items:start}.gasMeterPanel .energyDeviceBody,.gasMeterPanel .energyDeviceTop,.gasMeterPanel .energyDeviceFacts{min-width:0;max-width:100%}.gasMeterPanel .energyDeviceTop{flex-wrap:wrap}.gasMeterPanel .energyDeviceTop h3{overflow-wrap:anywhere}.gasMeterPanel .energyDeviceFacts{grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr))}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasContextGrid,.planningContextGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gasStatisticsHost{min-height:220px}}
+        .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasHistoryControls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.gasHistoryControls>span{font-size:9px;color:#64748b}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.energyHistoryPanel{margin-top:12px}.energyHistoryHost{min-height:205px;margin-top:6px}.energyHistoryHost hui-history-graph-card{display:block}.energyHistorySelector{display:flex;flex-wrap:wrap}.gasMeterPanel .energyDeviceGrid{display:grid;grid-template-columns:minmax(0,1fr);width:100%}.gasMeterPanel .energyDeviceCard{width:100%;max-width:none;min-width:0;grid-template-columns:96px minmax(0,1fr);align-items:start}.gasMeterPanel .energyDeviceBody,.gasMeterPanel .energyDeviceTop,.gasMeterPanel .energyDeviceFacts{min-width:0;max-width:100%}.gasMeterPanel .energyDeviceTop{flex-wrap:wrap}.gasMeterPanel .energyDeviceTop h3{overflow-wrap:anywhere}.gasMeterPanel .energyDeviceFacts{grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr))}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasContextGrid,.planningContextGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gasStatisticsHost{min-height:220px}}
 
         .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
         .solarEnergyStory{padding:10px 12px}.solarValueFlow{display:grid;grid-template-columns:repeat(4,minmax(92px,1fr));gap:7px;align-items:stretch}.solarValueFlow button,.solarFlowNode{border:0;background:#f8fafc;border-radius:10px;padding:8px 10px;text-align:left;min-width:0}.solarValueFlow button{cursor:pointer}.solarValueFlow button:hover{background:#eff6ff;box-shadow:inset 0 0 0 1px #bfdbfe}.solarValueFlow small,.solarValueFlow b,.solarValueFlow span{display:block}.solarValueFlow small{font-size:8px;color:#64748b;font-weight:700}.solarValueFlow b{font-size:14px;color:#0f172a;margin-top:2px;white-space:nowrap}.solarValueFlow span{font-size:8px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.solarFlowStatus{margin-top:7px;font-size:8.5px;color:#9a5b17;padding:0 2px}.solarHardwareSection{scroll-margin-top:12px}@media(max-width:720px){.solarValueFlow{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.solarValueFlow button,.solarFlowNode{padding:8px}.solarValueFlow b{font-size:12px}}
@@ -4061,6 +4124,7 @@
       return `${this.tabExperienceHeader(rt,'solar',pageVm)}<div class="solarPage solarHardwarePage">
         ${this.solarEnergyStory(rt)}
         ${this.solarHardwareExperience(rt)}
+        ${this.energyHistorySection(rt,'solar')}
       </div>`;
     }
 
@@ -4736,6 +4800,7 @@
           <section class="panel batteryHero"><h2>${escapeHtml(rhiEnergyT(this._hass,'battery.state',{},'Home Battery state'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'battery.state_desc',{},'Combined operational truth for the Home Battery system.'))}</p><div class="batteryGauge"><b>${escapeHtml(fmtPct(soc))}</b><span>${escapeHtml(fmtKwh(available))} / ${escapeHtml(fmtKwh(capacity))}</span><div class="bar"><i style="width:${escapeHtml(this.progress(soc,100))}%"></i></div></div>${this.kv('State', human(state))}${this.kv('Power now', fmtKw(power,'—'))}${this.kv('Available energy', fmtKwh(available))}${this.kv('Capacity', fmtKwh(capacity))}${reserve === null ? '' : this.kv('Reserve',fmtPct(reserve))}${this.kv('Health', human(batteryVm.health))}${systemDetails}</section>
           <section class="panel" id="battery-contributors"><h2>${escapeHtml(rhiEnergyT(this._hass,'battery.contributors',{},'Home Battery contributors'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'battery.contributors_desc',{},'Physical batteries contributing to the aggregate.'))}</p><div class="batteryContributorList">${children.map(id => this.batteryChildCard(rt, id)).join('') || `<div class="empty"><b>No Home Battery units available</b><span>Home Battery aggregate only.</span></div>`}</div></section>
         </div>
+        ${this.energyHistorySection(rt,'battery')}
       </div>`;
     }
     consumerSortOptions() {
@@ -6208,6 +6273,7 @@
         this.patchMarkup(markup);
         this.restoreInteractionState();
         this.mountGasStatisticsGraph();
+        this.mountEnergyHistoryGraphs();
         if (viewport) queueMicrotask(() => window.scrollTo(viewport.x, viewport.y));
         return;
       }
@@ -6219,6 +6285,7 @@
       this._renderedNavItem = this.navItem;
       this.restoreInteractionState();
       this.mountGasStatisticsGraph();
+      this.mountEnergyHistoryGraphs();
       const tabs = this.shadowRoot.querySelector('.navItems');
       if (tabs) {
         tabs.scrollLeft = this.navScrollLeft || 0;
