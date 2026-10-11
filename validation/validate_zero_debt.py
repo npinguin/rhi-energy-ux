@@ -4,7 +4,10 @@ import re
 ROOT=Path(__file__).resolve().parents[1]
 failures=[]
 CANONICAL_PROPERTY_CONTRACT="RHI_ENERGY_CANONICAL_PROPERTY_V2"
-ALLOWED_NATIVE_CONTRACTS=("RHI_ENERGY_PLANNING_HORIZON_V1",)
+ALLOWED_NATIVE_CONTRACTS=(
+    "RHI_ENERGY_PLANNING_HORIZON_V1",
+    "RHI_ENERGY_BASELINE_PLANNING_HORIZON_V1",
+)
 LEGACY_V1=re.compile(r"RHI_[A-Z0-9_]+_V1")
 
 def _without_current_contracts(text: str) -> str:
