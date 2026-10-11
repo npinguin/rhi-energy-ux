@@ -1,3 +1,10 @@
+## 4.3.36-rc.12 — Individually measured flexible-load flow channels
+
+- render canonical per-asset measured flexible-load channels in Power Flow Card Plus;
+- deduplicate actual power entities and exclude charger infrastructure from independent load accounting;
+- preserve full inventory and explicit no-data/missing source behavior without inventing power;
+- preserve all existing heroes, graphs and Core appearance.
+
 ## 4.3.36-rc.11 — Prevent derived Home power in external flow card
 
 - require published measured site demand for Power Flow Card Plus;

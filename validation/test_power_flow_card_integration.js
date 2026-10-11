@@ -23,6 +23,31 @@ assert.equal(config.entities.home.override_state,true,'plugin must display measu
 assert.equal(env.buildRhiPowerFlowCardConfig(runtime(data.filter(r=>r.property_key!=='site_consumption.power_kw'))),null,'no measured site demand means no implied home balance');
 assert.ok(!config.entities.battery,'must not invent battery direction');
 assert.ok(!config.entities.individual,'no inferred consumer sensors');
+const vehicle= {...good('flexible_load.power_kw','flexible_load','sensor.vehicle_power'),asset_id:'vehicle_a',asset_display_name:'EV A'};
+const charger= {...good('flexible_load.power_kw','flexible_load','sensor.charger_power'),asset_id:'charger_a',asset_display_name:'Wallbox A'};
+const onlyMeasured=env.buildRhiPowerFlowCardConfig({
+ ...runtime([...data,vehicle,charger]),
+ asset:id=>id==='charger_a'?{asset_type:'charger'}:{asset_type:'vehicle'}
+});
+assert.equal(onlyMeasured.entities.individual.length,1,'charger infrastructure must never be counted as a second load');
+assert.equal(onlyMeasured.entities.individual[0].entity,'sensor.vehicle_power');
+assert.equal(onlyMeasured.entities.individual[0].name,'EV A');
+const repeated=env.buildRhiPowerFlowCardConfig({
+ ...runtime([...data,vehicle,{...vehicle,asset_id:'vehicle_b',asset_display_name:'EV B'}]),
+ asset:()=>({asset_type:'vehicle'})
+});
+assert.equal(repeated.entities.individual.length,1,'same measured HA sensor must not be double-counted');
+const ambiguous=env.buildRhiPowerFlowCardConfig({
+ ...runtime([...data,vehicle,{...vehicle,entity_id:'sensor.other_power'}]),
+ asset:()=>({asset_type:'vehicle'})
+});
+assert.ok(!ambiguous.entities.individual,'ambiguous per-consumer authority must fail closed');
+const missingPower=env.buildRhiPowerFlowCardConfig({
+ ...runtime([...data,{...vehicle,availability:'UNAVAILABLE'}]),
+ asset:()=>({asset_type:'vehicle'})
+});
+assert.ok(!missingPower.entities.individual,'unavailable consumer power must never animate');
+
 assert.equal(env.buildRhiPowerFlowCardConfig(runtime(data.concat(data[0]))).entities.grid.entity.consumption,undefined,'ambiguous power source must fail closed');
 assert.equal(env.buildRhiPowerFlowCardConfig(runtime(data.map(r=>({...r,availability:'UNAVAILABLE'})))),null,'unknown power cannot be shown as live');
 assert.equal(env.buildRhiPowerFlowCardConfig(runtime([{...data[2],unit:'kWh'}])),null,'never feed accumulated energy into live power');

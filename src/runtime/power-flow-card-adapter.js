@@ -31,6 +31,32 @@ function buildRhiPowerFlowCardConfig(rt) {
   // The RHI site balance may be incomplete; never invent household demand.
   if (!homeId) return null;
   entities.home = {entity:homeId, override_state:true, name:'Site consumption'};
+  // Physical load circles use only one unambiguous canonical per-asset sensor.
+  // A charger is connection infrastructure, not an additional energy load.
+  const allPower = (index?.rowsForProperty?.('flexible_load.power_kw') || [])
+    .filter(row => row.logical_object_class === 'flexible_load');
+  const byAsset = new Map();
+  for (const row of allPower) {
+    const id = String(row?.asset_id || '').trim();
+    if (id) byAsset.set(id, [...(byAsset.get(id) || []), row]);
+  }
+  const used = new Set([importId,exportId,solarId,homeId].filter(Boolean));
+  const individuals = [];
+  for (const [id, rows] of byAsset) {
+    if (rows.length !== 1) continue;
+    const row = rows[0];
+    const entityId = String(row?.entity_id || '');
+    const unit = String(row?.unit || row?.unit_of_measurement || row?.native_unit_of_measurement || '').toLowerCase();
+    if (row.availability !== 'AVAILABLE' || !/^sensor\.[a-z0-9_]+$/.test(entityId) || (unit && unit !== 'w' && unit !== 'kw')) continue;
+    if (used.has(entityId)) continue;
+    const asset = rt?.asset?.(id) || {};
+    const role = [asset.asset_type,asset.source_asset_kind,asset.object_class,asset.energy_asset_role,asset.participation_state]
+      .map(value=>String(value || '').toLowerCase());
+    if (asset.infrastructure_only === true || role.some(value=>/charger|charging_point|charge_point|infrastructure_only/.test(value))) continue;
+    used.add(entityId);
+    individuals.push({entity:entityId,name:String(row.asset_display_name || asset.display_name || id),display_zero:true});
+  }
+  if (individuals.length) entities.individual = individuals;
   if (!entities.grid && !entities.solar) return null;
   return {
     type:'custom:power-flow-card-plus',
