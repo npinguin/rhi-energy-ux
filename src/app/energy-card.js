@@ -196,17 +196,23 @@
         state?.attributes?.canonical_source === 'rhi_energy.runtime' &&
         state?.attributes?.horizon_id === horizon &&
         state?.attributes?.variant === 'effective');
-      if (matches.length !== 1) return Object.freeze({available:false,details:null});
+      if (matches.length !== 1) return Object.freeze({
+        published:false,available:false,status:'UNAVAILABLE',details:null,
+        metadata:null,reason:matches.length>1?'duplicate_effective_horizon':'effective_horizon_not_published'
+      });
       const attrs=matches[0].attributes || {};
       const details=attrs.details;
-      if (String(attrs.availability || '').toUpperCase() !== 'AVAILABLE' ||
-          attrs.totals_complete !== true ||
-          !details || typeof details !== 'object' || Array.isArray(details) ||
-          !Array.isArray(details.buckets) ||
-          (details.horizon_id != null && details.horizon_id !== horizon)) {
-        return Object.freeze({available:false,details:null});
-      }
-      return Object.freeze({available:true,details,metadata:attrs});
+      const ready=String(attrs.availability || '').toUpperCase() === 'AVAILABLE' &&
+        attrs.totals_complete === true &&
+        details && typeof details === 'object' && !Array.isArray(details) &&
+        Array.isArray(details.buckets) &&
+        (details.horizon_id == null || details.horizon_id === horizon);
+      return Object.freeze({
+        published:true,available:!!ready,
+        status:ready?'AVAILABLE':String(attrs.availability || 'INCOMPLETE').toUpperCase(),
+        reason:ready?'':String(attrs.reason_code || 'effective_horizon_incomplete'),
+        details:ready?details:null,metadata:attrs
+      });
     }
 
     nativeMetric(metricKey = '') {
