@@ -5166,11 +5166,11 @@
     meteringNotPublishedPeriod(periods, remediation = null) {
       const selected = this.selectedPeriod(periods, this.selectedMeteringPeriodId) || { period_id:this.selectedMeteringPeriodId || 'week', label:human(this.selectedMeteringPeriodId || 'Period') };
       const label = this.periodLabel(selected);
-      const command = remediation?.command || this.runtime().meteringResetCommandFor({}, selected.period_id);
+      const command = remediation?.command || null;
       const action = command ? this.componentActionButton(command, `Reset ${label.toLowerCase()} totals`, 'metering') : '';
-      const title = remediation ? `${label} totals need a one-time reset` : `${label} totals are being prepared`;
-      const why = remediation ? `Home Intelligence found measurements for ${label.toLowerCase()}, but the starting point cannot yet be trusted.` : `Reliable ${label.toLowerCase()} totals are not available yet.`;
-      const recommendation = remediation ? `Reset once. Home Intelligence will confirm the new baseline while keeping the measured values visible.` : `${label} measurements are currently unavailable. They will appear when measurements become available.`;
+      const title = remediation ? `${label} totals need a one-time reset` : `${label} period measurements not published`;
+      const why = remediation ? `Home Intelligence found measurements for ${label.toLowerCase()}, but the starting point cannot yet be trusted.` : `Energy has not published a canonical metering period with measurements and quality for ${label.toLowerCase()}. Diagnostic storage values are not public UX evidence.`;
+      const recommendation = remediation ? `Reset once. Home Intelligence will confirm the new baseline while keeping the measured values visible.` : `Waiting for the backend-owned metering period publication. No baseline reset is assumed necessary.`;
       const selector = this.componentPeriodSelector(periods, selected.period_id || this.selectedMeteringPeriodId || 'today', 'metering-period');
       return `<div class="meteringPage productPortalPage"><section class="panel compact meteringPeriodControl"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'metering.period',{},'Measurement period'))}</h2><p>Select the period even while totals are still being prepared.</p></div>${selector}${this.editablePropertyFeedback(this.runtime().row('metering.selected_period'))}</section>${this.productStoryCard({ eyebrow:`${label} measurements`, title, why, recommendation, actions:action, tone:remediation?'orange':'blue' })}</div>`;
     }
