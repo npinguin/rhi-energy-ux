@@ -1,50 +1,43 @@
-# P0 — Canonical-only frontend migration audit (2026-10-09)
+# Energy UX — Native canonical-only migration / recovery evidence
 
-Status as of **2026-10-11**: **ACTIVE IMPLEMENTATION / NO-GO**. Engineering build `4.3.36-rc.2` is unpublished, with source-level canonical native property, Home Consumption, D0/D1 total and financial-period work exists on `work/ux-structural-closure-20261011`; legacy aggregate remains active in other consumers. Strict source audit last reported **36** retired Public V2 matches on the previous migratory head. Do not publish while this remains. Backend identities are taken from inspected producer code, not invented.
+**Source migration:** complete on `work/ux-structural-closure-20261011` for bundled product-runtime consumers, pending branch Validate/merge.
+**Release status:** HACS `v4.3.36-rc.2` TEST CANDIDATE; **joint target Home Assistant acceptance remains NO-GO**. This status is not permission to mark `release/QUALIFICATION.json` as passed.
 
-## Architectural decision
-Runtime presentation path: domain-owned canonical state → native HA devices/entities → Energy gateway → scoped view models → components.
-**No** Public V2 reader, dual-contract gateway, reverse relationship lookup, derived totals or fallback arithmetic. Do not remove backend-to-backend producer contracts.
+## Single-source architecture
 
-## Historical verified dependencies (main, 2026-10-09; see current source for progress)
-| Frontend consumer | Current source | Canonical replacement | Backend owner | Required properties | Availability | Migration status |
-|---|---|---|---|---|---|---|
-| `src/runtime/public-interface-registry.js` | `sensor.rhi_energy_public_contract_v2` via `UX_INTERFACES.publicV2` | Native Energy canonical HA entities; exact mapping pending catalog | Energy | Asset/object identity, properties, availability, reason, freshness, provenance, placement | Not independently verified | BLOCKED — replace entrypoint |
-| `src/runtime/energy-contract-gateway.js` | Contract-key resolution and cached Public V2 envelope | Bounded native entity selector indexed by backend-provided canonical asset/property identity | Energy | Stable IDs, revision/change detection, quality metadata | Pending native contract | BLOCKED — refactor gateway |
-| `src/domain/planning/planning-contract.js` | `readEnergyPublicV2(gateway)`, `planning.horizons`, `planning.assets`; source marker is `RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons` | Native, Planning-owned D0/D1 properties and asset outcomes | Energy | Planning horizon totals, lane totals, buckets, asset results, incomplete reasons | Backend release pending | BLOCKED — no UX totals calculation |
-| `validation/test_energy_contract_gateway.js` | Test fixture injects `RHI_ENERGY_PUBLIC_CONTRACT_V2` aggregate and asserts Public V2 entity | Canonical native entity fixture and fail-closed missing-field tests | Energy / UX | Exact published native metadata | Pending contract | REWRITE REQUIRED |
-| `docs/CONTRACT.md` | Describes `sensor.energy_planning_index` and `sensor.rhi_energy_public_contract_v2` as product owners | Canonical presentation boundary | Energy / UX | Actual published identifiers and write/readback descriptors | Pending contract | DOCUMENTATION DRIFT |
+Energy E0.15.116 → exact native HA `RHI_ENERGY_CANONICAL_OBJECT_V2`, `RHI_ENERGY_CANONICAL_PROPERTY_V2`, `RHI_ENERGY_CANONICAL_COMMAND_V1`, `RHI_ENERGY_PLANNING_HORIZON_V1` and native `metric_key` → Energy gateway + property/object index → domain selectors / view models → RHI UX Core components.
 
-## Implementation evidence and outstanding closure (2026-10-11)
+- Retired `RHI_ENERGY_PUBLIC_CONTRACT_V2` and `sensor.rhi_energy_public_contract_v2` may be referred to **only in historical documentation**, never consumed by bundled source. `npm run check:canonical-only` is mandatory in the package gate.
+- No integration-specific HA entity names, guessed devices, inferred financial/planning totals, stale-property backfill or duplicate-authority preference.
+- Both object and property publishers are indexed. A conflicting asset or `asset_id::property_key` fails closed, as do missing, invalid and stale native metrics. Multiple physical batteries with the same `property_key` remain distinct scoped assets.
+- User navigation presence is from structural object/configuration rows, not the latest measurement. An installed but currently idle or unavailable asset remains discoverable.
+- Canonical button commands publish an exact target, service, `supported`, `visible`, `execution_allowed` and availability; UX cannot elevate readback or bypass backend execution gates.
 
-- Native `RHI_ENERGY_CANONICAL_PROPERTY_V2` indexed by backend `asset_id::property_key`, with parent/HA source IDs preserved and invalid/duplicate values rejected.
-- Home Consumption consumes exact native `home_consumption_power_kw`; planning D0/D1 totals and per-asset planning outcome selection use native producer publications only; financial value is period-scoped.
-- The former Public V2 registry/gateway/reader plus selectors, commands and remaining screen dependencies still require one structural replacement; do **not** rename strings to quiet the scanner.
-- Detailed planning buckets/assets need verified `RHI_ENERGY_PLANNING_HORIZON_V1` backend publication (#249). Full per-period metering, strategy configured/effective, pricing and commands need producer contract proof (#242).
-- Existing source tests may pass while the strict canonical-only release gate fails. Both gates must agree before publication; target-HA qualification remains missing.
+## Verified implementation and regression owners
 
-## Workstream A
-- [ ] Enumerate *all* runtime references to Public V2, snapshot JSON, caches, legacy revisions and semantic fallback chains; extend this initial verified sample into an exhaustive inventory.
-- [ ] Replace Public V2 gateway with canonical-only, bounded native HA entity selection when exact contract is published; never invent entity IDs.
-- [ ] Add independent regression fixtures for missing/unknown/zero/unavailable/not-applicable and structural addition/removal.
-- [ ] Make component render invalidation dependency-scoped and benchmark repeated identical HA state, scalar change and closed surfaces.
-- [ ] Independently address iOS Safari widths, responsive wrapping, image sizing, appearance hierarchy.
-- [ ] Keep missing canonical truth visibly blocked as contract gap rather than backfill.
+| Product concern | Canonical authority | Automated protection |
+|---|---|---|
+| Home Consumption | unique numeric `home_consumption_power_kw` | `validation/test_current_energy_view_model.js` |
+| D0/D1 planning and incomplete quality | native per-horizon numeric metrics and effective `attributes.details` | `validation/test_planning_contract.js` |
+| Battery identity, children, source visual | canonical object/property entities | `validation/test_energy_v2_projection.js`, `validation/test_native_energy_backend_interfaces.js` |
+| Pricing and strategy editors | canonical configuration property + backend write/readback | `validation/test_native_energy_backend_interfaces.js`, property/control gates |
+| Charging commands | canonical button command entity and exact invocation | `validation/test_command_contract.js` |
+| Period financial result | uniquely published `net_financial_result_eur` and exact `period` | `validation/test_planning_contract.js`, projection test |
+| Structural capability presence | object/configuration inventory, not telemetry | `validation/test_structural_capability_presence.js` |
+| No old transport or generated drift | source manifest audit, zero-debt and committed `dist/` | `npm run check:canonical-only`, `npm run validate`, `tools/check-committed-dist.mjs` |
 
-## Backend acceptance dependencies
-Energy #240 and #241 must publish exact canonical native HA identifiers, attributes, command/write boundaries, planning totals and financial truth before the integration cutover. Do not infer Foundation Shared Baseline adoption; verify each domain manifest and catalog separately.
+## Outstanding product/runtime acceptance (not waived)
 
-## Release gate
-No candidate promotion before actual backend candidate publication and same-instance HA integration/performance/rollback evidence. Zero accepted technical and feature debt. This audit is **not** runtime proof.
+1. Real target-HA deployment of the **same immutable** Foundation F1.8.44, Energy E0.15.116, Mobility M0.10.44, Energy UX rc.2 and Mobility UX rc.90. Confirm actual installed config entries and artifact SHAs.
+2. Home Consumption and battery hierarchy with multiple battery units; no wrong placeholder identity or guessed source-device connection.
+3. Effective D0/D1 provider results: buckets, flexible-load totals, per-asset allocations and incomplete statuses. No totals silently synthesized from render data.
+4. Edit pricing, strategies, metering and visual appearance; save→service result→canonical terminal readback→refresh/reload/restart, failure/revert handling.
+5. Physical vs assigned/effective charger identity; commands visible and executable only under backend gates; command lifecycle and Activity chronology.
+6. Period-scoped Metering/Retrospective, financial attribution and charging relationships need complete producer evidence where currently unpublished. Missing backend semantics remain reported as contract gaps. A blank panel or fake zero is not an accepted substitute.
+7. Responsive iPad/iPhone/desktop visual parity, installation/upgrade from previous immutable HACS tags, rollback, cache refresh and repeated HA update performance.
 
-## Coordinated P0 release gates — blocking
-Six issue program: Foundation #109/#111; Mobility #246/#247; Energy #240/#242.
+**Publish policy:** test candidate source/package validation is necessary but is not stable product qualification. Stable promotion requires evidence recorded under `release/QUALIFICATION.json` and reviewed together across five runtime packages. No green CI or renaming exercise substitutes for this.
 
-1. Domain model first: normalized property changes must update domain model, canonical catalog, HA materialization and bidirectional Validate canaries in the same backend PR.
-2. Backend complete: exact public native entity/unique IDs, attributes, typed state/quality/freshness, placement, invoke and terminal readback; missing capability stays open at owning backend issue.
-3. Backend validated: Foundation, Mobility and Energy CI PASS, no active retired aggregate transport in UX/HA hot path, no shadow semantic authority.
-4. Backend released: immutable tested backend tags, full SHA and baseline-adoption manifests for all three domains; confirm identities rather than assuming.
-5. UX validated: all critical screens and actions use native canonical entities only; absent backend truth is visible contract gap.
-6. Joint qualified: one HA instance, install/upgrade, dynamic asset lifecycle, reload/restart, outages, write/readback, rollback, iPhone/iPad/desktop and measured event→gateway→component processing. Backend CPU ≤25% target must be assessed in same qualification.
+## Historical migration context
 
-**No premature closure:** backend CI green alone is not product acceptance. Keep WIP backend decommission PRs blocked until canonical replacement is proven. Technical debt acceptance = 0; feature debt acceptance = 0. Never substitute frontend logic for missing backend semantics.
+This work supersedes the previous 2026-10-09 dependency inventory that counted 36 retired Public V2 references. References in old handovers and legacy backend interface discussions are historical, not a supported runtime compatibility path.
