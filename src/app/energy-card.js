@@ -1301,10 +1301,25 @@
       this._preserveViewportOnRender = true;
       this.scheduleRender();
     }
-    connectedCallback() { this.scheduleRender(true); }
+    connectedCallback() {
+      this.scheduleRender(true);
+      if (this._powerFlowWatchArmed) return;
+      this._powerFlowWatchArmed = true;
+      if (typeof customElements !== 'undefined' && !customElements.get('power-flow-card-plus')) {
+        customElements.whenDefined('power-flow-card-plus').then(() => {
+          if (this.isConnected) { this._forceRender = true; this.scheduleRender(true); }
+        });
+      }
+      this._powerFlowProbeTimer = setTimeout(() => {
+        this._powerFlowProbeSettled = true;
+        if (this.isConnected && this.view === 'flow') { this._forceRender = true; this.scheduleRender(true); }
+      }, 1500);
+    }
     disconnectedCallback() {
       if (this._renderTimer) clearTimeout(this._renderTimer);
+      if (this._powerFlowProbeTimer) clearTimeout(this._powerFlowProbeTimer);
       this._renderTimer = null;
+      this._powerFlowProbeTimer = null;
     }
     scheduleRender(immediate = false) {
       if (!this._hass) return;
@@ -4080,6 +4095,12 @@
       </section>`;
     }
 
+    flowDependencyStyles() {
+      return `.rhiFlowDependencyNotice{border-left:3px solid #c08420;background:#fffbef;padding:10px 14px;margin-bottom:10px}
+        .rhiFlowDependencyNotice strong{font-size:12px;color:#713f12}
+        .rhiFlowDependencyNotice p{font-size:11px;line-height:1.4;margin:6px 0;color:#66502b}
+        .rhiFlowDependencyNotice a{font-size:11px;text-decoration:underline;color:#1d4ed8}`;
+    }
     energyHardwareStyles() {
       return `
         .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasHistoryControls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.gasHistoryControls>span{font-size:9px;color:#64748b}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.energyHistoryPanel{margin-top:12px}.energyHistoryHost{min-height:205px;margin-top:6px}.energyHistoryHost hui-history-graph-card{display:block}.energyHistorySelector{display:flex;flex-wrap:wrap}.gasMeterPanel .energyDeviceGrid{display:grid;grid-template-columns:minmax(0,1fr);width:100%}.gasMeterPanel .energyDeviceCard{width:100%;max-width:none;min-width:0;grid-template-columns:96px minmax(0,1fr);align-items:start}.gasMeterPanel .energyDeviceBody,.gasMeterPanel .energyDeviceTop,.gasMeterPanel .energyDeviceFacts{min-width:0;max-width:100%}.gasMeterPanel .energyDeviceTop{flex-wrap:wrap}.gasMeterPanel .energyDeviceTop h3{overflow-wrap:anywhere}.gasMeterPanel .energyDeviceFacts{grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr))}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasContextGrid,.planningContextGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gasStatisticsHost{min-height:220px}}
@@ -4473,6 +4494,27 @@
         source:'RHI_ENERGY_CANONICAL_PROPERTY_V2'
       });
     }
+    // HACS cannot enforce dashboard-card dependencies at download time.
+    // Check the actual browser registration on first render and whenever Flow is opened.
+    powerFlowDependencyStatus() {
+      const tag = 'power-flow-card-plus';
+      if (typeof customElements === 'undefined') return 'checking';
+      return customElements.get(tag) ? 'ready' : (this._powerFlowProbeSettled ? 'missing' : 'checking');
+    }
+    powerFlowDependencyNotice() {
+      const status = this.powerFlowDependencyStatus();
+      if (status === 'ready') return '';
+      const docs = 'https://github.com/flixlix/power-flow-card-plus';
+      return `<section class="panel rhiFlowDependencyNotice" role="status" aria-live="polite">
+        <strong>Power Flow Card Plus · ${status==='checking'?'Checking':'Not loaded'}</strong>
+        <p>${status==='checking'
+          ? 'Checking whether the installed card has registered with Home Assistant.'
+          : 'The Power Flow Card Plus frontend resource is missing or has not loaded in this browser. The existing energy information remains available.'}</p>
+        <p>In HACS, verify <b>Power Flow Card Plus</b> is installed under Dashboard and that its JavaScript resource is loaded. Then refresh this dashboard.</p>
+        <a href="${docs}" target="_blank" rel="noopener noreferrer">Dependency and installation instructions</a>
+      </section>`;
+    }
+
     flow(rt) {
       const pageVm = this.buildPageViewModel(rt, 'flow');
       const current = this.currentEnergyModel(rt);
@@ -4492,7 +4534,7 @@
       const connectionPower = physicalFlow.connectionPowerKw;
       const homeBus = rt.asset('home_bus') || { display_name: 'Home Bus' };
       const switchboard = rt.asset('main_switchboard') || { display_name: 'Main Switchboard' };
-      return `${this.tabExperienceHeader(rt,'flow',pageVm)}<div class="flowPage">
+      return `${this.tabExperienceHeader(rt,'flow',pageVm)}<div class="flowPage">\n        ${this.powerFlowDependencyNotice()}
         <section class="panel physicalFlowHero">
           <div class="flowHeader"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'flow.physical',{},'Physical Energy Flow'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'flow.physical_desc',{},'Live measured energy paths only. Disabled and planning-only assets are excluded.'))}</p></div></div>
           <div class="flowCanvas">
@@ -5926,7 +5968,7 @@
         console.error(`[HomeBrain Energy ${UX_VERSION}] ${this.view} render failed`, error);
         content = this.renderError(this.view, error);
       }
-      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${this.energyHardwareStyles()}${typeof rhiUxVisualPickerStyles === 'function' ? rhiUxVisualPickerStyles() : ''}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
+      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${this.energyHardwareStyles()}${this.flowDependencyStyles()}${typeof rhiUxVisualPickerStyles === 'function' ? rhiUxVisualPickerStyles() : ''}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
 
       /* R3.62.0 canonical component framework and adaptive convergence */
       :host{--hi-space-1:4px;--hi-space-2:8px;--hi-space-3:12px;--hi-space-4:16px;--hi-radius-sm:8px;--hi-radius-md:12px;--hi-break-tablet:980px;--hi-break-phone:700px}

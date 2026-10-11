@@ -1,10 +1,9 @@
-# v4.3.36-rc.8 — Solar production hierarchy visibility (HACS TEST CANDIDATE)
+# v4.3.36-rc.9 — Power Flow Card Plus dependency readiness (HACS TEST CANDIDATE)
 
-- Restore immediately visible Solar Production → inverter → zone/string hierarchy in the Energy UX without semantic relationship reconstruction.
-- Keep 40 optimizer cards discoverable through per-zone progressive disclosure instead of forcing multiple closed ancestors.
-- Preserve canonical parent_asset_id authority, physical-source provenance and HA-native flat device projection.
-- Add hierarchy visibility regression protection; tested against static source/package and HACS delivery gates.
-- Coordinated installed backend evidence: Foundation F1.8.44, Energy E0.15.119, Mobility M0.10.47.
+- Flow detects actual browser registration of Power Flow Card Plus after a short loading grace period, and rechecks when its custom element registers later.
+- If missing or unloaded, show a nonblocking status with exact HACS Dashboard resource and installation guidance; all Energy tabs remain usable.
+- Detect runtime registration only: HACS cannot enforce installing another custom dashboard card or guarantee a specific resource version.
+- This candidate does NOT yet replace existing RHI Flow visualization with Power Flow Card Plus; that requires explicit canonical adapter and rendering validation.
+- Tests protect ready/checking/missing messages and report/recovery mechanics. Existing heroes, charts and Core branding stay untouched.
 
-This is a TEST CANDIDATE, not a stable approval. Target Home Assistant desktop/tablet/mobile hierarchy, source links, reload and rollback remain to be qualified.
-Rollback: v4.3.36-rc.7.
+Home Assistant runtime validation and rollback proof are still pending. Rollback: v4.3.36-rc.8.
