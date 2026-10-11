@@ -1,12 +1,12 @@
 {
   "product": "rhi-energy-ux",
   "version": "4.3.36-rc.2",
-  "stage": "engineering",
+  "stage": "test_candidate",
   "publication_authority": "github_releases",
-  "publication_status": "blocked_legacy_contract_cutover",
+  "publication_status": "test_candidate_pending_target_ha_qualification",
   "license": "GPL-3.0-only",
-  "energy_contract": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
-  "minimum_backend": "E0.15.112",
+  "energy_contract": "RHI_ENERGY_CANONICAL_PROPERTY_V2",
+  "minimum_backend": "E0.15.116",
   "runtime_artifact": "dist/rhi-energy-ux.js",
   "hacs_repository_type": "dashboard",
   "hacs_validation_category": "plugin",
@@ -16,16 +16,17 @@
   "known_accepted_feature_debt": 0,
   "target_runtime_proof": "pending",
   "rollback_proof": "pending",
-  "github_release_prerelease": true,
+  "github_release_prerelease": false,
   "runtime_checksum_artifact": "dist/rhi-energy-ux.js.sha256",
   "package_manifest": "dist/PACKAGE_MANIFEST.json",
   "hacs_package_root": "dist",
   "hacs_delivery_mode": "immutable_tag_dist_tree",
   "release_asset_policy": "none",
   "required_contracts": [
-    "RHI_ENERGY_PUBLIC_CONTRACT_V2",
     "RHI_ENERGY_CANONICAL_OBJECT_V2",
     "RHI_ENERGY_CANONICAL_PROPERTY_V2",
+    "RHI_ENERGY_CANONICAL_COMMAND_V1",
+    "RHI_ENERGY_PLANNING_HORIZON_V1",
     "RHI_VISUAL_ASSET_REGISTRY_V2"
   ],
   "ux_core": {
@@ -35,7 +36,7 @@
     "runtime_dependency": false,
     "branding_owner": "rhi-ux-core"
   },
-  "minimum_foundation": "F1.8.42",
-  "minimum_mobility_for_cross_domain_visuals": "M0.10.41",
-  "tested_backend_baseline": "E0.15.112"
+  "minimum_foundation": "F1.8.44",
+  "minimum_mobility_for_cross_domain_visuals": "M0.10.44",
+  "tested_backend_baseline": "E0.15.116"
 }
