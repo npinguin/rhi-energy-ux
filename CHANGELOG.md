@@ -1,3 +1,11 @@
+## 4.3.36-rc.2 — Structural canonical Energy recovery (engineering, unpublished)
+
+- preserve physical hierarchy, device provenance and duplicate-property rejection;
+- use native Home Consumption, D0/D1 planning totals and selected-period financial value;
+- expose explicit unavailable product states, align contract and product documents;
+- regenerate HACS dist without modifying the immutable rc.1 release;
+- legacy aggregate cutover and real HA acceptance remain blocking, no publication.
+
 ## 4.3.36-rc.1 — Experimental canonical planning HACS candidate
 
 - target E0.15.112 selectable deterministic/EMHASS backend with no planner-specific UX semantics;

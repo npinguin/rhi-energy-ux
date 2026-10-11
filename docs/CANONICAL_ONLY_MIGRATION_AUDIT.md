@@ -1,6 +1,6 @@
 # P0 — Canonical-only frontend migration audit (2026-10-09)
 
-Status as of **2026-10-11**: **ACTIVE IMPLEMENTATION / NO-GO**. Source-level canonical native property, Home Consumption, D0/D1 total and financial-period work exists on `work/ux-structural-closure-20261011`; legacy aggregate remains active in other consumers. Strict source audit last reported **36** retired Public V2 matches on the previous migratory head. Do not publish while this remains. Backend identities are taken from inspected producer code, not invented.
+Status as of **2026-10-11**: **ACTIVE IMPLEMENTATION / NO-GO**. Engineering build `4.3.36-rc.2` is unpublished, with source-level canonical native property, Home Consumption, D0/D1 total and financial-period work exists on `work/ux-structural-closure-20261011`; legacy aggregate remains active in other consumers. Strict source audit last reported **36** retired Public V2 matches on the previous migratory head. Do not publish while this remains. Backend identities are taken from inspected producer code, not invented.
 
 ## Architectural decision
 Runtime presentation path: domain-owned canonical state → native HA devices/entities → Energy gateway → scoped view models → components.

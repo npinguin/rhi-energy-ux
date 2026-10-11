@@ -1,9 +1,9 @@
 {
   "product": "rhi-energy-ux",
-  "version": "4.3.36-rc.1",
-  "stage": "test_candidate",
+  "version": "4.3.36-rc.2",
+  "stage": "engineering",
   "publication_authority": "github_releases",
-  "publication_status": "installable_candidate_until_qualified",
+  "publication_status": "blocked_legacy_contract_cutover",
   "license": "GPL-3.0-only",
   "energy_contract": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
   "minimum_backend": "E0.15.112",

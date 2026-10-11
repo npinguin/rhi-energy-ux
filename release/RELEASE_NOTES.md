@@ -1,10 +1,14 @@
-# v4.3.36-rc.1 — experimental Energy HACS native-planning candidate
+# v4.3.36-rc.2 — Energy structural recovery (UNPUBLISHED ENGINEERING BUILD)
 
-This is an **installable test prerelease, not stable or target-HA qualified**. It targets the selectable EMHASS / deterministic Energy backend E0.15.112. HACS beta versions must be enabled.
+**NO-GO / DO NOT PUBLISH.** The immutable `v4.3.36-rc.1` experimental candidate is not modified. This is a new engineering build, not an installable release candidate. A strict canonical-only audit still finds retired Public V2 dependencies; the current E0.15.114 producer does not provide that retired aggregate.
 
-- Native D0/D1 total metrics preserve zero, reject malformed data and fail closed for unsupported horizons.
-- A provider-neutral canonical horizon reader consumes buckets, planning assets, lane/balance evidence, plan identity and execution policy only when the backend publishes the optional RHI_ENERGY_PLANNING_HORIZON_V1 contract.
-- Backend publication of full horizon details is proposed separately in Energy backend PR #249 and is **not included in E0.15.112**. Until deployed, the UX marks missing planning-detail capabilities explicitly.
-- Public V2 compatibility consumers remain in this candidate; canonical-only cutover, full configuration UX, live Home Assistant acceptance and rollback proof are open P0 gates. This candidate makes no stable-qualification claim.
+- Preserve canonical asset parentage, HA source linkage and identity metadata across runtime refresh.
+- Home Consumption now reads producer-owned native `home_consumption_power_kw`; no inferred power balance.
+- Native Energy D0/D1 planning totals and optional provider-owned horizon asset outcomes drive selected UX projections; missing planning details remain visibly unavailable.
+- Financial value uses only the backend-selected period on native `net_financial_result_eur`; other periods are unknown, not zero.
+- Show missing canonical product-truth warnings, do not declare pilot readiness without full product parity.
+- Update contract, product vision and architecture documentation; strengthen negative regressions; regenerate bundle and checksum from the complete source manifest.
 
-Rollback: **v4.3.35**. No GitHub release assets; HACS installs the immutable tag `dist/` tree.
+**Remaining blockers:** Public V2 reader/gateway and consumer paths; backend planning detail #249, Energy #240/#242, per-period metering and Strategy/Price/Command write/readback; full local source/UX/package tests and real target-HA upgrade/rollback. Minimum/tested backend version in the legacy descriptor is a **historical compatibility declaration, NOT evidence that this WIP build runs against E0.15.114**.
+
+This engineering build has not passed full CI/HACS or target-HA qualification. No tag or GitHub Release should be created.

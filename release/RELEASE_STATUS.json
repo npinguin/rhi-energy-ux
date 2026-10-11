@@ -1,9 +1,9 @@
 {
   "product": "rhi-energy-ux",
-  "source_candidate_version": "4.3.36-rc.1",
-  "stage": "test_candidate",
+  "source_candidate_version": "4.3.36-rc.2",
+  "stage": "engineering",
   "publication_authority": "github_releases",
-  "publication_status": "derive_from_github_release",
+  "publication_status": "not_published_blocked_legacy_dependencies",
   "github_release_prerelease": true,
   "hacs_visibility": "beta_toggle_required",
   "contract": "RHI_ENERGY_PUBLIC_CONTRACT_V2",
