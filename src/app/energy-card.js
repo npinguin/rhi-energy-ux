@@ -1577,7 +1577,7 @@
       const sourceNav = event.target.closest('[data-source-asset-nav], .rhiUxAssetRelationshipLink[data-nav]');
       if (sourceNav && !sourceNav.disabled) {
         const path = String(sourceNav.dataset.sourceAssetNav || sourceNav.dataset.nav || '').trim();
-        if (path && !/^(?:[a-z][a-z0-9+.-]*:|\\/\\/)/i.test(path)) {
+        if (path && !/^[a-z][a-z0-9+.-]*:/i.test(path) && !path.startsWith('//')) {
           event.preventDefault();
           history.pushState(null, '', path);
           window.dispatchEvent(new Event('location-changed'));
