@@ -27,6 +27,44 @@
 
   function adaptPlanningBucket(bucket = {}, contractVersion = '') {
     const version = String(contractVersion || '');
+    if (version === 'ENERGY_NATIVE_PLANNING') {
+      // The canonical D0/D1 producer publishes bucket facts directly. Never
+      // derive kWh from power/time, invent Home or Grid lane occupants, or
+      // promote an old R1.79.x advisory transport to native authority.
+      const durationMinutes=asNumber(bucket.duration_minutes);
+      const allocations=planningArray(bucket.asset_allocations);
+      const sourceRows=planningArray(bucket.source_lane);
+      const consumerRows=planningArray(bucket.consumer_lane);
+      const nativeRow=(row,role)=>({
+        ...row, participantId:planningParticipantId(row),laneRole:role,
+        energyKwh:asNumber(firstDefined(row.planned_energy_kwh,row.planned_demand_kwh,row.planned_supply_kwh)),
+        powerKw:asNumber(firstDefined(row.planned_power_kw,row.power_kw)),
+        state:String(firstDefined(row.planning_state,row.state,row.status,'')||'').toLowerCase(),
+        allocationState:String(firstDefined(row.allocation_state,'')||'').toLowerCase(),
+        executionAllowed:firstDefined(row.plan_execution_allowed,null),
+        reason:firstDefined(row.reason_code,row.reason,'')
+      });
+      const consumers=consumerRows.length?consumerRows.map(row=>nativeRow(row,'consumer'))
+        :allocations.map(row=>nativeRow(row,'consumer'));
+      return {
+        raw:bucket,
+        id:String(firstDefined(bucket.bucket_id,bucket.id,'')),
+        startTime:firstDefined(bucket.start_time,bucket.start,bucket.bucket_start,''),
+        endTime:firstDefined(bucket.end_time,bucket.end,bucket.bucket_end,''),
+        durationMinutes,
+        sources:sourceRows.map(row=>nativeRow(row,'source')),
+        consumers,
+        boundary:{gridExportKwh:asNumber(bucket.grid_export_kwh)},
+        balanceDeltaKwh:asNumber(bucket.balance_delta_kwh),
+        state:String(firstDefined(bucket.planning_state,bucket.state,'')||'').toLowerCase(),
+        reason:firstDefined(bucket.reason_code,bucket.reason,''),
+        confidence:firstDefined(bucket.confidence,''),
+        forecastQuality:firstDefined(bucket.forecast_quality,''),
+        disclosure:firstDefined(bucket.estimation_disclosure,''),
+        canonicalLanes:sourceRows.length>0||consumerRows.length>0,
+        contractSupported:true,contractFamily:'ENERGY_NATIVE_PLANNING'
+      };
+    }
     const isR1794 = ['advisory_source_lane','advisory_consumer_lane','advisory_boundary_flows','advisory_lane_balance_delta_kwh']
       .some(key => Object.prototype.hasOwnProperty.call(bucket, key));
     const isR1793 = version.includes('R1.79.3');

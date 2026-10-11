@@ -83,6 +83,42 @@ assert.equal(unsupported.contractSupported, false);
 assert.equal(unsupported.sources.length, 0);
 assert.equal(unsupported.reason, 'unsupported_planning_contract');
 
+// Real E0.15.116 native bucket schema. No R1.79.x compatibility
+// derivation or phantom Home/Grid lane may appear in canonical UI.
+const nativeBucketView=adaptPlanningBucket({
+  bucket_id:'D0-H10',start_time:'2026-10-11T09:00:00Z',
+  solar_forecast_kwh:0,base_demand_forecast_kwh:8,
+  duration_minutes:30,
+  asset_allocations:[
+    {asset_id:'vehicle_q8',planned_energy_kwh:0,planned_power_kw:9},
+    {asset_id:'vehicle_id4',planned_power_kw:8}
+  ],
+  grid_net_kwh:-2,expected_grid_import_kwh:3
+},'ENERGY_NATIVE_PLANNING');
+assert.equal(nativeBucketView.contractSupported,true);
+assert.equal(nativeBucketView.contractFamily,'ENERGY_NATIVE_PLANNING');
+assert.equal(nativeBucketView.sources.length,0,
+  'native source lanes absent, not synthesized from solar forecast');
+assert.equal(nativeBucketView.consumers.length,2);
+assert.equal(nativeBucketView.consumers[0].participantId,'vehicle_q8');
+assert.equal(nativeBucketView.consumers[0].energyKwh,0);
+assert.equal(nativeBucketView.consumers[1].energyKwh,null,
+  'power × duration is not producer-owned energy');
+assert.equal(nativeBucketView.boundary.gridExportKwh,null,
+  'signed grid value cannot be silently decomposed by frontend');
+assert.equal(nativeBucketView.canonicalLanes,false);
+const exactNativeLanes=adaptPlanningBucket({
+  bucket_id:'D1-H15',
+  source_lane:[{participant_id:'solar',planned_supply_kwh:0}],
+  consumer_lane:[{participant_id:'vehicle_q8',planned_demand_kwh:1.25}],
+  grid_export_kwh:0,balance_delta_kwh:0
+},'ENERGY_NATIVE_PLANNING');
+assert.equal(exactNativeLanes.canonicalLanes,true);
+assert.equal(exactNativeLanes.sources[0].energyKwh,0);
+assert.equal(exactNativeLanes.consumers[0].energyKwh,1.25);
+assert.equal(exactNativeLanes.boundary.gridExportKwh,0);
+assert.equal(exactNativeLanes.balanceDeltaKwh,0);
+
 const fs = require('fs');
 const vm = require('vm');
 const v2Source = fs.readFileSync('src/runtime/energy-v2-contract.js','utf8');
@@ -104,11 +140,15 @@ const d0Contract=readPlanningContract(runtime,'D0');
 const d1Contract=readPlanningContract(runtime,'D1');
 const unsupportedHorizon=readPlanningContract(runtime,'D2');
 assert.equal(unsupportedHorizon.available,false);
-assert.equal(unsupportedHorizon.horizon.status,'INCOMPLETE');
+assert.equal(unsupportedHorizon.horizon.status,'UNAVAILABLE');
 assert.ok(unsupportedHorizon.horizon.quality.missing.includes('unsupported_planning_horizon'));
 assert.equal(unsupportedHorizon.horizon.required_kwh,undefined);
 
 assert.equal(d0Contract.contractVersion,'ENERGY_NATIVE_PLANNING');
+assert.equal(d0Contract.available,false,'numeric totals alone do not certify effective horizon');
+assert.equal(d0Contract.totalsAvailable,true);
+assert.equal(d0Contract.provisionalTotals,true);
+assert.equal(d0Contract.publicationStatus,'UNAVAILABLE');
 assert.equal(d0Contract.totalsSource,'rhi_energy.runtime/native_metric');
 assert.equal(d0Contract.planningTodayTotals.required_kwh,0);
 assert.equal(d1Contract.planningTomorrowTotals.flexible_planned_kwh,5);
@@ -121,6 +161,9 @@ const withNativeDetail={
 };
 const publishedD0=readPlanningContract(withNativeDetail,'D0');
 assert.equal(publishedD0.buckets.length,1);
+assert.equal(publishedD0.available,true);
+assert.equal(publishedD0.provisionalTotals,false);
+assert.equal(publishedD0.publicationStatus,'AVAILABLE');
 assert.equal(publishedD0.planningAssets.length,1);
 assert.equal(publishedD0.currentActionIntent.configured_mode,'advice');
 assert.equal(publishedD0.providerId,'emhass');
@@ -146,7 +189,7 @@ const unavailableRuntime={nativePlanningTotals(horizon){
 const unavailableContract=readPlanningContract(unavailableRuntime,'D0');
 assert.equal(unavailableContract.available,false);
 assert.equal(unavailableContract.laneTotals.planned_kwh,null);
-assert.equal(unavailableContract.horizon.status,'INCOMPLETE');
+assert.equal(unavailableContract.horizon.status,'UNAVAILABLE');
 console.log('PASS native Energy D0/D1 planning reader with explicit missing capabilities, zero and unavailable');
 
 
@@ -284,6 +327,23 @@ assert.equal(selectedContract.missingContractCapabilities.includes('native_plann
 assert.equal(selectedContract.planningAssetsById.ev_q8.planned_today_kwh,0);
 const nativeUnavailable=attributes=>nativeReader.call({hass:{states:states(attributes)}},'D0');
 assert.equal(nativeUnavailable({...producerAttributes,availability:'INCOMPLETE'}).available,false);
+const producerHeld=nativeUnavailable({...producerAttributes,availability:'INCOMPLETE',provider_id:null,requested_provider:'emhass',reason_code:'native_optimizer_not_available'});
+assert.equal(producerHeld.published,true);
+assert.equal(producerHeld.status,'INCOMPLETE');
+assert.equal(producerHeld.metadata.requested_provider,'emhass');
+assert.equal(producerHeld.details,null);
+const heldContract=readPlanningContract({...runtime,nativePlanningHorizon:()=>producerHeld},'D0');
+assert.equal(heldContract.available,false);
+assert.equal(heldContract.totalsAvailable,true);
+assert.equal(heldContract.provisionalTotals,true);
+assert.equal(heldContract.horizon.status,'INCOMPLETE');
+assert.equal(heldContract.providerHold,true);
+assert.equal(heldContract.requestedProvider,'emhass');
+assert.equal(heldContract.effectiveProvider,'');
+assert.equal(heldContract.reasonCode,'native_optimizer_not_available');
+assert.equal(heldContract.planningAssets.length,0);
+assert.equal(heldContract.currentActionIntent.manual_plan_execution_allowed,undefined);
+assert.ok(heldContract.missingContractCapabilities.includes('native_effective_horizon'));
 assert.equal(nativeUnavailable({...producerAttributes,totals_complete:false}).available,false);
 assert.equal(nativeUnavailable({...producerAttributes,details:{...producerDetails,buckets:null}}).available,false);
 assert.equal(nativeUnavailable({...producerAttributes,variant:'baseline',

@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.36-rc.2';
+  const UX_VERSION = 'R4.3.36-rc.3';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Native Energy publication is discovered by exact canonical contract markers.
@@ -1604,17 +1604,23 @@ function readEnergyCommandContract(gateway) {
         state?.attributes?.canonical_source === 'rhi_energy.runtime' &&
         state?.attributes?.horizon_id === horizon &&
         state?.attributes?.variant === 'effective');
-      if (matches.length !== 1) return Object.freeze({available:false,details:null});
+      if (matches.length !== 1) return Object.freeze({
+        published:false,available:false,status:'UNAVAILABLE',details:null,
+        metadata:null,reason:matches.length>1?'duplicate_effective_horizon':'effective_horizon_not_published'
+      });
       const attrs=matches[0].attributes || {};
       const details=attrs.details;
-      if (String(attrs.availability || '').toUpperCase() !== 'AVAILABLE' ||
-          attrs.totals_complete !== true ||
-          !details || typeof details !== 'object' || Array.isArray(details) ||
-          !Array.isArray(details.buckets) ||
-          (details.horizon_id != null && details.horizon_id !== horizon)) {
-        return Object.freeze({available:false,details:null});
-      }
-      return Object.freeze({available:true,details,metadata:attrs});
+      const ready=String(attrs.availability || '').toUpperCase() === 'AVAILABLE' &&
+        attrs.totals_complete === true &&
+        details && typeof details === 'object' && !Array.isArray(details) &&
+        Array.isArray(details.buckets) &&
+        (details.horizon_id == null || details.horizon_id === horizon);
+      return Object.freeze({
+        published:true,available:!!ready,
+        status:ready?'AVAILABLE':String(attrs.availability || 'INCOMPLETE').toUpperCase(),
+        reason:ready?'':String(attrs.reason_code || 'effective_horizon_incomplete'),
+        details:ready?details:null,metadata:attrs
+      });
     }
 
     nativeMetric(metricKey = '') {
@@ -2808,6 +2814,44 @@ class FlexibleAssetDomainModel {
 
   function adaptPlanningBucket(bucket = {}, contractVersion = '') {
     const version = String(contractVersion || '');
+    if (version === 'ENERGY_NATIVE_PLANNING') {
+      // The canonical D0/D1 producer publishes bucket facts directly. Never
+      // derive kWh from power/time, invent Home or Grid lane occupants, or
+      // promote an old R1.79.x advisory transport to native authority.
+      const durationMinutes=asNumber(bucket.duration_minutes);
+      const allocations=planningArray(bucket.asset_allocations);
+      const sourceRows=planningArray(bucket.source_lane);
+      const consumerRows=planningArray(bucket.consumer_lane);
+      const nativeRow=(row,role)=>({
+        ...row, participantId:planningParticipantId(row),laneRole:role,
+        energyKwh:asNumber(firstDefined(row.planned_energy_kwh,row.planned_demand_kwh,row.planned_supply_kwh)),
+        powerKw:asNumber(firstDefined(row.planned_power_kw,row.power_kw)),
+        state:String(firstDefined(row.planning_state,row.state,row.status,'')||'').toLowerCase(),
+        allocationState:String(firstDefined(row.allocation_state,'')||'').toLowerCase(),
+        executionAllowed:firstDefined(row.plan_execution_allowed,null),
+        reason:firstDefined(row.reason_code,row.reason,'')
+      });
+      const consumers=consumerRows.length?consumerRows.map(row=>nativeRow(row,'consumer'))
+        :allocations.map(row=>nativeRow(row,'consumer'));
+      return {
+        raw:bucket,
+        id:String(firstDefined(bucket.bucket_id,bucket.id,'')),
+        startTime:firstDefined(bucket.start_time,bucket.start,bucket.bucket_start,''),
+        endTime:firstDefined(bucket.end_time,bucket.end,bucket.bucket_end,''),
+        durationMinutes,
+        sources:sourceRows.map(row=>nativeRow(row,'source')),
+        consumers,
+        boundary:{gridExportKwh:asNumber(bucket.grid_export_kwh)},
+        balanceDeltaKwh:asNumber(bucket.balance_delta_kwh),
+        state:String(firstDefined(bucket.planning_state,bucket.state,'')||'').toLowerCase(),
+        reason:firstDefined(bucket.reason_code,bucket.reason,''),
+        confidence:firstDefined(bucket.confidence,''),
+        forecastQuality:firstDefined(bucket.forecast_quality,''),
+        disclosure:firstDefined(bucket.estimation_disclosure,''),
+        canonicalLanes:sourceRows.length>0||consumerRows.length>0,
+        contractSupported:true,contractFamily:'ENERGY_NATIVE_PLANNING'
+      };
+    }
     const isR1794 = ['advisory_source_lane','advisory_consumer_lane','advisory_boundary_flows','advisory_lane_balance_delta_kwh']
       .some(key => Object.prototype.hasOwnProperty.call(bucket, key));
     const isR1793 = version.includes('R1.79.3');
@@ -2903,7 +2947,16 @@ class FlexibleAssetDomainModel {
       ? runtime.nativePlanningHorizon(normalized) : null;
     const published = nativeHorizon?.available === true ? nativeHorizon : null;
     const horizonDetails = published?.details || {};
-    const publicationMetadata = published?.metadata || {};
+    const publicationMetadata = nativeHorizon?.metadata || {};
+    // Native numeric totals remain available as measurement evidence but never
+    // authorize an effective schedule without one quality-complete horizon.
+    const effectiveAvailable = selected.available===true && !!published;
+    const publicationStatus = effectiveAvailable ? 'AVAILABLE' :
+      nativeHorizon?.published===true ? 'INCOMPLETE' :
+        nativeHorizon?.status || 'UNAVAILABLE';
+    const requestedProvider=String(publicationMetadata.requested_provider||'');
+    const effectiveProvider=String(publicationMetadata.provider_id||'');
+    const providerHold=!!requestedProvider&&!effectiveProvider;
     const planningAssets = published && Array.isArray(horizonDetails.planning_assets)
       ? horizonDetails.planning_assets : [];
 
@@ -2912,15 +2965,24 @@ class FlexibleAssetDomainModel {
     const horizon=Object.freeze({
       horizon_id:normalized,
       ...totals(selected),
-      status:selected.available ? 'AVAILABLE' : 'INCOMPLETE',
-      quality:Object.freeze({availability:selected.available ? 'AVAILABLE' : 'INCOMPLETE',
-        missing:selected.missing})
+      status:publicationStatus,
+      quality:Object.freeze({availability:publicationStatus,
+        missing:selected.missing,
+        effective_horizon:effectiveAvailable,
+        metrics_available:selected.available===true})
     });
     const todayTotals=totals(today),tomorrowTotals=totals(tomorrow);
     return Object.freeze({
       entityId:null,
       contractVersion:'ENERGY_NATIVE_PLANNING',
-      available:selected.available,
+      available:effectiveAvailable,
+      totalsAvailable:selected.available===true,
+      provisionalTotals:selected.available===true&&!effectiveAvailable,
+      published:nativeHorizon?.published===true||!!published,
+      publicationStatus,
+      requestedProvider,effectiveProvider,providerHold,
+      reasonCode:effectiveAvailable?'':String(nativeHorizon?.reason||publicationMetadata.reason_code||'effective_horizon_not_published'),
+      executionAuthorized:effectiveAvailable&&publicationMetadata.execution_authorized===true,
       attrs:Object.freeze({}),
       planId:published ? publicationMetadata.plan_id ?? horizonDetails.plan_id ?? null : null,
       providerId:published ? publicationMetadata.provider_id ?? horizonDetails.provider_id ?? null : null,
@@ -2946,7 +3008,7 @@ class FlexibleAssetDomainModel {
       currentPlanningBucket:Object.freeze(planningObject(horizonDetails.current_bucket)),
       currentActionIntent:Object.freeze(published && horizonDetails.execution_policy && typeof horizonDetails.execution_policy === 'object' ? horizonDetails.execution_policy : {}),
       missingContractCapabilities:Object.freeze([
-        ...(!published ? ['native_planning_buckets'] : []),
+        ...(!published ? ['native_effective_horizon','native_planning_buckets'] : []),
         ...(!published || !Array.isArray(horizonDetails.planning_assets) ? ['native_planning_assets'] : []),
         ...(!published || !horizonDetails.execution_policy || typeof horizonDetails.execution_policy !== 'object' || Array.isArray(horizonDetails.execution_policy)
           ? ['native_planning_actions'] : [])
@@ -5241,7 +5303,7 @@ function rhiEnergyVisualPickerStyles() {
         <div class="overviewCoreGrid">
           <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon orange">☀</span><div><h2>${escapeHtml(rhiEnergyT(this._hass,'section.production_supply',{},'Production & supply'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.production_supply_desc',{},'Energy available to the home now.'))}</p></div></div>${sourceRows.join('') || `<div class="empty compact"><b>Supply unavailable</b><span>Current supply cannot be determined from the available measurements.</span></div>`}</section>
           <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(decisionReason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>${escapeHtml(rhiEnergyT(this._hass,"solar.grid",{},"Grid"))}</small><b>${escapeHtml(fmtKw(gridValue,'—'))} ${escapeHtml(gridDirection)}</b></div>${rt.experiencePresence().battery === true ? `<div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div>` : ''}</div></div></section>
-          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>${escapeHtml(rhiEnergyT(this._hass,'nav.consumption',{},'Consumption'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.consumption_desc',{},'Site demand and its active components.'))}</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'}) : ''}${contributorRows}${rt.experiencePresence().battery === true && balanceVm.battery.direction === 'into_storage' && balanceVm.battery.displayPowerKw !== null ? this.overviewEnergyRow({icon:'▣',label:rhiEnergyT(this._hass,'nav.battery',{},'Home Battery'),subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}) : ''}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${this.overviewEnergyRow({icon:'',label:gridDirection === 'Exporting' ? 'Grid Export' : gridDirection === 'Importing' ? 'Grid Import' : 'Grid',subtitle:'Grid boundary',value:fmtKw(gridValue,'—'),variant:'boundary'})}</section>
+          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>${escapeHtml(rhiEnergyT(this._hass,'nav.consumption',{},'Consumption'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.consumption_desc',{},'Site demand and its active components.'))}</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'}) : ''}${contributorRows}${rt.experiencePresence().battery === true && balanceVm.battery.direction === 'into_storage' && balanceVm.battery.displayPowerKw !== null ? this.overviewEnergyRow({icon:'▣',label:rhiEnergyT(this._hass,'nav.battery',{},'Home Battery'),subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}) : ''}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${balanceVm.grid.direction === 'exporting' && balanceVm.grid.exportPowerKw !== null ? this.overviewEnergyRow({icon:'↗',label:'Grid Export',subtitle:'Exporting to grid',value:fmtKw(balanceVm.grid.exportPowerKw),variant:'boundary'}) : ''}</section>
         </div>
         ${this.overviewExperiencePanel(rt)}`;
     }
@@ -6422,7 +6484,7 @@ function rhiEnergyVisualPickerStyles() {
 
     energyHardwareStyles() {
       return `
-        .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasHistoryControls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.gasHistoryControls>span{font-size:9px;color:#64748b}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceCard{max-width:720px}.gasMeterPanel .energyDeviceGrid{grid-template-columns:minmax(0,720px)}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasContextGrid,.planningContextGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gasStatisticsHost{min-height:220px}}
+        .gasPage{display:grid;gap:12px}.gasKpiStrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.gasKpiStrip article{background:#fff;border:1px solid #e5ebf3;border-radius:12px;padding:11px 12px;min-width:0}.gasKpiStrip small,.gasKpiStrip b,.gasKpiStrip span{display:block}.gasKpiStrip small{font-size:9px;color:#64748b}.gasKpiStrip b{font-size:14px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gasKpiStrip span{font-size:9px;color:#64748b;margin-top:4px}.gasUseFacts,.gasSetupFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.gasUseFacts article,.gasSetupFacts>div{border:1px solid #e5ebf3;border-radius:12px;padding:12px;background:#fbfdff;min-width:0}.gasUseFacts article{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;align-items:center}.gasUseFacts article>span{font-size:18px}.gasUseFacts small,.gasUseFacts b,.gasSetupFacts small,.gasSetupFacts b,.gasSetupFacts span{display:block}.gasUseFacts small,.gasSetupFacts small,.gasSetupFacts span{font-size:9px;color:#64748b}.gasUseFacts b,.gasSetupFacts b{font-size:12px;margin-top:3px}.gasSetupFacts span{margin-top:4px;line-height:1.35}.gasHistoryControls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.gasHistoryControls>span{font-size:9px;color:#64748b}.gasStatisticsHost{min-height:260px;margin-top:10px}.gasStatisticsHost hui-statistics-graph-card{display:block}.gasMeterPanel .energyDeviceGrid{display:grid;grid-template-columns:minmax(0,1fr);width:100%}.gasMeterPanel .energyDeviceCard{width:100%;max-width:none;min-width:0;grid-template-columns:96px minmax(0,1fr);align-items:start}.gasMeterPanel .energyDeviceBody,.gasMeterPanel .energyDeviceTop,.gasMeterPanel .energyDeviceFacts{min-width:0;max-width:100%}.gasMeterPanel .energyDeviceTop{flex-wrap:wrap}.gasMeterPanel .energyDeviceTop h3{overflow-wrap:anywhere}.gasMeterPanel .energyDeviceFacts{grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr))}@media(max-width:720px){.gasKpiStrip{grid-template-columns:repeat(2,minmax(0,1fr))}.gasUseFacts,.gasSetupFacts{grid-template-columns:1fr}.gasContextGrid,.planningContextGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gasStatisticsHost{min-height:220px}}
 
         .energyHardwarePanel,.solarEnergyStory{margin:12px 0}.energyHardwareHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}.energyHardwareHead>span{font-size:11px;font-weight:700;color:#64748b;background:#f8fafc;border:1px solid #e5ebf3;border-radius:999px;padding:6px 9px;white-space:nowrap}
         .solarEnergyStory{padding:10px 12px}.solarValueFlow{display:grid;grid-template-columns:repeat(4,minmax(92px,1fr));gap:7px;align-items:stretch}.solarValueFlow button,.solarFlowNode{border:0;background:#f8fafc;border-radius:10px;padding:8px 10px;text-align:left;min-width:0}.solarValueFlow button{cursor:pointer}.solarValueFlow button:hover{background:#eff6ff;box-shadow:inset 0 0 0 1px #bfdbfe}.solarValueFlow small,.solarValueFlow b,.solarValueFlow span{display:block}.solarValueFlow small{font-size:8px;color:#64748b;font-weight:700}.solarValueFlow b{font-size:14px;color:#0f172a;margin-top:2px;white-space:nowrap}.solarValueFlow span{font-size:8px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.solarFlowStatus{margin-top:7px;font-size:8.5px;color:#9a5b17;padding:0 2px}.solarHardwareSection{scroll-margin-top:12px}@media(max-width:720px){.solarValueFlow{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.solarValueFlow button,.solarFlowNode{padding:8px}.solarValueFlow b{font-size:12px}}
@@ -7683,7 +7745,7 @@ function rhiEnergyVisualPickerStyles() {
           {label:rhiEnergyT(this._hass,'retro.execution_results',{},'Execution results'),state:'PENDING',ready:false},
           {label:rhiEnergyT(this._hass,'retro.measured_energy',{},'Measured energy'),state:'PENDING',ready:false}
         ]).map(step=>`<span><b>${escapeHtml(step.label)}</b><em>${escapeHtml(step.ready?'Ready':human(step.state || 'Pending'))}</em>${step.reason?`<small>${escapeHtml(step.reason)}</small>`:''}</span>`).join('');
-        return `${this.tabExperienceHeader(rt,'retrospective',vm)}<div class="retrospectivePage"><section class="panel retroCollectingState"><div class="retroCollectingIcon">↺</div><div><small>${escapeHtml(rhiEnergyT(this._hass,"retro.prerequisites",{},"REVIEW PREREQUISITES"))}</small><h2>${escapeHtml(review.rating || 'Waiting for evidence')}</h2><p>${escapeHtml(review.explanation)}</p><div class="retroEvidenceSteps">${steps}</div><div class="productNotice"><b>No action required</b><span>The review appears automatically when enough evidence is available.</span></div></div></section></div>`;
+        return `${this.tabExperienceHeader(rt,'retrospective',vm)}<div class="retrospectivePage"><section class="panel retroCollectingState"><div class="retroCollectingIcon">↺</div><div><small>${escapeHtml(rhiEnergyT(this._hass,"retro.prerequisites",{},"REVIEW PREREQUISITES"))}</small><h2>${escapeHtml(review.rating || 'Waiting for evidence')}</h2><p>${escapeHtml(review.explanation)}</p><div class="retroEvidenceSteps">${steps}</div><div class="productNotice"><b>Review awaiting evidence</b><span>Planning outcomes, execution and measured consumption must be published before a reliable retrospective can be presented. Check the missing prerequisites above.</span></div></div></section></div>`;
       }
       const scoreOf=row=>asNumber(firstDefined(row.score,row.score_pct,row.value,row.achieved_score));
       const weightOf=row=>asNumber(firstDefined(row.weight,row.weight_pct));

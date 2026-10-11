@@ -1,3 +1,11 @@
+## 4.3.36-rc.3 — Native effective planning quality, EMHASS HOLD, bucket adapter
+
+- never present native metric totals as a complete or executable plan without an available effective D0/D1 horizon;
+- retain requested/effective provider, quality, reason and provisional native totals;
+- support native Energy D0/D1 bucket schema with exact allocations, excluding invented lanes and power-to-energy estimations;
+- prevent baseline deterministic publication from silently substituting EMHASS HOLD;
+- preserve full canonical-only and release test gates; target Home Assistant qualification remains blocked.
+
 ## 4.3.36-rc.2 — Native canonical-only Energy HACS test candidate
 
 - remove all retired Public V2 product readers, gateway, registry and display consumers;
