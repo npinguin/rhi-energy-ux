@@ -137,7 +137,7 @@
     // The canonical flexible_load inventory remains visible independently of
     // operational readiness. A charger represented as a flexible_load is still
     // an Energy consumer: do not hide it because its physical source is a charger.
-    consumerFacing() { return this.all().filter(vm => !vm.isStorage && (String(vm.raw?.object_class || '') === 'flexible_load' || (!vm.raw?.object_class && !vm.isInfrastructure))); }
+    consumerFacing() { return this.all().filter(vm => !vm.isStorage && String(vm.raw?.object_class || '') === 'flexible_load'); }
     // Unknown participation is an inventory/readiness gap, not an active plan.
     inventory() { return this.consumerFacing(); }
     participating() { return this.consumerFacing().filter(vm => vm.isParticipating); }
