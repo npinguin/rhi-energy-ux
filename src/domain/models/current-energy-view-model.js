@@ -26,9 +26,18 @@ function readTypedPropertyContract(gateway, interfaceKey, propertyKey) {
     : [];
   const usable = candidates.filter(row => row?.availability === 'AVAILABLE' && row?.value !== null && row?.value !== undefined);
   const valid = candidates.length === 1 && usable.length === 1 ? usable[0] : null;
+  // Home consumption is also independently published as a native Energy
+  // runtime metric. Use it only when the logical property has not appeared;
+  // do not override an unavailable or ambiguous canonical property.
+  const native = propertyKey === 'home_consumption.power_kw' && candidates.length === 0
+    ? readNativeEnergyMetric(gateway.host?.hass || {},'home_consumption_power_kw') : null;
+  const nativeValid = native?.available === true;
   const projected = valid ? {
     raw:valid,value:valid.value,status:valid.availability,quality:valid.quality,reason:valid.reason,
     source:valid.entity_id
+  } : nativeValid ? {
+    raw:native,value:native.value,status:'AVAILABLE',quality:native.quality || 'CANONICAL',
+    reason:'',source:native.entity_id
   } : {
     raw:{},value:null,status:'UNAVAILABLE',quality:'CONTRACT_GAP',
     reason:candidates.length > 1 ? 'ambiguous_canonical_property' : 'canonical_property_not_available',

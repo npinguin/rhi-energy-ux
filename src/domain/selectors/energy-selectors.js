@@ -6,17 +6,20 @@ function selectEnergyAsset(store, assetId) {
 
 function selectEnergyOverview(store) {
   const row=store?.overview && typeof store.overview === 'object' ? store.overview : {};
+  const home=store?.currentField?.('home_consumption.power_kw');
+  const primary=home?.resolved===true ? {value:home.value,unit:home.unit || 'kW',
+    property_key:'home_consumption.power_kw',source:'RHI_ENERGY_CANONICAL_PROPERTY_V2'} : null;
   return Object.freeze({
     available:store?.available === true,
-    status:String(row.status || row.product_status || row.state || store?.health || 'UNKNOWN'),
-    primary:row.primary || row.primary_metric || null,
-    summary:row.summary || {},
-    flow:row.flow || {},
+    status:String(row.status || row.product_status || row.state ||
+      (store?.available === true ? 'AVAILABLE':'UNAVAILABLE')),
+    primary:row.primary || row.primary_metric || primary,
+    summary:row.summary || {},flow:row.flow || {},
     conclusions:Array.isArray(row.conclusions) ? row.conclusions : [],
-    reason:String(row.reason || row.product_reason || ''),
-    raw:row,
-    core:store?.core || {},
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.core'
+    reason:String(row.reason || row.product_reason ||
+      (store?.available ? '':'canonical_product_unavailable')),
+    raw:row,core:store?.core || {},
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2'
   });
 }
 
@@ -43,7 +46,7 @@ function selectEnergyPlanning(store, horizon='D0') {
     buckets:Array.isArray(row.buckets) ? row.buckets : [],
     flexible_plan:{},
     planning_objects:Array.isArray(store?.planningObjects) ? store.planningObjects : [],
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons'
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.planning.horizons'
   });
 }
 
@@ -64,7 +67,7 @@ function selectEnergyConfigurationProperties(store, scope) {
       effective_state:String(effective.status || 'UNAVAILABLE'),
       effective_reason:String(effective.reason || ''),
       runtime_overrides:Object.freeze((Array.isArray(effective.runtime_overrides) ? effective.runtime_overrides : []).map(row=>Object.freeze({...row}))),
-      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy'
+      source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.configuration.strategy'
     });
   }
   const rows=Array.isArray(section.properties) ? section.properties : [];
@@ -75,7 +78,7 @@ function selectEnergyConfigurationProperties(store, scope) {
     effective_properties:Object.freeze([]),
     effective_state:String(section.availability || section.status || 'UNAVAILABLE'),
     effective_reason:String(section.reason || ''),
-    source:`RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.${kind}`
+    source:`RHI_ENERGY_CANONICAL_PROPERTY_V2.configuration.${kind}`
   });
 }
 
@@ -95,7 +98,7 @@ function selectEnergyValue(store, period='today') {
     value:row,
     net_financial_result_eur:row.net_financial_result_eur ?? (id === selectedId ? netOutcome.value ?? accounting.net_financial_result_eur ?? null : null),
     net_financial_result:id === selectedId ? netOutcome : {},
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.value_accounting'
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.value_accounting'
   });
 }
 
@@ -107,7 +110,7 @@ function selectEnergyMetering(store, period='today') {
     period_id:id,
     metrics:Object.freeze({}),
     reason:'canonical_period_energy_not_published',
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2'
   });
 }
 
@@ -115,7 +118,7 @@ function selectEnergyActivity(store) {
   return Object.freeze({
     available:store?.available === true,
     rows:Object.freeze((Array.isArray(store?.activity) ? store.activity : []).map(row=>Object.freeze({...row}))),
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.activity'
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.activity'
   });
 }
 
@@ -127,7 +130,7 @@ function selectEnergyCommands(store, assetId='') {
   return Object.freeze({
     available:store?.available === true,
     rows:Object.freeze(rows),
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.commands'
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.commands'
   });
 }
 
@@ -150,6 +153,6 @@ function selectEnergyCoverage(store) {
     complete:Object.values(capabilities).every(value=>value === 'SUPPORTED'),
     capabilities,
     unsupported:Object.freeze(Object.entries(capabilities).filter(([,v])=>v!=='SUPPORTED').map(([k])=>k)),
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.coverage'
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.coverage'
   });
 }
