@@ -127,3 +127,9 @@ See `BUILDING.md`, `docs/CONTRACT.md`, `docs/BRANDING.md`, `docs/TEST_GOVERNANCE
 `src/OWNERSHIP.json` and `src/manifest.json` define source ownership and build insertion order. Canonical assets live only under `src/assets/<category>/`; the build mirrors that tree under `dist/assets/<category>/`. `dist/PACKAGE_MANIFEST.json` inventories the complete generated HACS package.
 
 For nested assets the GitHub Release intentionally does not attach `rhi-energy-ux.js`; HACS therefore installs the immutable tag's complete `dist/` subtree instead of switching to single-file mode. See `docs/SOURCE_PACKAGE_GOVERNANCE.md`.
+
+### Power Flow Card Plus (optional frontend dependency)
+
+The Flow screen checks for the registered `power-flow-card-plus` custom card after the frontend has loaded. If it is missing or has not registered, Energy displays a dependency warning with HACS installation and resource-check instructions. Other Energy pages remain usable. This check cannot verify which version HACS has downloaded, nor does the HACS Dashboard installer support enforcing an external custom-card installation.
+
+Install [Power Flow Card Plus](https://github.com/flixlix/power-flow-card-plus) from HACS → Dashboard, ensure its JavaScript resource is loaded, then refresh Home Assistant. If the resource registers later, Energy automatically clears the warning. The dependency warning is not proof that Flow already renders with that external card: external-card integration needs its own configuration and acceptance tests.
