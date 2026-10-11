@@ -23,7 +23,11 @@ for (const forbidden of [
 
 if (!/ATTRIBUTION_PENDING:\s*'Waiting for trusted meter attribution'/.test(src)) throw new Error('pending mapping missing');
 if (!/NOT_APPLICABLE:\s*'Not applicable'/.test(src)) throw new Error('NA mapping missing');
-if (!/row\.visible/.test(src) || !/row\.enabled/.test(src)) throw new Error('backend-owned command presentation missing');
+const nativeCommands=fs.readFileSync('src/runtime/command-contract.js','utf8');
+for(const guard of ['const visible=supported && a.visible===true',
+  "a.execution_allowed===true", "String(a.availability || '').toUpperCase()==='AVAILABLE'",
+  "enabled:allowed"])
+  if(!nativeCommands.includes(guard))throw new Error('native command authority guard missing '+guard);
 console.log('PASS V2-only consumption and physical Flow contracts');
 
 
