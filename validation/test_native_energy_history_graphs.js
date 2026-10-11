@@ -5,7 +5,9 @@ const app = fs.readFileSync('src/app/energy-card.js','utf8');
 const presentation = fs.readFileSync('src/app/presentation.js','utf8');
 const between = (start,end) => {
   const i=app.indexOf('\n    '+start+'(');
-  const j=app.indexOf('\n    '+end+'(',i+1);
+  const j0=app.indexOf('\n    '+end+'(',i+1);
+  const j1=app.indexOf('\n    async '+end+'(',i+1);
+  const j=j0<0?j1:j1<0?j0:Math.min(j0,j1);
   assert.ok(i>0 && j>i, 'history method boundaries '+start+'/'+end);
   return app.slice(i,j);
 };
