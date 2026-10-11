@@ -6,6 +6,41 @@
 // This index deliberately uses backend-published presentation metadata literally.
 // It never derives family/role/surface from property_key or object_class.
 const RHI_ENERGY_CANONICAL_PROPERTY_V2 = 'RHI_ENERGY_CANONICAL_PROPERTY_V2';
+// Logical object status is a separate canonical HA entity. Treat it as the
+// sole authority for identity, parentage, profile and presentation; properties
+// supply values but must not invent topology or missing physical assets.
+const RHI_ENERGY_CANONICAL_OBJECT_V2 = 'RHI_ENERGY_CANONICAL_OBJECT_V2';
+function canonicalEnergyObjectRow(entityId,state) {
+  const a=state?.attributes || {};
+  if(a.canonical_contract !== RHI_ENERGY_CANONICAL_OBJECT_V2) return null;
+  const assetId=String(a.asset_id || '').trim();
+  const objectClass=String(a.logical_object_class || '').trim();
+  if(!assetId || !objectClass) return null;
+  return Object.freeze({
+    asset_id:assetId,object_class:objectClass,asset_type:objectClass,
+    logical_object_class:objectClass,entity_id:String(entityId),
+    display_name:String(a.display_name || assetId),
+    parent_asset_id:a.parent_asset_id || null,
+    children:Object.freeze(Array.isArray(a.children) ? [...a.children] : []),
+    canonical_path:Object.freeze(Array.isArray(a.canonical_path) ? [...a.canonical_path] : []),
+    canonical_depth:a.canonical_depth ?? null,
+    canonical_root:a.canonical_root ?? null,
+    projection_role:String(a.projection_role || ''),
+    ha_materialization:a.ha_materialization === true,
+    runtime_truth:a.runtime_truth === true,
+    profile_id:String(a.profile_id || ''),
+    visual_ref:String(a.visual_ref || ''),
+    configured_visual_ref:String(a.configured_visual_ref || ''),
+    appearance_editable:a.appearance_editable === true,
+    appearance_owner:a.appearance_owner || null,
+    health:String(a.health || state?.state || 'UNKNOWN'),
+    availability:String(a.availability || 'UNAVAILABLE'),
+    source_devices:Object.freeze(Array.isArray(a.source_devices) ? [...a.source_devices] : []),
+    source_device_ids:Object.freeze(Array.isArray(a.source_device_ids) ? [...a.source_device_ids] : []),
+    selected_device_ids:Object.freeze(Array.isArray(a.selected_device_ids) ? [...a.selected_device_ids] : [])
+  });
+}
+
 
 function normalizeCanonicalEnergyAvailability(state = null, attributes = {}) {
   // Availability and quality are distinct backend dimensions. A quality label
@@ -55,17 +90,10 @@ function canonicalEnergyPropertyRow(entityId, state) {
     entity_id:String(entityId || ''),
     canonical_contract:RHI_ENERGY_CANONICAL_PROPERTY_V2,
     asset_id:assetId,
-    // The producer owns asset identity, parentage and source provenance. Keep
-    // them intact so presentation never has to guess hierarchy or HA links.
-    parent_asset_id:String(attributes.parent_asset_id || ''),
-    asset_display_name:String(attributes.asset_display_name || assetId),
-    integration_domain:String(attributes.integration_domain || ''),
-    device_registry_id:String(attributes.device_registry_id || ''),
-    config_entry_id:String(attributes.config_entry_id || ''),
-    entity_registry_id:String(attributes.entity_registry_id || ''),
-    source_unique_id:String(attributes.source_unique_id || ''),
     logical_object_class:objectClass,
     object_class:objectClass,
+    parent_asset_id:attributes.parent_asset_id || null,
+    asset_display_name:String(attributes.asset_display_name || assetId),
     property_key:propertyKey,
     property_id:propertyKey,
     key:propertyKey,
@@ -76,12 +104,18 @@ function canonicalEnergyPropertyRow(entityId, state) {
     quality:String(attributes.quality ?? ''),
     reason:String(attributes.reason ?? attributes.reason_code ?? ''),
     editable:attributes.editable === true,
+    editor:attributes.editor || null,
+    constraints:attributes.constraints || {},
+    operation:attributes.operation || {},
     write_supported:attributes.write_supported === true,
     write:attributes.write || null,
     source:attributes.source || attributes.provenance || null,
     statistics_entity_id:String(attributes.statistics_entity_id || ''),
     history_entity_id:String(attributes.history_entity_id || ''),
     source_entity_id:String(attributes.source_entity_id || attributes.source?.entity_id || ''),
+    source_device_path:String(attributes.source_device_path || ''),
+    device_registry_id:String(attributes.device_registry_id || ''),
+    integration_domain:String(attributes.integration_domain || ''),
     capability_ref:String(attributes.capability_ref || ''),
     presentation_family:family,
     presentation_role:role,
@@ -96,6 +130,9 @@ function canonicalEnergyPropertyRow(entityId, state) {
 class EnergyCanonicalPropertyIndex {
   constructor(hass = {}) {
     this.byEntity = new Map();
+    this.byObject = new Map();
+    this.objectStates = new Map();
+    this.ambiguousObjects = new Set();
     this.byAssetAndKey = new Map();
     this.ambiguousAssetKeys = new Set();
     this.byPropertyKey = new Map();
@@ -124,6 +161,9 @@ class EnergyCanonicalPropertyIndex {
 
   discover(hass = {}) {
     this.byEntity.clear();
+    this.byObject.clear();
+    this.objectStates.clear();
+    this.ambiguousObjects.clear();
     this.byAssetAndKey.clear();
     this.ambiguousAssetKeys.clear();
     this.byPropertyKey.clear();
@@ -133,7 +173,15 @@ class EnergyCanonicalPropertyIndex {
     const states = hass?.states || {};
     this._hassRef = hass;
     this._stateCount = Object.keys(states).length;
-    for (const [entityId,state] of Object.entries(states)) this._index(canonicalEnergyPropertyRow(entityId,state),state);
+    for (const [entityId,state] of Object.entries(states)) {
+      this._index(canonicalEnergyPropertyRow(entityId,state),state);
+      const object=canonicalEnergyObjectRow(entityId,state);
+      if(object){
+        if(this.byObject.has(object.asset_id)) this.ambiguousObjects.add(object.asset_id);
+        else this.byObject.set(object.asset_id,object);
+        this.objectStates.set(entityId,state);
+      }
+    }
     return this;
   }
 
@@ -141,16 +189,21 @@ class EnergyCanonicalPropertyIndex {
     const states = hass?.states || {};
     // Entity replacement can preserve the total HA state count; membership must
     // be checked explicitly or stale canonical rows remain visible.
+    const objectChanged=[...this.objectStates.entries()].some(([id,previous])=>states[id] !== previous) ||
+      Object.entries(states).some(([id,state]) => !this.objectStates.has(id) && canonicalEnergyObjectRow(id,state) !== null);
     const membershipChanged = [...this.stateRefs.keys()].some(id => !Object.prototype.hasOwnProperty.call(states,id)) ||
       Object.entries(states).some(([id,state]) =>
         !this.stateRefs.has(id) && canonicalEnergyPropertyRow(id,state) !== null);
-    if (Object.keys(states).length !== this._stateCount || membershipChanged) {
+    if (Object.keys(states).length !== this._stateCount || membershipChanged || objectChanged) {
       const before = new Map(this.stateRefs);
+      const priorObjects=new Map(this.objectStates);
       this.discover(hass);
       const changed = new Set();
       for (const [id,ref] of this.stateRefs.entries())
         if (!before.has(id) || before.get(id) !== ref) changed.add(id);
       for (const id of before.keys()) if (!this.stateRefs.has(id)) changed.add(id);
+      for(const [id,state] of this.objectStates) if(priorObjects.get(id) !== state) changed.add(id);
+      for(const id of priorObjects.keys()) if(!this.objectStates.has(id)) changed.add(id);
       return changed;
     }
     // Decide whether a full rebuild is needed before mutating any secondary
@@ -170,12 +223,6 @@ class EnergyCanonicalPropertyIndex {
           row.asset_id !== before.asset_id ||
           row.property_key !== before.property_key ||
           row.logical_object_class !== before.logical_object_class ||
-          row.parent_asset_id !== before.parent_asset_id ||
-          row.asset_display_name !== before.asset_display_name ||
-          row.integration_domain !== before.integration_domain ||
-          row.device_registry_id !== before.device_registry_id ||
-          row.config_entry_id !== before.config_entry_id ||
-          row.entity_registry_id !== before.entity_registry_id ||
           row.presentation_surface !== before.presentation_surface ||
           row.presentation_family !== before.presentation_family ||
           row.presentation_role !== before.presentation_role ||
@@ -202,6 +249,13 @@ class EnergyCanonicalPropertyIndex {
   changedRows(entityIds = []) {
     return [...entityIds].map(id=>this.byEntity.get(id)).filter(Boolean);
   }
+  // Object status and product properties are joined only by exact canonical ID.
+  object(assetId){
+    const id=String(assetId || '');
+    return this.ambiguousObjects.has(id) ? null : (this.byObject.get(id) || null);
+  }
+  objectRows(){return [...this.byObject.values()].filter(row=>!this.ambiguousObjects.has(row.asset_id));}
+  objectEntityIds(){return [...this.objectStates.keys()];}
 
   uniqueProductRows() {
     // Property keys describe semantics, not globally unique physical assets.
@@ -224,7 +278,7 @@ class EnergyCanonicalPropertyIndex {
   }
 
   affectedComponents(entityIds = []) {
-    return this.changedRows(entityIds).map(row=>Object.freeze({
+    const propertyChanges=this.changedRows(entityIds).map(row=>Object.freeze({
       entity_id:row.entity_id,
       asset_id:row.asset_id,
       property_key:row.property_key,
@@ -233,6 +287,11 @@ class EnergyCanonicalPropertyIndex {
       family:row.presentation_family,
       component_key:`${row.asset_id}::${row.property_key}`
     }));
+    // Identity/topology changes affect all page types; expose a generic
+    // product-level invalidation rather than silently ignoring object changes.
+    const changedObjects=[...entityIds].filter(id=>this.objectStates.has(id))
+      .map(id=>Object.freeze({entity_id:id,surface:'all',role:'identity',family:'asset',asset_id:'*'}));
+    return [...propertyChanges,...changedObjects];
   }
 
   get size() { return this.byEntity.size; }
@@ -255,6 +314,7 @@ class EnergyCanonicalPropertyIndex {
   technicalRows() { return [...this.byEntity.values()].filter(row=>row.presentation_technical === true || row.presentation_surface === 'diagnostics'); }
   contractGaps() {
     return [
+      ...[...this.ambiguousObjects].sort().map(asset_id=>Object.freeze({asset_id,reason:'duplicate_canonical_object'})),
       ...[...this.byEntity.values()].filter(row=>!row.presentation_complete && row.presentation_technical !== true),
       ...[...this.ambiguousAssetKeys].sort().map(key=>Object.freeze({key,reason:'duplicate_canonical_property'}))
     ];
@@ -311,10 +371,15 @@ function readNativeEnergyMetric(hass = {}, metricKey = '') {
        (availability === 'AVAILABLE' && !validNumber ? 'invalid_native_energy_metric' :
         (availability || 'native_energy_metric_unavailable')))),
     metric_key:key,
-    // The net financial metric belongs to exactly one backend-selected period.
-    // A missing period must not be treated as today's financial result.
+    // Native evidence is period/horizon scoped and must not be reused for an
+    // unrelated selector (e.g. 'today' result shown as 'this month').
     period:String(attrs.period || ''),
-    actual_complete:attrs.actual_complete === true
+    horizon:String(attrs.horizon || ''),
+    actual_complete:attrs.actual_complete === true,
+    totals_complete:attrs.totals_complete === true,
+    evidence_method:String(attrs.evidence_method || ''),
+    source_field:String(attrs.source_field || ''),
+    observed_at:String(attrs.observed_at || '')
   });
 }
 

@@ -1,30 +1,15 @@
-// Single backend-access owner for Energy UX public product contracts.
-  function createEnergyContractGateway(host) {
-    const cache = new Map();
-    const entityId = contractKey => {
-      const key = String(contractKey || '');
-      const configured = UX_INTERFACES[key];
-      if (!configured) throw new Error(`unknown_energy_contract:${key}`);
-      return configured;
-    };
-    const state = contractKey => {
-      const id = entityId(contractKey);
-      if (!cache.has(id)) cache.set(id, host.state(id) || null);
-      return cache.get(id);
-    };
-    const attrs = contractKey => state(contractKey)?.attributes || {};
-    const contract = contractKey => {
-      const id = entityId(contractKey);
-      const current = state(contractKey);
-      const attributes = current?.attributes || {};
-      return {
-        contractKey,
-        entityId: id,
-        state: current?.state ?? null,
-        attributes,
-        contractVersion: String(firstDefined(attributes.contract_version, attributes.release, '')),
-        available: !!current
-      };
-    };
-    return Object.freeze({ host, entityId, state, attrs, contract });
-  }
+// Backend-access boundary. Native canonical property/object/metric/command
+// entities are indexed by published markers, never by guessed HA entity IDs.
+function createEnergyContractGateway(host) {
+  const state=id=>host?.rawState?.(id) || host?.hass?.states?.[id] || null;
+  const attrs=id=>state(id)?.attributes || {};
+  return Object.freeze({
+    host,
+    state,attrs,
+    canonicalProperty:(assetId,propertyKey)=>host?.canonicalIndex?.row(assetId,propertyKey) || null,
+    canonicalObject:assetId=>host?.canonicalIndex?.object(assetId) || null,
+    nativeMetric:key=>host?.nativeMetric?.(key) || readNativeEnergyMetric(host?.hass || {},key),
+    nativePlanningTotals:id=>host?.nativePlanningTotals?.(id) || readNativeEnergyPlanningTotals(host?.hass || {},id),
+    nativePlanningHorizon:id=>host?.nativePlanningHorizon?.(id) || {available:false,details:null}
+  });
+}

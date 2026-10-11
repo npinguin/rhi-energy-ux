@@ -2,11 +2,9 @@
   const UX_VERSION = 'R4.3.36-rc.2';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
-// Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
-// product-state entry point. Release/engineering entities are diagnostics only.
-const UX_INTERFACES = Object.freeze({
-  publicV2: 'sensor.rhi_energy_public_contract_v2'
-});
+// Native Energy publication is discovered by exact canonical contract markers.
+// Release metadata is diagnostic only; there is no aggregate product sensor.
+const UX_INTERFACES=Object.freeze({release:'sensor.rhi_energy_release'});
 
 // ---- src/runtime/canonical-property-index.js ----
 // Canonical Energy property index.
@@ -17,6 +15,41 @@ const UX_INTERFACES = Object.freeze({
 // This index deliberately uses backend-published presentation metadata literally.
 // It never derives family/role/surface from property_key or object_class.
 const RHI_ENERGY_CANONICAL_PROPERTY_V2 = 'RHI_ENERGY_CANONICAL_PROPERTY_V2';
+// Logical object status is a separate canonical HA entity. Treat it as the
+// sole authority for identity, parentage, profile and presentation; properties
+// supply values but must not invent topology or missing physical assets.
+const RHI_ENERGY_CANONICAL_OBJECT_V2 = 'RHI_ENERGY_CANONICAL_OBJECT_V2';
+function canonicalEnergyObjectRow(entityId,state) {
+  const a=state?.attributes || {};
+  if(a.canonical_contract !== RHI_ENERGY_CANONICAL_OBJECT_V2) return null;
+  const assetId=String(a.asset_id || '').trim();
+  const objectClass=String(a.logical_object_class || '').trim();
+  if(!assetId || !objectClass) return null;
+  return Object.freeze({
+    asset_id:assetId,object_class:objectClass,asset_type:objectClass,
+    logical_object_class:objectClass,entity_id:String(entityId),
+    display_name:String(a.display_name || assetId),
+    parent_asset_id:a.parent_asset_id || null,
+    children:Object.freeze(Array.isArray(a.children) ? [...a.children] : []),
+    canonical_path:Object.freeze(Array.isArray(a.canonical_path) ? [...a.canonical_path] : []),
+    canonical_depth:a.canonical_depth ?? null,
+    canonical_root:a.canonical_root ?? null,
+    projection_role:String(a.projection_role || ''),
+    ha_materialization:a.ha_materialization === true,
+    runtime_truth:a.runtime_truth === true,
+    profile_id:String(a.profile_id || ''),
+    visual_ref:String(a.visual_ref || ''),
+    configured_visual_ref:String(a.configured_visual_ref || ''),
+    appearance_editable:a.appearance_editable === true,
+    appearance_owner:a.appearance_owner || null,
+    health:String(a.health || state?.state || 'UNKNOWN'),
+    availability:String(a.availability || 'UNAVAILABLE'),
+    source_devices:Object.freeze(Array.isArray(a.source_devices) ? [...a.source_devices] : []),
+    source_device_ids:Object.freeze(Array.isArray(a.source_device_ids) ? [...a.source_device_ids] : []),
+    selected_device_ids:Object.freeze(Array.isArray(a.selected_device_ids) ? [...a.selected_device_ids] : [])
+  });
+}
+
 
 function normalizeCanonicalEnergyAvailability(state = null, attributes = {}) {
   // Availability and quality are distinct backend dimensions. A quality label
@@ -66,17 +99,10 @@ function canonicalEnergyPropertyRow(entityId, state) {
     entity_id:String(entityId || ''),
     canonical_contract:RHI_ENERGY_CANONICAL_PROPERTY_V2,
     asset_id:assetId,
-    // The producer owns asset identity, parentage and source provenance. Keep
-    // them intact so presentation never has to guess hierarchy or HA links.
-    parent_asset_id:String(attributes.parent_asset_id || ''),
-    asset_display_name:String(attributes.asset_display_name || assetId),
-    integration_domain:String(attributes.integration_domain || ''),
-    device_registry_id:String(attributes.device_registry_id || ''),
-    config_entry_id:String(attributes.config_entry_id || ''),
-    entity_registry_id:String(attributes.entity_registry_id || ''),
-    source_unique_id:String(attributes.source_unique_id || ''),
     logical_object_class:objectClass,
     object_class:objectClass,
+    parent_asset_id:attributes.parent_asset_id || null,
+    asset_display_name:String(attributes.asset_display_name || assetId),
     property_key:propertyKey,
     property_id:propertyKey,
     key:propertyKey,
@@ -87,12 +113,18 @@ function canonicalEnergyPropertyRow(entityId, state) {
     quality:String(attributes.quality ?? ''),
     reason:String(attributes.reason ?? attributes.reason_code ?? ''),
     editable:attributes.editable === true,
+    editor:attributes.editor || null,
+    constraints:attributes.constraints || {},
+    operation:attributes.operation || {},
     write_supported:attributes.write_supported === true,
     write:attributes.write || null,
     source:attributes.source || attributes.provenance || null,
     statistics_entity_id:String(attributes.statistics_entity_id || ''),
     history_entity_id:String(attributes.history_entity_id || ''),
     source_entity_id:String(attributes.source_entity_id || attributes.source?.entity_id || ''),
+    source_device_path:String(attributes.source_device_path || ''),
+    device_registry_id:String(attributes.device_registry_id || ''),
+    integration_domain:String(attributes.integration_domain || ''),
     capability_ref:String(attributes.capability_ref || ''),
     presentation_family:family,
     presentation_role:role,
@@ -107,6 +139,9 @@ function canonicalEnergyPropertyRow(entityId, state) {
 class EnergyCanonicalPropertyIndex {
   constructor(hass = {}) {
     this.byEntity = new Map();
+    this.byObject = new Map();
+    this.objectStates = new Map();
+    this.ambiguousObjects = new Set();
     this.byAssetAndKey = new Map();
     this.ambiguousAssetKeys = new Set();
     this.byPropertyKey = new Map();
@@ -135,6 +170,9 @@ class EnergyCanonicalPropertyIndex {
 
   discover(hass = {}) {
     this.byEntity.clear();
+    this.byObject.clear();
+    this.objectStates.clear();
+    this.ambiguousObjects.clear();
     this.byAssetAndKey.clear();
     this.ambiguousAssetKeys.clear();
     this.byPropertyKey.clear();
@@ -144,7 +182,15 @@ class EnergyCanonicalPropertyIndex {
     const states = hass?.states || {};
     this._hassRef = hass;
     this._stateCount = Object.keys(states).length;
-    for (const [entityId,state] of Object.entries(states)) this._index(canonicalEnergyPropertyRow(entityId,state),state);
+    for (const [entityId,state] of Object.entries(states)) {
+      this._index(canonicalEnergyPropertyRow(entityId,state),state);
+      const object=canonicalEnergyObjectRow(entityId,state);
+      if(object){
+        if(this.byObject.has(object.asset_id)) this.ambiguousObjects.add(object.asset_id);
+        else this.byObject.set(object.asset_id,object);
+        this.objectStates.set(entityId,state);
+      }
+    }
     return this;
   }
 
@@ -152,16 +198,21 @@ class EnergyCanonicalPropertyIndex {
     const states = hass?.states || {};
     // Entity replacement can preserve the total HA state count; membership must
     // be checked explicitly or stale canonical rows remain visible.
+    const objectChanged=[...this.objectStates.entries()].some(([id,previous])=>states[id] !== previous) ||
+      Object.entries(states).some(([id,state]) => !this.objectStates.has(id) && canonicalEnergyObjectRow(id,state) !== null);
     const membershipChanged = [...this.stateRefs.keys()].some(id => !Object.prototype.hasOwnProperty.call(states,id)) ||
       Object.entries(states).some(([id,state]) =>
         !this.stateRefs.has(id) && canonicalEnergyPropertyRow(id,state) !== null);
-    if (Object.keys(states).length !== this._stateCount || membershipChanged) {
+    if (Object.keys(states).length !== this._stateCount || membershipChanged || objectChanged) {
       const before = new Map(this.stateRefs);
+      const priorObjects=new Map(this.objectStates);
       this.discover(hass);
       const changed = new Set();
       for (const [id,ref] of this.stateRefs.entries())
         if (!before.has(id) || before.get(id) !== ref) changed.add(id);
       for (const id of before.keys()) if (!this.stateRefs.has(id)) changed.add(id);
+      for(const [id,state] of this.objectStates) if(priorObjects.get(id) !== state) changed.add(id);
+      for(const id of priorObjects.keys()) if(!this.objectStates.has(id)) changed.add(id);
       return changed;
     }
     // Decide whether a full rebuild is needed before mutating any secondary
@@ -181,12 +232,6 @@ class EnergyCanonicalPropertyIndex {
           row.asset_id !== before.asset_id ||
           row.property_key !== before.property_key ||
           row.logical_object_class !== before.logical_object_class ||
-          row.parent_asset_id !== before.parent_asset_id ||
-          row.asset_display_name !== before.asset_display_name ||
-          row.integration_domain !== before.integration_domain ||
-          row.device_registry_id !== before.device_registry_id ||
-          row.config_entry_id !== before.config_entry_id ||
-          row.entity_registry_id !== before.entity_registry_id ||
           row.presentation_surface !== before.presentation_surface ||
           row.presentation_family !== before.presentation_family ||
           row.presentation_role !== before.presentation_role ||
@@ -213,6 +258,13 @@ class EnergyCanonicalPropertyIndex {
   changedRows(entityIds = []) {
     return [...entityIds].map(id=>this.byEntity.get(id)).filter(Boolean);
   }
+  // Object status and product properties are joined only by exact canonical ID.
+  object(assetId){
+    const id=String(assetId || '');
+    return this.ambiguousObjects.has(id) ? null : (this.byObject.get(id) || null);
+  }
+  objectRows(){return [...this.byObject.values()].filter(row=>!this.ambiguousObjects.has(row.asset_id));}
+  objectEntityIds(){return [...this.objectStates.keys()];}
 
   uniqueProductRows() {
     // Property keys describe semantics, not globally unique physical assets.
@@ -235,7 +287,7 @@ class EnergyCanonicalPropertyIndex {
   }
 
   affectedComponents(entityIds = []) {
-    return this.changedRows(entityIds).map(row=>Object.freeze({
+    const propertyChanges=this.changedRows(entityIds).map(row=>Object.freeze({
       entity_id:row.entity_id,
       asset_id:row.asset_id,
       property_key:row.property_key,
@@ -244,6 +296,11 @@ class EnergyCanonicalPropertyIndex {
       family:row.presentation_family,
       component_key:`${row.asset_id}::${row.property_key}`
     }));
+    // Identity/topology changes affect all page types; expose a generic
+    // product-level invalidation rather than silently ignoring object changes.
+    const changedObjects=[...entityIds].filter(id=>this.objectStates.has(id))
+      .map(id=>Object.freeze({entity_id:id,surface:'all',role:'identity',family:'asset',asset_id:'*'}));
+    return [...propertyChanges,...changedObjects];
   }
 
   get size() { return this.byEntity.size; }
@@ -266,6 +323,7 @@ class EnergyCanonicalPropertyIndex {
   technicalRows() { return [...this.byEntity.values()].filter(row=>row.presentation_technical === true || row.presentation_surface === 'diagnostics'); }
   contractGaps() {
     return [
+      ...[...this.ambiguousObjects].sort().map(asset_id=>Object.freeze({asset_id,reason:'duplicate_canonical_object'})),
       ...[...this.byEntity.values()].filter(row=>!row.presentation_complete && row.presentation_technical !== true),
       ...[...this.ambiguousAssetKeys].sort().map(key=>Object.freeze({key,reason:'duplicate_canonical_property'}))
     ];
@@ -322,10 +380,15 @@ function readNativeEnergyMetric(hass = {}, metricKey = '') {
        (availability === 'AVAILABLE' && !validNumber ? 'invalid_native_energy_metric' :
         (availability || 'native_energy_metric_unavailable')))),
     metric_key:key,
-    // The net financial metric belongs to exactly one backend-selected period.
-    // A missing period must not be treated as today's financial result.
+    // Native evidence is period/horizon scoped and must not be reused for an
+    // unrelated selector (e.g. 'today' result shown as 'this month').
     period:String(attrs.period || ''),
-    actual_complete:attrs.actual_complete === true
+    horizon:String(attrs.horizon || ''),
+    actual_complete:attrs.actual_complete === true,
+    totals_complete:attrs.totals_complete === true,
+    evidence_method:String(attrs.evidence_method || ''),
+    source_field:String(attrs.source_field || ''),
+    observed_at:String(attrs.observed_at || '')
   });
 }
 
@@ -354,347 +417,235 @@ function readNativeEnergyPlanningTotals(hass = {}, horizonId = 'D0') {
 }
 
 // ---- src/runtime/energy-contract-gateway.js ----
-// Single backend-access owner for Energy UX public product contracts.
-  function createEnergyContractGateway(host) {
-    const cache = new Map();
-    const entityId = contractKey => {
-      const key = String(contractKey || '');
-      const configured = UX_INTERFACES[key];
-      if (!configured) throw new Error(`unknown_energy_contract:${key}`);
-      return configured;
-    };
-    const state = contractKey => {
-      const id = entityId(contractKey);
-      if (!cache.has(id)) cache.set(id, host.state(id) || null);
-      return cache.get(id);
-    };
-    const attrs = contractKey => state(contractKey)?.attributes || {};
-    const contract = contractKey => {
-      const id = entityId(contractKey);
-      const current = state(contractKey);
-      const attributes = current?.attributes || {};
-      return {
-        contractKey,
-        entityId: id,
-        state: current?.state ?? null,
-        attributes,
-        contractVersion: String(firstDefined(attributes.contract_version, attributes.release, '')),
-        available: !!current
-      };
-    };
-    return Object.freeze({ host, entityId, state, attrs, contract });
-  }
-
-// ---- src/runtime/energy-v2-contract.js ----
-// Canonical Energy V2 reader. This is the only UX adapter allowed to interpret
-// sensor.rhi_energy_public_contract_v2. Screens consume projections derived here.
-function readEnergyPublicV2(gateway) {
-  const envelope = gateway.contract('publicV2');
-  const attrs = envelope.attributes || {};
-  const array = value => {
-    const parsed = parseMaybeJson(value, value);
-    if (Array.isArray(parsed)) return parsed.filter(row => row && typeof row === 'object');
-    if (parsed && typeof parsed === 'object') return Object.values(parsed).filter(row => row && typeof row === 'object');
-    return [];
-  };
-  const object = value => {
-    const parsed = parseMaybeJson(value, value);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  };
-
-  const core = object(attrs.core);
-  const objects = array(attrs.objects);
-  const profiles = array(attrs.profiles);
-  const relationships = array(attrs.relationships).map(row => Object.freeze({
-    ...row,
-    from_asset_id:String(row.from_asset_id || row.source_asset_id || ''),
-    to_asset_id:String(row.to_asset_id || row.target_asset_id || ''),
-    source_asset_id:String(row.source_asset_id || row.from_asset_id || ''),
-    target_asset_id:String(row.target_asset_id || row.to_asset_id || '')
-  }));
-  // Producer-owned physical charging topology is a first-class Energy V2
-  // surface. Keep it separate from Energy logical objects and do not infer it
-  // from Home Assistant names/devices in the frontend.
-  const connections = Object.freeze(array(attrs.connections).map(row => Object.freeze({...row})));
-  const commands = array(attrs.commands);
-  const activity = array(attrs.activity);
-  const planning = object(attrs.planning);
-  const metering = object(attrs.metering);
-  const retrospective = object(attrs.retrospective);
-  const intelligence = object(attrs.intelligence);
-  const overview = object(attrs.overview);
-  const configuration = object(attrs.configuration);
-  const valueAccounting = object(attrs.value_accounting);
-  const layers = object(attrs.layers);
-  const summary = object(attrs.summary);
-  const experience = object(attrs.experience);
-  const presence = Object.freeze({...object(experience.presence)});
-
-  const semantic = raw => {
-    const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {value:raw};
-    const resolution = source.resolution && typeof source.resolution === 'object' ? source.resolution : {};
-    const value = source.value !== undefined ? source.value : null;
-    const sourceStatus = String(source.status || '').toUpperCase();
-    const resolutionStatus = String(resolution.status || '').toUpperCase();
-    const availability = String(
-      source.availability
-      || (['AVAILABLE','UNAVAILABLE'].includes(sourceStatus) ? sourceStatus : '')
-      || (resolutionStatus === 'RESOLVED' ? 'AVAILABLE' : resolutionStatus === 'UNAVAILABLE' ? 'UNAVAILABLE' : '')
-      || (value !== null ? 'AVAILABLE' : 'UNAVAILABLE')
-    ).toUpperCase();
-    const quality = String(source.quality || resolution.quality || (availability === 'AVAILABLE' ? 'CANONICAL' : 'UNKNOWN')).toUpperCase();
-    const resolved = availability === 'AVAILABLE' && value !== null && !['INVALID','STALE','NOT_ASSESSED'].includes(quality);
-    return Object.freeze({
-      resolved,
-      value,
-      display:String(source.display ?? source.display_value ?? (value ?? '—')),
-      unit:String(source.unit || ''),
-      state:availability.toLowerCase(),
-      status:availability,
-      quality,
-      normalization_status:sourceStatus && !['AVAILABLE','UNAVAILABLE'].includes(sourceStatus) ? sourceStatus : '',
-      resolution_status:resolutionStatus,
-      reason:String(source.reason || resolution.reason_code || source.reason_code || source.reason_text || ''),
-      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
-      editable:source.write_supported === true || source.editable === true,
-      editor:source.editor || null,
-      constraints:source.constraints && typeof source.constraints === 'object' ? source.constraints : {},
-      write:source.write && typeof source.write === 'object' ? source.write : null,
-      operation:source.operation && typeof source.operation === 'object' ? source.operation : null,
-      raw:source
-    });
-  };
-
-  const coreField = (sectionName, fieldName) => {
-    const section = object(core[sectionName]);
-    const fields = object(section.fields);
-    if (fields[fieldName] !== undefined) return semantic(fields[fieldName]);
-    if (section[fieldName] && typeof section[fieldName] === 'object' && Object.prototype.hasOwnProperty.call(section[fieldName],'value')) {
-      return semantic(section[fieldName]);
-    }
-    if (Object.prototype.hasOwnProperty.call(section, fieldName)) {
-      const value = section[fieldName];
-      return semantic({
-        value,
-        unit:({power_kw:'kW',net_power_kw:'kW',import_power_kw:'kW',export_power_kw:'kW',attributed_power_kw:'kW',soc_pct:'%',reserve_target_pct:'%',capacity_kwh:'kWh',available_kwh:'kWh'})[fieldName] || null,
-        status:value === null || value === undefined ? 'UNAVAILABLE' : 'AVAILABLE',
-        quality:value === null || value === undefined ? 'UNKNOWN' : 'CANONICAL',
-        reason:value === null || value === undefined ? String(section.reason || '') : null
-      });
-    }
-    return semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:String(section.reason || 'canonical_field_not_published')});
-  };
-
-  const coreByKey = new Map([
-    ['battery.power_kw', coreField('battery','power_kw')],
-    ['battery.soc_pct', coreField('battery','soc_pct')],
-    ['battery.capacity_kwh', coreField('battery','capacity_kwh')],
-    ['battery.available_kwh', coreField('battery','available_kwh')],
-    ['battery.state', coreField('battery','state')],
-    ['battery.reserve_target_pct', coreField('battery','reserve_target_pct')],
-    ['solar.power_kw', coreField('solar','power_kw')],
-    ['grid.net_power_kw', coreField('grid','net_power_kw')],
-    ['grid_import.power_kw', coreField('grid','import_power_kw')],
-    ['grid_export.power_kw', coreField('grid','export_power_kw')],
-    ['grid.flow_direction', coreField('grid','flow_direction')],
-    ['site_consumption.power_kw', coreField('consumption','power_kw')],
-    ['home_consumption.power_kw', coreField('home','power_kw')],
-    ['flexible_loads.power_kw', coreField('flexible','power_kw')],
-    ['flexible_loads.attributed_power_kw', coreField('flexible','attributed_power_kw')]
-  ]);
-
-  const coreFlexible = object(core.flexible);
-  const flexibleAssets = Object.freeze(
-    (array(coreFlexible.assets).length ? array(coreFlexible.assets) : objects.filter(row => {
-      const type=String(row.asset_type || row.object_class || '').toLowerCase();
-      return type === 'flexible_load' || type === 'flexible_asset';
-    })).map(row => Object.freeze({ ...row }))
-  );
-  const planningObjects = Object.freeze(array(layers.planning_objects));
-  const objectById = new Map(objects.map(row => [String(row.asset_id || ''), row]).filter(([id]) => id));
-  const profileById = new Map(profiles.map(row => [String(row.profile_id || ''), row]).filter(([id]) => id));
-
-  const propertyRows = [];
-  const propertyByKey = new Map();
-  const propertyByAssetAndKey = new Map();
-  const configurationRows = [];
-  const addConfigurationRows = (configurationKind, rows) => {
-    for (const raw of array(rows)) {
-      const key = String(raw.property_key || raw.property_id || raw.key || '');
-      if (!key) continue;
-      const row = Object.freeze({
-        asset_id:String(raw.asset_id || configurationKind),
-        configuration_kind:configurationKind,
-        ...raw,
-        property_id:String(raw.property_id || key),
-        property_key:key,
-        key
-      });
-      configurationRows.push(row);
-      if (!propertyByKey.has(key)) propertyByKey.set(key,row);
-    }
-  };
-  const pricing = object(configuration.pricing);
-  const meteringConfiguration = object(configuration.metering);
-  const strategy = object(configuration.strategy);
-  addConfigurationRows('pricing', pricing.properties);
-  addConfigurationRows('metering', meteringConfiguration.properties);
-  addConfigurationRows('strategy', object(strategy.configured).properties || strategy.configured_properties);
-
-  for (const asset of objects) {
-    const assetId = String(asset.asset_id || '');
-    for (const raw of array(asset.properties)) {
-      const key = String(raw.property_key || raw.property_id || raw.key || '');
-      if (!key) continue;
-      const row = Object.freeze({ asset_id:assetId, ...raw, property_key:key, key });
-      propertyRows.push(row);
-      if (!propertyByKey.has(key)) propertyByKey.set(key, row);
-      if (assetId) propertyByAssetAndKey.set(`${assetId}::${key}`, row);
-    }
-
-    // Appearance is product presentation metadata, not a semantic measurement.
-    // Adapt the backend-owned appearance contract into the generic property writer
-    // without polluting the object's published semantic property set.
-    const appearance = object(asset.appearance);
-    const appearanceWrite = object(appearance.write);
-    const appearancePropertyId = String(appearanceWrite?.data?.property_id || '');
-    if (
-      assetId
-      && appearance.editable === true
-      && appearanceWrite.supported === true
-      && appearancePropertyId
-    ) {
-      const row = Object.freeze({
-        asset_id:assetId,
-        property_id:appearancePropertyId,
-        property_key:appearancePropertyId,
-        key:appearancePropertyId,
-        display_name:'Image',
-        value:appearance.configured_visual_ref ?? null,
-        availability:'AVAILABLE',
-        editable:true,
-        write_supported:true,
-        write:appearanceWrite,
-        operation:object(appearance.operation)
-      });
-      propertyRows.push(row);
-      propertyByKey.set(appearancePropertyId,row);
-      propertyByAssetAndKey.set(`${assetId}::${appearancePropertyId}`,row);
-    }
-  }
-
-  // The aggregate object's ad-hoc fields and alias names are not property
-  // authority. Missing current measurements must remain unavailable instead
-  // of being reconstructed from a legacy Core/object snapshot.
-  const currentAggregateObject = _key => null;
-  const currentField = key => coreByKey.get(String(key || '')) ||
-    semantic({value:null,status:'UNAVAILABLE',quality:'UNKNOWN',reason:'canonical_current_field_not_published'});
-
-  const publicContractOk = envelope.available && String(attrs.contract_id || '') === 'RHI_ENERGY_PUBLIC_CONTRACT_V2';
-  const corePresent = Object.keys(core).length > 0;
-  const capabilities = Object.freeze({
-    core:corePresent,
-    assets:Array.isArray(objects),
-    relationships:Array.isArray(relationships),
-    connections:Array.isArray(connections),
-    planning:Object.keys(object(planning.horizons)).length > 0,
-    metering:Object.keys(object(metering.periods)).length > 0,
-    retrospective:Object.keys(retrospective).length > 0,
-    pricing:Object.keys(pricing).length > 0,
-    metering_configuration:Object.keys(meteringConfiguration).length > 0,
-    strategy:Object.keys(strategy).length > 0,
-    value_accounting:Object.keys(valueAccounting).length > 0,
-    commands:Array.isArray(commands)
-  });
-  const compatibilityReason = !publicContractOk ? 'public_v2_contract_unavailable' : '';
-
+// Backend-access boundary. Native canonical property/object/metric/command
+// entities are indexed by published markers, never by guessed HA entity IDs.
+function createEnergyContractGateway(host) {
+  const state=id=>host?.rawState?.(id) || host?.hass?.states?.[id] || null;
+  const attrs=id=>state(id)?.attributes || {};
   return Object.freeze({
-    envelope,
-    available:publicContractOk,
-    publicContractOk,
-    corePresent,
-    capabilities,
-    compatibilityReason,
-    contractVersion:String(attrs.contract_version || envelope.contractVersion || ''),
-    release:String(attrs.release || ''),
-    health:object(attrs.health).status || String(attrs.health || envelope.state || 'UNKNOWN'),
-    core,
-    summary,
-    experience:Object.freeze({...experience, presence}),
-    presence,
-    objects,
-    profiles,
-    relationships,
-    connections,
-    planning,
-    metering,
-    retrospective,
-    intelligence,
-    overview,
-    configuration,
-    valueAccounting,
-    activity,
-    layers,
-    flexibleAssets,
-    planningObjects,
-    commands,
-    objectById,
-    profileById,
-    propertyRows:Object.freeze(propertyRows),
-    configurationRows:Object.freeze(configurationRows),
-    allPropertyRows:Object.freeze([...propertyRows, ...configurationRows]),
-    propertyByKey,
-    propertyByAssetAndKey,
-    coreByKey,
-    currentAggregateObject,
-    currentField,
-    object(assetId) { return objectById.get(String(assetId || '')) || null; },
-    profile(profileId) { return profileById.get(String(profileId || '')) || null; },
-    property(key, assetId = '') {
-      const id = String(assetId || '');
-      return id ? (propertyByAssetAndKey.get(`${id}::${String(key || '')}`) || null) : (propertyByKey.get(String(key || '')) || null);
-    },
-    field(key, assetId = '') {
-      if (!assetId && coreByKey.has(String(key || ''))) return coreByKey.get(String(key || ''));
-      return semantic(this.property(key, assetId));
-    }
+    host,
+    state,attrs,
+    canonicalProperty:(assetId,propertyKey)=>host?.canonicalIndex?.row(assetId,propertyKey) || null,
+    canonicalObject:assetId=>host?.canonicalIndex?.object(assetId) || null,
+    nativeMetric:key=>host?.nativeMetric?.(key) || readNativeEnergyMetric(host?.hass || {},key),
+    nativePlanningTotals:id=>host?.nativePlanningTotals?.(id) || readNativeEnergyPlanningTotals(host?.hass || {},id),
+    nativePlanningHorizon:id=>host?.nativePlanningHorizon?.(id) || {available:false,details:null}
   });
 }
 
-function createEnergyAssetProjection(v2, assetId) {
-  const asset = v2?.object?.(assetId) || null;
-  if (!asset) return null;
-  const profile = v2.profile(asset.profile_id) || null;
-  const relationships = (v2.relationships || []).filter(row =>
-    String(row.source_asset_id || '') === String(assetId)
-    || String(row.target_asset_id || '') === String(assetId)
-  );
-  const properties = (asset.properties || []).map(row => ({
-    ...row,
-    projection:v2.field(row.property_key || row.property_id || row.key, assetId)
-  }));
-  const controls = Array.isArray(asset.controls) ? asset.controls : [];
+// ---- src/runtime/energy-v2-contract.js ----
+// Canonical Energy product projection from direct HA object/property entities,
+// domain-owned native metrics and published horizon decisions. No aggregate
+// Public V2 snapshot is read here. Screens receive one coherent read-only view.
+function readEnergyCanonicalProduct(gateway) {
+  const index=gateway?.host?.canonicalIndex;
+  const hass=gateway?.host?.hass || {};
+  const propertyRows=index?.productRows?.() || [];
+  const ids=new Set();
+  const byId=new Map();
+  const byKey=new Map();
+  const byAssetAndKey=new Map();
+  const conflicts=new Set();
+  const objectRows=index?.objectRows?.() || [];
+  for(const object of objectRows) {
+    if(object.object_class === 'energy_configuration') continue;
+    if(byId.has(object.asset_id)){conflicts.add(object.asset_id);continue;}
+    byId.set(object.asset_id,{...object,properties:[]});
+  }
+  for(const property of propertyRows) {
+    const id=String(property.asset_id || '');
+    const key=String(property.property_key || '');
+    if(!id || !key || index?.ambiguousObjects?.has(id)) continue;
+    const objectClass=String(property.logical_object_class || '');
+    if(objectClass === 'energy_configuration') continue;
+    const object=byId.get(id);
+    if(object && object.object_class !== objectClass) {conflicts.add(id);continue;}
+    if(!object)byId.set(id,{
+      asset_id:id,object_class:objectClass,asset_type:objectClass,
+      display_name:String(property.asset_display_name || id),
+      parent_asset_id:property.parent_asset_id || null,
+      profile_id:'',visual_ref:'',properties:[]
+    });
+    byId.get(id).properties.push(property);
+  }
+  for(const id of conflicts)byId.delete(id);
+  for(const [id,obj] of byId) {
+    ids.add(id);
+    Object.freeze(obj.properties);
+    byId.set(id,Object.freeze(obj));
+    for(const p of obj.properties) {
+      const key=String(p.property_key);
+      byAssetAndKey.set(id+'::'+key,p);
+      if(!byKey.has(key))byKey.set(key,p);
+      else {byKey.set(key,null);}
+    }
+  }
+  const objects=Object.freeze([...byId.values()]);
+  const semantic=raw=>{
+    if(!raw || raw.availability !== 'AVAILABLE')return Object.freeze({
+      resolved:false,value:null,display:'—',status:'UNAVAILABLE',state:'unavailable',
+      reason:String(raw?.reason || 'canonical_property_not_published'),
+      quality:String(raw?.quality || 'UNKNOWN'),unit:String(raw?.unit || ''),raw:raw || {}
+    });
+    return Object.freeze({
+      resolved:true,value:raw.value,display:String(raw.value),status:'AVAILABLE',
+      state:'available',reason:String(raw.reason || ''),quality:String(raw.quality || ''),
+      unit:String(raw.unit || ''),editable:raw.editable === true,
+      editor:raw.editor || null,write:raw.write || null,
+      constraints:raw.constraints || {},raw
+    });
+  };
+  const currentField=key=>semantic(byKey.get(String(key || '')) || null);
+  const currentMap=[
+    ['battery','battery_system',['power_kw','soc_pct','capacity_kwh','available_kwh','state','reserve_target_pct']],
+    ['solar','solar_production',['power_kw']],
+    ['grid','grid_connection',['net_power_kw','flow_direction']],
+    ['home','home_consumption',['power_kw']],
+    ['consumption','site_consumption',['power_kw']],
+    ['flexible','flexible_loads',['power_kw','attributed_power_kw']]
+  ];
+  const core={},coreByKey=new Map();
+  for(const [section,cls,keys] of currentMap) {
+    const sectionFields={};
+    const matching=objects.filter(obj=>obj.object_class===cls);
+    for(const field of keys) {
+      const key=section==='grid' && field==='net_power_kw' ? 'grid.net_power_kw'
+        : section==='grid' && field==='flow_direction' ? 'grid.flow_direction'
+        : section==='grid' ? 'grid_'+field
+        : section==='consumption' ? 'site_consumption.'+field
+        : section==='home' ? 'home_consumption.'+field
+        : section==='battery' ? 'battery.'+field
+        : section==='solar' ? 'solar.'+field : 'flexible_loads.'+field;
+      const rows=matching.flatMap(o=>o.properties.filter(p=>p.property_key===key));
+      const one=rows.length===1?rows[0]:null;
+      const value=semantic(one);
+      coreByKey.set(key,value);
+      sectionFields[field]=value;
+    }
+    core[section]={fields:sectionFields,...Object.fromEntries(Object.entries(sectionFields).map(([key,row])=>[key,row.resolved ? row.value : null]))};
+  }
+  const configRows=propertyRows.filter(row=>row.logical_object_class === 'energy_configuration');
+  for(const p of configRows){
+    const key=String(p.property_key || ''),id=String(p.asset_id || '');
+    if(!key || !id)continue;
+    byAssetAndKey.set(id+'::'+key,p);
+    if(!byKey.has(key))byKey.set(key,p);
+    else byKey.set(key,null);
+  }
+  const forFamily=kind=>configRows.filter(row=>row.presentation_family === kind);
+  const pricingRows=forFamily('pricing'), strategyRows=forFamily('strategy'), meteringRows=forFamily('metering');
+  const groupProfiles=new Map();
+  for(const row of strategyRows) {
+    const id=String(row.asset_id || '').replace(/^configuration:/,'');
+    if(!id)continue;
+    if(!groupProfiles.has(id))groupProfiles.set(id,{
+      profile_id:id,display_name:id.replace(/_/g,' '),configured_properties:[],effective_properties:[]
+    });
+    groupProfiles.get(id).configured_properties.push(row);
+  }
+  const configuration={
+    pricing:{properties:pricingRows},
+    metering:{properties:meteringRows},
+    strategy:{profiles:[...groupProfiles.values()],configured:{properties:strategyRows},
+      configured_properties:strategyRows,effective:{properties:[],status:'UNAVAILABLE',reason:'effective_strategy_not_published'}}
+  };
+  const horizons={},planningObjects=[];
+  for(const id of ['D0','D1']) {
+    const native=typeof gateway.host?.nativePlanningTotals==='function'
+      ? gateway.host.nativePlanningTotals(id) : readNativeEnergyPlanningTotals(hass,id);
+    const detail=typeof gateway.host?.nativePlanningHorizon==='function'
+      ? gateway.host.nativePlanningHorizon(id):null;
+    const attrs=detail?.available === true ? detail.details || {} : {};
+    const numeric=(field)=>{
+      const cell=native?.values?.[field];
+      return cell?.available === true ? Number(cell.value) : null;
+    };
+    const totalFields=['required_kwh','planned_kwh','still_to_plan_kwh',
+      'flexible_required_kwh','flexible_planned_kwh','flexible_still_to_plan_kwh'];
+    horizons[id]={
+      horizon_id:id,status:native?.available ? 'AVAILABLE':'INCOMPLETE',
+      quality:{availability:native?.available ? 'AVAILABLE':'INCOMPLETE',
+        missing:native?.missing || totalFields},
+      ...Object.fromEntries(totalFields.map(k=>[k,numeric(k)])),
+      buckets:Array.isArray(attrs.buckets) ? attrs.buckets:[],
+      planning_assets:Array.isArray(attrs.planning_assets)?attrs.planning_assets:[],
+      source_lanes:attrs.source_lanes || {},consumer_lanes:attrs.consumer_lanes || {},
+      balance:attrs.balance || {},battery_ledger:attrs.battery_ledger || {},
+      policy_evidence:attrs.policy_evidence || {},plan_id:attrs.plan_id || null,
+      generated_at:attrs.generated_at || null,provider_id:attrs.provider_id || null,
+      execution_policy:attrs.execution_policy || {}
+    };
+    for(const row of horizons[id].planning_assets) if(row?.asset_id)
+      planningObjects.push({...row,horizon_id:id});
+  }
+  const nativeValue=readNativeEnergyMetric(hass,'net_financial_result_eur');
+  const period=nativeValue?.period || null;
+  const valueAccounting={selected_period_id:period,
+    periods:period && nativeValue.available ? {
+      [period]:{available:true,actual_complete:nativeValue.actual_complete === true,
+        net_financial_result_eur:Number(nativeValue.value),
+        quality:nativeValue.quality,reason:nativeValue.reason || ''}
+    } : {},
+    net_financial_result:period && nativeValue.available ?
+      {value:Number(nativeValue.value),period_id:period,actual_complete:nativeValue.actual_complete} : {}
+  };
+  const flexibleAssets=objects.filter(obj=>obj.object_class==='flexible_load').map(obj=>{
+    const rows=obj.properties;
+    const facts=Object.fromEntries(rows.filter(p=>p.availability === 'AVAILABLE')
+      .map(p=>[p.property_key,p.value]));
+    const propertyValue=suffix=>rows.find(p=>p.property_key===suffix)?.value ?? null;
+    return {...obj,...facts,power_kw:propertyValue('power_kw'),
+      energy_to_target_kwh:propertyValue('energy_to_target_kwh'),
+      flexible_role:propertyValue('flexible_role'),visible:true,show_in_primary_ux:true};
+  });
+  const nativeCommands=readEnergyCommandContract(gateway).rows;
+  const envelope=Object.freeze({entityId:null,available:!!index?.hasCanonicalTruth?.(),
+    contractVersion:'ENERGY_CANONICAL_NATIVE_V2'});
+  const capabilities={
+    core:propertyRows.length>0,assets:objects.length>0,
+    planning:Object.values(horizons).some(h=>h.status==='AVAILABLE'),
+    pricing:pricingRows.length>0,strategy:strategyRows.length>0,
+    commands:nativeCommands.length>0,
+    value_accounting:nativeValue.available === true
+  };
   return Object.freeze({
-    identity:Object.freeze({
-      asset_id:String(asset.asset_id || ''),
-      display_name:String(asset.display_name || asset.name || asset.asset_id || ''),
-      asset_type:String(asset.asset_type || asset.object_class || ''),
-      object_class:String(asset.object_class || ''),
-      profile_id:String(asset.profile_id || ''),
-      visual_ref:String(asset.visual_ref || ''),
-      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
-    }),
-    lifecycle:Object.freeze({
-      state:String(asset.health || asset.status || 'UNKNOWN'),
-      publication:asset.property_publication || {},
-      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
-    }),
+    envelope,available:envelope.available,publicContractOk:envelope.available,
+    corePresent:capabilities.core,capabilities,compatibilityReason:envelope.available?'':'canonical_energy_property_unavailable',
+    contractVersion:envelope.contractVersion,release:'',
+    health:envelope.available?'AVAILABLE':'UNAVAILABLE',
+    core,summary:{},experience:{presence:{}},presence:{},
+    objects,profiles:[],relationships:[],connections:[],commands:nativeCommands,activity:[],
+    planning:{horizons},metering:{periods:{}},retrospective:{},intelligence:{},overview:{},
+    configuration,valueAccounting,layers:{planning_objects:planningObjects},
+    flexibleAssets:Object.freeze(flexibleAssets),planningObjects:Object.freeze(planningObjects),
+    objectById:byId,profileById:new Map(),
+    propertyRows:Object.freeze(propertyRows),configurationRows:Object.freeze(configRows),
+    allPropertyRows:Object.freeze(propertyRows),propertyByKey:byKey,
+    propertyByAssetAndKey:byAssetAndKey,coreByKey,
+    currentAggregateObject:()=>null,currentField,
+    object:id=>byId.get(String(id||''))||null,
+    profile:()=>null,
+    property:(key,id='')=>id ? (byAssetAndKey.get(String(id)+'::'+String(key)) || null)
+      : (byKey.get(String(key)) || null),
+    field:(key,id='')=>semantic(id ? byAssetAndKey.get(String(id)+'::'+String(key))
+      : byKey.get(String(key)))
+  });
+}
+
+function createEnergyAssetProjection(product,assetId) {
+  const asset=product?.object?.(assetId);
+  if(!asset)return null;
+  const properties=(asset.properties || []).map(row=>({...row,projection:product.field(row.property_key,assetId)}));
+  return Object.freeze({
+    identity:Object.freeze({asset_id:asset.asset_id,display_name:asset.display_name,
+      asset_type:asset.object_class,object_class:asset.object_class,
+      profile_id:asset.profile_id || '',visual_ref:asset.visual_ref || '',
+      source:'RHI_ENERGY_CANONICAL_OBJECT_V2'}),
+    lifecycle:Object.freeze({state:asset.health || 'UNKNOWN',source:'RHI_ENERGY_CANONICAL_OBJECT_V2'}),
     properties:Object.freeze(properties),
-    property(key) { return v2.field(key, assetId); },
-    relationships:Object.freeze(relationships),
-    controls:Object.freeze(controls),
-    profile,
-    raw:asset
+    property:key=>product.field(key,assetId),
+    relationships:Object.freeze([]),controls:Object.freeze([]),
+    profile:null,raw:asset
   });
 }
 
@@ -707,17 +658,20 @@ function selectEnergyAsset(store, assetId) {
 
 function selectEnergyOverview(store) {
   const row=store?.overview && typeof store.overview === 'object' ? store.overview : {};
+  const home=store?.currentField?.('home_consumption.power_kw');
+  const primary=home?.resolved===true ? {value:home.value,unit:home.unit || 'kW',
+    property_key:'home_consumption.power_kw',source:'RHI_ENERGY_CANONICAL_PROPERTY_V2'} : null;
   return Object.freeze({
     available:store?.available === true,
-    status:String(row.status || row.product_status || row.state || store?.health || 'UNKNOWN'),
-    primary:row.primary || row.primary_metric || null,
-    summary:row.summary || {},
-    flow:row.flow || {},
+    status:String(row.status || row.product_status || row.state ||
+      (store?.available === true ? 'AVAILABLE':'UNAVAILABLE')),
+    primary:row.primary || row.primary_metric || primary,
+    summary:row.summary || {},flow:row.flow || {},
     conclusions:Array.isArray(row.conclusions) ? row.conclusions : [],
-    reason:String(row.reason || row.product_reason || ''),
-    raw:row,
-    core:store?.core || {},
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.core'
+    reason:String(row.reason || row.product_reason ||
+      (store?.available ? '':'canonical_product_unavailable')),
+    raw:row,core:store?.core || {},
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2'
   });
 }
 
@@ -744,7 +698,7 @@ function selectEnergyPlanning(store, horizon='D0') {
     buckets:Array.isArray(row.buckets) ? row.buckets : [],
     flexible_plan:{},
     planning_objects:Array.isArray(store?.planningObjects) ? store.planningObjects : [],
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons'
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.planning.horizons'
   });
 }
 
@@ -765,7 +719,7 @@ function selectEnergyConfigurationProperties(store, scope) {
       effective_state:String(effective.status || 'UNAVAILABLE'),
       effective_reason:String(effective.reason || ''),
       runtime_overrides:Object.freeze((Array.isArray(effective.runtime_overrides) ? effective.runtime_overrides : []).map(row=>Object.freeze({...row}))),
-      source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy'
+      source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.configuration.strategy'
     });
   }
   const rows=Array.isArray(section.properties) ? section.properties : [];
@@ -776,7 +730,7 @@ function selectEnergyConfigurationProperties(store, scope) {
     effective_properties:Object.freeze([]),
     effective_state:String(section.availability || section.status || 'UNAVAILABLE'),
     effective_reason:String(section.reason || ''),
-    source:`RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.${kind}`
+    source:`RHI_ENERGY_CANONICAL_PROPERTY_V2.configuration.${kind}`
   });
 }
 
@@ -796,7 +750,7 @@ function selectEnergyValue(store, period='today') {
     value:row,
     net_financial_result_eur:row.net_financial_result_eur ?? (id === selectedId ? netOutcome.value ?? accounting.net_financial_result_eur ?? null : null),
     net_financial_result:id === selectedId ? netOutcome : {},
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.value_accounting'
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.value_accounting'
   });
 }
 
@@ -808,7 +762,7 @@ function selectEnergyMetering(store, period='today') {
     period_id:id,
     metrics:Object.freeze({}),
     reason:'canonical_period_energy_not_published',
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2'
   });
 }
 
@@ -816,7 +770,7 @@ function selectEnergyActivity(store) {
   return Object.freeze({
     available:store?.available === true,
     rows:Object.freeze((Array.isArray(store?.activity) ? store.activity : []).map(row=>Object.freeze({...row}))),
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.activity'
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.activity'
   });
 }
 
@@ -828,7 +782,7 @@ function selectEnergyCommands(store, assetId='') {
   return Object.freeze({
     available:store?.available === true,
     rows:Object.freeze(rows),
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.commands'
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.commands'
   });
 }
 
@@ -851,7 +805,7 @@ function selectEnergyCoverage(store) {
     complete:Object.values(capabilities).every(value=>value === 'SUPPORTED'),
     capabilities,
     unsupported:Object.freeze(Object.entries(capabilities).filter(([,v])=>v!=='SUPPORTED').map(([k])=>k)),
-    source:'RHI_ENERGY_PUBLIC_CONTRACT_V2.coverage'
+    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.coverage'
   });
 }
 
@@ -1076,37 +1030,40 @@ function resolveEnergyAssetVisual(asset = {}, registry = null, variant = "card")
 }
 
 // ---- src/runtime/asset-profile-contract.js ----
-// Canonical Energy asset context; the backend owns class, properties and profile
-// evidence. Never infer a profile or completeness from a legacy object registry.
-function readEnergyAssetContext(gateway, assetId = "") {
-  const id=String(assetId || '').trim();
-  const index=gateway?.host?.canonicalIndex;
-  // Only unambiguous, product-published canonical properties may establish
-  // an asset context. A conflicting publisher must not win by insertion order.
-  const rows=id && index?.productRows ? index.productRows().filter(row=>
-    row.asset_id === id && row.canonical_contract === 'RHI_ENERGY_CANONICAL_PROPERTY_V2') : [];
-  if(rows.length===0) return Object.freeze({available:false,asset:null,profile:null,publication:null});
-  const classes=new Set(rows.map(row=>row.logical_object_class).filter(Boolean));
-  if(classes.size!==1) return Object.freeze({available:false,asset:null,profile:null,publication:null,reason:'ambiguous_asset_class'});
-  const first=rows[0];
+// Native Energy asset context. Only backend canonical object and property
+// publications own identity, hierarchy, appearance and technical details.
+function readEnergyAssetContext(gateway, assetId = '') {
+  const id=String(assetId || '').trim(),index=gateway?.host?.canonicalIndex;
+  if(!id || index?.ambiguousObjects?.has(id))return Object.freeze({
+    available:false,asset:null,profile:null,publication:null,
+    reason:index?.ambiguousObjects?.has(id) ? 'duplicate_canonical_object':'asset_id_required'
+  });
+  const status=index?.object?.(id) || null;
+  const rows=(index?.productRows?.() || []).filter(r=>r.asset_id===id);
+  const classes=new Set([status?.object_class,...rows.map(r=>r.logical_object_class)].filter(Boolean));
+  if(classes.size!==1)return Object.freeze({available:false,asset:null,profile:null,publication:null,
+    reason:classes.size>1 ? 'ambiguous_asset_class':'canonical_asset_not_published'});
+  const cls=[...classes][0];
+  const first=rows[0] || {};
   const asset=Object.freeze({
-    asset_id:id,
-    object_class:first.logical_object_class,
-    asset_type:first.logical_object_class,
-    display_name:String(first.asset_display_name || id),
-    parent_asset_id:first.parent_asset_id || null,
+    asset_id:id,object_class:cls,asset_type:cls,
+    display_name:String(status?.display_name || first.asset_display_name || id),
+    parent_asset_id:status?.parent_asset_id || first.parent_asset_id || null,
     integration_domain:first.integration_domain || null,
+    profile_id:status?.profile_id || '',visual_ref:status?.visual_ref || '',
+    health:status?.health || 'UNKNOWN',
+    source_device_ids:status?.source_device_ids || [],
+    children:status?.children || [],
     properties:Object.freeze(rows.map(row=>Object.freeze({...row})))
   });
-  // Neither profile nor completeness may be synthesized from property-name matches.
   return Object.freeze({available:true,asset,profile:null,publication:null});
 }
-function energyAssetPublicationGap(gateway, assetId = "") {
+function energyAssetPublicationGap(gateway,assetId='') {
   const context=readEnergyAssetContext(gateway,assetId);
   return Object.freeze({
-    status:context.available ? 'not_published' : 'unavailable',
+    status:context.available ? 'not_published':'unavailable',
     missing:[],unresolved:[],resolution_complete:false,
-    authority:'RHI_ENERGY_CANONICAL_PROPERTY_V2',
+    authority:'RHI_ENERGY_CANONICAL_OBJECT_V2',
     reason:context.reason || 'backend_publication_completeness_not_published'
   });
 }
@@ -1360,36 +1317,50 @@ function createCurrentEnergyViewModel(gateway) {
   }
 
 // ---- src/runtime/command-contract.js ----
-// Canonical Energy V2 command reader. UX visibility and enablement are backend-owned.
+// Native Energy command authority. A canonical button advertises a literal,
+// backend-owned service invocation; availability is never inferred from HA IDs.
 function readEnergyCommandContract(gateway) {
-  const v2 = readEnergyPublicV2(gateway);
-  const envelope = v2.envelope;
-  const roleFor = row => String(row.role || '').trim().toLowerCase();
-  const rows = (v2.commands || []).map((value, index) => {
-    const row = objectFrom(value);
-    const commandId = String(firstDefined(row.command_id, row.action_id, row.command_key, row.id, '') || '');
-    const targetAssetId = String(firstDefined(row.target_asset_id, row.asset_id, row.flexible_asset_id, row.planning_target_asset_id, '') || '');
-    const visible = asBool(firstDefined(row.visible, row.ux_visible, row.supported), false);
-    const enabled = visible && asBool(firstDefined(row.enabled, row.ux_enabled, String(row.availability || '').toUpperCase() === 'AVAILABLE'), false);
-    return Object.freeze({
-      command_row_id: row.command_instance_id || row.command_row_id || `command_${index + 1}`,
-      entity_id: envelope.entityId,
-      ...row,
-      command_id: commandId,
-      target_asset_id: targetAssetId,
-      role: roleFor(row),
-      contract_valid: !!commandId && !!targetAssetId && !!row.invoke,
-      command_owner: String(firstDefined(row.command_owner, row.owner, 'energy') || 'energy'),
-      action_kind: String(firstDefined(row.action_kind, row.kind, 'command') || 'command'),
-      command_resolved: !!row.invoke,
-      currently_applicable: enabled,
-      visible,
-      enabled,
-      blocked_reason:String(firstDefined(row.blocked_reason, row.reason?.message, row.reason?.code, '')),
-      user_action_text:String(firstDefined(row.user_action_text, ''))
-    });
+  const states=gateway?.host?.hass?.states || {};
+  const grouped=new Map(),ambiguous=new Set();
+  for(const [entityId,state] of Object.entries(states)) {
+    const a=state?.attributes || {};
+    if(a.canonical_contract !== 'RHI_ENERGY_CANONICAL_COMMAND_V1') continue;
+    const id=String(a.asset_id || a.target_asset_id || '').trim();
+    const key=String(a.command_id || a.command_key || '').trim();
+    const role=String(a.role || '').trim();
+    if(!id || !key || !role || id!==String(a.target_asset_id || id).trim()) continue;
+    const composite=`${id}::${key}`;
+    if(grouped.has(composite)){ambiguous.add(composite);continue;}
+    const invoke=a.invoke && typeof a.invoke==='object' ? a.invoke : {};
+    const data=invoke.data && typeof invoke.data==='object' ? invoke.data : {};
+    const exact=String(invoke.service || '')==='rhi_energy.invoke_command' &&
+      String(data.command_id || '')===key &&
+      String(data.target_asset_id || '')===id;
+    const supported=a.supported===true;
+    const visible=supported && a.visible===true;
+    const allowed=visible && exact && a.execution_allowed===true &&
+      String(a.availability || '').toUpperCase()==='AVAILABLE';
+    grouped.set(composite,Object.freeze({
+      entity_id:entityId,command_row_id:composite,command_instance_id:composite,
+      command_id:key,command_key:key,target_asset_id:id,asset_id:id,role,
+      label:String(a.label || role.replace(/_/g,' ')),
+      command_owner:'energy',action_kind:'command',
+      contract_valid:exact,
+      command_resolved:exact,
+      currently_applicable:allowed,visible,enabled:allowed,
+      supported,execution_allowed:allowed,
+      blocked_reason:String(a.blocked_reason || (allowed ? '' : exact ? 'backend_not_available':'incomplete_command_invocation')),
+      invoke:exact ? Object.freeze({service:invoke.service,data:Object.freeze({...data})}) : null,
+      source:'RHI_ENERGY_CANONICAL_COMMAND_V1'
+    }));
+  }
+  const rows=[...grouped.entries()].filter(([id])=>!ambiguous.has(id)).map(([,row])=>row);
+  return Object.freeze({
+    envelope:Object.freeze({entityId:null,available:rows.length>0}),
+    rows:Object.freeze(rows),
+    ambiguous:Object.freeze([...ambiguous]),
+    source:'RHI_ENERGY_CANONICAL_COMMAND_V1'
   });
-  return Object.freeze({ envelope, rows, source:'RHI_ENERGY_PUBLIC_CONTRACT_V2' });
 }
 
 // ---- src/runtime/command-action-model.js ----
@@ -1647,7 +1618,11 @@ function readEnergyCommandContract(gateway) {
           && (!!String(state?.attributes?.metric_key || '').trim() ||
             state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1'))
         .map(([entityId])=>entityId);
-      return [...new Set([...canonicalIds, ...nativeMetrics, registryEntity].filter(Boolean))];
+      const objectIds=this.canonicalIndex?.objectEntityIds?.() || [];
+      const commandIds=Object.entries(this.hass?.states || {})
+        .filter(([,state])=>state?.attributes?.canonical_contract === 'RHI_ENERGY_CANONICAL_COMMAND_V1')
+        .map(([id])=>id);
+      return [...new Set([...canonicalIds, ...objectIds, ...nativeMetrics, ...commandIds, registryEntity].filter(Boolean))];
     }
     entitySignature(entityIds = []) {
       return (entityIds || []).map(id => {
@@ -1689,31 +1664,18 @@ function readEnergyCommandContract(gateway) {
     }
     releaseState() { return this.rawState(RELEASE_ENTITY); }
     releaseAttrs() { return this.releaseState()?.attributes || {}; }
-    publicUxEntities() {
-      if (!this._allowed) this._allowed=[UX_INTERFACES.publicV2];
-      return this._allowed;
-    }
+    publicUxEntities() { return this.subscriptionEntityIds(); }
     isCanonicalUxInterface(entityId) {
-      // The canonical interface is defined by its exact published entity id and
-      // validated contract_id/core contract in readEnergyPublicV2(). Do not add
-      // optional transport metadata as a second availability gate.
-      return entityId === UX_INTERFACES.publicV2 && !!this.rawState(entityId);
+      return !!this.canonicalIndex?.byEntity?.has(entityId) ||
+        !!this.canonicalIndex?.objectStates?.has(entityId);
     }
-    isAllowed(entityId) {
-      return entityId === RELEASE_ENTITY || this.isCanonicalUxInterface(entityId);
-    }
+    isAllowed(entityId) { return entityId === RELEASE_ENTITY || this.isCanonicalUxInterface(entityId); }
     state(entityId) { return this.isAllowed(entityId) ? this.rawState(entityId) : null; }
     attrs(entityId) { return this.state(entityId)?.attributes || {}; }
     contractGateway() { return createEnergyContractGateway(this); }
-    interfaceEntity(interfaceKey) {
-      return interfaceKey === 'publicV2' && this.isCanonicalUxInterface(UX_INTERFACES.publicV2)
-        ? UX_INTERFACES.publicV2
-        : null;
-    }
-    entityForKey(_key) { return UX_INTERFACES.publicV2; }
-    rowsForEntity(entityId) {
-      return entityId === UX_INTERFACES.publicV2 ? this.propertyRows() : [];
-    }
+    interfaceEntity(_interfaceKey) { return null; }
+    entityForKey(key) { return this.row(key)?.entity_id || null; }
+    rowsForEntity(entityId) { const row=this.canonicalIndex?.byEntity?.get(entityId); return row ? [row] : []; }
     allRows() {
       if (this._rows) return this._rows;
       const result = new Map();
@@ -1806,15 +1768,15 @@ function readEnergyCommandContract(gateway) {
         showMainWarning:backendStatus.showMainWarning
       };
     }
-    publicV2() {
-      if (!this._publicV2) this._publicV2 = readEnergyPublicV2(this.contractGateway());
-      return this._publicV2;
+    canonicalProduct() {
+      if (!this._canonicalProduct) this._canonicalProduct = readEnergyCanonicalProduct(this.contractGateway());
+      return this._canonicalProduct;
     }
     experiencePresence() {
-      return Object.freeze({...(this.publicV2().presence || {})});
+      return Object.freeze({...(this.canonicalProduct().presence || {})});
     }
     contractCompatibility() {
-      const v2=this.publicV2();
+      const v2=this.canonicalProduct();
       return Object.freeze({
         available:v2.available === true,
         reason:String(v2.compatibilityReason || ''),
@@ -1823,9 +1785,9 @@ function readEnergyCommandContract(gateway) {
         capabilities:v2.capabilities || {}
       });
     }
-    contractEntityId() { return this.publicV2().envelope.entityId; }
-    assetProjection(assetId) { return selectEnergyAsset(this.publicV2(), assetId); }
-    overviewProjection() { return selectEnergyOverview(this.publicV2()); }
+    contractEntityId() { return this.canonicalProduct().envelope.entityId; }
+    assetProjection(assetId) { return selectEnergyAsset(this.canonicalProduct(), assetId); }
+    overviewProjection() { return selectEnergyOverview(this.canonicalProduct()); }
     planningProjection(horizon = 'D0') {
       const native=readPlanningContract(this,horizon);
       return Object.freeze({...native,
@@ -1834,8 +1796,8 @@ function readEnergyCommandContract(gateway) {
         source:'rhi_energy.runtime/native_metric'
       });
     }
-    strategyProjection() { return selectEnergyStrategies(this.publicV2()); }
-    pricingProjection() { return selectEnergyPricing(this.publicV2()); }
+    strategyProjection() { return selectEnergyStrategies(this.canonicalProduct()); }
+    pricingProjection() { return selectEnergyPricing(this.canonicalProduct()); }
     valueProjection(period = 'today') {
       const requested=String(period || '').toLowerCase();
       const native=this.nativeMetric('net_financial_result_eur');
@@ -1852,27 +1814,39 @@ function readEnergyCommandContract(gateway) {
         source:'rhi_energy.runtime/native_metric'
       });
     }
-    meteringProjection(period = 'today') { return selectEnergyMetering(this.publicV2(), period); }
-    activityProjection() { return selectEnergyActivity(this.publicV2()); }
-    commandProjection(assetId = '') { return selectEnergyCommands(this.publicV2(), assetId); }
-    coverage() { return selectEnergyCoverage(this.publicV2()); }
+    meteringProjection(period = 'today') { return selectEnergyMetering(this.canonicalProduct(), period); }
+    activityProjection() { return selectEnergyActivity(this.canonicalProduct()); }
+    commandProjection(assetId = '') { return selectEnergyCommands(this.canonicalProduct(), assetId); }
+    coverage() { return selectEnergyCoverage(this.canonicalProduct()); }
     assets() {
       if (this._assets) return this._assets;
       const grouped=new Map();
-      // Backend canonical logical property rows are the inventory authority.
-      // Grouping is a presentation operation, never a semantic recomputation.
-      for (const row of (this.canonicalIndex?.productRows?.() || [])) {
-        const assetId=String(row.asset_id || '').trim();
+      // The object status entity owns identity, appearance and HA parentage.
+      // It may represent a structural node with zero product properties.
+      for(const row of (this.canonicalIndex?.objectRows?.() || [])) {
+        if(row.object_class === 'energy_configuration') continue;
+        grouped.set(row.asset_id,{...row,properties:[]});
+      }
+      // Direct canonical properties also publish their own asset/class identity.
+      // Keep this independent evidence visible when the object entity has not
+      // yet been materialized; never overwrite a conflicting canonical identity.
+      for(const row of (this.canonicalIndex?.productRows?.() || [])) {
+        const id=String(row.asset_id || '').trim();
         const objectClass=String(row.logical_object_class || '').trim();
-        if (!assetId || !objectClass) continue;
-        if (!grouped.has(assetId)) grouped.set(assetId,{
-          asset_id:assetId,asset_type:objectClass,object_class:objectClass,
+        if(!id || !objectClass || objectClass === 'energy_configuration' || this.canonicalIndex?.ambiguousObjects?.has(id)) continue;
+        const existing=grouped.get(id);
+        if(existing && existing.object_class !== objectClass) {
+          grouped.delete(id); // inconsistent product authority: fail closed
+          continue;
+        }
+        const asset=existing || {
+          asset_id:id,asset_type:objectClass,object_class:objectClass,
           parent_asset_id:row.parent_asset_id || null,
-          display_name:String(row.asset_display_name || assetId),
-          integration_domain:row.integration_domain || null,
-          properties:[]
-        });
-        grouped.get(assetId).properties.push(row);
+          display_name:String(row.asset_display_name || id),
+          integration_domain:row.integration_domain || null,properties:[]
+        };
+        asset.properties.push(row);
+        grouped.set(id,asset);
       }
       this._assets=[...grouped.values()].map(asset=>Object.freeze({
         ...asset,properties:Object.freeze(asset.properties)
@@ -1930,10 +1904,7 @@ function readEnergyCommandContract(gateway) {
       return this._commandContract;
     }
     commands() {
-      const authority = this.commandContract().rows;
-      return this.commandProjection().rows
-        .map(row => authority.find(candidate => candidate.command_id === row.command_id && candidate.target_asset_id === row.target_asset_id) || null)
-        .filter(Boolean);
+      return this.commandContract().rows;
     }
     commandVisible(command) { return !!command && command.command_resolved === true && command.visible === true; }
     commandResolved(command) { return !!command && command.command_resolved === true; }
@@ -2006,10 +1977,10 @@ function readEnergyCommandContract(gateway) {
     planningExperienceFor(assetId) {
       return this.planningExperienceRows().find(row => String(row.asset_id || row.target_asset_id || '') === String(assetId)) || null;
     }
-    consumerMixIndexEntity() { return this.publicV2().envelope.entityId; }
+    consumerMixIndexEntity() { return this.canonicalProduct().envelope.entityId; }
     consumerMixRows() {
       if (this._consumerMixRows) return this._consumerMixRows;
-      const v2=this.publicV2();
+      const v2=this.canonicalProduct();
       this._consumerMixRows=(v2.flexibleAssets || []).map((raw,index)=>{
         const row=objectFrom(raw);
         const assetId=String(row.asset_id || `flexible_${index+1}`);
@@ -2030,7 +2001,7 @@ function readEnergyCommandContract(gateway) {
           availability:row.availability_state || row.health || 'UNAVAILABLE',
           visible:true,
           flexible:true,
-          source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.objects'],
+          source_refs:['RHI_ENERGY_CANONICAL_PROPERTY_V2.objects'],
           metering_state:'UNAVAILABLE',
           metering_reason:'Canonical per-asset period energy is not published by the current public contract.'
         };
@@ -2050,7 +2021,7 @@ function readEnergyCommandContract(gateway) {
         energy_by_asset_kwh:{},
         health:'PARTIAL',
         reason:'Canonical current flexible-asset truth is available; category/per-asset period energy is not published by the current public contract.',
-        source_refs:['RHI_ENERGY_PUBLIC_CONTRACT_V2.objects']
+        source_refs:['RHI_ENERGY_CANONICAL_PROPERTY_V2.objects']
       };
       return this._consumerMixSummary;
     }
@@ -2164,8 +2135,8 @@ function readEnergyCommandContract(gateway) {
     }
     flexibleAssetIndexRows() {
       if (this._flexibleAssets) return this._flexibleAssets;
-      const v2=this.publicV2();
-      this._flexibleAssetSource='RHI_ENERGY_PUBLIC_CONTRACT_V2.flexible_assets';
+      const v2=this.canonicalProduct();
+      this._flexibleAssetSource='RHI_ENERGY_CANONICAL_PROPERTY_V2.flexible_assets';
       this._flexibleAssets=(v2.flexibleAssets || []).map(row=>this.normalizeFlexibleAssetRow({
         ...row,
         compatibility_fallback:false,
@@ -2234,7 +2205,7 @@ function readEnergyCommandContract(gateway) {
     }
 
     relationships() {
-      return this.publicV2().available ? [...this.publicV2().relationships] : [];
+      return this.canonicalProduct().available ? [...this.canonicalProduct().relationships] : [];
     }
     flowRelationships() {
       return this.relationships().filter(r => String(r.relationship_type || '').toLowerCase() === 'flows_to');
@@ -2280,7 +2251,7 @@ function readEnergyCommandContract(gateway) {
     strategyIntentRows() { return []; }
     strategyProfileRows() {
       if (this._strategyProfiles) return this._strategyProfiles;
-      const v2=this.publicV2();
+      const v2=this.canonicalProduct();
       // Settings grouping is Energy-owned. UX consumes the published groups and
       // never rebuilds them from property-name/group heuristics.
       this._strategyProfiles=asArray(v2.configuration?.strategy?.profiles).map(raw=>{
@@ -2329,8 +2300,8 @@ function readEnergyCommandContract(gateway) {
         const suffix=key.split('.').pop();
         return {
           ...row,
-          entity_id:this.publicV2().envelope.entityId,
-          source_index:'RHI_ENERGY_PUBLIC_CONTRACT_V2.configuration.strategy',
+          entity_id:this.canonicalProduct().envelope.entityId,
+          source_index:'RHI_ENERGY_CANONICAL_PROPERTY_V2.configuration.strategy',
           contract_role:'canonical_strategy_property',
           profile_id:profileId,
           strategy_profile_id:profileId,
@@ -2354,14 +2325,14 @@ function readEnergyCommandContract(gateway) {
       return null;
     }
     settingsParticipationRows() {
-      const v2=this.publicV2();
+      const v2=this.canonicalProduct();
       return asArray(v2.configuration?.strategy?.participating_assets)
         .map(row=>objectFrom(row))
         .filter(row=>row.asset_id);
     }
     effectiveStrategyRows() {
       if (this._effectiveStrategies) return this._effectiveStrategies;
-      const v2=this.publicV2();
+      const v2=this.canonicalProduct();
       const rows=asArray(v2.configuration?.strategy?.effective?.properties);
       const byGroup=new Map();
       rows.forEach(raw=>{
@@ -2383,7 +2354,7 @@ function readEnergyCommandContract(gateway) {
       return this._effectiveStrategies;
     }
     strategyBehaviorTopics() {
-      const v2=this.publicV2();
+      const v2=this.canonicalProduct();
       return asArray(v2.configuration?.strategy?.behavior_topics)
         .map(row=>objectFrom(row))
         .filter(row=>row.topic_id)
@@ -2420,7 +2391,7 @@ function readEnergyCommandContract(gateway) {
     }
     meteringPeriods() {
       if (this._meteringPeriods) return this._meteringPeriods;
-      const v2=this.publicV2();
+      const v2=this.canonicalProduct();
       const periods=objectFrom(v2.metering?.periods || {});
       const labels={hour:'This hour',today:'Today',day:'Today',week:'This week',month:'This month',year:'This year'};
       const order={hour:0,today:1,day:1,week:2,month:3,year:4};
@@ -4805,7 +4776,7 @@ function rhiEnergyVisualPickerStyles() {
         const direct = directFacts[spec.id];
         const value = published !== undefined && published !== null ? published : (rowVal !== null ? rowVal : direct);
         const configured = asNumber(value) !== null || (value !== undefined && value !== null && value !== '');
-        const pricingConfig=objectFrom(rt.publicV2().configuration?.pricing || {});
+        const pricingConfig=objectFrom(rt.canonicalProduct().configuration?.pricing || {});
         const blockers=new Set(asArray(pricingConfig.blocking_property_ids).map(String));
         const propertyId=String(firstDefined(row?.property_id,row?.property_key,row?.key,'') || '');
         const required=propertyId ? blockers.has(propertyId) : false;
@@ -4844,7 +4815,7 @@ function rhiEnergyVisualPickerStyles() {
         savings:null, avoided:null, selfConsumption:null, breakdown:{}, consumers:[],
         interpretation, attention, reason:String(summary.reason || ''),
         tariffs:this.valueTariffRows(rt, {}), accountingReady,
-        pricingComplete:objectFrom(rt.publicV2().configuration?.pricing || {}).accounting_configuration_complete === true
+        pricingComplete:objectFrom(rt.canonicalProduct().configuration?.pricing || {}).accounting_configuration_complete === true
       };
     }
 
@@ -5481,7 +5452,7 @@ function rhiEnergyVisualPickerStyles() {
       return row && !row.missing ? rowValue(row, fallback) : fallback;
     }
     automationExecutionPolicy(rt) {
-      const policy = objectFrom(rt.publicV2().planning?.execution_policy || {});
+      const policy = objectFrom(rt.canonicalProduct().planning?.execution_policy || {});
       const configuredMode = String(firstDefined(policy.configured_mode, this.automationModeValue(rt, 'advice')) || 'advice').toLowerCase();
       return {
         configuredMode,
@@ -6762,7 +6733,7 @@ function rhiEnergyVisualPickerStyles() {
       // Prefer the exact producer-owned connection rows published by Energy V2.
       // This is the canonical cross-domain topology boundary and remains visible
       // even at 0 kW / idle.
-      asArray(rt.publicV2().connections).forEach(connection => {
+      asArray(rt.canonicalProduct().connections).forEach(connection => {
         materialize(
           firstDefined(connection.asset_id, connection.connection_asset_id, ''),
           firstDefined(connection.connected_asset_id, connection.connected_consumer_id, ''),
@@ -6810,13 +6781,13 @@ function rhiEnergyVisualPickerStyles() {
       const projected = Object.freeze([...rows.values()].map(row => Object.freeze(row)));
       const observedAt = projected.map(row => String(firstDefined(row.observed_at, row.updated_at, '') || '')).filter(Boolean).sort().pop() || '';
       return Object.freeze({
-        available:rt.publicV2().available === true,
+        available:rt.canonicalProduct().available === true,
         rows:projected,
         // Deliberately not derived from row power: Energy aggregate truth stays backend-owned.
         totalPowerKw:null,
         observedAt,
         reason:projected.length ? '' : 'No charging connection is currently available.',
-        source:'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+        source:'RHI_ENERGY_CANONICAL_PROPERTY_V2'
       });
     }
     flow(rt) {
@@ -7045,7 +7016,7 @@ function rhiEnergyVisualPickerStyles() {
     }
     strategyProfileCard(rt, profile = {}) {
       const id = profile.profile_id || 'strategy_profile';
-      const details = this.componentDetailsBlock(`strategy-profile-${id}-details`, 'Diagnostics', `${this.kv('Profile id', id)}${this.kv('Raw profile type', profile.profile_type || profile.asset_type || '—')}${this.kv('Editable fields published', String(this.profileEditableRows(rt, profile).length))}${this.kv('Contract role', profile.contract_role || 'editable_strategy_profile')}${this.kv('Planning outcome source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.planning')}${this.kv('Command source', 'RHI_ENERGY_PUBLIC_CONTRACT_V2.commands')}${this.kv('Engineer reason', human(profile.engineer_reason || '—'))}`);
+      const details = this.componentDetailsBlock(`strategy-profile-${id}-details`, 'Diagnostics', `${this.kv('Profile id', id)}${this.kv('Raw profile type', profile.profile_type || profile.asset_type || '—')}${this.kv('Editable fields published', String(this.profileEditableRows(rt, profile).length))}${this.kv('Contract role', profile.contract_role || 'editable_strategy_profile')}${this.kv('Planning outcome source', 'RHI_ENERGY_CANONICAL_PROPERTY_V2.planning')}${this.kv('Command source', 'RHI_ENERGY_CANONICAL_PROPERTY_V2.commands')}${this.kv('Engineer reason', human(profile.engineer_reason || '—'))}`);
       return this.strategyTable(rt, profile, { details, alwaysEditable:true });
     }
     effectivePolicyPreviewCard(rt, strategy = {}) {
@@ -7595,7 +7566,7 @@ function rhiEnergyVisualPickerStyles() {
       return this.tabExperienceHeader(rt,'metering',pageVm) + this.meteringCleanPage(vm);
     }
     retrospectiveState() {
-      const retrospective=objectFrom(this.runtime().publicV2().retrospective || {});
+      const retrospective=objectFrom(this.runtime().canonicalProduct().retrospective || {});
       if (!Object.keys(retrospective).length) return null;
       return {
         state:String(firstDefined(retrospective.status,'COLLECTING_EVIDENCE')),
@@ -8142,7 +8113,7 @@ function rhiEnergyVisualPickerStyles() {
     diagnosticSpec(tab) {
       const label=human(tab || 'overview');
       return [
-        [UX_INTERFACES.publicV2,'Energy Public V2',`${label} product truth through the single canonical Energy contract`]
+        [RELEASE_ENTITY,'Energy release diagnostics',`${label} product truth through the single canonical Energy contract`]
       ];
     }
 

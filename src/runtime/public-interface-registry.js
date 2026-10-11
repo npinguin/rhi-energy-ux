@@ -1,5 +1,3 @@
-// Energy UX product authority. RHI_ENERGY_PUBLIC_CONTRACT_V2 is the sole
-// product-state entry point. Release/engineering entities are diagnostics only.
-const UX_INTERFACES = Object.freeze({
-  publicV2: 'sensor.rhi_energy_public_contract_v2'
-});
+// Native Energy publication is discovered by exact canonical contract markers.
+// Release metadata is diagnostic only; there is no aggregate product sensor.
+const UX_INTERFACES=Object.freeze({release:'sensor.rhi_energy_release'});
