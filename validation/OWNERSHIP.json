@@ -18,7 +18,8 @@
     "gas_experience": "validation/test_gas_insights_tab.js",
     "ux_core_integration": "validation/validate_ux_core_integration.py",
     "asset_visual_runtime_scope": "validation/test_asset_visual_runtime_scope.js",
-    "energy_history_graphs": "validation/test_native_energy_history_graphs.js"
+    "energy_history_graphs": "validation/test_native_energy_history_graphs.js",
+    "power_flow_dependency": "validation/test_power_flow_dependency.js"
   },
   "policy": {
     "source_inspection": "negative_architecture_boundaries_only",
