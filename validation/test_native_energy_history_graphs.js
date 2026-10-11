@@ -4,7 +4,9 @@ const vm = require('node:vm');
 const app = fs.readFileSync('src/app/energy-card.js','utf8');
 const presentation = fs.readFileSync('src/app/presentation.js','utf8');
 const between = (start,end) => {
-  const i=app.indexOf('\n    '+start+'(');
+  const i0=app.indexOf('\n    '+start+'(');
+  const i1=app.indexOf('\n    async '+start+'(');
+  const i=i0<0?i1:i1<0?i0:Math.min(i0,i1);
   const j0=app.indexOf('\n    '+end+'(',i+1);
   const j1=app.indexOf('\n    async '+end+'(',i+1);
   const j=j0<0?j1:j1<0?j0:Math.min(j0,j1);
