@@ -1,3 +1,10 @@
+## 4.3.36-rc.11 — Prevent derived Home power in external flow card
+
+- require published measured site demand for Power Flow Card Plus;
+- set home.override_state to prevent its default derived Home balance;
+- report missing sources rather than animate an invented physical balance;
+- maintain full load/charger inventory and existing charts.
+
 ## 4.3.36-rc.10 — Real Power Flow Card Plus and full flexible-load inventory
 
 - mount installed Power Flow Card Plus as the primary Flow visualization using canonical Grid/Solar sensors;
