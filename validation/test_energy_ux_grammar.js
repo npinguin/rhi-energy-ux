@@ -78,7 +78,10 @@ for (const logicalType of ["flexible_asset","consumer","solar_array","inverter",
   assert.ok(!catalog.includes(`asset_type:"${logicalType}"`), "logical/non-canonical visual fallback returned "+logicalType);
 }
 
-assert.ok(core.includes('const RHI_UX_CORE_VERSION = "1.6.3";'), 'Energy must vendor UX Core 1.6.4');
+assert.ok(core.includes('const RHI_UX_CORE_VERSION = "1.6.4";'), 'Energy must vendor UX Core 1.6.4');
+assert.ok(core.includes('function rhiUxCompactAssetRow('), 'missing Core compact asset presentation');
+assert.ok(app.includes('rhiUxCompactAssetRow({'), 'Consumption must use Core compact asset rows');
+assert.ok(app.includes('coreAssetNavigation.dataset.nav'), 'linked charger navigation must be handled');
 assert.match(core,/function rhiUxContextBar/);
 assert.match(core,/function rhiUxResolveDomainAssetNavigation/);
 assert.ok(core.includes("{asset_id}"), "runtime-safe Core navigation token missing");
