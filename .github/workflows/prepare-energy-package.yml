@@ -2,6 +2,9 @@ name: Prepare Energy test candidate package (temporary)
 on:
   push:
     branches: [feat/compact-energy-charts-hacs-20261011]
+concurrency:
+  group: energy-candidate-build-20261011
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
