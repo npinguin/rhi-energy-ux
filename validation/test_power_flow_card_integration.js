@@ -19,6 +19,8 @@ assert.equal(config.entities.grid.entity.consumption,'sensor.grid_import');
 assert.equal(config.entities.grid.entity.production,'sensor.grid_export');
 assert.equal(config.entities.solar.entity,'sensor.solar_power');
 assert.equal(config.entities.home.entity,'sensor.site_power');
+assert.equal(config.entities.home.override_state,true,'plugin must display measured Home, never derived source balance');
+assert.equal(env.buildRhiPowerFlowCardConfig(runtime(data.filter(r=>r.property_key!=='site_consumption.power_kw'))),null,'no measured site demand means no implied home balance');
 assert.ok(!config.entities.battery,'must not invent battery direction');
 assert.ok(!config.entities.individual,'no inferred consumer sensors');
 assert.equal(env.buildRhiPowerFlowCardConfig(runtime(data.concat(data[0]))).entities.grid.entity.consumption,undefined,'ambiguous power source must fail closed');
