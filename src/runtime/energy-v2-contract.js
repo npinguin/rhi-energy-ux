@@ -199,7 +199,7 @@ function readEnergyCanonicalProduct(gateway) {
     health:envelope.available?'AVAILABLE':'UNAVAILABLE',
     core,summary:{},experience:{presence},presence,
     objects,profiles:[],relationships:[],connections:[],commands:nativeCommands,activity:[],
-    planning:{horizons},metering:{periods:{}},retrospective:{},intelligence:{},overview:{},
+    planning:{horizons},metering:{periods:{},available:false,reason:'canonical_period_publication_unavailable'},retrospective:{},intelligence:{},overview:{},
     configuration,valueAccounting,layers:{planning_objects:planningObjects},
     flexibleAssets:Object.freeze(flexibleAssets),planningObjects:Object.freeze(planningObjects),
     objectById:byId,profileById:new Map(),
