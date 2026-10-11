@@ -57,7 +57,7 @@ assert.doesNotMatch(device,/Telemetry not published/,"telemetry availability bel
 assert.doesNotMatch(device,/Asset id.*energyDeviceFacts/);
 
 const consumer = method("consumerExplorerCard");
-for (const token of ["Energy needed","Planned today","Still to plan","Connection","energyAssetFoldStack","energyAssetDiagnostics"]) {
+for (const token of ["Energy needed","Planned today","Still to plan","relationshipLabel:relation","energyAssetFoldStack","energyAssetDiagnostics"]) {
   assert.ok(consumer.includes(token), "managed asset primary grammar missing "+token);
 }
 assert.doesNotMatch(consumer,/rt\.assetName\(chargerId\)/,"managed asset relationship must not fall back to raw charger id");
