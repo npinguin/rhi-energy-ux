@@ -127,9 +127,14 @@ function readEnergyCanonicalProduct(gateway) {
     const totalFields=['required_kwh','planned_kwh','still_to_plan_kwh',
       'flexible_required_kwh','flexible_planned_kwh','flexible_still_to_plan_kwh'];
     horizons[id]={
-      horizon_id:id,status:native?.available ? 'AVAILABLE':'INCOMPLETE',
-      quality:{availability:native?.available ? 'AVAILABLE':'INCOMPLETE',
+      horizon_id:id,
+      // Numeric totals are evidence, not proof that an effective plan exists.
+      status:detail?.available === true ? 'AVAILABLE' : (detail?.status || 'INCOMPLETE'),
+      quality:{availability:detail?.available === true ? 'AVAILABLE' : (detail?.status || 'INCOMPLETE'),
+        reason_code:detail?.reason || null,
         missing:native?.missing || totalFields},
+      requested_provider:detail?.metadata?.requested_provider ?? null,
+      effective_provider:detail?.available === true ? (detail?.metadata?.effective_provider ?? detail?.metadata?.provider_id ?? null) : null,
       ...Object.fromEntries(totalFields.map(k=>[k,numeric(k)])),
       buckets:Array.isArray(attrs.buckets) ? attrs.buckets:[],
       planning_assets:Array.isArray(attrs.planning_assets)?attrs.planning_assets:[],
