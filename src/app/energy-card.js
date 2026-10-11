@@ -4095,6 +4095,7 @@
       </section>`;
     }
 
+    powerFlowCardStyles() { return `.rhiPowerFlowPanel{min-width:0}.rhiPowerFlowHost{min-height:230px;width:100%;overflow-x:auto}.rhiPowerFlowHost power-flow-card-plus{display:block;width:100%}.rhiFlowMeasurementNote{font-size:11px;color:var(--rhi-color-muted);margin-top:7px}.rhiFlowAllLoads{margin-top:10px}.rhiFlowAllLoads .flowPhysicalConsumerCard{margin-top:5px}`; }
     flowDependencyStyles() {
       return `.rhiFlowDependencyNotice{border-left:3px solid #c08420;background:#fffbef;padding:10px 14px;margin-bottom:10px}
         .rhiFlowDependencyNotice strong{font-size:12px;color:#713f12}
@@ -4515,6 +4516,30 @@
       </section>`;
     }
 
+    async mountPowerFlowCard() {
+      if (this.view !== 'flow' || this.powerFlowDependencyStatus() !== 'ready') return;
+      const host = this.shadowRoot?.querySelector('[data-rhi-power-flow-host]');
+      if (!host || host.firstElementChild || host.dataset.loading === 'true') return;
+      const config = buildRhiPowerFlowCardConfig(this.runtime());
+      if (!config) {
+        host.innerHTML = '<div class="empty compact"><b>Power-flow measurements unavailable</b><span>No unique, available canonical Solar or Grid power sensor can be provided to Power Flow Card Plus.</span></div>';
+        return;
+      }
+      host.dataset.loading='true';
+      try {
+        if (typeof window.loadCardHelpers !== 'function') throw new Error('Home Assistant card helpers unavailable');
+        const helpers = await window.loadCardHelpers();
+        if (!host.isConnected || this.view !== 'flow') return;
+        const card = await helpers.createCardElement(config);
+        card.hass = this._hass;
+        host.replaceChildren(card);
+      } catch (error) {
+        if (host.isConnected) host.innerHTML = '<div class="empty compact"><b>Power Flow Card Plus could not render</b><span>Check that the HACS resource is installed, loaded and compatible with your Home Assistant version. Other Energy functions remain available.</span></div>';
+      } finally {
+        delete host.dataset.loading;
+      }
+    }
+
     flow(rt) {
       const pageVm = this.buildPageViewModel(rt, 'flow');
       const current = this.currentEnergyModel(rt);
@@ -4535,33 +4560,15 @@
       const homeBus = rt.asset('home_bus') || { display_name: 'Home Bus' };
       const switchboard = rt.asset('main_switchboard') || { display_name: 'Main Switchboard' };
       return `${this.tabExperienceHeader(rt,'flow',pageVm)}<div class="flowPage">\n        ${this.powerFlowDependencyNotice()}
-        <section class="panel physicalFlowHero">
-          <div class="flowHeader"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'flow.physical',{},'Physical Energy Flow'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'flow.physical_desc',{},'Live measured energy paths only. Disabled and planning-only assets are excluded.'))}</p></div></div>
-          <div class="flowCanvas">
-            <div class="flowColumn producers">
-              <h3>${escapeHtml(rhiEnergyT(this._hass,'flow.producers',{},'Producers'))}</h3>
-              ${this.flowNode('☀','Solar',fmtKw(solar,'0.0 kW'),'solar → home bus','solarNode')}
-              ${this.flowNode('▣','Home Battery',fmtKw(battery.displayPowerKw,'—'),battery.detail,'batteryNode')}
-              ${this.flowNode('⚡','Grid import',fmtKw(gridImport,'—'),'grid import → home bus','gridNode')}
-            </div>
-            <div class="flowCenter">
-              <div class="busStack">
-                <div class="switchboardNode"><span>${escapeHtml(rhiEnergyT(this._hass,"flow.main_switchboard",{},"Main Switchboard"))}</span><b>${escapeHtml(switchboard.display_name || rhiEnergyT(this._hass,'flow.main_switchboard',{},'Main Switchboard'))}</b></div>
-                <div class="homeBusNode"><span>${escapeHtml(rhiEnergyT(this._hass,"flow.physical_bus",{},"Physical bus"))}</span><b>${escapeHtml(homeBus.display_name || rhiEnergyT(this._hass,'flow.home_bus',{},'Home Bus'))}</b><small>${escapeHtml(fmtKw(siteConsumption,'—'))} ${escapeHtml(rhiEnergyT(this._hass,"flow.site_consumption",{},"Site Consumption"))}</small></div>
-              </div>
-              <div class="flowLines">
-                ${this.flowLine('Solar feed', fmtKw(solar,'—'), 'solar')}
-                ${this.flowLine('Battery feed / charge', fmtKw(battery.signedFlowKw,'—'), 'battery')}
-                ${this.flowLine('Grid import', fmtKw(gridImport,'—'), 'grid')}
-                ${this.flowLine('Grid export', fmtKw(gridExport,'—'), 'export')}
-              </div>
-            </div>
-            <div class="flowColumn sinks">
-              <h3>${escapeHtml(rhiEnergyT(this._hass,'flow.consumers',{},'Consumers'))}</h3>
-              ${this.flowNode('⌂','Home Consumption',fmtKw(homeConsumption,'—'),'household consumption excluding Flexible Loads','homeNode')}
-              ${this.flowNode('🚘','Flexible Loads',fmtKw(flexibleLoadsPower,'—'),`${consumers.length} managed consumer${consumers.length === 1 ? '' : 's'}`,'consumerNode')}
-            </div>
+        <section class="panel rhiPowerFlowPanel">
+          <div class="flowHeader"><div><h2>Live power flow</h2><p>Powered by Power Flow Card Plus. Only published, measured sources can animate; missing energy values are not estimated.</p></div></div>
+          <div class="rhiPowerFlowHost rhiUxChartViewport" data-rhi-power-flow-host role="region" aria-label="Interactive energy flow">
+            ${this.powerFlowDependencyStatus()==='ready' ? '<div class="empty compact">Loading Power Flow Card Plus…</div>' : '<div class="empty compact">Waiting for Power Flow Card Plus resource…</div>'}
           </div>
+          <p class="rhiFlowMeasurementNote">Battery power is displayed separately unless a direction-compatible signed sensor is published. Charger and vehicle power are never added together.</p>
+        </section>
+        <section class="panel rhiFlowAllLoads"><div class="flowHeader"><div><h2>All flexible loads</h2><p>Full canonical inventory, including idle and currently unavailable assets. Chargers remain connection interfaces, not duplicate consumers.</p></div></div>
+          ${this.flexibleAssetDomain(rt).consumerFacing().filter(vm=>!vm.isStorage).map(vm=>this.consumerCard(rt,vm.raw||{})).join('') || '<div class="empty compact"><b>No flexible loads published</b><span>The Energy inventory currently has no canonical consumers.</span></div>'}
         </section>
         <div class="flowDetailsGrid flowDetailsGridTwoUp">
           <section class="panel"><h2>${escapeHtml(rhiEnergyT(this._hass,'flow.charging_connections',{},'Charging connections'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'flow.charging_connections_desc',{},'Chargers and vehicle assignments currently visible to Energy.'))}</p>${chargers.map(charger => this.connectorCard(rt, charger)).join('') || `<div class="empty"><b>${connectionSnapshot.available ? 'No charging connections available' : 'Connection data unavailable'}</b><span>${connectionSnapshot.available ? 'No charger or vehicle assignment is currently available.' : 'Connection information is not available right now.'}</span></div>`}</section>
@@ -5968,7 +5975,7 @@
         console.error(`[HomeBrain Energy ${UX_VERSION}] ${this.view} render failed`, error);
         content = this.renderError(this.view, error);
       }
-      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${this.energyHardwareStyles()}${this.flowDependencyStyles()}${typeof rhiUxVisualPickerStyles === 'function' ? rhiUxVisualPickerStyles() : ''}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
+      const markup = `<style>${this.styles()}${hbEnergyPresentationStyles()}${this.energyHardwareStyles()}${this.flowDependencyStyles()}${this.powerFlowCardStyles()}${typeof rhiUxVisualPickerStyles === 'function' ? rhiUxVisualPickerStyles() : ''}${typeof rhiEnergyVisualPickerStyles === 'function' ? rhiEnergyVisualPickerStyles() : ''}
 
       /* R3.62.0 canonical component framework and adaptive convergence */
       :host{--hi-space-1:4px;--hi-space-2:8px;--hi-space-3:12px;--hi-space-4:16px;--hi-radius-sm:8px;--hi-radius-md:12px;--hi-break-tablet:980px;--hi-break-phone:700px}
@@ -6315,6 +6322,7 @@
         this.restoreInteractionState();
         this.mountGasStatisticsGraph();
         this.mountEnergyHistoryGraphs();
+        this.mountPowerFlowCard();
         if (viewport) queueMicrotask(() => window.scrollTo(viewport.x, viewport.y));
         return;
       }
@@ -6327,6 +6335,7 @@
       this.restoreInteractionState();
       this.mountGasStatisticsGraph();
       this.mountEnergyHistoryGraphs();
+      this.mountPowerFlowCard();
       const tabs = this.shadowRoot.querySelector('.navItems');
       if (tabs) {
         tabs.scrollLeft = this.navScrollLeft || 0;
