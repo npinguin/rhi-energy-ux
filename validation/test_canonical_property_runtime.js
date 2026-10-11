@@ -341,7 +341,15 @@ const inventoryStates={
   "sensor.load_four":logicalFixture("four"),
   "sensor.load_five":logicalFixture("five"),
   "sensor.one_power":propertyFixture("one","power_kw",0),
-  "sensor.three_need":propertyFixture("three","energy_to_target_kwh",11.22)
+  "sensor.three_need":propertyFixture("three","energy_to_target_kwh",11.22),
+  "sensor.flexible_group":logicalFixture("flexible_loads","flexible_loads"),
+  "sensor.flexible_budget":{state:"0",attributes:{
+    canonical_contract:"RHI_ENERGY_CANONICAL_PROPERTY_V2",
+    asset_id:"flexible_loads",logical_object_class:"flexible_loads",
+    property_key:"flexible_loads.available_power_kw",value:0,
+    availability:"AVAILABLE",quality:"CANONICAL",
+    presentation_family:"consumer",presentation_role:"key",presentation_surface:"consumers"
+  }}
 };
 const inventoryHass={states:inventoryStates};
 const inventoryIndex=inventoryContext.createEnergyCanonicalPropertyIndex(inventoryHass);
@@ -351,6 +359,10 @@ const inventoryGateway={host:{
   nativePlanningHorizon:()=>({available:false})
 }};
 const inventoryProduct=inventoryContext.readEnergyCanonicalProduct(inventoryGateway);
+if(inventoryProduct.core.flexible.available_power_kw!==0)
+  throw new Error("backend-published flexible available power zero must survive canonical projection");
+if(inventoryProduct.planning.horizons.D0.status==="AVAILABLE")
+  throw new Error("missing effective D0 horizon must not look AVAILABLE even if metric totals exist");
 if(inventoryProduct.flexibleAssets.length!==5)
   throw new Error("five canonical flexible_load objects must survive even if properties and planning are missing");
 if(inventoryProduct.flexibleAssets.find(row=>row.asset_id==="one")?.power_kw!==0)
