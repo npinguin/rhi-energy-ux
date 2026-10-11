@@ -31,7 +31,16 @@
       ? runtime.nativePlanningHorizon(normalized) : null;
     const published = nativeHorizon?.available === true ? nativeHorizon : null;
     const horizonDetails = published?.details || {};
-    const publicationMetadata = published?.metadata || {};
+    const publicationMetadata = nativeHorizon?.metadata || {};
+    // Native numeric totals remain available as measurement evidence but never
+    // authorize an effective schedule without one quality-complete horizon.
+    const effectiveAvailable = selected.available===true && !!published;
+    const publicationStatus = effectiveAvailable ? 'AVAILABLE' :
+      nativeHorizon?.published===true ? 'INCOMPLETE' :
+        nativeHorizon?.status || 'UNAVAILABLE';
+    const requestedProvider=String(publicationMetadata.requested_provider||'');
+    const effectiveProvider=String(publicationMetadata.provider_id||'');
+    const providerHold=!!requestedProvider&&!effectiveProvider;
     const planningAssets = published && Array.isArray(horizonDetails.planning_assets)
       ? horizonDetails.planning_assets : [];
 
@@ -40,15 +49,24 @@
     const horizon=Object.freeze({
       horizon_id:normalized,
       ...totals(selected),
-      status:selected.available ? 'AVAILABLE' : 'INCOMPLETE',
-      quality:Object.freeze({availability:selected.available ? 'AVAILABLE' : 'INCOMPLETE',
-        missing:selected.missing})
+      status:publicationStatus,
+      quality:Object.freeze({availability:publicationStatus,
+        missing:selected.missing,
+        effective_horizon:effectiveAvailable,
+        metrics_available:selected.available===true})
     });
     const todayTotals=totals(today),tomorrowTotals=totals(tomorrow);
     return Object.freeze({
       entityId:null,
       contractVersion:'ENERGY_NATIVE_PLANNING',
-      available:selected.available,
+      available:effectiveAvailable,
+      totalsAvailable:selected.available===true,
+      provisionalTotals:selected.available===true&&!effectiveAvailable,
+      published:nativeHorizon?.published===true||!!published,
+      publicationStatus,
+      requestedProvider,effectiveProvider,providerHold,
+      reasonCode:effectiveAvailable?'':String(nativeHorizon?.reason||publicationMetadata.reason_code||'effective_horizon_not_published'),
+      executionAuthorized:effectiveAvailable&&publicationMetadata.execution_authorized===true,
       attrs:Object.freeze({}),
       planId:published ? publicationMetadata.plan_id ?? horizonDetails.plan_id ?? null : null,
       providerId:published ? publicationMetadata.provider_id ?? horizonDetails.provider_id ?? null : null,
@@ -74,7 +92,7 @@
       currentPlanningBucket:Object.freeze(planningObject(horizonDetails.current_bucket)),
       currentActionIntent:Object.freeze(published && horizonDetails.execution_policy && typeof horizonDetails.execution_policy === 'object' ? horizonDetails.execution_policy : {}),
       missingContractCapabilities:Object.freeze([
-        ...(!published ? ['native_planning_buckets'] : []),
+        ...(!published ? ['native_effective_horizon','native_planning_buckets'] : []),
         ...(!published || !Array.isArray(horizonDetails.planning_assets) ? ['native_planning_assets'] : []),
         ...(!published || !horizonDetails.execution_policy || typeof horizonDetails.execution_policy !== 'object' || Array.isArray(horizonDetails.execution_policy)
           ? ['native_planning_actions'] : [])
