@@ -1,11 +1,9 @@
-# v4.3.36-rc.4 — Canonical flexible inventory, available power and readiness (HACS TEST CANDIDATE)
+# v4.3.36-rc.5 — Shared Core asset grammar layout correction (HACS TEST CANDIDATE)
 
-- Preserve every unique backend-published canonical `flexible_load` object in Consumption, including missing-power and non-plan-ready objects.
-- Preserve producer-owned operating, participation, availability and readiness only when explicitly published; unknown is not an active plan.
-- Require explicit planning readiness, and show blocked/unassessed inventory separately.
-- Consume `flexible_loads.available_power_kw` directly from canonical Energy property; valid zero and unavailable remain distinct.
-- D0/D1 numeric totals alone do not prove an effective plan; incomplete EMHASS HOLD remains non-executable.
-- Backend metering period diagnostics are not a public canonical period contract. Missing public publication is tracked in Energy #242. UX does not suggest unproven resets.
-- Contract regressions for canonical inventory, zero and absent planning.
+- Repair a structural CSS collision: legacy Energy device cards still supplied an outer narrow image column around the shared `rhiUxAssetIdentity`, whose Core grammar already contains its own visual and title columns. This squeezed Gas identity and fact text and caused overlap on tablet and desktop.
+- Use the Core-asset-specific grid rule for identity, facts, relationships and disclosures; auto-fit fact tiles by available width. Apply to all core-backed Energy device cards, not a gas-entity special case.
+- Preserve all canonical data, ownership and actions. No screen-level numeric corrections or hardcoded asset IDs.
+- Responsive markup/CSS regression added; source/package/HACS deterministic validation required.
+- Carry forward rc.4 canonical flexible inventory and available-power changes. HA tablet/desktop/mobile visual qualification and rollback remain pending. **Not stable**.
 
-Compatibility: Energy E0.15.116 or newer; Foundation F1.8.44; Mobility M0.10.44 for cross-domain visuals. Rollback: v4.3.36-rc.3. Target HA qualification remains pending; **not stable**.
+Compatibility: Energy E0.15.116+; Foundation F1.8.44; UX Core 1.6.3. Rollback: v4.3.36-rc.4.
