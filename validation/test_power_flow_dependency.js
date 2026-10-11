@@ -8,7 +8,7 @@ const method=(name,next)=>{
   assert.ok(begin>=0&&end>begin,name+' boundary');
   return src.slice(begin,end);
 };
-const methods=method('powerFlowDependencyStatus','powerFlowDependencyNotice')+method('powerFlowDependencyNotice','flow');
+const methods=[method('powerFlowDependencyStatus','powerFlowDependencyNotice'),method('powerFlowDependencyNotice','flow')].join(',');
 const context={customElements:{get:()=>undefined}};
 vm.createContext(context);
 const callbacks=vm.runInContext('({'+methods+'})',context);
