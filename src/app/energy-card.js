@@ -1301,10 +1301,25 @@
       this._preserveViewportOnRender = true;
       this.scheduleRender();
     }
-    connectedCallback() { this.scheduleRender(true); }
+    connectedCallback() {
+      this.scheduleRender(true);
+      if (this._powerFlowWatchArmed) return;
+      this._powerFlowWatchArmed = true;
+      if (typeof customElements !== 'undefined' && !customElements.get('power-flow-card-plus')) {
+        customElements.whenDefined('power-flow-card-plus').then(() => {
+          if (this.isConnected) { this._forceRender = true; this.scheduleRender(true); }
+        });
+      }
+      this._powerFlowProbeTimer = setTimeout(() => {
+        this._powerFlowProbeSettled = true;
+        if (this.isConnected && this.view === 'flow') { this._forceRender = true; this.scheduleRender(true); }
+      }, 1500);
+    }
     disconnectedCallback() {
       if (this._renderTimer) clearTimeout(this._renderTimer);
+      if (this._powerFlowProbeTimer) clearTimeout(this._powerFlowProbeTimer);
       this._renderTimer = null;
+      this._powerFlowProbeTimer = null;
     }
     scheduleRender(immediate = false) {
       if (!this._hass) return;
@@ -4484,7 +4499,7 @@
     powerFlowDependencyStatus() {
       const tag = 'power-flow-card-plus';
       if (typeof customElements === 'undefined') return 'checking';
-      return customElements.get(tag) ? 'ready' : 'missing';
+      return customElements.get(tag) ? 'ready' : (this._powerFlowProbeSettled ? 'missing' : 'checking');
     }
     powerFlowDependencyNotice() {
       const status = this.powerFlowDependencyStatus();
