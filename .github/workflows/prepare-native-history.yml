@@ -2,7 +2,6 @@ name: Prepare native history HACS candidate (temporary)
 on:
   push:
     branches: [feat/native-solar-battery-history-20261011]
-    paths: [.github/workflows/prepare-native-history.yml]
 permissions:
   contents: write
 jobs:
