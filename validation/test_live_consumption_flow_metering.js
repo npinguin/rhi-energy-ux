@@ -53,7 +53,7 @@ for(const token of [
   'metering:{periods:{}}','retrospective:{}','valueAccounting',
   'readNativeEnergyMetric(hass,\'net_financial_result_eur\')'
 ]) if(!native.includes(token)) throw new Error('native Metering/Value missing-data invariant '+token);
-const card=fs.readFileSync('src/app/energy-card.js','utf8');
+
 for(const token of [
   'const periods=objectFrom(v2.metering?.periods || {})',
   'const rawPeriod=objectFrom(period)',
