@@ -1,10 +1,10 @@
-# v4.3.36-rc.7 — Actual Solar and Battery history graphs (HACS TEST CANDIDATE)
+# v4.3.36-rc.8 — Solar production hierarchy visibility (HACS TEST CANDIDATE)
 
-- Implement real Home Assistant history-graph cards in Solar (canonical measured solar power, kW) and Home Battery (canonical system state of charge, %).
-- Use exactly one authoritative published RHI_ENERGY_CANONICAL_PROPERTY_V2 sensor per view; reject ambiguous sources, unsupported entity domains and missing sensors. No derived energy totals, synthetic curves or invented cost.
-- Working Today/Week/Month controls, HA-native card mounting and explicit unavailable/load-failure states.
-- Retain Gas native statistics bar graph, all hero art, tabs, navigation, asset cards and Core 1.6.4 styling.
-- Regression coverage for mounting, authority, controls and original Gas graph.
+- Restore immediately visible Solar Production → inverter → zone/string hierarchy in the Energy UX without semantic relationship reconstruction.
+- Keep 40 optimizer cards discoverable through per-zone progressive disclosure instead of forcing multiple closed ancestors.
+- Preserve canonical parent_asset_id authority, physical-source provenance and HA-native flat device projection.
+- Add hierarchy visibility regression protection; tested against static source/package and HACS delivery gates.
+- Coordinated installed backend evidence: Foundation F1.8.44, Energy E0.15.119, Mobility M0.10.47.
 
-This is a HACS TEST CANDIDATE, not stable. Target Home Assistant mobile/tablet, historic sources and rollback require actual qualification.
-Rollback: v4.3.36-rc.6.
+This is a TEST CANDIDATE, not a stable approval. Target Home Assistant desktop/tablet/mobile hierarchy, source links, reload and rollback remain to be qualified.
+Rollback: v4.3.36-rc.7.

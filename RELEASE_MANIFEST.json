@@ -1,6 +1,6 @@
 {
   "product": "rhi-energy-ux",
-  "version": "4.3.36-rc.7",
+  "version": "4.3.36-rc.8",
   "stage": "test_candidate",
   "publication_authority": "github_releases",
   "publication_status": "test_candidate_pending_target_ha_qualification",
@@ -38,5 +38,5 @@
   },
   "minimum_foundation": "F1.8.44",
   "minimum_mobility_for_cross_domain_visuals": "M0.10.44",
-  "tested_backend_baseline": "E0.15.116"
+  "tested_backend_baseline": "E0.15.119"
 }

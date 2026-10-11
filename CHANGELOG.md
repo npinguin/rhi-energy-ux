@@ -1,3 +1,10 @@
+## 4.3.36-rc.8 — Canonical Solar hierarchy visible from production to inverter and zone
+
+- Correct deep default-closed navigation regression: Solar Production and inverter zones/strings are initially visible; the high-cardinality optimizer groups remain expandable by zone.
+- Preserve source-owned exact inverter/zone/optimizer canonical parent identity, no inferred HA via_device relationships and no duplicate child graph.
+- Source and immutable dist updated together; full UX contract, HACS and source/package checks required.
+- Target HA E0.15.119 diagnostics prove two SolarEdge inverters and 40 optimizer leaves under two nonempty zones; real browser visual and restart/rollback qualification remains pending.
+
 ## 4.3.36-rc.7 — Real canonical Solar and Home Battery history graphs
 
 - display HA-native Solar measured power (kW) graph and battery system state of charge (%) graph;
