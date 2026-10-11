@@ -66,7 +66,7 @@ function readEnergyCanonicalProduct(gateway) {
     ['grid','grid_connection',['net_power_kw','flow_direction']],
     ['home','home_consumption',['power_kw']],
     ['consumption','site_consumption',['power_kw']],
-    ['flexible','flexible_loads',['power_kw','attributed_power_kw']]
+    ['flexible','flexible_loads',['power_kw','attributed_power_kw','available_power_kw']]
   ];
   const core={},coreByKey=new Map();
   for(const [section,cls,keys] of currentMap) {
