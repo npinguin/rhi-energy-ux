@@ -13,9 +13,12 @@ for(const forbidden of [
   "rt.number('grid.net_power_kw')","rt.number('site_consumption.power_kw')","rt.number('home_consumption.power_kw')",
   "rt.value('battery.reserve_target_pct'"
 ]) if(app.includes(forbidden)) throw new Error('screen bypasses canonical current projection: '+forbidden);
+// Site and flexible demand are canonical per-asset properties. Home power is a
+// separate native Energy metric on the current backend, NOT an inferred alias.
 if (!consumption.includes("readTypedPropertyContract(gateway,'consumption','site_consumption.power_kw')") ||
-    !consumption.includes("readTypedPropertyContract(gateway,'consumption','home_consumption.power_kw')"))
-  throw new Error('consumption must use backend canonical properties');
+    !consumption.includes("readNativeEnergyMetric(gateway?.host?.hass || {},'home_consumption_power_kw')") ||
+    !consumption.includes("readTypedPropertyContract(gateway,'consumption','flexible_loads.power_kw')"))
+  throw new Error('consumption must use the backend-owned canonical and native metric authorities');
 if(consumption.includes('readEnergyPublicV2(')) throw new Error('retired aggregate consumption reader');
 if(!app.includes("return physical === null ? null : Math.abs(physical);")) throw new Error('Flexible power may not be reconstructed from participant rows');
 console.log('PASS one canonical current Energy projection drives all current-value surfaces');
