@@ -41,3 +41,5 @@ jobs:
 # Re-run after canonical index fixture repair; checks remain unchanged.
 
 # Verify native home consumption projection authority after source/test alignment.
+
+# Full gate: both explicit backend-native effective/baseline V1 horizons are authoritative, no retired fallback.
