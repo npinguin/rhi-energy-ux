@@ -1,0 +1,25 @@
+name: Native Energy D0/D1 quality and bucket regression (recovery branch)
+on:
+  push:
+    branches: [fix/native-planning-quality-20261011]
+    paths: [.github/workflows/verify-native-planning-quality-20261011.yml]
+permissions:
+  contents: read
+jobs:
+  source-verification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/native-planning-quality-20261011
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify complete Energy UX source, native planning and package controls
+        run: |
+          npm ci
+          npm run validate
+          npm run test:release
