@@ -60,3 +60,5 @@ jobs:
           npm run validate
           node tools/check-committed-dist.mjs
           npm run test:release
+
+# Recheck residual Public V2 references at source, not just generated bundle.
