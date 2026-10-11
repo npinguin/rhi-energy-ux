@@ -165,6 +165,21 @@ function readEnergyCanonicalProduct(gateway) {
   const nativeCommands=readEnergyCommandContract(gateway).rows;
   const envelope=Object.freeze({entityId:null,available:!!index?.hasCanonicalTruth?.(),
     contractVersion:'ENERGY_CANONICAL_NATIVE_V2'});
+  // Navigation presence is published by the native object/configuration
+  // inventory, not guessed from a momentary power measurement or old snapshot.
+  // An unavailable battery remains visible so the user can diagnose it.
+  const objectClasses=new Set(objects.map(obj=>String(obj.object_class || '')));
+  const presence=Object.freeze({
+    battery:objectClasses.has('battery_system') || objectClasses.has('battery'),
+    gas:objectClasses.has('gas_meter'),
+    flexible_loads:objectClasses.has('flexible_load') ||
+      objectClasses.has('flexible_loads'),
+    solar:objectClasses.has('solar_production'),
+    pricing:pricingRows.length>0,
+    strategy:strategyRows.length>0,
+    metering:meteringRows.length>0,
+    planning:Object.values(horizons).some(h=>h.status==='AVAILABLE')
+  });
   const capabilities={
     core:propertyRows.length>0,assets:objects.length>0,
     planning:Object.values(horizons).some(h=>h.status==='AVAILABLE'),
@@ -177,7 +192,7 @@ function readEnergyCanonicalProduct(gateway) {
     corePresent:capabilities.core,capabilities,compatibilityReason:envelope.available?'':'canonical_energy_property_unavailable',
     contractVersion:envelope.contractVersion,release:'',
     health:envelope.available?'AVAILABLE':'UNAVAILABLE',
-    core,summary:{},experience:{presence:{}},presence:{},
+    core,summary:{},experience:{presence},presence,
     objects,profiles:[],relationships:[],connections:[],commands:nativeCommands,activity:[],
     planning:{horizons},metering:{periods:{}},retrospective:{},intelligence:{},overview:{},
     configuration,valueAccounting,layers:{planning_objects:planningObjects},
