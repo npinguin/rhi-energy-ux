@@ -1,3 +1,10 @@
+## 4.3.36-rc.9 — Power Flow Card Plus dependency readiness
+
+- Report missing or unloaded optional Power Flow Card Plus in the Flow view with HACS repair instructions;
+- allow late browser resource registration and recovery without changing canonical Energy semantics;
+- preserve all Energy screens; separate actual flow-card integration remains future work;
+- no mandatory HACS install-time hook is claimed; target HA evidence pending.
+
 ## 4.3.36-rc.8 — Canonical Solar hierarchy visible from production to inverter and zone
 
 - Correct deep default-closed navigation regression: Solar Production and inverter zones/strings are initially visible; the high-cardinality optimizer groups remain expandable by zone.
