@@ -1,0 +1,50 @@
+name: Native Energy release metadata synchronization (single use)
+on:
+  push:
+    branches: [work/ux-structural-closure-20261011]
+    paths: [.github/workflows/sync-native-energy-release-20261011.yml]
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/work/ux-structural-closure-20261011'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/ux-structural-closure-20261011
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Synchronize all release identity projections from release/product.json
+        run: |
+          python tools/sync-release-metadata.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for filename in ('RELEASE_MANIFEST.json','release/RELEASE_STATUS.json'):
+              p=Path(filename)
+              o=json.loads(p.read_text())
+              o['publication_status']='test_candidate_pending_target_ha_qualification'
+              # HACS tag-tree distribution uses a normal GitHub release for
+              # discovery even though this semver is a test candidate.
+              o['github_release_prerelease']=False
+              if filename.endswith('RELEASE_STATUS.json'):
+                  o['hacs_visibility']='test_candidate_normal_release_discovery'
+                  o['stable_promotion']='blocked_until_target_qualification_pass'
+              p.write_text(json.dumps(o,indent=2)+'\n')
+          PY
+          python validation/validate_release_governance.py
+      - name: Commit consistent release metadata; retire this helper
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/sync-native-energy-release-20261011.yml
+          git add -A COMPATIBILITY.json RELEASE_MANIFEST.json release/RELEASE_STATUS.json release/QUALIFICATION.json package.json package-lock.json
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m 'release: synchronize canonical rc2 test candidate metadata and HACS discovery policy'
+          git push origin HEAD:refs/heads/work/ux-structural-closure-20261011
