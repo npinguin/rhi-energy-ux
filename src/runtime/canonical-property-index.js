@@ -33,6 +33,15 @@ function canonicalEnergyObjectRow(entityId,state) {
     configured_visual_ref:String(a.configured_visual_ref || ''),
     appearance_editable:a.appearance_editable === true,
     appearance_owner:a.appearance_owner || null,
+    // Preserve producer-owned object lifecycle and readiness where published.
+    // Absence is unknown, never an implicit participating/plan-ready state.
+    participation_state:a.participation_state ?? null,
+    operating_state:a.operating_state ?? null,
+    availability_state:a.availability_state ?? null,
+    planning_input_ready:a.planning_input_ready === true ? true : a.planning_input_ready === false ? false : null,
+    planning_input_reason:a.planning_input_reason ?? null,
+    source_asset_kind:a.source_asset_kind ?? null,
+    infrastructure_only:a.infrastructure_only === true,
     health:String(a.health || state?.state || 'UNKNOWN'),
     availability:String(a.availability || 'UNAVAILABLE'),
     source_devices:Object.freeze(Array.isArray(a.source_devices) ? [...a.source_devices] : []),
