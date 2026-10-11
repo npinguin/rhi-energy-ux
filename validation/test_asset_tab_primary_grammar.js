@@ -62,4 +62,8 @@ assert.match(consumers,/Flexible loads/);
 assert.match(consumers,/!vm\.isDisabled/,'unknown participation must remain in the visible inventory');
 assert.match(consumers,/domain\.consumerFacing\(\)/);
 
+// Core asset identity includes its own image-and-title layout; the outer
+// device card must not assign it a legacy narrow grid column.
+assert.ok(app.includes('.energyDeviceCard.rhiEnergyCoreAssetCard{grid-template-columns:minmax(0,1fr)'), 'Core asset card must use full-width identity');
+assert.ok(app.includes('.rhiEnergyCoreAssetCard>.rhiUxAssetFactGrid{grid-template-columns:repeat(auto-fit'), 'Core fact grid must auto-fit without a narrow legacy column');
 console.log("PASS asset tabs use compact primary truth with progressive details");

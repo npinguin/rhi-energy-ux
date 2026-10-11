@@ -1,3 +1,10 @@
+## 4.3.36-rc.5 — Shared Core asset card layout and Gas overflow recovery
+
+- avoid nested legacy device columns around shared Core identity/fact components;
+- allocate full-width rows to identity, metrics, relationships and progressive disclosures;
+- responsive fact layout uses available width, preventing Gas meter overlap and other Core-backed card clipping;
+- add regression protecting the generic component boundary (not a Gas-only patch).
+
 ## 4.3.36-rc.4 — Canonical flexible-load inventory and fail-closed planning/metering
 
 - render every canonical flexible_load object, independent of missing metrics and planning readiness;
