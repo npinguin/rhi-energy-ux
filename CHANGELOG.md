@@ -1,3 +1,10 @@
+## 4.3.36-rc.10 — Real Power Flow Card Plus and full flexible-load inventory
+
+- mount installed Power Flow Card Plus as the primary Flow visualization using canonical Grid/Solar sensors;
+- fail closed on ambiguous, missing or wrongly typed measurements; keep battery direction unknown until compatible signed evidence is available;
+- preserve all canonical flexible loads and charger connection detail without double counting;
+- retain original branding, heroes and existing historical charts.
+
 ## 4.3.36-rc.9 — Power Flow Card Plus dependency readiness
 
 - Report missing or unloaded optional Power Flow Card Plus in the Flow view with HACS repair instructions;
