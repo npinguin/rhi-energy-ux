@@ -83,6 +83,42 @@ assert.equal(unsupported.contractSupported, false);
 assert.equal(unsupported.sources.length, 0);
 assert.equal(unsupported.reason, 'unsupported_planning_contract');
 
+// Real E0.15.116 native bucket schema. No R1.79.x compatibility
+// derivation or phantom Home/Grid lane may appear in canonical UI.
+const nativeBucketView=adaptPlanningBucket({
+  bucket_id:'D0-H10',start_time:'2026-10-11T09:00:00Z',
+  solar_forecast_kwh:0,base_demand_forecast_kwh:8,
+  duration_minutes:30,
+  asset_allocations:[
+    {asset_id:'vehicle_q8',planned_energy_kwh:0,planned_power_kw:9},
+    {asset_id:'vehicle_id4',planned_power_kw:8}
+  ],
+  grid_net_kwh:-2,expected_grid_import_kwh:3
+},'ENERGY_NATIVE_PLANNING');
+assert.equal(nativeBucketView.contractSupported,true);
+assert.equal(nativeBucketView.contractFamily,'ENERGY_NATIVE_PLANNING');
+assert.equal(nativeBucketView.sources.length,0,
+  'native source lanes absent, not synthesized from solar forecast');
+assert.equal(nativeBucketView.consumers.length,2);
+assert.equal(nativeBucketView.consumers[0].participantId,'vehicle_q8');
+assert.equal(nativeBucketView.consumers[0].energyKwh,0);
+assert.equal(nativeBucketView.consumers[1].energyKwh,null,
+  'power × duration is not producer-owned energy');
+assert.equal(nativeBucketView.boundary.gridExportKwh,null,
+  'signed grid value cannot be silently decomposed by frontend');
+assert.equal(nativeBucketView.canonicalLanes,false);
+const exactNativeLanes=adaptPlanningBucket({
+  bucket_id:'D1-H15',
+  source_lane:[{participant_id:'solar',planned_supply_kwh:0}],
+  consumer_lane:[{participant_id:'vehicle_q8',planned_demand_kwh:1.25}],
+  grid_export_kwh:0,balance_delta_kwh:0
+},'ENERGY_NATIVE_PLANNING');
+assert.equal(exactNativeLanes.canonicalLanes,true);
+assert.equal(exactNativeLanes.sources[0].energyKwh,0);
+assert.equal(exactNativeLanes.consumers[0].energyKwh,1.25);
+assert.equal(exactNativeLanes.boundary.gridExportKwh,0);
+assert.equal(exactNativeLanes.balanceDeltaKwh,0);
+
 const fs = require('fs');
 const vm = require('vm');
 const v2Source = fs.readFileSync('src/runtime/energy-v2-contract.js','utf8');
