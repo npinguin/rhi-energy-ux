@@ -37,3 +37,5 @@ jobs:
           git push origin HEAD:refs/heads/work/ux-structural-closure-20261011
 
 # Retry with real native-energy metric fixture loaded in current-energy regression.
+
+# Re-run after canonical index fixture repair; checks remain unchanged.
