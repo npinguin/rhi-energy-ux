@@ -342,7 +342,11 @@
       };
     }
     backendStatus() {
-      const canonicalReady = this.canonicalIndex?.hasCanonicalTruth?.() === true;
+      // A diagnostics-only or stale canonical publication is not evidence
+      // that the user-facing Energy product is healthy.
+      const canonicalReady = (this.canonicalIndex?.productRows?.() || []).some(row=>
+        row.availability === 'AVAILABLE' &&
+        ['key_properties','details','configuration'].includes(row.presentation_surface));
       return {
         runtimeTrusted: canonicalReady,
         showMainWarning: !canonicalReady,
@@ -546,24 +550,24 @@
       return projection.available ? { entity_id:this.contractEntityId(), ...projection.raw } : null;
     }
     pilotReadiness() {
-      const v2=this.publicV2();
-      const coverage=this.coverage();
+      const backend=this.backendStatus();
+      // Product parity and target-HA qualification remain independent gates;
+      // native property publication alone must never declare the pilot READY.
       return {
-        entity_id:v2.envelope.entityId,
-        state:v2.available ? (coverage.complete ? 'READY' : 'PARTIAL') : 'UNAVAILABLE',
-        contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
-        contract_version:v2.contractVersion,
-        release:v2.release,
-        coverage
+        entity_id:RELEASE_ENTITY,
+        state:backend.runtimeTrusted ? 'PARTIAL' : 'UNAVAILABLE',
+        contract_id:'RHI_ENERGY_CANONICAL_PROPERTY_V2',
+        contract_version:'2.0.0',
+        release:String(this.releaseAttrs().backend_release || ''),
+        coverage:this.coverage()
       };
     }
     planningExperienceRows() {
       if (this._planningExperienceRows) return this._planningExperienceRows;
-      const v2=this.publicV2();
-      this._planningExperienceRows=(v2.layers?.planning_objects || []).map((row,index)=>({
-        experience_id:row.experience_id || row.id || row.asset_id || `planning_experience_${index+1}`,
-        entity_id:v2.envelope.entityId,
-        ...objectFrom(row)
+      // The same backend-owned planning assets drive all cross-screen views.
+      // No separate aggregate planning_objects list or fabricated participant ID.
+      this._planningExperienceRows=this.planningIndexRows().map(row=>Object.freeze({
+        ...row,experience_id:String(row.experience_id || row.planning_id)
       }));
       return this._planningExperienceRows;
     }
@@ -1009,18 +1013,19 @@
     }
     valuePeriods() {
       if (this._valuePeriods) return this._valuePeriods;
-      const v2=this.publicV2();
-      const periods=objectFrom(v2.valueAccounting?.periods || {});
-      const order={today:1,day:1,week:2,month:3,year:4};
+      const financial=this.nativeMetric('net_financial_result_eur');
+      const id=String(financial.period || '').toLowerCase();
       const labels={today:'Today',day:'Today',week:'This week',month:'This month',year:'This year'};
-      this._valuePeriods=Object.entries(periods).map(([period_id,row])=>({
-        entity_id:v2.envelope.entityId,
-        period_id:String(period_id).toLowerCase(),
-        label:labels[String(period_id).toLowerCase()] || human(period_id),
-        selector_order:order[String(period_id).toLowerCase()] || 99,
-        summary:{ cost:objectFrom(row), quality:{ financial:row?.quality || 'UNKNOWN' } },
-        ...objectFrom(row)
-      })).sort((a,b)=>(a.selector_order||99)-(b.selector_order||99));
+      // Only the backend-selected financial period is currently published.
+      // Unknown periods must not be rendered as selectable financial facts.
+      this._valuePeriods=id ? [Object.freeze({
+        entity_id:financial.entity_id || null,
+        period_id:id,label:labels[id] || human(id),selector_order:1,
+        net_financial_result_eur:financial.available ? Number(financial.value) : null,
+        summary:{cost:{net_financial_result_eur:financial.available ? Number(financial.value) : null},
+          quality:{financial:financial.available ? 'AVAILABLE' : 'UNAVAILABLE'}},
+        reason:financial.reason || ''
+      })] : [];
       return this._valuePeriods;
     }
     meteringRemediations() {
