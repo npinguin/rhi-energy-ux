@@ -4,7 +4,7 @@ const vm=require('node:vm');
 const src=fs.readFileSync('src/app/energy-card.js','utf8');
 const method=(name,next)=>{
   const begin=src.indexOf('\n    '+name+'(');
-  const end=src.indexOf('\n    '+next+'(',begin+1);
+  const end=next==='flow' ? src.indexOf('\n    async mountPowerFlowCard(',begin+1) : src.indexOf('\n    '+next+'(',begin+1);
   assert.ok(begin>=0&&end>begin,name+' boundary');
   return src.slice(begin,end);
 };

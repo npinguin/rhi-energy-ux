@@ -17,6 +17,7 @@
         "runtime/consumption-contract.js",
         "domain/models/current-energy-view-model.js",
         "domain/models/physical-flow-view-model.js",
+        "runtime/power-flow-card-adapter.js",
         "domain/models/metering-status-model.js",
         "runtime/command-contract.js",
         "runtime/command-action-model.js"
