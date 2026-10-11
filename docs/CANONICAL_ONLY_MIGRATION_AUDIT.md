@@ -41,3 +41,7 @@ Energy E0.15.116 → exact native HA `RHI_ENERGY_CANONICAL_OBJECT_V2`, `RHI_ENER
 ## Historical migration context
 
 This work supersedes the previous 2026-10-09 dependency inventory that counted 36 retired Public V2 references. References in old handovers and legacy backend interface discussions are historical, not a supported runtime compatibility path.
+
+## Final source-branch evidence
+
+The recurring canonical recovery validation on the updated native implementation passed at [run 38131759385](https://github.com/npinguin/rhi-energy-ux/actions/runs/38131759385); the full two-job PR Validate on the final merge head is the required release gate. The committed HACS distribution was built from the native-only source and its checksum checked. This does **not** certify physical Home Assistant operations or stable promotion.
