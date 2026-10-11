@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.36-rc.10';
+  const UX_VERSION = 'R4.3.36-rc.11';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Native Energy publication is discovered by exact canonical contract markers.
@@ -1347,7 +1347,10 @@ function buildRhiPowerFlowCardConfig(rt) {
   // battery.power_kw sign is not contractually the direction convention
   // required by Power Flow Card Plus. Do not map it without separate signed evidence.
   const homeId = sensor('site_consumption.power_kw', 'site_consumption');
-  if (homeId) entities.home = {entity:homeId};
+  // Power Flow Card Plus otherwise computes Home by adding the input sources.
+  // The RHI site balance may be incomplete; never invent household demand.
+  if (!homeId) return null;
+  entities.home = {entity:homeId, override_state:true, name:'Site consumption'};
   if (!entities.grid && !entities.solar) return null;
   return {
     type:'custom:power-flow-card-plus',
