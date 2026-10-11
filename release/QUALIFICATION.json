@@ -1,8 +1,8 @@
 {
-  "version": "4.3.36-rc.3",
-  "candidate_tag": "v4.3.36-rc.3",
+  "version": "4.3.36-rc.4",
+  "candidate_tag": "v4.3.36-rc.4",
   "candidate_sha": "pending",
-  "previous_release": "4.3.36-rc.2",
+  "previous_release": "4.3.36-rc.3",
   "known_accepted_technical_debt": 0,
   "known_accepted_feature_debt": 0,
   "hacs_install": "NOT_EXECUTED",

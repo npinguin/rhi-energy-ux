@@ -307,3 +307,76 @@ if(unknownHome.homeConsumptionKw!==null || unknownHome.homeStatus!=="UNAVAILABLE
   throw new Error("missing Home Consumption must remain unknown rather than zero");
 
 console.log("PASS canonical Energy property metadata, fail-closed lookup and incremental indexing");
+
+
+/* Canonical flexible-load inventory must not depend on measurement availability,
+ * planning readiness, charger source role, or optional presentation fields. */
+const energyProjectionSource=fs.readFileSync("src/runtime/energy-v2-contract.js","utf8");
+const flexibleModelSource=fs.readFileSync("src/domain/models/flexible-asset-model.js","utf8");
+const inventoryContext=vm.createContext({
+  Object,Array,Number,String,Map,Set,console,
+  firstDefined:(...values)=>values.find(value=>value!==null&&value!==undefined),
+  asBool:(value,fallback)=>value==null?fallback:value===true||value==="true",
+});
+vm.runInContext(source+"\n"+energyProjectionSource+"\n"+flexibleModelSource+
+  "\nglobalThis.readEnergyCanonicalProduct=readEnergyCanonicalProduct;"+
+  "\nglobalThis.createEnergyCanonicalPropertyIndex=createEnergyCanonicalPropertyIndex;"+
+  "\nglobalThis.FlexibleAssetDomainModel=FlexibleAssetDomainModel;"+
+  "\nglobalThis.readEnergyCommandContract=()=>({rows:[]});",inventoryContext);
+const logicalFixture=(id,cls="flexible_load")=>({
+  state:"READY",attributes:{canonical_contract:"RHI_ENERGY_CANONICAL_OBJECT_V2",
+    asset_id:id,logical_object_class:cls,display_name:"Load "+id,availability:"AVAILABLE"}
+});
+const propertyFixture=(id,key,val,availability="AVAILABLE")=>({
+  state:val==null?"unavailable":String(val),attributes:{
+    canonical_contract:"RHI_ENERGY_CANONICAL_PROPERTY_V2",
+    asset_id:id,logical_object_class:"flexible_load",
+    property_key:key,value:val,availability,quality:"CANONICAL",
+    presentation_family:"consumer",presentation_role:"key",presentation_surface:"consumers"}
+});
+const inventoryStates={
+  "sensor.load_one":logicalFixture("one"),
+  "sensor.load_two":logicalFixture("two"),
+  "sensor.load_three":logicalFixture("three"),
+  "sensor.load_four":logicalFixture("four"),
+  "sensor.load_five":logicalFixture("five"),
+  "sensor.one_power":propertyFixture("one","power_kw",0),
+  "sensor.three_need":propertyFixture("three","energy_to_target_kwh",11.22),
+  "sensor.flexible_group":logicalFixture("flexible_loads","flexible_loads"),
+  "sensor.flexible_budget":{state:"0",attributes:{
+    canonical_contract:"RHI_ENERGY_CANONICAL_PROPERTY_V2",
+    asset_id:"flexible_loads",logical_object_class:"flexible_loads",
+    property_key:"flexible_loads.available_power_kw",value:0,
+    availability:"AVAILABLE",quality:"CANONICAL",
+    presentation_family:"consumer",presentation_role:"key",presentation_surface:"consumers"
+  }}
+};
+const inventoryHass={states:inventoryStates};
+const inventoryIndex=inventoryContext.createEnergyCanonicalPropertyIndex(inventoryHass);
+const inventoryGateway={host:{
+  hass:inventoryHass,canonicalIndex:inventoryIndex,
+  nativePlanningTotals:()=>({available:false,values:{},missing:[]}),
+  nativePlanningHorizon:()=>({available:false})
+}};
+const inventoryProduct=inventoryContext.readEnergyCanonicalProduct(inventoryGateway);
+if(inventoryProduct.core.flexible.available_power_kw!==0)
+  throw new Error("backend-published flexible available power zero must survive canonical projection");
+if(inventoryProduct.planning.horizons.D0.status==="AVAILABLE")
+  throw new Error("missing effective D0 horizon must not look AVAILABLE even if metric totals exist");
+if(inventoryProduct.flexibleAssets.length!==5)
+  throw new Error("five canonical flexible_load objects must survive even if properties and planning are missing");
+if(inventoryProduct.flexibleAssets.find(row=>row.asset_id==="one")?.power_kw!==0)
+  throw new Error("canonical measured zero lost in flexible projection");
+if(inventoryProduct.flexibleAssets.find(row=>row.asset_id==="three")?.energy_to_target_kwh!==11.22)
+  throw new Error("canonical energy need lost in flexible projection");
+if(inventoryProduct.flexibleAssets.find(row=>row.asset_id==="two")?.power_kw!==null)
+  throw new Error("missing flexible power must not become zero");
+const inventoryDomain=new inventoryContext.FlexibleAssetDomainModel({
+  primaryFlexibleAssets:()=>inventoryProduct.flexibleAssets,
+  planningOutcomeFor:()=>({}),contractGateway:()=>inventoryGateway
+});
+if(inventoryDomain.consumerFacing().length!==5)
+  throw new Error("canonical flexible_load inventory is not a subset of plan-ready loads");
+if(inventoryDomain.planningParticipants().length!==0)
+  throw new Error("unknown planning readiness must not be silently promoted to eligibility");
+console.log("PASS canonical flexible-load inventory preserves five objects, valid zero, unknown inputs and planning separation");

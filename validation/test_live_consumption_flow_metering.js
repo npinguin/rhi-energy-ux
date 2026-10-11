@@ -54,7 +54,7 @@ const native=fs.readFileSync('src/runtime/energy-v2-contract.js','utf8');
 // metering-period or retrospective canonical entity. The product must fail
 // closed here, never synthesize period totals or retrospective scores.
 for(const token of [
-  'metering:{periods:{}}','retrospective:{}','valueAccounting',
+  'metering:{periods:{},available:false,reason:\'canonical_period_publication_unavailable\'}','retrospective:{}','valueAccounting',
   'readNativeEnergyMetric(hass,\'net_financial_result_eur\')'
 ]) if(!native.includes(token)) throw new Error('native Metering/Value missing-data invariant '+token);
 

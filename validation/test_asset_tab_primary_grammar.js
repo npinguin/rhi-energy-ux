@@ -58,7 +58,8 @@ const consumersEnd = app.indexOf("\n    strategies(rt)", consumersStart);
 const consumers = app.slice(consumersStart, consumersEnd);
 assert.doesNotMatch(consumers,/consumerPrimarySummary/);
 assert.doesNotMatch(consumers,/productStoryCard\(\{ eyebrow:'Managed energy'/);
-assert.match(consumers,/Managed flexible assets/);
+assert.match(consumers,/Flexible loads/);
+assert.match(consumers,/!vm\.isDisabled/,'unknown participation must remain in the visible inventory');
 assert.match(consumers,/domain\.consumerFacing\(\)/);
 
 console.log("PASS asset tabs use compact primary truth with progressive details");

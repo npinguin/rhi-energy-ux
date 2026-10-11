@@ -1,11 +1,11 @@
-# v4.3.36-rc.3 — Native D0/D1 planning-quality and bucket semantics (HACS TEST CANDIDATE)
+# v4.3.36-rc.4 — Canonical flexible inventory, available power and readiness (HACS TEST CANDIDATE)
 
-The installed Energy E0.15.116 diagnostics show an EMHASS provider hold (`effective_provider=null`), a deterministic baseline plan that is not selected as effective, and incomplete D0/D1 horizons. The frontend must distinguish actual numeric planning metrics, effective plan quality, and baseline nonexecutability.
+- Preserve every unique backend-published canonical `flexible_load` object in Consumption, including missing-power and non-plan-ready objects.
+- Preserve producer-owned operating, participation, availability and readiness only when explicitly published; unknown is not an active plan.
+- Require explicit planning readiness, and show blocked/unassessed inventory separately.
+- Consume `flexible_loads.available_power_kw` directly from canonical Energy property; valid zero and unavailable remain distinct.
+- D0/D1 numeric totals alone do not prove an effective plan; incomplete EMHASS HOLD remains non-executable.
+- Backend metering period diagnostics are not a public canonical period contract. Missing public publication is tracked in Energy #242. UX does not suggest unproven resets.
+- Contract regressions for canonical inventory, zero and absent planning.
 
-- Numeric D0/D1 native metrics may be visible as provisional evidence; they do **not** establish an AVAILABLE or executable effective plan.
-- A complete effective `RHI_ENERGY_PLANNING_HORIZON_V1` producer is required, with provider selection, `attributes.details`, published buckets and exact execution policy. Missing/duplicate/incomplete publications fail closed and disclose the provider reason.
-- The canonical native bucket adapter now accepts `ENERGY_NATIVE_PLANNING`; old R1.79.x adapters must not reject valid native buckets, infer Home/Grid lanes, or derive kWh from a power value and a guessed duration.
-- New regressions protect provider HOLD, missing horizon and real zero values.
-- HACS source/package/CI validation is separate from target Home Assistant functional qualification. **Not stable.**
-
-Compatibility: Energy backend E0.15.116 or newer with the native horizon contract, Foundation F1.8.44, UX Core 1.6.3. Rollback UX: v4.3.36-rc.2. The EMHASS missing solar forecast slot is backend evidence and is **not resolved by this frontend release**.
+Compatibility: Energy E0.15.116 or newer; Foundation F1.8.44; Mobility M0.10.44 for cross-domain visuals. Rollback: v4.3.36-rc.3. Target HA qualification remains pending; **not stable**.

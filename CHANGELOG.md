@@ -1,3 +1,12 @@
+## 4.3.36-rc.4 — Canonical flexible-load inventory and fail-closed planning/metering
+
+- render every canonical flexible_load object, independent of missing metrics and planning readiness;
+- preserve producer lifecycle/readiness metadata without default eligibility;
+- consume canonical flexible_loads.available_power_kw without UI arithmetic;
+- require effective D0/D1 horizon for availability, not just numeric totals;
+- explain absent public metering period evidence without phantom reset commands;
+- protect valid zero, missing data and inventory count with contract regressions.
+
 ## 4.3.36-rc.3 — Native effective planning quality, EMHASS HOLD, bucket adapter
 
 - never present native metric totals as a complete or executable plan without an available effective D0/D1 horizon;

@@ -703,7 +703,7 @@
         cluster_role: row.cluster_role || 'standalone',
         show_in_primary_ux: row.show_in_primary_ux ?? true,
         show_in_engineering: row.show_in_engineering ?? false,
-        planning_enabled: row.planning_enabled ?? true,
+        planning_enabled: row.planning_enabled ?? null,
         contributor_asset_ids: asArray(row.contributor_asset_ids),
         actual_power_kw: actual,
         current_power_kw: actual,
@@ -2577,7 +2577,8 @@
     buildPageViewModel(rt, tab) {
       const current = this.currentEnergyModel(rt);
       const solar = current.solar.powerKw;
-      const flexibleLoadBudget = null; // R1.89.22 does not register a canonical public budget field.
+      const budgetEvidence = rt.canonicalProduct()?.core?.flexible?.fields?.available_power_kw;
+      const flexibleLoadBudget = budgetEvidence?.resolved === true ? asNumber(budgetEvidence.value) : null;
       const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
       const solarForecast = rt.number('forecast.solar_today_kwh');
       const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
@@ -4066,9 +4067,11 @@
       const targetId = firstDefined(d.recommended_target_asset_id, rt.value('energy_intelligence.recommended_target_asset_id', null), '');
       const assetDomain = this.flexibleAssetDomain(rt);
       const loads = assetDomain.consumerFacing().map(vm => vm.raw);
-      const participating = loads.filter(load => !assetDomain.byId(load.asset_id)?.isDisabled);
+      const participating = loads.filter(load => assetDomain.byId(load.asset_id)?.isParticipating && load.planning_input_ready === true);
+      const unassessed = loads.filter(load => !assetDomain.byId(load.asset_id)?.isDisabled && !(assetDomain.byId(load.asset_id)?.isParticipating && load.planning_input_ready === true));
       const disabled = loads.filter(load => assetDomain.byId(load.asset_id)?.isDisabled);
       const cards = participating.map(load => this.operationalLoadCard(rt, load, recommendation, targetId)).join('');
+      const unassessedCards = unassessed.map(load => this.consumerExplorerCard(rt,load)).join('');
       const disabledCards = disabled.map(load => this.disabledFlexibleAssetCard(rt, load, load.energy_planning || rt.planningOutcomeFor(load.asset_id) || {})).join('');
       const active = participating.filter(load => (asNumber(load.power_kw) || 0) > 0.05 || /running|charging|executing/i.test(String(load.operating_state || load.current_status || ''))).length;
       const planned = participating.filter(load => {
@@ -4091,7 +4094,8 @@
         : executionPolicy.configuredMode === 'advice'
           ? 'Home Intelligence calculates the same plan but cannot dispatch it autonomously.'
           : 'Home Intelligence keeps calculating planning insight but managed plan execution is blocked.';
-      const executeAction = executePlan && rt.commandVisible(executePlan)
+      const effectivePlanAvailable = rt.nativePlanningHorizon('D0')?.available === true;
+      const executeAction = effectivePlanAvailable && executePlan && rt.commandVisible(executePlan)
         ? this.componentActionButton(executePlan, executePlan.label || (executionPolicy.configuredMode === 'advice' ? 'Apply current plan' : 'Run current plan now'), 'energy')
         : '';
       const authorityCard = this.productStoryCard({
@@ -4108,6 +4112,7 @@
       });
       return `${this.tabExperienceHeader(rt,'operational-planning',pageVm)}${this.bodyContextBar(rt,'operational-planning','operational-planning-body')}<div id="operational-planning-body" class="operationalPlanningPage">${authorityCard}
         <section class="panel operationalPlanningLoads"><div class="energySectionHead"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'section.flexible_loads',{},'Flexible loads'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.flexible_loads_desc',{},'Current execution, next action, requested power and operational reason. Hardware configuration is not shown here.'))}</p></div></div><div class="flexLoadList">${cards || '<div class="empty"><b>No participating flexible loads</b><span>No controllable load currently participates in operational planning.</span></div>'}</div></section>
+        ${unassessedCards ? `<section class="panel operationalPlanningLoads"><div class="energySectionHead"><div><h2>Not plan-ready</h2><p>Published flexible loads without confirmed planning participation or complete inputs. No schedule or command readiness is inferred.</p></div></div><div class="flexLoadList">${unassessedCards}</div></section>` : ''}
         ${disabledCards ? `<details class="panel compactDisclosure"><summary>${escapeHtml(rhiEnergyT(this._hass,"asset.other",{},"Other assets"))} (${disabled.length})</summary><p>${escapeHtml(rhiEnergyT(this._hass,"asset.excluded_planning",{},"These assets are excluded from operational planning."))}</p><div class="disabledAssetList">${disabledCards}</div></details>` : ''}
       </div>`;
     }
@@ -4760,7 +4765,7 @@
       const raw = vm?.raw || row;
       const producerVisualRef = String(firstDefined(vm?.visualRef, raw.visual_ref, row.visual_ref, '') || '').trim();
       const asset = this.energyAssetContext(rt,{...raw,...row,visual_ref:producerVisualRef});
-      const stateRaw = firstDefined(planning.product_state,planning.status,planning.state,asset.operating_state,'available');
+      const stateRaw = firstDefined(planning.product_state,planning.status,planning.state,asset.operating_state,'unknown');
       const state = this.userStateText(stateRaw);
       const currentPower = asNumber(firstDefined(row.current_power_kw,row.actual_power_kw,row.power_kw,raw.current_power_kw,raw.actual_power_kw,raw.power_kw,null));
       const energyNeed = asNumber(firstDefined(
@@ -4789,12 +4794,16 @@
         rt.commandActionModelsForAsset(id).filter(action=>['start','stop','pause','resume'].includes(action.role)),
         [stateRaw, asset.operating_state, asset.execution_state, currentPower !== null && currentPower > 0.05 ? 'active' : ''].filter(Boolean).join(' ')
       );
+      const readiness = raw.planning_input_ready === true ? 'Plan-ready' : raw.planning_input_ready === false ? 'Planning blocked' : 'Planning not evaluated';
+      const readinessReason = String(raw.planning_input_reason || '');
       const keyFacts = [
+        ['Planning',readiness],
         energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
         readyBy ? ['Ready by',human(readyBy)] : null,
         plannedToday !== null ? ['Planned today',fmtKwh(plannedToday)] : null,
-        stillToPlan !== null ? ['Still to plan',fmtKwh(stillToPlan)] : null
-      ].filter(Boolean).slice(0,4);
+        stillToPlan !== null ? ['Still to plan',fmtKwh(stillToPlan)] : null,
+        readinessReason ? ['Reason',this.userSafeReason(readinessReason,'Not specified')] : null
+      ].filter(Boolean).slice(0,5);
       const configuration = requestedControl
         ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${requestedControl}</div></details>`
         : '';
@@ -4873,13 +4882,13 @@
         return !/(^|_)(charger|connection|charging_point)(_|$)/.test(kind);
       }));
       const visibleRows = this.filterAndSortConsumers(rows);
-      const participating = visibleRows.filter(row => { const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return !vm || (vm.isParticipating && !vm.isDisabled); });
+      const participating = visibleRows.filter(row => { const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return !vm || !vm.isDisabled; });
       const disabled = visibleRows.filter(row => domain.byId(row.asset_id||row.consumer_id||row.id)?.isDisabled);
       const totalPower = asNumber(summary.current_power_kw);
       const cards = participating.map(row=>this.consumerExplorerCard(rt,row)).join('');
       const disabledRows = disabled.map(row=>{ const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return this.disabledFlexibleAssetCard(rt,vm?.raw||row,vm?.planning||{}); }).join('');
       return `${this.tabExperienceHeader(rt,'consumers',pageVm)}${this.bodyContextBar(rt,'consumers','consumer-list')}<div class="consumersPage productPortalPage">
-        <section class="panel consumerExplorer" id="consumer-list"><div class="consumerExplorerHeader"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'consumer.managed',{},'Managed flexible assets'))}</h2><p>Primary cards show current power and energy need. Details contain additional user information; technical evidence stays in Diagnostics.</p></div><strong>${fmtKw(totalPower,'—')}</strong></div><div class="consumerExplorerList">${cards || `<div class="empty"><b>No managed assets</b><span>Enable participation for an asset to let Home Intelligence manage it.</span></div>`}</div></section>
+        <section class="panel consumerExplorer" id="consumer-list"><div class="consumerExplorerHeader"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'consumer.managed',{},'Flexible loads'))}</h2><p>Primary cards show current power and energy need. Details contain additional user information; technical evidence stays in Diagnostics.</p></div><strong>${fmtKw(totalPower,'—')}</strong></div><div class="consumerExplorerList">${cards || `<div class="empty"><b>No flexible loads published</b><span>Energy has not published a canonical flexible-load inventory.</span></div>`}</div></section>
         ${disabledRows ? `<details class="panel compactDisclosure"><summary>${escapeHtml(rhiEnergyT(this._hass,"asset.other",{},"Other assets"))} (${disabled.length})</summary><p>${escapeHtml(rhiEnergyT(this._hass,"asset.not_managed",{},"These assets are not managed by Home Intelligence."))}</p><div class="disabledAssetList">${disabledRows}</div></details>` : ''}
       </div>`;
     }
@@ -5157,11 +5166,11 @@
     meteringNotPublishedPeriod(periods, remediation = null) {
       const selected = this.selectedPeriod(periods, this.selectedMeteringPeriodId) || { period_id:this.selectedMeteringPeriodId || 'week', label:human(this.selectedMeteringPeriodId || 'Period') };
       const label = this.periodLabel(selected);
-      const command = remediation?.command || this.runtime().meteringResetCommandFor({}, selected.period_id);
+      const command = remediation?.command || null;
       const action = command ? this.componentActionButton(command, `Reset ${label.toLowerCase()} totals`, 'metering') : '';
-      const title = remediation ? `${label} totals need a one-time reset` : `${label} totals are being prepared`;
-      const why = remediation ? `Home Intelligence found measurements for ${label.toLowerCase()}, but the starting point cannot yet be trusted.` : `Reliable ${label.toLowerCase()} totals are not available yet.`;
-      const recommendation = remediation ? `Reset once. Home Intelligence will confirm the new baseline while keeping the measured values visible.` : `${label} measurements are currently unavailable. They will appear when measurements become available.`;
+      const title = remediation ? `${label} totals need a one-time reset` : `${label} period measurements not published`;
+      const why = remediation ? `Home Intelligence found measurements for ${label.toLowerCase()}, but the starting point cannot yet be trusted.` : `Energy has not published a canonical metering period with measurements and quality for ${label.toLowerCase()}. Diagnostic storage values are not public UX evidence.`;
+      const recommendation = remediation ? `Reset once. Home Intelligence will confirm the new baseline while keeping the measured values visible.` : `Waiting for the backend-owned metering period publication. No baseline reset is assumed necessary.`;
       const selector = this.componentPeriodSelector(periods, selected.period_id || this.selectedMeteringPeriodId || 'today', 'metering-period');
       return `<div class="meteringPage productPortalPage"><section class="panel compact meteringPeriodControl"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'metering.period',{},'Measurement period'))}</h2><p>Select the period even while totals are still being prepared.</p></div>${selector}${this.editablePropertyFeedback(this.runtime().row('metering.selected_period'))}</section>${this.productStoryCard({ eyebrow:`${label} measurements`, title, why, recommendation, actions:action, tone:remediation?'orange':'blue' })}</div>`;
     }
