@@ -39,3 +39,5 @@ jobs:
 # Retry with real native-energy metric fixture loaded in current-energy regression.
 
 # Re-run after canonical index fixture repair; checks remain unchanged.
+
+# Verify native home consumption projection authority after source/test alignment.
