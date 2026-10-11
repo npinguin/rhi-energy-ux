@@ -89,6 +89,13 @@ function readEnergyCanonicalProduct(gateway) {
     core[section]={fields:sectionFields,...Object.fromEntries(Object.entries(sectionFields).map(([key,row])=>[key,row.resolved ? row.value : null]))};
   }
   const configRows=propertyRows.filter(row=>row.logical_object_class === 'energy_configuration');
+  for(const p of configRows){
+    const key=String(p.property_key || ''),id=String(p.asset_id || '');
+    if(!key || !id)continue;
+    byAssetAndKey.set(id+'::'+key,p);
+    if(!byKey.has(key))byKey.set(key,p);
+    else byKey.set(key,null);
+  }
   const forFamily=kind=>configRows.filter(row=>row.presentation_family === kind);
   const pricingRows=forFamily('pricing'), strategyRows=forFamily('strategy'), meteringRows=forFamily('metering');
   const groupProfiles=new Map();
