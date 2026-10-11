@@ -24,7 +24,7 @@ Energy keeps backend/domain ownership intact. UX selects, composes, formats and 
 
 The product is **not yet mature**.
 
-In particular, Planning and Intelligence must be treated as **P0 unqualified product capability** until the complete V2 journey works on the target Home Assistant. Static V2 coverage, green CI and structurally present contracts are not enough.
+In particular, Planning and Intelligence must be treated as **P0 unqualified product capability** until the complete V2 journey works on the target Home Assistant. Static contract coverage, green CI and structurally present contracts are not enough.
 
 Observed product acceptance status: Planning/Intelligence has not demonstrated a dependable end-to-end working user journey since the V2 transition. Until target-runtime proof closes this, documentation and release decisions must not describe it as product-complete.
 
@@ -34,7 +34,7 @@ This is the first product priority before broadening the feature set.
 
 Acceptance requires, on the exact immutable candidate:
 
-- Energy public V2 planning contract available with real household data;
+- canonical native Energy D0/D1 metrics and producer-owned planning horizon details available with real household data;
 - current operational intent rendered correctly;
 - planned totals for today rendered correctly;
 - still-to-plan totals rendered correctly;

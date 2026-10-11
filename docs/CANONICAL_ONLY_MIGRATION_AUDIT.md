@@ -1,12 +1,12 @@
 # P0 — Canonical-only frontend migration audit (2026-10-09)
 
-Status: **OPEN / preparation only**. Branch is not releasable. Canonical replacement IDs and attributes are **not assumed**.
+Status as of **2026-10-11**: **ACTIVE IMPLEMENTATION / NO-GO**. Source-level canonical native property, Home Consumption, D0/D1 total and financial-period work exists on `work/ux-structural-closure-20261011`; legacy aggregate remains active in other consumers. Strict source audit last reported **36** retired Public V2 matches on the previous migratory head. Do not publish while this remains. Backend identities are taken from inspected producer code, not invented.
 
 ## Architectural decision
 Runtime presentation path: domain-owned canonical state → native HA devices/entities → Energy gateway → scoped view models → components.
 **No** Public V2 reader, dual-contract gateway, reverse relationship lookup, derived totals or fallback arithmetic. Do not remove backend-to-backend producer contracts.
 
-## Verified active dependencies (main, 2026-10-09)
+## Historical verified dependencies (main, 2026-10-09; see current source for progress)
 | Frontend consumer | Current source | Canonical replacement | Backend owner | Required properties | Availability | Migration status |
 |---|---|---|---|---|---|---|
 | `src/runtime/public-interface-registry.js` | `sensor.rhi_energy_public_contract_v2` via `UX_INTERFACES.publicV2` | Native Energy canonical HA entities; exact mapping pending catalog | Energy | Asset/object identity, properties, availability, reason, freshness, provenance, placement | Not independently verified | BLOCKED — replace entrypoint |
@@ -14,6 +14,14 @@ Runtime presentation path: domain-owned canonical state → native HA devices/en
 | `src/domain/planning/planning-contract.js` | `readEnergyPublicV2(gateway)`, `planning.horizons`, `planning.assets`; source marker is `RHI_ENERGY_PUBLIC_CONTRACT_V2.planning.horizons` | Native, Planning-owned D0/D1 properties and asset outcomes | Energy | Planning horizon totals, lane totals, buckets, asset results, incomplete reasons | Backend release pending | BLOCKED — no UX totals calculation |
 | `validation/test_energy_contract_gateway.js` | Test fixture injects `RHI_ENERGY_PUBLIC_CONTRACT_V2` aggregate and asserts Public V2 entity | Canonical native entity fixture and fail-closed missing-field tests | Energy / UX | Exact published native metadata | Pending contract | REWRITE REQUIRED |
 | `docs/CONTRACT.md` | Describes `sensor.energy_planning_index` and `sensor.rhi_energy_public_contract_v2` as product owners | Canonical presentation boundary | Energy / UX | Actual published identifiers and write/readback descriptors | Pending contract | DOCUMENTATION DRIFT |
+
+## Implementation evidence and outstanding closure (2026-10-11)
+
+- Native `RHI_ENERGY_CANONICAL_PROPERTY_V2` indexed by backend `asset_id::property_key`, with parent/HA source IDs preserved and invalid/duplicate values rejected.
+- Home Consumption consumes exact native `home_consumption_power_kw`; planning D0/D1 totals and per-asset planning outcome selection use native producer publications only; financial value is period-scoped.
+- The former Public V2 registry/gateway/reader plus selectors, commands and remaining screen dependencies still require one structural replacement; do **not** rename strings to quiet the scanner.
+- Detailed planning buckets/assets need verified `RHI_ENERGY_PLANNING_HORIZON_V1` backend publication (#249). Full per-period metering, strategy configured/effective, pricing and commands need producer contract proof (#242).
+- Existing source tests may pass while the strict canonical-only release gate fails. Both gates must agree before publication; target-HA qualification remains missing.
 
 ## Workstream A
 - [ ] Enumerate *all* runtime references to Public V2, snapshot JSON, caches, legacy revisions and semantic fallback chains; extend this initial verified sample into an exhaustive inventory.

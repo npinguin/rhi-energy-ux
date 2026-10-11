@@ -1,116 +1,37 @@
-# Backend-to-Frontend Contract — Current Boundary
+# Energy Backend-to-UX Contract — Canonical Native Boundary
 
-## Principle
+## Single-source rule
 
-Backend publishes complete product truth. UX validates, normalizes and presents it. UX does not reconstruct business meaning, readiness, routing or write targets.
+The backend owns product semantics. The UX reads producer-owned native HA property entities and domain-owned native metrics, and it never computes missing business values, assumes asset identity or uses a retired aggregate as fallback. `sensor.rhi_energy_public_contract_v2` is **retired producer transport** and remains an explicit migration blocker where still referenced in UX source.
 
-## Required per-asset semantics
+## Canonical property entity
 
-Where applicable, backend publishes explicit:
+The current Energy backend materializes `RHI_ENERGY_CANONICAL_PROPERTY_V2` properties with `asset_id`, `logical_object_class`, `parent_asset_id`, `asset_display_name`, `property_key`, `availability`, `quality`, `value`, `presentation_family`, `presentation_role`, `presentation_surface`, editable/write metadata and exact source provenance. These are backend-owned attributes. Duplicate `asset_id::property_key` publishers are invalid product truth. A missing property does not imply zero or an absent asset.
 
-- identity and taxonomy;
-- participation state;
-- physical/operational state;
-- control mode;
-- execution origin;
-- planning eligibility/selection and reason;
-- measured power/current and energy need with correct units;
-- editable property metadata and readback;
-- commands/actions with visibility, applicability and invoke;
-- measurement state, trust and period values;
-- relationship identity and measured relation power.
+## Native domain metrics
 
-## Command action contract
+Identify by the exact **pair** `canonical_source=rhi_energy.runtime` and `metric_key`, not an assumed `entity_id`. Reject absent/multiple/invalid/stale publication. Current backend keys:
 
-UX-safe action shape:
+- `home_consumption_power_kw` — current Home Consumption, in kW.
+- `planning_today_{required_kwh,planned_kwh,still_to_plan_kwh,flexible_required_kwh,flexible_planned_kwh,flexible_still_to_plan_kwh}`.
+- `planning_tomorrow_{required_kwh,planned_kwh,still_to_plan_kwh,flexible_required_kwh,flexible_planned_kwh,flexible_still_to_plan_kwh}`.
+- `net_financial_result_eur` — for the explicit backend-selected `period` only; `actual_complete`, `availability`, `quality`, `reason_code` and `provenance` are not optional guesses.
 
-```text
-command_id / command_key
-command_owner
-action_kind
-command_resolved
-currently_applicable
-visible
-enabled
-label
-reason
-invoke.service
-invoke.target
-invoke.data
-readback
-```
+No frontend aggregation of these totals and no claiming unselected periods from the selected-period metric. Known zero and absent values remain distinct.
 
-Rules:
+## Planning horizons
 
-- unresolved external actions are hidden;
-- visible/inapplicable actions may be disabled with published user reason;
-- backend must fail closed when invoke is incomplete;
-- UX executes invoke literally and does not translate identity into a route;
-- Start/Stop route through canonical Mobility resolution;
-- Pause/Resume are Energy planning-participation actions;
-- service success alone is insufficient; terminal readback is required.
+`RHI_ENERGY_PLANNING_HORIZON_V1` may supply provider, plan ID, buckets, planning assets, source/consumer lanes, balance and execution policy when exactly one producer-owned horizon for D0/D1 is present. **Backend Energy #249 remains open.** Without that publication, present native totals and an explicit gap for detailed buckets and per-asset outcomes. Do not invent combined totals, execution intent or allocations.
 
-## Editable property contract
+## Configuration and actions
 
-A writable property publishes:
+Canonical editable properties must publish the service target, operation, allowed values/constraints, applicability and readback authority. An accepted service call is not proof of saved configuration: show pending until confirmed canonical readback; on failure keep editor content and surface the reason. Commands must come from an exact domain-owned command contract, not an inferred script or entity naming rule. Missing configured/effective strategy differentiation is a contract gap, never a UI heuristic.
 
-```text
-property_id
-value
-unit
-editor_type
-min/max/step or choices
-editable
-write.supported
-write.operation_id
-write.service
-write.target
-write.data/value parameter
-authoritative_owner
-readback_property
-```
+## Product evidence still required
 
-UX may not invent a writer. A visible writable property with no complete route is a backend closure defect.
+- Backend-native full D0/D1 horizon coverage and financial period attribution (Energy #242/#249).
+- Real HA multi-battery, solar, grid, gas, home consumption and flexible consumer identity/availability.
+- Strategy/price/metering/appearance edit, invoke, error and persistence readback.
+- Installation, upgrade, reload/restart, outage/recovery, responsive UI and rollback.
 
-## Planning contract
-
-Public owner: `sensor.energy_planning_index`.
-
-Backend publishes D0/D1 horizons, buckets, Planning-owned totals, commitments and current operational intent. UX does not calculate totals or infer execution readiness.
-
-## Physical Flow contract
-
-Backend must provide one coherent measured physical truth per active relation. UX must not choose between requested/planned/need values.
-
-## Metering contract
-
-Backend owns lifetime-source lineage, baselines, deltas, periodization, attribution, aggregates, trust and health. UX presents exact measurement state and period values; no frontend delta calculation is permitted.
-
-## Missing and degraded data
-
-- zero = known zero;
-- null/missing = unavailable;
-- pending/incomplete/not-applicable remain separate;
-- degraded truth remains visible with calm quality context;
-- missing backend truth is not hidden by a frontend estimate.
-
-## Energy Public V2 asset profile contract
-
-`sensor.rhi_energy_public_contract_v2` is an additive canonical interface for asset
-context. The UX consumes it only through `UX_INTERFACES.publicV2`.
-
-Required semantics consumed by the UX:
-
-- `objects[].asset_id`
-- `objects[].asset_type`
-- `objects[].profile_id`
-- optional explicit `participation_state`, `operating_state`, `availability_state`
-- `objects[].property_publication`
-- top-level `profiles[]`
-
-`property_publication.v1_fallback_allowed=false` is fail-closed. The UX must not
-repair a missing canonical V2 property with a V1 compatibility projection.
-
-Profile identity is semantic Energy context; image selection remains presentation.
-The current profile catalog is read-only and is not a manufacturer/model picker.
-
+**Qualification status:** see `release/QUALIFICATION.json`. No target Home Assistant result is implied by passing static tests.
