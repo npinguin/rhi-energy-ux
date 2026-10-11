@@ -35,3 +35,5 @@ jobs:
           git rm .github/workflows/recovery-source-verification-20261011.yml
           git commit -m 'chore: retire completed recovery source-verification workflow'
           git push origin HEAD:refs/heads/work/ux-structural-closure-20261011
+
+# Retry with real native-energy metric fixture loaded in current-energy regression.
