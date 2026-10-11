@@ -2,7 +2,6 @@ name: Prepare Power Flow Card HACS candidate (temporary)
 on:
   push:
     branches: [feat/power-flow-card-integration-20261011]
-    paths: [.github/workflows/prepare-power-flow-card.yml]
 permissions:
   contents: write
 jobs:
