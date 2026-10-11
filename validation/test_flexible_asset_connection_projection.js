@@ -41,6 +41,7 @@ const runtime = {
   planningOutcomeFor: id => ({asset_id:id,status:'planned'}),
   primaryFlexibleAssets: () => [{
     asset_id:'vehicle_id4',
+    object_class:'flexible_load',
     source_asset_kind:'vehicle',
     asset_type:'vehicle',
     participation_state:'participating',
@@ -51,6 +52,7 @@ const runtime = {
     connection_state:'asset_connected'
   },{
     asset_id:'vehicle_waiting',
+    object_class:'flexible_load',
     source_asset_kind:'vehicle',
     asset_type:'vehicle',
     participation_state:'participating',
@@ -59,6 +61,7 @@ const runtime = {
     visual_ref:'mobility.vehicle.generic.waiting'
   },{
     asset_id:'charger_driveway',
+    object_class:'charger',
     source_asset_kind:'charger',
     asset_type:'charger',
     participation_state:'infrastructure_only',
