@@ -1,0 +1,62 @@
+name: Native Energy entity migration (single use)
+on:
+  push:
+    branches:
+      - work/ux-structural-closure-20261011
+    paths:
+      - .github/workflows/native-energy-cutover-20261011.yml
+permissions:
+  contents: write
+jobs:
+  native-cutover:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/work/ux-structural-closure-20261011'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/ux-structural-closure-20261011
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Read previous native implementation but preserve recovery changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin refs/heads/work/energy-native-interface-closure-20261011:refs/remotes/origin/work/energy-native-interface-closure-20261011
+          git checkout refs/remotes/origin/work/energy-native-interface-closure-20261011 -- \
+            src/runtime/public-interface-registry.js \
+            src/runtime/energy-v2-contract.js \
+            src/runtime/command-contract.js \
+            src/runtime/energy-contract-gateway.js \
+            src/runtime/canonical-property-index.js \
+            src/runtime/asset-profile-contract.js \
+            src/domain/selectors/energy-selectors.js \
+            validation/test_native_energy_backend_interfaces.js
+          python tools/migrate_native_energy_20261011.py
+      - name: Build and enforce no retired product interface
+        run: |
+          npm ci
+          npm run build
+          node --check dist/rhi-energy-ux.js
+          npm run check:canonical-only
+      - name: Commit source and exact distributable, remove one-time tooling
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm tools/migrate_native_energy_20261011.py .github/workflows/native-energy-cutover-20261011.yml
+          git add -A src/ dist/ validation/test_native_energy_backend_interfaces.js
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m 'refactor(energy): remove aggregate Public V2 consumers for native HA objects properties commands'
+          git push origin HEAD:refs/heads/work/ux-structural-closure-20261011
+      - name: Complete contract, UX and packaging tests (fail on any regression)
+        run: |
+          npm run validate
+          node tools/check-committed-dist.mjs
+          npm run test:release
