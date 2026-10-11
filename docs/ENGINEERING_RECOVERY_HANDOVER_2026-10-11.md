@@ -1,3 +1,5 @@
+> **Checkpoint notice (2026-10-11, GitHub reconciliation):** This document preserves the previous engineer's handover as historical source evidence; its PR status and main SHAs reflect its writing time. Foundation #116/#117, Energy #256/#257, and Mobility #251/#254 have subsequently **merged to main**. They are not still-open PRs. The 11 residual PRs, 739 branches across nine repositories, outstanding contract gaps, and current no-release decision are governed by the consolidation record in the UX repositories. This notice does NOT qualify a new HACS release or claim target Home Assistant acceptance.
+
 # RHI UX & backend recovery — engineer handover (2026-10-11)
 
 > **Authoritative engineering checkpoint, NOT release qualification.** Read this before changing either UX package or integrating an unreleased backend. Historical evergreen handovers may still mention retired Runtime/Public V2 aggregates; the current backend producer contract and actual source code outrank those descriptions. This handover documents verified findings, not proof that the product works on the target Home Assistant instance.
