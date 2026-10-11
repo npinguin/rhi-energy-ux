@@ -1574,6 +1574,16 @@
       if (saveAll && !saveAll.disabled) { this.savePropertyDrafts(); return; }
       const discardAll = event.target.closest('[data-discard-property-drafts]');
       if (discardAll && !discardAll.disabled) { this.editDrafts = {}; this.render(); return; }
+      const coreAssetNavigation = event.target.closest('.rhiUxAssetRelationshipLink[data-nav]');
+      if (coreAssetNavigation && !coreAssetNavigation.disabled) {
+        const path = String(coreAssetNavigation.dataset.nav || '').trim();
+        if (path.startsWith('/') && !path.startsWith('//')) {
+          event.preventDefault();
+          history.pushState(null, '', path);
+          window.dispatchEvent(new Event('location-changed'));
+        }
+        return;
+      }
       const sourceNav = event.target.closest('[data-source-asset-nav]');
       if (sourceNav && !sourceNav.disabled) {
         const path = String(sourceNav.dataset.sourceAssetNav || '').trim();
@@ -4705,8 +4715,8 @@
       const gasHorizonLabel = gasHorizons.find(([id])=>id===this.selectedGasHorizonId)?.[1] || 'Month';
       const gasHorizonSelector = `<div class="scopeSelector gasHorizonSelector" aria-label="Gas history horizon">${gasHorizons.map(([id,label])=>`<button type="button" class="scopeOption ${this.selectedGasHorizonId===id?'active':''}" data-gas-horizon="${id}">${label}</button>`).join('')}</div>`;
       const graph = historyAvailable
-        ? `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'gas.history',{},'Gas usage history'))}</h2><p>Daily measured gas use from Home Assistant history.</p></div><div class="gasHistoryControls"><span>${escapeHtml(gasHorizonLabel)}</span>${gasHorizonSelector}</div></div><div class="gasStatisticsHost" data-gas-statistics-host data-entity-id="${escapeHtml(gas.totalEntityId)}"></div></section>`
-        : `<section class="panel gasHistoryPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'gas.history',{},'Gas usage history'))}</h2><p>${hasMeter ? 'The current meter reading is available; historical statistics are separate.' : 'Daily gas consumption will appear here when a configured gas meter is available.'}</p></div></div><div class="empty"><b>${hasMeter ? 'Historical statistics not available yet' : 'No measured gas history yet'}</b><span>${hasMeter ? 'The meter is connected and reporting a current total, but Home Assistant history is not available for this source yet.' : 'Connect a supported gas meter to enable Home Assistant history. Missing consumption is never estimated.'}</span></div></section>`;
+        ? `<section class="panel gasHistoryPanel rhiUxChartPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'gas.history',{},'Gas usage history'))}</h2><p>Daily measured gas use from Home Assistant history.</p></div><div class="gasHistoryControls"><span>${escapeHtml(gasHorizonLabel)}</span>${gasHorizonSelector}</div></div><div class="gasStatisticsHost rhiUxChartViewport" data-gas-statistics-host data-entity-id="${escapeHtml(gas.totalEntityId)}"></div></section>`
+        : `<section class="panel gasHistoryPanel rhiUxChartPanel" id="gas-history"><div class="rhiUxSectionHead"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'gas.history',{},'Gas usage history'))}</h2><p>${hasMeter ? 'The current meter reading is available; historical statistics are separate.' : 'Daily gas consumption will appear here when a configured gas meter is available.'}</p></div></div><div class="empty"><b>${hasMeter ? 'Historical statistics not available yet' : 'No measured gas history yet'}</b><span>${hasMeter ? 'The meter is connected and reporting a current total, but Home Assistant history is not available for this source yet.' : 'Connect a supported gas meter to enable Home Assistant history. Missing consumption is never estimated.'}</span></div></section>`;
       const setupOrMeter = hasMeter
         ? `<section class="panel gasMeterPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'gas.meter',{},'Gas meter'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'gas.meter_desc',{},'Current meter state and measured values.'))}</p></div></div>${meter}</section>`
         : `<section class="panel gasSetupPanel" id="gas-meter"><div class="rhiUxSectionHead"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'gas.connect',{},'Connect your gas meter'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'gas.connect_desc',{},'Connect a gas meter before consumption history can be shown.'))}</p></div></div><div class="gasSetupFacts"><div><small>Required</small><b>Total gas meter</b><span>A cumulative total-increasing reading in m³.</span></div><div><small>Optional</small><b>Live gas flow</b><span>An instantaneous m³/h reading when available.</span></div><div><small>History</small><b>Home Assistant statistics</b><span>Daily changes are shown without estimating missing data.</span></div></div></section>`;
@@ -4799,21 +4809,14 @@
       );
       const readiness = raw.planning_input_ready === true ? 'Plan-ready' : raw.planning_input_ready === false ? 'Planning blocked' : 'Planning not evaluated';
       const readinessReason = String(raw.planning_input_reason || '');
-      const keyFacts = [
-        ['Planning',readiness],
-        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
-        readyBy ? ['Ready by',human(readyBy)] : null,
-        plannedToday !== null ? ['Planned today',fmtKwh(plannedToday)] : null,
-        stillToPlan !== null ? ['Still to plan',fmtKwh(stillToPlan)] : null,
-        readinessReason ? ['Reason',this.userSafeReason(readinessReason,'Not specified')] : null
-      ].filter(Boolean).slice(0,5);
       const configuration = requestedControl
         ? `<details class="energyAssetDisclosure energyAssetConfiguration"><summary>Configuration</summary><div class="energyAssetFoldBody">${requestedControl}</div></details>`
         : '';
       const detailRows = [
-        relation ? ['Connection',relation] : null,
+        energyNeed !== null ? ['Planning',readiness] : null,
+        readinessReason ? ['Reason',this.userSafeReason(readinessReason,'Not specified')] : null,
+        readyBy ? ['Ready by',human(readyBy)] : null,
         requested !== null ? ['Requested power',fmtKw(requested,'—')] : null,
-        energyNeed !== null ? ['Energy needed',fmtKwh(energyNeed)] : null,
         plannedToday !== null ? ['Planned today',fmtKwh(plannedToday)] : null,
         stillToPlan !== null ? ['Still to plan',fmtKwh(stillToPlan)] : null
       ].filter(Boolean);
@@ -4821,8 +4824,19 @@
         ? `<details class="energyAssetDisclosure energyAssetDetails"><summary>Details</summary><div class="energyAssetFoldBody energyAssetDetailGrid">${detailRows.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div></details>`
         : '';
       const diagnostics = `<details class="energyAssetDisclosure energyAssetDiagnostics"><summary>Diagnostics</summary><div class="energyAssetFoldBody energyAssetDiagnosticGrid"><span><small>Asset id</small><b>${escapeHtml(id)}</b></span><span><small>Health</small><b>${escapeHtml(human(firstDefined(asset.health,asset.lifecycle_state,asset.status,'Unknown')))}</b></span>${requestedControl ? '' : `<span><small>Requested charge power</small><b>${escapeHtml(requestedRow && !requestedRow.missing ? (this.userSafeReason(requestedRow.editable_reason,'Read-only')) : 'Not available')}</b></span>`}</div></details>`;
-      return `<article class="managedAssetCard compactManagedAsset"><div class="managedAssetHeader"><div class="managedAssetIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)})}<div><h3>${escapeHtml(row.display_name || rt.assetName(id) || human(id))}</h3><span>${escapeHtml(state)}${relation ? ` · ${escapeHtml(relation)}` : ''}</span></div></div><b>${escapeHtml(fmtKw(currentPower,'—'))}</b></div>
-        ${keyFacts.length ? `<div class="managedAssetFacts">${keyFacts.map(([label,value])=>`<span><small>${escapeHtml(label)}</small><b>${escapeHtml(value)}</b></span>`).join('')}</div>` : ''}
+      const chargerTarget = chargerId
+        ? (rhiUxResolveDomainAssetNavigation('rhi_mobility',chargerId) || rhiUxResolveDomainAssetNavigation('mobility',chargerId))
+        : '';
+      const headline = rhiUxCompactAssetRow({
+        visualHtml:this.assetVisual(asset,{size:'sm',fallbackIcon:this.flexibleAssetIcon(asset)}),
+        name:row.display_name || rt.assetName(id) || human(id),
+        context:energyNeed !== null ? `Energy needed ${fmtKwh(energyNeed)}` : readiness,
+        power:fmtKw(currentPower,'—'),
+        state,
+        relationshipLabel:relation,
+        relationshipTarget:chargerTarget
+      });
+      return `<article class="managedAssetCard compactManagedAsset rhiEnergyCompactAssetCard">${headline}
         ${actions.length ? `<div class="energyAssetQuickActions"><small>${escapeHtml(rhiEnergyT(this._hass,"common.quick_actions",{},"Quick actions"))}</small><div>${actions.map(action=>this.componentActionModelButton(action)).join('')}</div></div>` : ''}
         <div class="energyAssetFoldStack">${configuration}${details}${diagnostics}</div>
       </article>`;
