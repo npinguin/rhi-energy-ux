@@ -5,8 +5,17 @@ const vm = require('vm');
 const runtime = fs.readFileSync('src/runtime/energy-v2-contract.js','utf8');
 const app = fs.readFileSync('src/app/energy-card.js','utf8');
 
-if (!runtime.includes('const presence = Object.freeze({...object(experience.presence)})')) throw new Error('Public V2 presence not consumed');
-if (!runtime.includes('presence,')) throw new Error('Presence not exposed by normalized V2 store');
+// Product presence reflects published objects (including unavailable ones),
+// never the temporary measured value or an aggregate Public V2 snapshot.
+for(const token of [
+  'const objectClasses=new Set(objects.map',
+  "battery:objectClasses.has('battery_system')",
+  "gas:objectClasses.has('gas_meter')",
+  "flexible_loads:objectClasses.has('flexible_load')",
+  'pricing:pricingRows.length>0',
+  'experience:{presence},presence,'
+]) if(!runtime.includes(token))throw new Error('native structural presence owner missing '+token);
+if(runtime.includes('object(experience.presence)'))throw new Error('retired snapshot presence returned');
 if (!app.includes("if(item.id === 'battery') return has('battery', false)")) throw new Error('Battery navigation not presence-gated');
 if (!app.includes("if(item.id === 'gas') return has('gas', false)")) throw new Error('Gas navigation not presence-gated');
 if (!app.includes("if(item.id === 'consumers') return showConsumers")) throw new Error('Consumers navigation not presence-gated');
@@ -16,4 +25,4 @@ if (!app.includes("rt.experiencePresence().battery === true")) throw new Error('
 if (!app.includes("rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow")) throw new Error('Overview flexible-load aggregate not presence-gated');
 if (!app.includes("rt.experiencePresence().battery === true && balanceVm.battery.direction")) throw new Error('Overview battery flow participant not presence-gated');
 
-console.log('PASS structural capability presence UX');
+console.log('PASS native structural capability presence UX, independent of transient telemetry');

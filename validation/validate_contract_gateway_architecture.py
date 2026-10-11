@@ -73,17 +73,31 @@ for rel in [
 if "contract_visibility" in card:
     failures.append("optional_contract_visibility_must_not_gate_public_v2")
 
-# The public registry has exactly one Energy product entrypoint.
+# The only registry entry is diagnostics. Backend product truth is native HA
+# canonical object/property/command entities and native metric/horizon markers.
 registry = (ROOT / "src/runtime/public-interface-registry.js").read_text(encoding="utf-8")
-if "publicV2: 'sensor.rhi_energy_public_contract_v2'" not in registry:
-    failures.append("canonical_public_v2_entrypoint_missing")
+if "release:'sensor.rhi_energy_release'" not in registry:
+    failures.append("native_diagnostics_release_entry_missing")
+if "publicV2" in registry or "rhi_energy_public_contract_v2" in registry:
+    failures.append("retired_aggregate_product_registry_remains")
 for legacy_key in ("assets:", "relationships:", "commands:", "planning:", "metering:", "value:", "editableProperties:"):
     if legacy_key in registry:
         failures.append(f"parallel_product_registry_owner:{legacy_key}")
+gateway = (ROOT / "src/runtime/energy-contract-gateway.js").read_text(encoding="utf-8")
+for canonical_owner in ("canonicalProperty:", "canonicalObject:", "nativeMetric:", "nativePlanningTotals:", "nativePlanningHorizon:"):
+    if canonical_owner not in gateway:
+        failures.append(f"native_gateway_owner_missing:{canonical_owner}")
+product = (ROOT / "src/runtime/energy-v2-contract.js").read_text(encoding="utf-8")
+if "function readEnergyCanonicalProduct(gateway)" not in product:
+    failures.append("native_product_projection_missing")
+if "readEnergyPublicV2(" in product or "gateway.contract('publicV2')" in product:
+    failures.append("retired_aggregate_product_consumer")
+if "canonicalProduct() {" not in card or "readEnergyCanonicalProduct(this.contractGateway())" not in card:
+    failures.append("renderer_native_projection_boundary_missing")
 
 if failures:
     for failure in failures:
         print("FAIL", failure)
     raise SystemExit(1)
 
-print("PASS Energy architecture boundary: Public V2 -> runtime/projections -> renderers; no legacy authority")
+print("PASS Energy architecture boundary: native canonical object/property/metric/command -> runtime projection -> renderer")

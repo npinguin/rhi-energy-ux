@@ -1,3 +1,23 @@
+## 4.3.36-rc.2 — Native canonical-only Energy HACS test candidate
+
+- remove all retired Public V2 product readers, gateway, registry and display consumers;
+- materialize native canonical objects, commands and published configuration values;
+- retain the strict fail-closed canonical property index and object identity semantics;
+- restore structural capability navigation presence independent of telemetry value;
+- use exact effective D0/D1 `attributes.details`, native totals and selected-period finance;
+- migrate obsolete regression fixtures to actual native producer contracts and make zero legacy references a hard package gate;
+- rebuild the complete committed HACS distribution with byte-identical deterministic checks;
+- bind minimum releases to Energy E0.15.116, Foundation F1.8.44 and Mobility M0.10.44;
+- target Home Assistant functional proof and stable promotion remain blocked.
+
+## 4.3.36-rc.1 — Experimental canonical planning HACS candidate
+
+- target E0.15.112 selectable deterministic/EMHASS backend with no planner-specific UX semantics;
+- consume backend-owned native D0/D1 horizon details when available; retain explicit contract-gap states where unavailable;
+- expose canonical planning asset evidence, lanes, provider provenance and execution policy without recomputing planner truth;
+- harden invalid metric handling and unsupported horizon rejection;
+- ship a distinct installable experimental HACS prerelease; stable remains blocked by target-runtime validation and legacy consumer migration.
+
 ## 4.3.35 — Zero-Debt Canonical Property Release
 
 - make RHI_ENERGY_CANONICAL_PROPERTY_V2 the sole frontend property truth;

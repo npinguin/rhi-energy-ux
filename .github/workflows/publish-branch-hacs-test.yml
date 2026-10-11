@@ -1,0 +1,93 @@
+name: Publish branch HACS test candidate
+
+on:
+  push:
+    branches:
+      - chore/canonical-only-migration-audit
+    paths:
+      - release/PUBLISH_TEST_CANDIDATE.json
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.repository }}-branch-test-candidate
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    name: Verify and publish explicit experimental candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact immutable source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+      - name: Verify requested release identity and authorized source branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/chore/canonical-only-migration-audit"
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          marker = json.loads(Path("release/PUBLISH_TEST_CANDIDATE.json").read_text())
+          product = json.loads(Path("release/product.json").read_text())
+          assert marker["tag"] == "v" + product["version"]
+          assert marker["kind"] == "EXPERIMENTAL_HACS_TEST_CANDIDATE"
+          assert product["stage"] == "test_candidate"
+          assert marker["validated_parent_sha"] == subprocess.check_output(["git", "rev-parse", "HEAD^"], text=True).strip()
+          PY
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Validate exact source, build and immutable committed HACS package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run preflight
+          npm run release:check
+      - name: HACS validation
+        uses: hacs/action@885037da508419fd08c13515967aec868dfdee2d
+        with:
+          category: plugin
+      - name: Require actual HA qualification before publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          q = json.loads(Path("release/QUALIFICATION.json").read_text())
+          def passed(value):
+              return str(value).strip().upper() in {"PASS", "PASSED", "SUCCESS", "QUALIFIED"}
+          required = ["runtime_proof", "rollback_proof", "hacs_install"]
+          missing = [key for key in required if not passed(q.get(key))]
+          if missing:
+              raise SystemExit("BLOCKED: target HA qualification missing: " + ", ".join(missing))
+          PY
+      - name: Publish asset-free prerelease from validated tag tree
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=$(node -p "'v' + require('./package.json').version")
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Immutable release tag ${TAG} already exists; refusing overwrite" >&2
+            exit 1
+          fi
+          gh release create "${TAG}" --target "${GITHUB_SHA}" --prerelease \
+            --title "${GITHUB_REPOSITORY##*/} ${TAG} — EXPERIMENTAL HACS TEST" \
+            --notes-file release/RELEASE_NOTES.md
+          test "$(gh release view "${TAG}" --json isPrerelease --jq .isPrerelease)" = true
+          test "$(gh release view "${TAG}" --json assets --jq '.assets | length')" = 0
+          echo "Published HACS test prerelease ${TAG} at ${GITHUB_SHA}"

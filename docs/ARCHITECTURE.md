@@ -1,123 +1,53 @@
 # Home Intelligence Energy UX Architecture
 
-## Canonical dependency direction
+## Product purpose
+
+Energy answers five user questions: **What is happening? Why? What is planned? Do I need to act? What was the outcome?** Product navigation follows Overview → Details → Actions → Configuration → Diagnostics, with Intelligence and Insights as meaningful user-level destinations. Screens should be calm, responsive and actionable without concealing unavailable truth.
+
+## Contract authority — canonical-only target
 
 ```text
-page
-→ reusable component
-→ normalized view model
-→ contract-family module
-→ Energy Contract Gateway
-→ canonical public backend owner
+Energy domain model and canonical runtime
+  → native HA canonical property entities + domain-owned native metrics
+  → Energy runtime boundary / scoped index
+  → domain-owned planning, consumption, asset and value projections
+  → view models → reusable UI → screens
 ```
 
-Reverse dependencies are forbidden.
+Backend owns identity, parentage, measured facts, period ownership, presentation family/surface, availability, quality, provenance, editing descriptors, command applicability, financial and planning semantics. UX owns selection, literal metadata grouping, formatting, rendering and permitted interaction. Never infer a physical relationship from an entity name, manufacture a zero, calculate planning totals, or apply optimistic write values as actual readback.
 
-## Responsibilities
+### Current implementation status (2026-10-11)
 
-### Public Interface Registry
+The canonical property index and native metric readers are implemented. Per-asset parent/HA source identity is preserved; Home Consumption uses `home_consumption_power_kw`; native D0/D1 totals use `planning_today_*` and `planning_tomorrow_*`; `net_financial_result_eur` is accepted only for the exact backend-selected period. Missing, duplicate, stale and invalid values fail closed. The UI now uses these native readers in additional product paths.
 
-Owns exact interface identity. It does not infer aliases, scan suffixes or use internal/diagnostic entities for product truth.
+**This is not yet a canonical-only release.** `src/runtime/public-interface-registry.js`, `src/runtime/energy-contract-gateway.js`, `src/runtime/energy-v2-contract.js` and remaining `src/app/energy-card.js`/selector paths still consume the retired Public V2 aggregate. These must be removed as complete vertical changes, with parity tests and no replacement snapshot. The strict audit remains authoritative over the older zero-debt check.
 
-### Energy Contract Gateway
+### Native scope and backend gaps
 
-Owns Home Assistant state access, contract envelopes, availability, version metadata and bounded caching/invalidation.
+- `RHI_ENERGY_CANONICAL_PROPERTY_V2` — direct per-asset HA property truth, presentation metadata, editing/readback descriptors when published.
+- Native `canonical_source=rhi_energy.runtime` / `metric_key` — Home Consumption, D0/D1 totals, selected-period financial result. No guessed entity ID.
+- `RHI_ENERGY_PLANNING_HORIZON_V1` — detailed buckets/lanes/asset outcomes only when a uniquely published backend horizon supplies explicit status and buckets. Pending producer closure: Energy #249.
+- Physical relationships, full period metering/attribution, effective Strategy/Price, commands and editing depend on exact native producer authority; missing contracts are backend gaps, not frontend calculation tasks. See Energy #240 and #242.
 
-### Contract-family module
+## Layer responsibilities
 
-Owns parsing, validation, schema-shape normalization, zero/null preservation and the meaning of one contract family.
+- `src/runtime/canonical-property-index.js`: bounded native property/metric discovery, producer identity, duplicate and quality rejection, change invalidation.
+- `src/runtime/consumption-contract.js`: read native Home Consumption and independently published Site/Flexible consumption without arithmetic.
+- `src/domain/planning/planning-contract.js`: backend-owned D0/D1 totals and optional horizon details, no synthetic combined totals.
+- `src/runtime/asset-profile-contract.js`: one asset identity from unambiguous native property rows; no asset/profile fabrication.
+- `src/domain/models/`: normalized UX meaning from published facts only.
+- `src/app/energy-card.js`: screen composition, routing, lifecycle and user interaction. Its long-term decomposition into screen-owned modules is product-supporting refactoring, not permission for a second semantic interpretation.
 
-### Normalized view model
+## Invariants
 
-Combines canonical meanings into a stable renderer input. It does not expose backend paths or create a new business owner.
+1. Unknown, absent, unavailable, stale, invalid and duplicate are **not zero**. Known numeric zero remains zero.
+2. Unscoped duplicate semantic keys across physical assets must fail closed; exact asset IDs are required for per-asset reads.
+3. Parent asset IDs and HA source links must be preserved literally; source devices are never cloned or reparented.
+4. Requested/configured values are distinct from actual/backend-confirmed readback.
+5. Planning/value numbers and selected period are Energy-owned, not a Mobility or frontend derivation.
+6. Render revision invalidation must preserve navigation, editor state and interaction. No full-root churn for routine telemetry.
+7. Tests and package are deterministic. `src/manifest.json` is build composition authority, `src/OWNERSHIP.json` source authority, `dist/` generated output; `validation/OWNERSHIP.json` owns regression scope.
 
-### Reusable component and renderer
+## Release rule
 
-Owns layout, formatting, visual filtering, accessibility and explicit user interaction. It does not parse contracts, infer readiness or calculate business truth.
-
-## Current modules
-
-- `src/runtime/public-interface-registry.js`
-- `src/runtime/energy-contract-gateway.js`
-- `src/domain/planning/planning-contract.js`
-- `src/domain/planning/planning-view-model.js`
-- `src/runtime/command-contract.js`
-- `src/runtime/command-action-model.js`
-- `src/runtime/consumption-contract.js`
-- `src/domain/models/physical-flow-view-model.js`
-- `src/domain/models/metering-status-model.js`
-
-Physical Flow uses the relation-owned view-model boundary. Add further modules only when closing proven ownership drift—not as a big-bang rewrite.
-
-## Semantic projections
-
-- Planning: advisory horizons, commitments, totals and current operational intent.
-- Physical Flow: measured relation power and topology only.
-- Consumption: canonical Site Consumption, Home Consumption and Flexible Loads.
-- Commands: published actions and literal invoke.
-- Control state: mode, physical state, origin and participation separated.
-- Metering: periodized measured energy and measurement lifecycle.
-- Configuration: editable public properties and authoritative readback.
-- Retrospective: backend-owned outcome review.
-- Value: backend-owned financial interpretation.
-
-## Forbidden dependencies
-
-- pages/components reading `sensor.energy_*` directly;
-- widgets parsing raw backend rows;
-- screen-local command or property routes;
-- Planning totals sourced from another interface;
-- Flow values sourced from need/request/plan semantics;
-- action applicability used as control mode;
-- direct edits to generated distribution;
-- local compatibility fallback without a documented owner and expiry.
-
-## Performance boundary
-
-The gateway and model layer must prevent repeated whole-contract parsing per cell/render. Updates should invalidate only affected models. Re-renders must preserve user tab, selection, disclosure, scroll and draft state.
-
-## Test architecture
-
-Test ownership mirrors runtime ownership.
-
-```text
-contract/domain owners
-        ↓
-UX behavior owners
-        ↓
-shared shell owners
-        ↓
-package verification
-        ↓
-release/qualification gates
-```
-
-An invariant is asserted by exactly one owner. Other suites may rely on it but may not freeze its implementation. The normative map is `validation/OWNERSHIP.json`; see `docs/TEST_GOVERNANCE.md`.
-
-Cross-owner assertions are test technical debt because they make unrelated changes fail together and recreate the same drift this architecture is designed to prevent.
-
-## Physical source/package architecture
-
-The repository structure is part of the architecture contract: `src/app`, `src/runtime`, `src/domain`, and `src/assets` have explicit ownership. `src/manifest.json` owns build composition. `dist/` is generated and is the complete HACS install package; it is never edited as source.
-
-## Canonical Energy V2 asset context
-
-Energy UX may consume `sensor.rhi_energy_public_contract_v2` only through the
-runtime interface registry/gateway and `runtime/asset-profile-contract.js`.
-
-The backend owns:
-
-- canonical `asset_type`;
-- read-only Energy `profile_id`;
-- the Energy asset-profile catalog;
-- participation / operating / availability conclusions that are published on the asset;
-- per-object property-publication completeness.
-
-The UX owns presentation only. It must not infer semantic identity from display names,
-entity ids, commercial artwork or image keys. It must not infer operational state from
-power thresholds. Missing canonical state remains unknown/unavailable.
-
-Energy profiles currently have `profile_scope=domain_asset_type` and are read-only.
-No profile picker is shown until the backend explicitly publishes an editable profile
-contract with canonical choices and write/readback capability.
-
+No stable release until the strict canonical-only scan, full source/UX/package tests, real target HA behavior (including multi-battery, consumption, plans, strategies, pricing and readback), mobile/tablet/desktop, restart, upgrade and rollback are proven against exact backend SHA/version. See `docs/CANONICAL_ONLY_MIGRATION_AUDIT.md` and `release/QUALIFICATION.json`.

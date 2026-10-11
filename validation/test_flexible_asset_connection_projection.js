@@ -92,7 +92,8 @@ assert.equal(domain.physicalFlowParticipants().length,1,'charger-linked idle veh
 
 const card = fs.readFileSync('src/app/energy-card.js','utf8');
 assert.ok(card.includes('canonicalConnectionSnapshot(rt)'));
-assert.ok(card.includes('rt.publicV2().connections'));
+assert.ok(card.includes('rt.canonicalProduct().connections'), 'connected assets must be fed by native backend-owned relationship truth');
+assert.ok(!card.includes('rt.publicV2().connections'), 'retired snapshot connections are forbidden');
 assert.ok(card.includes('rt.connectedRelationships().forEach'));
 assert.ok(card.includes('asset.effective_connection_id'));
 assert.ok(card.includes('asset.assigned_connection_id'));

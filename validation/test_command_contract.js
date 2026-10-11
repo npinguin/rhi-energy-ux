@@ -1,48 +1,47 @@
-const fs = require('fs');
-const vm = require('vm');
-
-const bundle = [
-  fs.readFileSync('src/runtime/energy-v2-contract.js', 'utf8'),
-  fs.readFileSync('src/runtime/command-contract.js', 'utf8'),
-  fs.readFileSync('src/runtime/command-action-model.js', 'utf8')
-].join('\n');
-const helpers = `
-const parseMaybeJson = (value, fallback = null) => { if (value === undefined || value === null || value === '') return fallback; if (typeof value !== 'string') return value; try { return JSON.parse(value); } catch { return fallback; } };
-const firstDefined = (...values) => values.find(value => value !== undefined && value !== null);
-const objectFrom = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-const asBool = (value, fallback = false) => { if (value === true || value === false) return value; const s = String(value ?? '').toLowerCase(); if (['true','1','yes','on','ok','ready','active','enabled','available'].includes(s)) return true; if (['false','0','no','off','fail','degraded','blocked','disabled','inactive','unavailable'].includes(s)) return false; return fallback; };
-const human = value => String(value || '').replace(/_/g, ' ');
-`;
-const context = { Object, Array, Map, Set, String, Number, Boolean, JSON };
+// Native command publication / view-model regression, with no aggregate V2 ingress.
+const fs=require('node:fs');
+const vm=require('node:vm');
+const assert=require('node:assert/strict');
+const context={Object,Array,Map,Set,String,Number,Boolean,JSON,
+  firstDefined:(...v)=>v.find(x=>x!==undefined&&x!==null),
+  human:value=>String(value||'').replace(/_/g,' ')};
 vm.createContext(context);
-vm.runInContext(`${helpers}\n${bundle}\nthis.readEnergyCommandContract=readEnergyCommandContract; this.createCommandActionModel=createCommandActionModel; this.commandActionModelsForAsset=commandActionModelsForAsset;`, context);
-
-const commands = [
-  { command_id:'start_vehicle', target_asset_id:'vehicle_nicky', role:'start', command_owner:'Mobility', action_kind:'physical_execution', visible:true, enabled:true, availability:'AVAILABLE', supported:true, label:'Start charging', invoke:{operation_id:'energy.command.execute',service:'rhi_energy.invoke_command',data:{command_id:'start_vehicle',target_asset_id:'vehicle_nicky'}} },
-  { command_id:'stop_vehicle', target_asset_id:'vehicle_nicky', role:'stop', visible:false, enabled:false, availability:'BLOCKED', supported:true, label:'Stop charging', invoke:{operation_id:'energy.command.execute',service:'rhi_energy.invoke_command',data:{command_id:'stop_vehicle',target_asset_id:'vehicle_nicky'}} },
-  { command_id:'pause_vehicle', target_asset_id:'vehicle_nicky', role:'pause', command_owner:'Energy', action_kind:'planning_participation_control', visible:true, enabled:false, availability:'BLOCKED', supported:true, label:'Pause Energy control', blocked_reason:'Already paused', user_action_text:'Resume Energy control to rejoin planning.', invoke:{operation_id:'energy.command.execute',service:'rhi_energy.invoke_command',data:{command_id:'pause_vehicle',target_asset_id:'vehicle_nicky'}} }
-];
-const gateway = {
-  contract(key) {
-    if (key !== 'publicV2') throw new Error(`legacy contract access:${key}`);
-    return {
-      entityId:'sensor.rhi_energy_public_contract_v2',
-      state:'OK',
-      available:true,
-      contractVersion:'2.0.0',
-      attributes:{
-        contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
-        contract_version:'2.0.0',
-        objects:[],profiles:[],relationships:[],commands,
-        planning:{},intelligence:{},overview:{},configuration:{},value_accounting:{},activity:[],layers:{}
-      }
-    };
+for(const path of ['src/runtime/command-contract.js','src/runtime/command-action-model.js'])
+  vm.runInContext(fs.readFileSync(path,'utf8'),context,{filename:path});
+const command=(id,role,visible=true,available=true,service='rhi_energy.invoke_command')=>({
+  state:available?'idle':'unavailable',attributes:{
+    canonical_contract:'RHI_ENERGY_CANONICAL_COMMAND_V1',
+    asset_id:'vehicle_nicky',target_asset_id:'vehicle_nicky',command_id:id,role,
+    supported:true,visible,execution_allowed:available,
+    availability:available?'AVAILABLE':'UNAVAILABLE',
+    blocked_reason:available?'':'Already paused',
+    label:role==='pause'?'Pause Energy control':role==='start'?'Start charging':'Stop charging',
+    invoke:{service,data:{command_id:id,target_asset_id:'vehicle_nicky'}}
   }
+});
+const states={
+  'button.start':command('energy.command.start_flexible_load','start'),
+  'button.stop':command('energy.command.stop_flexible_load','stop',false,false),
+  'button.pause':command('energy.command.pause_flexible_load','pause',true,false)
 };
-const contract = context.readEnergyCommandContract(gateway);
-const actions = context.commandActionModelsForAsset(contract, 'vehicle_nicky');
-if (actions.length !== 2) throw new Error(`Expected hidden action removed, got ${actions.length}`);
-if (!actions.find(a => a.role === 'start' && a.enabled && a.label === 'Start charging' && a.owner === 'Mobility')) throw new Error('Start action normalization failed');
-if (!actions.find(a => a.role === 'pause' && !a.enabled && a.reason === 'Already paused' && a.label === 'Pause Energy control' && a.owner === 'Energy')) throw new Error('Pause action normalization failed');
-if (actions.find(a => a.role === 'stop')) throw new Error('ux_visible=false stop must not be rendered');
-console.log('PASS command contract and action model are V2-only');
+const read=states=>context.readEnergyCommandContract({host:{hass:{states}}});
+const contract=read(states);
+const actions=context.commandActionModelsForAsset(contract,'vehicle_nicky');
+assert.equal(contract.rows.length,3,'including hidden backend commands for diagnostic completeness');
+assert.equal(actions.length,2,'hidden stop cannot be rendered as action');
+assert.ok(actions.some(a=>a.role==='start'&&a.enabled&&a.label==='Start charging'&&a.owner==='energy'));
+assert.ok(actions.some(a=>a.role==='pause'&&!a.enabled&&a.reason==='Already paused'));
+assert.ok(!actions.some(a=>a.role==='stop'));
+assert.equal(contract.rows.find(x=>x.role==='pause').enabled,false);
+assert.equal(contract.rows.find(x=>x.role==='start').invoke.data.target_asset_id,'vehicle_nicky');
+// Incomplete/mismatched service data must never enable a physical command.
+const invalid=command('energy.command.start_flexible_load','start',true,true,'other.execute');
+assert.equal(read({'button.unsafe':invalid}).rows[0].enabled,false);
+const incorrect=command('energy.command.start_flexible_load','start');
+incorrect.attributes.invoke.data.target_asset_id='another_vehicle';
+assert.equal(read({'button.unsafe':incorrect}).rows[0].enabled,false);
+// Duplicate canonical publishers fail closed, independent of discovery order.
+assert.equal(read({...states,'button.start_duplicate':states['button.start']}).rows
+  .some(row=>row.command_id==='energy.command.start_flexible_load'),false);
+assert.equal(read({}).rows.length,0);
+console.log('PASS native Energy command contract and action models: hidden, blocked, exact invoke and duplicates');

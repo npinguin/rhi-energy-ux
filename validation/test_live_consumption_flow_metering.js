@@ -9,7 +9,7 @@ for (const token of [
   'buildPhysicalFlowViewModel',
   'createMeteringStatusModel',
   'selectEnergyMetering',
-  'RHI_ENERGY_PUBLIC_CONTRACT_V2'
+  'RHI_ENERGY_CANONICAL_PROPERTY_V2'
 ]) if(!src.includes(token)) throw new Error('missing '+token);
 
 for (const forbidden of [
@@ -23,19 +23,25 @@ for (const forbidden of [
 
 if (!/ATTRIBUTION_PENDING:\s*'Waiting for trusted meter attribution'/.test(src)) throw new Error('pending mapping missing');
 if (!/NOT_APPLICABLE:\s*'Not applicable'/.test(src)) throw new Error('NA mapping missing');
-if (!/row\.visible/.test(src) || !/row\.enabled/.test(src)) throw new Error('backend-owned command presentation missing');
+const nativeCommands=fs.readFileSync('src/runtime/command-contract.js','utf8');
+for(const guard of ['const visible=supported && a.visible===true',
+  "a.execution_allowed===true", "String(a.availability || '').toUpperCase()==='AVAILABLE'",
+  "enabled:allowed"])
+  if(!nativeCommands.includes(guard))throw new Error('native command authority guard missing '+guard);
 console.log('PASS V2-only consumption and physical Flow contracts');
 
 
-for (const token of [
-  "addConfigurationRows('metering', meteringConfiguration.properties)",
-  "metering.selected_period",
-  "meteringPeriodControl",
+for(const token of [
+  "configuration={", "metering:{properties:meteringRows}",
+  "strategy:{profiles:", "pricing:{properties:pricingRows}"
+]) if(!fs.readFileSync('src/runtime/energy-v2-contract.js','utf8').includes(token))
+  throw new Error('missing native configuration projection '+token);
+for(const token of [
+  "metering.selected_period","meteringPeriodControl",
   "componentPeriodSelector(vm.periods, vm.periodId, 'metering-period')",
-  "strategyAutomationMode",
-  "energy.automation_mode",
-  "alwaysEditable:true"
-]) if(!fs.readFileSync('src/runtime/energy-v2-contract.js','utf8').includes(token) && !fs.readFileSync('src/app/energy-card.js','utf8').includes(token)) throw new Error('missing editable settings invariant '+token);
+  "strategyAutomationMode","energy.automation_mode","alwaysEditable:true"
+]) if(!fs.readFileSync('src/app/energy-card.js','utf8').includes(token))
+  throw new Error('missing editable UI affordance '+token);
 
 const card=fs.readFileSync('src/app/energy-card.js','utf8');
 if(!card.includes("data-property-key':'energy.automation_mode'")) throw new Error('automation mode must bind canonical property write');
@@ -43,24 +49,25 @@ if(!card.includes("requestPropertyWrite('metering.selected_period'")) throw new 
 console.log('PASS Metering period, Automation mode and policy settings expose canonical write paths');
 
 
-const v2=fs.readFileSync('src/runtime/energy-v2-contract.js','utf8');
-for (const token of [
-  'const metering = object(attrs.metering)',
-  'const retrospective = object(attrs.retrospective)',
-  'metering:Object.keys(object(metering.periods)).length > 0',
-  'retrospective:Object.keys(retrospective).length > 0'
-]) if(!v2.includes(token)) throw new Error('missing canonical V2 evidence surface '+token);
+const native=fs.readFileSync('src/runtime/energy-v2-contract.js','utf8');
+// Backend currently publishes per-period metrics, not a fully reconciled
+// metering-period or retrospective canonical entity. The product must fail
+// closed here, never synthesize period totals or retrospective scores.
+for(const token of [
+  'metering:{periods:{}}','retrospective:{}','valueAccounting',
+  'readNativeEnergyMetric(hass,\'net_financial_result_eur\')'
+]) if(!native.includes(token)) throw new Error('native Metering/Value missing-data invariant '+token);
 
-for (const token of [
+for(const token of [
   'const periods=objectFrom(v2.metering?.periods || {})',
   'const rawPeriod=objectFrom(period)',
   'rawPeriod.baseline_reset_required',
   'vm.quality?.user_action_required === true && vm.command',
-  'const retrospective=objectFrom(this.runtime().publicV2().retrospective || {})',
+  'const retrospective=objectFrom(this.runtime().canonicalProduct().retrospective || {})',
   'Waiting for measured evidence',
   'blocking_property_ids'
-]) if(!card.includes(token)) throw new Error('missing structural Metering/Value/Retrospective invariant '+token);
-
-if(card.includes("const rawPeriod={};")) throw new Error('Metering may not discard canonical backend period evidence');
-if(card.includes("Canonical metering energy is not published by the current public contract.")) throw new Error('obsolete hard-coded unavailable Metering projection returned');
-console.log('PASS canonical Metering, Value blocker and Retrospective evidence chain');
+]) if(!card.includes(token)) throw new Error('missing Metering/Value/Retrospective UX invariant '+token);
+if(card.includes("const rawPeriod={};"))throw new Error('Metering must not discard native period evidence');
+if(card.includes("Canonical metering energy is not published by the current public contract."))
+  throw new Error('obsolete Public V2 metering source presented to users');
+console.log('PASS native Metering/Value fail-closed, user settings and retrospective missing-evidence states');

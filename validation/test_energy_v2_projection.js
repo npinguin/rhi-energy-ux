@@ -1,116 +1,93 @@
-const fs = require('fs');
-const vm = require('vm');
-
-const context = {
-  console,
-  Object, Array, Map, Set, String, Number, Boolean, JSON,
-  parseMaybeJson: (value, fallback = null) => {
-    if (value === undefined || value === null || value === '') return fallback;
-    if (typeof value !== 'string') return value;
-    try { return JSON.parse(value); } catch { return fallback; }
-  }
+// End-to-end native Energy product projection. Every datum is published on
+// its own canonical HA object/property/metric entity; retired snapshots are absent.
+const fs=require('node:fs');
+const vm=require('node:vm');
+const assert=require('node:assert/strict');
+const ctx={Object,Array,Map,Set,String,Number,Boolean,JSON,console};
+vm.createContext(ctx);
+for(const path of [
+  'src/runtime/canonical-property-index.js',
+  'src/runtime/command-contract.js',
+  'src/runtime/energy-v2-contract.js',
+  'src/domain/selectors/energy-selectors.js'
+])vm.runInContext(fs.readFileSync(path,'utf8'),ctx,{filename:path});
+const object=(asset,cls,metadata={})=>({state:'OK',attributes:{
+  canonical_contract:'RHI_ENERGY_CANONICAL_OBJECT_V2',asset_id:asset,
+  logical_object_class:cls,display_name:asset,availability:'AVAILABLE',...metadata
+}});
+const property=(asset,cls,key,value,metadata={})=>({
+  state:value===null?'unavailable':String(value),
+  attributes:{canonical_contract:'RHI_ENERGY_CANONICAL_PROPERTY_V2',
+    asset_id:asset,logical_object_class:cls,property_key:key,value,
+    availability:value===null?'UNAVAILABLE':'AVAILABLE',quality:'CANONICAL',
+    presentation_family:cls,presentation_role:'key',presentation_surface:'overview',
+    ...metadata}
+});
+const native=(key,value,extra={})=>({state:value===null?'unavailable':String(value),
+  attributes:{canonical_source:'rhi_energy.runtime',metric_key:key,
+    availability:value===null?'UNAVAILABLE':'AVAILABLE',...extra}});
+const states={
+  'sensor.battery_system':object('battery_system','battery_system',{
+    visual_ref:'energy:battery',children:['battery_a','battery_b'],profile_id:'battery.default'}),
+  'sensor.battery_a':object('battery_a','battery',{parent_asset_id:'battery_system'}),
+  'sensor.battery_b':object('battery_b','battery',{parent_asset_id:'battery_system'}),
+  'sensor.battery_master_soc':property('battery_system','battery_system','battery.soc_pct',72),
+  'sensor.battery_master_power':property('battery_system','battery_system','battery.power_kw',-1.2),
+  'sensor.battery_a_soc':property('battery_a','battery','battery.soc_pct',81),
+  'sensor.battery_a_power':property('battery_a','battery','battery.power_kw',-1.1),
+  'sensor.battery_b_soc':property('battery_b','battery','battery.soc_pct',43),
+  'sensor.battery_b_power':property('battery_b','battery','battery.power_kw',0.7),
+  'sensor.site':object('site_consumption','site_consumption'),
+  'sensor.site_kw':property('site_consumption','site_consumption','site_consumption.power_kw',2.6),
+  'sensor.home':object('home_consumption','home_consumption'),
+  'sensor.home_kw':property('home_consumption','home_consumption','home_consumption.power_kw',1.8),
+  'sensor.solar':object('solar_production','solar_production'),
+  'sensor.solar_kw':property('solar_production','solar_production','solar.power_kw',3.4),
+  'number.reserve':property('configuration:battery','energy_configuration',
+    'battery.reserve_target_pct',20,{editable:true,write_supported:true,
+      presentation_family:'strategy',presentation_surface:'configuration',
+      editor:'number',constraints:{min:5,max:80},
+      write:{supported:true,service:'rhi_energy.write_property',
+        data:{property_id:'battery.reserve_target_pct'}}}),
+  'sensor.financial':native('net_financial_result_eur',1.23,{period:'today',actual_complete:true}),
+  'sensor.home_native':native('home_consumption_power_kw',1.8)
 };
-vm.createContext(context);
-vm.runInContext(fs.readFileSync('src/runtime/energy-v2-contract.js','utf8'), context);
-
-const states = {
-  'sensor.rhi_energy_public_contract_v2': {
-    state:'OK',
-    attributes:{
-      contract_id:'RHI_ENERGY_PUBLIC_CONTRACT_V2',
-      contract_version:'2.0.0',
-      release:'E0.15.52',
-      core:{contract_id:'RHI_ENERGY_CORE_V2',
-        battery:{status:'AVAILABLE',fields:{
-          power_kw:{value:-1.2,unit:'kW',status:'AVAILABLE',quality:'CANONICAL',reason:null},
-          soc_pct:{value:72,unit:'%',status:'AVAILABLE',quality:'CANONICAL',reason:null},
-          capacity_kwh:{value:29.2,unit:'kWh',status:'AVAILABLE',quality:'CANONICAL',reason:null},
-          available_kwh:{value:21.0,unit:'kWh',status:'AVAILABLE',quality:'CANONICAL',reason:null},
-          state:{value:'charging',unit:null,status:'AVAILABLE',quality:'CANONICAL',reason:null},
-          reserve_target_pct:{value:20,unit:'%',status:'AVAILABLE',quality:'CANONICAL',reason:null}
-        },contributors:[]},
-        solar:{status:'AVAILABLE',fields:{power_kw:{value:3.4,unit:'kW',status:'AVAILABLE',quality:'CANONICAL',reason:null}}},
-        grid:{status:'AVAILABLE',fields:{
-          net_power_kw:{value:-0.8,unit:'kW',status:'AVAILABLE',quality:'CANONICAL',reason:null},
-          import_power_kw:{value:0,unit:'kW',status:'AVAILABLE',quality:'CANONICAL',reason:null},
-          export_power_kw:{value:0.8,unit:'kW',status:'AVAILABLE',quality:'CANONICAL',reason:null},
-          flow_direction:{value:'exporting',status:'AVAILABLE',quality:'CANONICAL',reason:null}
-        }},
-        consumption:{status:'AVAILABLE',fields:{power_kw:{value:2.6,unit:'kW',status:'AVAILABLE',quality:'CANONICAL',reason:null}}},
-        home:{status:'AVAILABLE',fields:{power_kw:{value:1.8,unit:'kW',status:'AVAILABLE',quality:'CANONICAL',reason:null}}},
-        flexible:{status:'AVAILABLE',producer_available:true,fields:{
-          power_kw:{value:0.8,unit:'kW',status:'AVAILABLE',quality:'CANONICAL',reason:null},
-          attributed_power_kw:{value:0.8,unit:'kW',status:'AVAILABLE',quality:'CANONICAL',reason:null}
-        },assets:[{asset_id:'car_a',asset_type:'flexible_load',display_name:'Car A',power_kw:0.8}]}
-      },
-      objects:[
-        {
-          asset_id:'battery_system',
-          display_name:'Home Battery',
-          object_class:'battery_system',
-          profile_id:'battery.default',
-          visual_ref:'energy:battery',
-          health:'OK',
-          property_publication:{complete:true,resolution_complete:true},
-          properties:[
-            {property_key:'battery.reserve_target_pct',value:20,unit:'%',resolution:{status:'RESOLVED'},write_supported:true,editor:'number',constraints:{min:5,max:80},write:{operation_id:'energy.property.write',service:'rhi_energy.write_property'}}
-          ],
-          controls:[{control_id:'battery.reserve_target_pct',supported:true,operation_id:'energy.property.write'}]
-        },
-        {
-          asset_id:'battery_a', parent_asset_id:'battery_system', display_name:'Battery A',
-          asset_type:'battery', object_class:'battery', health:'OK',
-          properties:[
-            {property_key:'battery.soc_pct',value:81,unit:'%',status:'AVAILABLE',quality:'CANONICAL'},
-            {property_key:'battery.power_kw',value:-1.1,unit:'kW',status:'AVAILABLE',quality:'CANONICAL'},
-            {property_key:'battery.state',value:'charging',status:'AVAILABLE',quality:'CANONICAL'}
-          ]
-        },
-        {
-          asset_id:'battery_b', parent_asset_id:'battery_system', display_name:'Battery B',
-          asset_type:'battery', object_class:'battery', health:'OK',
-          properties:[
-            {property_key:'battery.soc_pct',value:43,unit:'%',status:'AVAILABLE',quality:'CANONICAL'},
-            {property_key:'battery.power_kw',value:0.7,unit:'kW',status:'AVAILABLE',quality:'CANONICAL'},
-            {property_key:'battery.state',value:'discharging',status:'AVAILABLE',quality:'CANONICAL'}
-          ]
-        }
-      ],
-      profiles:[{profile_id:'battery.default',asset_type:'battery_system'}],
-      relationships:[
-        {relationship_id:'energy:home:contains:battery',source_asset_id:'home_consumption',target_asset_id:'battery_system',relationship_type:'contains',source_domain:'energy'},
-        {relationship_id:'energy:battery_system:contains:a',source_asset_id:'battery_system',target_asset_id:'battery_a',relationship_type:'contains',source_domain:'energy'},
-        {relationship_id:'energy:battery_system:contains:b',source_asset_id:'battery_system',target_asset_id:'battery_b',relationship_type:'contains',source_domain:'energy'}
-      ],
-      planning:{horizons:{D0:{required_kwh:19.2,planned_kwh:19.2,executed_kwh:null,still_to_plan_kwh:0,status:'AVAILABLE',execution_status:'NOT_MEASURED'},D1:{required_kwh:11,planned_kwh:4,still_to_plan_kwh:7,status:'AVAILABLE'}}},
-      configuration:{strategy:{configured:{status:'AVAILABLE',properties:[]},effective:{status:'AVAILABLE',properties:[],runtime_overrides:[]}}},
-      metering:{selected_period_id:'today',periods:{today:{period_id:'today',availability:'AVAILABLE',measurement_state:'AVAILABLE',quality:'OK',baseline_reset_required:false,user_action_required:false,summary:{measured:{solar_production_kwh:4.2,site_consumption_kwh:3.1,grid_import_kwh:0.4,grid_export_kwh:0.2,battery_charge_kwh:0.5,battery_discharge_kwh:1.0,flexible_loads_energy_in_kwh:0.0},quality:{period:'OK',health:'OK',measurement_state:'AVAILABLE',user_action_required:false}}}}},
-      retrospective:{contract_id:'RHI_ENERGY_RETROSPECTIVE_V2',status:'COLLECTING_EVIDENCE',reason:'retrospective_prerequisites_incomplete',prerequisites:[{prerequisite_id:'planning_outcome',state:'READY'},{prerequisite_id:'execution_evidence',state:'PENDING'},{prerequisite_id:'completed_metering',state:'READY'}],evidence_coverage_pct:66.7,score:null},
-      value_accounting:{selected_period_id:'today',net_financial_result:{value:1.23,unit:'EUR',status:'AVAILABLE'},periods:{today:{net_financial_result_eur:1.23}}},
-      commands:[]
-    }
-  }
-};
-const gateway={contract(key){
-  if(key!=='publicV2') throw new Error('legacy contract access:'+key);
-  const state=states['sensor.rhi_energy_public_contract_v2'];
-  return {entityId:'sensor.rhi_energy_public_contract_v2',state:state.state,available:true,attributes:state.attributes,contractVersion:'2.0.0'};
-}};
-const v2=context.readEnergyPublicV2(gateway);
-if(!v2.available) throw new Error('V2 contract not available');
-if(v2.field('battery.soc_pct').value!==72) throw new Error('core battery field not authoritative');
-if(v2.field('site_consumption.power_kw').value!==2.6) throw new Error('core consumption field missing');
-if(v2.flexibleAssets.length!==1 || v2.flexibleAssets[0].asset_id!=='car_a') throw new Error('core flexible assets not projected');
-const reserve=v2.field('battery.reserve_target_pct','battery_system');
-if(!reserve.editable || reserve.write?.service!=='rhi_energy.write_property') throw new Error('object write metadata lost');
-const asset=context.createEnergyAssetProjection(v2,'battery_system');
-if(asset.identity.display_name!=='Home Battery' || asset.controls.length!==1) throw new Error('asset projection incomplete');
-if(v2.field('battery.soc_pct','battery_a').value!==81) throw new Error('battery A asset-scoped SoC lost');
-if(v2.field('battery.soc_pct','battery_b').value!==43) throw new Error('battery B asset-scoped SoC masked by duplicate property key');
-if(v2.field('battery.power_kw','battery_a').value!==-1.1 || v2.field('battery.power_kw','battery_b').value!==0.7) throw new Error('battery asset-scoped power collision');
-const batteryChildren=v2.relationships.filter(row => row.relationship_type==='contains' && row.source_asset_id==='battery_system').map(row => row.target_asset_id).sort();
-if(JSON.stringify(batteryChildren)!==JSON.stringify(['battery_a','battery_b'])) throw new Error('canonical battery_system child reachability lost');
-if(v2.metering.periods.today.summary.measured.solar_production_kwh!==4.2) throw new Error('canonical Metering period evidence lost');
-if(v2.metering.periods.today.user_action_required!==false) throw new Error('reset requirement drifted from backend evidence');
-if(v2.retrospective.prerequisites[1].state!=='PENDING' || v2.retrospective.score!==null) throw new Error('Retrospective must preserve backend evidence readiness without inventing a score');
-console.log('PASS canonical Energy V2 core + multi-object asset + Metering/Retrospective projection reader');
+const totals=['required_kwh','planned_kwh','still_to_plan_kwh',
+  'flexible_required_kwh','flexible_planned_kwh','flexible_still_to_plan_kwh'];
+for(const [day,values] of [['today',[19.2,19.2,0,8,5,3]],['tomorrow',[11,4,7,7,1,6]]])
+  totals.forEach((k,i)=>states['sensor.'+day+'_'+k]=native('planning_'+day+'_'+k,values[i]));
+const hass={states};
+const host={hass,canonicalIndex:ctx.createEnergyCanonicalPropertyIndex(hass)};
+const view=ctx.readEnergyCanonicalProduct({host});
+assert.equal(view.available,true);
+assert.equal(view.contractVersion,'ENERGY_CANONICAL_NATIVE_V2');
+assert.equal(view.object('battery_system').profile_id,'battery.default');
+assert.equal(view.object('battery_system').visual_ref,'energy:battery');
+assert.equal(view.object('battery_a').parent_asset_id,'battery_system');
+assert.equal(view.field('battery.soc_pct','battery_a').value,81);
+assert.equal(view.field('battery.soc_pct','battery_b').value,43);
+assert.equal(view.field('battery.power_kw','battery_b').value,0.7);
+// A globally ambiguous battery.soc_pct must not silently select one asset.
+assert.equal(view.field('battery.soc_pct').resolved,false);
+assert.equal(view.field('battery.soc_pct').value,null);
+assert.equal(view.field('site_consumption.power_kw','site_consumption').value,2.6);
+assert.equal(view.field('battery.reserve_target_pct','configuration:battery').editable,true);
+assert.equal(view.configuration.strategy.profiles.length,1);
+assert.equal(view.configuration.strategy.profiles[0].profile_id,'battery');
+assert.equal(view.valueAccounting.periods.today.net_financial_result_eur,1.23);
+assert.equal(ctx.selectEnergyValue(view,'month').net_financial_result_eur,null);
+assert.equal(view.planning.horizons.D0.required_kwh,19.2);
+assert.equal(view.planning.horizons.D1.still_to_plan_kwh,7);
+assert.equal(ctx.selectEnergyOverview(view).available,true);
+assert.equal(ctx.selectEnergyAsset(view,'battery_system').identity.visual_ref,'energy:battery');
+assert.equal(ctx.selectEnergyConfigurationProperties(view,'strategy').properties.length,1);
+// Duplicate publisher for the same asset/property cannot win based on iteration order.
+const ambiguous={states:{...states,'sensor.battery_a_duplicate':states['sensor.battery_a_soc']}};
+const duplicate=ctx.readEnergyCanonicalProduct({host:{
+  hass:ambiguous,canonicalIndex:ctx.createEnergyCanonicalPropertyIndex(ambiguous)
+}});
+assert.equal(duplicate.field('battery.soc_pct','battery_a').resolved,false);
+assert.equal(duplicate.field('battery.soc_pct','battery_a').value,null);
+assert.equal(ctx.readEnergyCanonicalProduct({host:{hass:{states:{}},
+  canonicalIndex:ctx.createEnergyCanonicalPropertyIndex({states:{}})}}).available,false);
+console.log('PASS native Energy object hierarchy, visual identity, asset-scoped properties, pricing, plan, finance and duplicate guards');

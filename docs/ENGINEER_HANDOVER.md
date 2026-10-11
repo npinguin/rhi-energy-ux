@@ -1,5 +1,9 @@
 # Engineer handover — RHI Energy UX
 
+## Active engineering recovery — 2026-10-11
+
+**Read [ENGINEERING_RECOVERY_HANDOVER_2026-10-11.md](ENGINEERING_RECOVERY_HANDOVER_2026-10-11.md) first.** It identifies the exact unreleased Foundation/Energy/Mobility producer branches, 34 Public V2 source violations, native D0/D1 schema mismatch, execution plan, test gates and blocked release qualification. The legacy Public V2 gateway below is **historical implementation debt, not an endorsed product authority**. Do not merge/release the current Energy UX recovery candidate until the canonical-only cutover and target-HA evidence are complete.
+
 ## Start here
 
 Do not copy current release identity from this document. Authoritative sources are:
