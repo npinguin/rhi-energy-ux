@@ -2559,7 +2559,6 @@
       const row = candidates[0];
       const id = String(row?.entity_id || '').trim();
       if (row.availability !== 'AVAILABLE' || !/^sensor\.[a-z0-9_]+$/.test(id)) return '';
-      if (!this._hass?.states?.[id]) return '';
       return id;
     }
     energyHistorySection(rt, kind) {
