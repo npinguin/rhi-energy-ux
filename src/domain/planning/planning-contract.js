@@ -31,6 +31,7 @@
       ? runtime.nativePlanningHorizon(normalized) : null;
     const published = nativeHorizon?.available === true ? nativeHorizon : null;
     const horizonDetails = published?.details || {};
+    const publicationMetadata = published?.metadata || {};
     const planningAssets = published && Array.isArray(horizonDetails.planning_assets)
       ? horizonDetails.planning_assets : [];
 
@@ -49,10 +50,10 @@
       contractVersion:'ENERGY_NATIVE_PLANNING',
       available:selected.available,
       attrs:Object.freeze({}),
-      planId:published ? horizonDetails.plan_id ?? null : null,
-      providerId:published ? horizonDetails.provider_id ?? null : null,
+      planId:published ? publicationMetadata.plan_id ?? horizonDetails.plan_id ?? null : null,
+      providerId:published ? publicationMetadata.provider_id ?? horizonDetails.provider_id ?? null : null,
       providerPlanReference:published ? horizonDetails.provider_plan_ref ?? null : null,
-      generatedAt:published ? horizonDetails.generated_at ?? null : null,
+      generatedAt:published ? publicationMetadata.generated_at ?? horizonDetails.generated_at ?? null : null,
       sourceLanes:Object.freeze(planningObject(horizonDetails.source_lanes)),
       consumerLanes:Object.freeze(planningObject(horizonDetails.consumer_lanes)),
       balance:Object.freeze(planningObject(horizonDetails.balance)),
@@ -69,12 +70,14 @@
       horizonId:normalized,horizon,summary:horizon,
       laneTotals:Object.freeze(totals(selected)),
       buckets:Object.freeze(Array.isArray(horizonDetails.buckets) ? horizonDetails.buckets : []),
-      currentPlanningBucket:Object.freeze({}),
+      // The producer may explicitly identify the current bucket; otherwise it is unknown.
+      currentPlanningBucket:Object.freeze(planningObject(horizonDetails.current_bucket)),
       currentActionIntent:Object.freeze(published && horizonDetails.execution_policy && typeof horizonDetails.execution_policy === 'object' ? horizonDetails.execution_policy : {}),
       missingContractCapabilities:Object.freeze([
         ...(!published ? ['native_planning_buckets'] : []),
         ...(!published || !Array.isArray(horizonDetails.planning_assets) ? ['native_planning_assets'] : []),
-        'native_planning_actions'
+        ...(!published || !horizonDetails.execution_policy || typeof horizonDetails.execution_policy !== 'object' || Array.isArray(horizonDetails.execution_policy)
+          ? ['native_planning_actions'] : [])
       ]),
       totalsSource:'rhi_energy.runtime/native_metric'
     });
