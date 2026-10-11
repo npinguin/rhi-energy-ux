@@ -3,7 +3,9 @@
 function readEnergyAssetContext(gateway, assetId = "") {
   const id=String(assetId || '').trim();
   const index=gateway?.host?.canonicalIndex;
-  const rows=id && index?.byEntity ? [...index.byEntity.values()].filter(row=>
+  // Only unambiguous, product-published canonical properties may establish
+  // an asset context. A conflicting publisher must not win by insertion order.
+  const rows=id && index?.productRows ? index.productRows().filter(row=>
     row.asset_id === id && row.canonical_contract === 'RHI_ENERGY_CANONICAL_PROPERTY_V2') : [];
   if(rows.length===0) return Object.freeze({available:false,asset:null,profile:null,publication:null});
   const classes=new Set(rows.map(row=>row.logical_object_class).filter(Boolean));

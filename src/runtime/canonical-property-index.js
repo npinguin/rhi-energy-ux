@@ -55,6 +55,15 @@ function canonicalEnergyPropertyRow(entityId, state) {
     entity_id:String(entityId || ''),
     canonical_contract:RHI_ENERGY_CANONICAL_PROPERTY_V2,
     asset_id:assetId,
+    // The producer owns asset identity, parentage and source provenance. Keep
+    // them intact so presentation never has to guess hierarchy or HA links.
+    parent_asset_id:String(attributes.parent_asset_id || ''),
+    asset_display_name:String(attributes.asset_display_name || assetId),
+    integration_domain:String(attributes.integration_domain || ''),
+    device_registry_id:String(attributes.device_registry_id || ''),
+    config_entry_id:String(attributes.config_entry_id || ''),
+    entity_registry_id:String(attributes.entity_registry_id || ''),
+    source_unique_id:String(attributes.source_unique_id || ''),
     logical_object_class:objectClass,
     object_class:objectClass,
     property_key:propertyKey,
@@ -161,6 +170,12 @@ class EnergyCanonicalPropertyIndex {
           row.asset_id !== before.asset_id ||
           row.property_key !== before.property_key ||
           row.logical_object_class !== before.logical_object_class ||
+          row.parent_asset_id !== before.parent_asset_id ||
+          row.asset_display_name !== before.asset_display_name ||
+          row.integration_domain !== before.integration_domain ||
+          row.device_registry_id !== before.device_registry_id ||
+          row.config_entry_id !== before.config_entry_id ||
+          row.entity_registry_id !== before.entity_registry_id ||
           row.presentation_surface !== before.presentation_surface ||
           row.presentation_family !== before.presentation_family ||
           row.presentation_role !== before.presentation_role ||

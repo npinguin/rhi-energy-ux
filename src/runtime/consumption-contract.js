@@ -2,7 +2,15 @@
 // entities. No Public V2, source-provider, aggregate or derived-power fallback.
 function readLiveConsumptionContract(gateway) {
   const site=readTypedPropertyContract(gateway,'consumption','site_consumption.power_kw');
-  const home=readTypedPropertyContract(gateway,'consumption','home_consumption.power_kw');
+  // Home consumption is published as a dedicated native HA metric by Energy.
+  // Do not treat a second property-path guess as fallback or recompute it from
+  // solar/grid/battery flows. The producer's availability is authoritative.
+  const homeMetric=readNativeEnergyMetric(gateway?.host?.hass || {},'home_consumption_power_kw');
+  const home=Object.freeze({
+    number:homeMetric.available ? Number(homeMetric.value) : null,
+    health:homeMetric.available ? 'AVAILABLE' : 'UNAVAILABLE',
+    reason:homeMetric.reason || ''
+  });
   // Flexible power is independently published by the backend, if present.
   const flexible=readTypedPropertyContract(gateway,'consumption','flexible_loads.power_kw');
   const attributed=readTypedPropertyContract(gateway,'consumption','flexible_loads.attributed_power_kw');

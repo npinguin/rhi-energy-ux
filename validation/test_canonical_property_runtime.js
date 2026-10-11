@@ -62,6 +62,23 @@ const zeroResult=vm.runInContext("createEnergyCanonicalPropertyIndex",context)({
   .row("battery_home","battery.soc_pct");
 if(zeroResult?.availability!=="AVAILABLE" || zeroResult.value!==0)
   throw new Error("valid backend-owned canonical zero must survive");
+// Native Energy property metadata must preserve exact producer identities.
+const linkedBattery={...hass.states["sensor.battery_soc"],attributes:{
+  ...hass.states["sensor.battery_soc"].attributes,
+  parent_asset_id:"storage_cluster",asset_display_name:"Physical Battery A",
+  integration_domain:"solaredge_modbus",device_registry_id:"device-id-123",
+  config_entry_id:"entry-abc",entity_registry_id:"entity-reg-1"
+}};
+const linkedIndex=vm.runInContext("createEnergyCanonicalPropertyIndex",context)({states:{"sensor.linked":linkedBattery}});
+const linked=linkedIndex.row("battery_home","battery.soc_pct");
+if(linked.parent_asset_id!=="storage_cluster" || linked.asset_display_name!=="Physical Battery A" ||
+   linked.device_registry_id!=="device-id-123" || linked.integration_domain!=="solaredge_modbus")
+  throw new Error("native Energy source identity and physical parent metadata lost");
+const reparented={...linkedBattery,attributes:{...linkedBattery.attributes,parent_asset_id:"new_cluster"}};
+const changedParent=linkedIndex.refresh({states:{"sensor.linked":reparented}});
+if(!changedParent.has("sensor.linked") || linkedIndex.row("battery_home","battery.soc_pct").parent_asset_id!=="new_cluster")
+  throw new Error("backend-owned hierarchy change must invalidate the parent projection");
+
 const index=vm.runInContext("createEnergyCanonicalPropertyIndex",context)(hass);
 if(index.size!==2) throw new Error("canonical property discovery must index only canonical Energy properties");
 const soc=index.row("battery_home","battery.soc_pct");
@@ -270,5 +287,23 @@ const runtimeNative=card.slice(runtimeNativeStart,runtimeNativeEnd);
 if(!runtimeNative.includes("readNativeEnergyPlanningTotals(this.hass, horizonId)") ||
    !runtimeNative.includes("readNativeEnergyMetric(this.hass, metricKey)") ||
    runtimeNative.includes("publicV2")) throw new Error("native Energy runtime must consume canonical HA evidence only");
+
+// Home consumption must be sourced exclusively from the native metric, not
+// guessed from a missing logical property or grid/solar arithmetic.
+const consumptionSource=fs.readFileSync("src/runtime/consumption-contract.js","utf8");
+const consumptionContext=vm.createContext({Object,Number,String,Array,Set,Map});
+vm.runInContext(source+"\n"+consumptionSource+"\nthis.readConsumption=readLiveConsumptionContract;",consumptionContext);
+const nativeHome={states:{"sensor.home_native":{
+  state:"0",attributes:{canonical_source:"rhi_energy.runtime",metric_key:"home_consumption_power_kw",
+    availability:"AVAILABLE",quality:"CANONICAL",unit_of_measurement:"kW"}
+}}};
+// Other consumption families are absent in this fixture; no synthetic values.
+vm.runInContext("this.readTypedPropertyContract=()=>({number:null,health:'UNAVAILABLE',reason:'not_published'})",consumptionContext);
+const consumed=consumptionContext.readConsumption({host:{hass:nativeHome}});
+if(consumed.homeConsumptionKw!==0 || consumed.homeStatus!=="AVAILABLE" || consumed.siteConsumptionKw!==null)
+  throw new Error("native Home Consumption zero or missing Site Consumption contract was corrupted");
+const unknownHome=consumptionContext.readConsumption({host:{hass:{states:{}}}});
+if(unknownHome.homeConsumptionKw!==null || unknownHome.homeStatus!=="UNAVAILABLE")
+  throw new Error("missing Home Consumption must remain unknown rather than zero");
 
 console.log("PASS canonical Energy property metadata, fail-closed lookup and incremental indexing");
