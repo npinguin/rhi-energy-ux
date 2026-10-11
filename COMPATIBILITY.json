@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "ux_version": "4.3.36-rc.7",
+  "ux_version": "4.3.36-rc.8",
   "energy_contract": {
     "minimum": "RHI_ENERGY_CANONICAL_PROPERTY_V2",
     "minimum_backend": "E0.15.116",
     "tested_backend_releases": [
-      "E0.15.116"
+      "E0.15.119"
     ],
     "required_contracts": [
       "RHI_ENERGY_CANONICAL_OBJECT_V2",
