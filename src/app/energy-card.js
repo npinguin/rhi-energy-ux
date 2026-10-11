@@ -3806,7 +3806,7 @@
       const details = this.energyAssetDetailDisclosure(rt,enriched);
       const diagnostics = this.energyAssetDiagnosticsDisclosure(rt,enriched);
       const children = childrenHtml
-        ? `<details class="energyAssetChildrenSibling"><summary>${escapeHtml(rhiEnergyT(this._hass,'common.children',{},'Children'))}</summary><div class="energyAssetChildrenStack">${childrenHtml}</div></details>`
+        ? `<details class="energyAssetChildrenSibling"${roleLabel === 'Solar inverter' ? ' open' : ''}><summary>${escapeHtml(rhiEnergyT(this._hass,'common.children',{},'Children'))}</summary><div class="energyAssetChildrenStack">${childrenHtml}</div></details>`
         : '';
       return `<div class="energyAssetNode" data-energy-device-type="${escapeHtml(type)}"><article class="energyDeviceCard rhiEnergyCoreAssetCard">
         ${identity}
@@ -4030,7 +4030,7 @@
         const aggregateFacts = [{label:rhiEnergyT(this._hass,'solar.production_now',{},'Production now'),value:fmtKw(currentSolar.powerKw,'—')}, ...secondaryFacts];
         const aggregateState = currentSolar.powerKw === null ? 'Unavailable' : currentSolar.powerKw > 0.005 ? 'Producing' : 'Idle';
         const children = inverterSection
-          ? `<details class="energyAssetChildrenSibling solarProductionChildrenDisclosure"><summary>Children · ${inverters.length}</summary><div class="energyAssetChildrenStack">${inverterSection}</div></details>`
+          ? `<details class="energyAssetChildrenSibling solarProductionChildrenDisclosure" open><summary>Children · ${inverters.length}</summary><div class="energyAssetChildrenStack">${inverterSection}</div></details>`
           : '';
         productionBody = `<div class="energyAssetNode solarProductionNode"><article class="solarProductionObject">
           <div class="solarProductionRepresentativeWrap">${this.solarProductionRepresentative(rt)}</div>
