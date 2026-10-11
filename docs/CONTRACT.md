@@ -2,7 +2,7 @@
 
 ## Single-source rule
 
-The backend owns product semantics. The UX reads producer-owned native HA property entities and domain-owned native metrics, and it never computes missing business values, assumes asset identity or uses a retired aggregate as fallback. `sensor.rhi_energy_public_contract_v2` is **retired producer transport** and remains an explicit migration blocker where still referenced in UX source.
+The backend owns product semantics. The UX reads producer-owned native HA property entities and domain-owned native metrics, and it never computes missing business values, assumes asset identity or uses a retired aggregate as fallback. The former `sensor.rhi_energy_public_contract_v2` transport is retired and is **not consumed** by the canonical-only frontend. The strict bundle-source scanner rejects its reintroduction.
 
 ## Canonical property entity
 
@@ -21,7 +21,7 @@ No frontend aggregation of these totals and no claiming unselected periods from 
 
 ## Planning horizons
 
-`RHI_ENERGY_PLANNING_HORIZON_V1` may supply provider, plan ID, buckets, planning assets, source/consumer lanes, balance and execution policy when exactly one producer-owned horizon for D0/D1 is present. **Backend Energy #249 remains open.** Without that publication, present native totals and an explicit gap for detailed buckets and per-asset outcomes. Do not invent combined totals, execution intent or allocations.
+`RHI_ENERGY_PLANNING_HORIZON_V1` may supply provider, plan ID, buckets, planning assets, source/consumer lanes, balance and execution policy when exactly one producer-owned horizon for D0/D1 is present. Energy E0.15.116 publishes effective and baseline planning separately, with effective `attributes.details` holding buckets, asset allocations, lane data and execution policy. Require exactly one available, complete, effective publisher per horizon; the baseline is non-executing. If its details are missing, show native totals and a concrete gap, never invented buckets. Do not invent combined totals, execution intent or allocations.
 
 ## Configuration and actions
 
@@ -29,7 +29,7 @@ Canonical editable properties must publish the service target, operation, allowe
 
 ## Product evidence still required
 
-- Backend-native full D0/D1 horizon coverage and financial period attribution (Energy #242/#249).
+- Target-HA proof of complete native D0/D1 effective horizon coverage and period-accurate financial attribution, including provider fallback and incomplete scenarios.
 - Real HA multi-battery, solar, grid, gas, home consumption and flexible consumer identity/availability.
 - Strategy/price/metering/appearance edit, invoke, error and persistence readback.
 - Installation, upgrade, reload/restart, outage/recovery, responsive UI and rollback.
