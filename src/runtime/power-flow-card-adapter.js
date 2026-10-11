@@ -47,7 +47,7 @@ function buildRhiPowerFlowCardConfig(rt) {
     const row = rows[0];
     const entityId = String(row?.entity_id || '');
     const unit = String(row?.unit || row?.unit_of_measurement || row?.native_unit_of_measurement || '').toLowerCase();
-    if (row.availability !== 'AVAILABLE' || !/^sensor\\.[a-z0-9_]+$/.test(entityId) || (unit && unit !== 'w' && unit !== 'kw')) continue;
+    if (row.availability !== 'AVAILABLE' || !/^sensor\.[a-z0-9_]+$/.test(entityId) || (unit && unit !== 'w' && unit !== 'kw')) continue;
     if (used.has(entityId)) continue;
     const asset = rt?.asset?.(id) || {};
     const role = [asset.asset_type,asset.source_asset_kind,asset.object_class,asset.energy_asset_role,asset.participation_state]
