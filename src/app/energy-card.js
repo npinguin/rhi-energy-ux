@@ -4873,7 +4873,7 @@
         return !/(^|_)(charger|connection|charging_point)(_|$)/.test(kind);
       }));
       const visibleRows = this.filterAndSortConsumers(rows);
-      const participating = visibleRows.filter(row => { const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return !vm || (vm.isParticipating && !vm.isDisabled); });
+      const participating = visibleRows.filter(row => { const vm=domain.byId(row.asset_id||row.consumer_id||row.id); return !vm || !vm.isDisabled; });
       const disabled = visibleRows.filter(row => domain.byId(row.asset_id||row.consumer_id||row.id)?.isDisabled);
       const totalPower = asNumber(summary.current_power_kw);
       const cards = participating.map(row=>this.consumerExplorerCard(rt,row)).join('');
