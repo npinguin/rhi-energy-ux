@@ -53,4 +53,16 @@ if(hardware.includes('energyAssetFoldStack">${this.energyAssetConfigurationDiscl
   throw new Error("Solar Production Children must not be embedded in the aggregate fold stack");
 }
 
+// The canonical solar tree must not disappear behind two nested closed details.
+// Zone->optimizer expansion remains deliberate to keep large installations usable.
+if(!source.includes('solarProductionChildrenDisclosure" open>')) {
+  throw new Error("Solar Production must expose its inverter children on initial render");
+}
+if(!source.includes("roleLabel === 'Solar inverter' ? ' open' : ''")) {
+  throw new Error("Solar inverter must expose linked zones/strings on initial render");
+}
+if(!source.includes('<details class="energyAssetChildrenSibling"><summary>Children · ${childOptimizers.length + childPanels.length}')) {
+  throw new Error("Large optimizer groups should remain user-expandable per zone");
+}
+
 console.log("PASS 4.3.25 flat solar hierarchy and section parity");
