@@ -4562,9 +4562,7 @@
       return `${this.tabExperienceHeader(rt,'flow',pageVm)}<div class="flowPage">\n        ${this.powerFlowDependencyNotice()}
         <section class="panel rhiPowerFlowPanel">
           <div class="flowHeader"><div><h2>Live power flow</h2><p>Powered by Power Flow Card Plus. Only published, measured sources can animate; missing energy values are not estimated.</p></div></div>
-          <div class="rhiPowerFlowHost rhiUxChartViewport" data-rhi-power-flow-host role="region" aria-label="Interactive energy flow">
-            ${this.powerFlowDependencyStatus()==='ready' ? '<div class="empty compact">Loading Power Flow Card Plus…</div>' : '<div class="empty compact">Waiting for Power Flow Card Plus resource…</div>'}
-          </div>
+          <div class="rhiPowerFlowHost rhiUxChartViewport" data-rhi-power-flow-host role="region" aria-label="Interactive energy flow"></div>
           <p class="rhiFlowMeasurementNote">Battery power is displayed separately unless a direction-compatible signed sensor is published. Charger and vehicle power are never added together.</p>
         </section>
         <section class="panel rhiFlowAllLoads"><div class="flowHeader"><div><h2>All flexible loads</h2><p>Full canonical inventory, including idle and currently unavailable assets. Chargers remain connection interfaces, not duplicate consumers.</p></div></div>
