@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.36-rc.2';
+  const UX_VERSION = 'R4.3.36-rc.3';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Native Energy publication is discovered by exact canonical contract markers.
@@ -1604,17 +1604,23 @@ function readEnergyCommandContract(gateway) {
         state?.attributes?.canonical_source === 'rhi_energy.runtime' &&
         state?.attributes?.horizon_id === horizon &&
         state?.attributes?.variant === 'effective');
-      if (matches.length !== 1) return Object.freeze({available:false,details:null});
+      if (matches.length !== 1) return Object.freeze({
+        published:false,available:false,status:'UNAVAILABLE',details:null,
+        metadata:null,reason:matches.length>1?'duplicate_effective_horizon':'effective_horizon_not_published'
+      });
       const attrs=matches[0].attributes || {};
       const details=attrs.details;
-      if (String(attrs.availability || '').toUpperCase() !== 'AVAILABLE' ||
-          attrs.totals_complete !== true ||
-          !details || typeof details !== 'object' || Array.isArray(details) ||
-          !Array.isArray(details.buckets) ||
-          (details.horizon_id != null && details.horizon_id !== horizon)) {
-        return Object.freeze({available:false,details:null});
-      }
-      return Object.freeze({available:true,details,metadata:attrs});
+      const ready=String(attrs.availability || '').toUpperCase() === 'AVAILABLE' &&
+        attrs.totals_complete === true &&
+        details && typeof details === 'object' && !Array.isArray(details) &&
+        Array.isArray(details.buckets) &&
+        (details.horizon_id == null || details.horizon_id === horizon);
+      return Object.freeze({
+        published:true,available:!!ready,
+        status:ready?'AVAILABLE':String(attrs.availability || 'INCOMPLETE').toUpperCase(),
+        reason:ready?'':String(attrs.reason_code || 'effective_horizon_incomplete'),
+        details:ready?details:null,metadata:attrs
+      });
     }
 
     nativeMetric(metricKey = '') {
@@ -2808,6 +2814,44 @@ class FlexibleAssetDomainModel {
 
   function adaptPlanningBucket(bucket = {}, contractVersion = '') {
     const version = String(contractVersion || '');
+    if (version === 'ENERGY_NATIVE_PLANNING') {
+      // The canonical D0/D1 producer publishes bucket facts directly. Never
+      // derive kWh from power/time, invent Home or Grid lane occupants, or
+      // promote an old R1.79.x advisory transport to native authority.
+      const durationMinutes=asNumber(bucket.duration_minutes);
+      const allocations=planningArray(bucket.asset_allocations);
+      const sourceRows=planningArray(bucket.source_lane);
+      const consumerRows=planningArray(bucket.consumer_lane);
+      const nativeRow=(row,role)=>({
+        ...row, participantId:planningParticipantId(row),laneRole:role,
+        energyKwh:asNumber(firstDefined(row.planned_energy_kwh,row.planned_demand_kwh,row.planned_supply_kwh)),
+        powerKw:asNumber(firstDefined(row.planned_power_kw,row.power_kw)),
+        state:String(firstDefined(row.planning_state,row.state,row.status,'')||'').toLowerCase(),
+        allocationState:String(firstDefined(row.allocation_state,'')||'').toLowerCase(),
+        executionAllowed:firstDefined(row.plan_execution_allowed,null),
+        reason:firstDefined(row.reason_code,row.reason,'')
+      });
+      const consumers=consumerRows.length?consumerRows.map(row=>nativeRow(row,'consumer'))
+        :allocations.map(row=>nativeRow(row,'consumer'));
+      return {
+        raw:bucket,
+        id:String(firstDefined(bucket.bucket_id,bucket.id,'')),
+        startTime:firstDefined(bucket.start_time,bucket.start,bucket.bucket_start,''),
+        endTime:firstDefined(bucket.end_time,bucket.end,bucket.bucket_end,''),
+        durationMinutes,
+        sources:sourceRows.map(row=>nativeRow(row,'source')),
+        consumers,
+        boundary:{gridExportKwh:asNumber(bucket.grid_export_kwh)},
+        balanceDeltaKwh:asNumber(bucket.balance_delta_kwh),
+        state:String(firstDefined(bucket.planning_state,bucket.state,'')||'').toLowerCase(),
+        reason:firstDefined(bucket.reason_code,bucket.reason,''),
+        confidence:firstDefined(bucket.confidence,''),
+        forecastQuality:firstDefined(bucket.forecast_quality,''),
+        disclosure:firstDefined(bucket.estimation_disclosure,''),
+        canonicalLanes:sourceRows.length>0||consumerRows.length>0,
+        contractSupported:true,contractFamily:'ENERGY_NATIVE_PLANNING'
+      };
+    }
     const isR1794 = ['advisory_source_lane','advisory_consumer_lane','advisory_boundary_flows','advisory_lane_balance_delta_kwh']
       .some(key => Object.prototype.hasOwnProperty.call(bucket, key));
     const isR1793 = version.includes('R1.79.3');
@@ -2903,7 +2947,16 @@ class FlexibleAssetDomainModel {
       ? runtime.nativePlanningHorizon(normalized) : null;
     const published = nativeHorizon?.available === true ? nativeHorizon : null;
     const horizonDetails = published?.details || {};
-    const publicationMetadata = published?.metadata || {};
+    const publicationMetadata = nativeHorizon?.metadata || {};
+    // Native numeric totals remain available as measurement evidence but never
+    // authorize an effective schedule without one quality-complete horizon.
+    const effectiveAvailable = selected.available===true && !!published;
+    const publicationStatus = effectiveAvailable ? 'AVAILABLE' :
+      nativeHorizon?.published===true ? 'INCOMPLETE' :
+        nativeHorizon?.status || 'UNAVAILABLE';
+    const requestedProvider=String(publicationMetadata.requested_provider||'');
+    const effectiveProvider=String(publicationMetadata.provider_id||'');
+    const providerHold=!!requestedProvider&&!effectiveProvider;
     const planningAssets = published && Array.isArray(horizonDetails.planning_assets)
       ? horizonDetails.planning_assets : [];
 
@@ -2912,15 +2965,24 @@ class FlexibleAssetDomainModel {
     const horizon=Object.freeze({
       horizon_id:normalized,
       ...totals(selected),
-      status:selected.available ? 'AVAILABLE' : 'INCOMPLETE',
-      quality:Object.freeze({availability:selected.available ? 'AVAILABLE' : 'INCOMPLETE',
-        missing:selected.missing})
+      status:publicationStatus,
+      quality:Object.freeze({availability:publicationStatus,
+        missing:selected.missing,
+        effective_horizon:effectiveAvailable,
+        metrics_available:selected.available===true})
     });
     const todayTotals=totals(today),tomorrowTotals=totals(tomorrow);
     return Object.freeze({
       entityId:null,
       contractVersion:'ENERGY_NATIVE_PLANNING',
-      available:selected.available,
+      available:effectiveAvailable,
+      totalsAvailable:selected.available===true,
+      provisionalTotals:selected.available===true&&!effectiveAvailable,
+      published:nativeHorizon?.published===true||!!published,
+      publicationStatus,
+      requestedProvider,effectiveProvider,providerHold,
+      reasonCode:effectiveAvailable?'':String(nativeHorizon?.reason||publicationMetadata.reason_code||'effective_horizon_not_published'),
+      executionAuthorized:effectiveAvailable&&publicationMetadata.execution_authorized===true,
       attrs:Object.freeze({}),
       planId:published ? publicationMetadata.plan_id ?? horizonDetails.plan_id ?? null : null,
       providerId:published ? publicationMetadata.provider_id ?? horizonDetails.provider_id ?? null : null,
@@ -2946,7 +3008,7 @@ class FlexibleAssetDomainModel {
       currentPlanningBucket:Object.freeze(planningObject(horizonDetails.current_bucket)),
       currentActionIntent:Object.freeze(published && horizonDetails.execution_policy && typeof horizonDetails.execution_policy === 'object' ? horizonDetails.execution_policy : {}),
       missingContractCapabilities:Object.freeze([
-        ...(!published ? ['native_planning_buckets'] : []),
+        ...(!published ? ['native_effective_horizon','native_planning_buckets'] : []),
         ...(!published || !Array.isArray(horizonDetails.planning_assets) ? ['native_planning_assets'] : []),
         ...(!published || !horizonDetails.execution_policy || typeof horizonDetails.execution_policy !== 'object' || Array.isArray(horizonDetails.execution_policy)
           ? ['native_planning_actions'] : [])
