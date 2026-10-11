@@ -1574,20 +1574,11 @@
       if (saveAll && !saveAll.disabled) { this.savePropertyDrafts(); return; }
       const discardAll = event.target.closest('[data-discard-property-drafts]');
       if (discardAll && !discardAll.disabled) { this.editDrafts = {}; this.render(); return; }
-      const coreAssetNavigation = event.target.closest('.rhiUxAssetRelationshipLink[data-nav]');
-      if (coreAssetNavigation && !coreAssetNavigation.disabled) {
-        const path = String(coreAssetNavigation.dataset.nav || '').trim();
-        if (path.startsWith('/') && !path.startsWith('//')) {
-          event.preventDefault();
-          history.pushState(null, '', path);
-          window.dispatchEvent(new Event('location-changed'));
-        }
-        return;
-      }
-      const sourceNav = event.target.closest('[data-source-asset-nav]');
+      const sourceNav = event.target.closest('[data-source-asset-nav], .rhiUxAssetRelationshipLink[data-nav]');
       if (sourceNav && !sourceNav.disabled) {
-        const path = String(sourceNav.dataset.sourceAssetNav || '').trim();
-        if (path && !/^https?:\/\//i.test(path)) {
+        const path = String(sourceNav.dataset.sourceAssetNav || sourceNav.dataset.nav || '').trim();
+        if (path && !/^(?:[a-z][a-z0-9+.-]*:|\\/\\/)/i.test(path)) {
+          event.preventDefault();
           history.pushState(null, '', path);
           window.dispatchEvent(new Event('location-changed'));
         }
