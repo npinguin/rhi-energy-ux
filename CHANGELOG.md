@@ -1,3 +1,10 @@
+## 4.3.36-rc.7 — Real canonical Solar and Home Battery history graphs
+
+- display HA-native Solar measured power (kW) graph and battery system state of charge (%) graph;
+- Today/Week/Month controls and explicit unavailable handling for missing or ambiguous sensors;
+- preserve actual Gas statistics graph, hero images and canonical UX Core;
+- frontend only, no calculated history or invented totals; target-HA and rollback pending.
+
 ## 4.3.36-rc.6 — Core 1.6.4 compact asset rows and native chart responsiveness
 
 - preserve all existing heroes, tabs, navigation, chart data sources and Home Assistant Gas statistics history;
