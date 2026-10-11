@@ -1,3 +1,12 @@
+## 4.3.36-rc.6 — Core 1.6.4 compact asset rows and native chart responsiveness
+
+- preserve all existing heroes, tabs, navigation, chart data sources and Home Assistant Gas statistics history;
+- render canonical flexible consumers with one image, meaningful need, source-owned charger relation and right-aligned measured power/state;
+- navigate to a charger only with an advertised same-origin Mobility route; preserve unknown vs zero;
+- keep controls and progressive details/diagnostics, reduce body whitespace and align responsive chart presentation;
+- adopt and vendor validated Core 1.6.4 presentation primitives, with owned regressions;
+- HACS test candidate; target-HA installation, visual/runtime proof and rollback are still required for stable qualification.
+
 ## 4.3.36-rc.5 — Shared Core asset card layout and Gas overflow recovery
 
 - avoid nested legacy device columns around shared Core identity/fact components;

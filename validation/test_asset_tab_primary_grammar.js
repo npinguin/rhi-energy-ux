@@ -45,10 +45,11 @@ assert.doesNotMatch(battery,/Home Battery strategy/,"Home Battery page must not 
 const consumerStart = app.indexOf("\n    consumerExplorerCard(");
 const consumerEnd = app.indexOf("\n    filterAndSortConsumers(", consumerStart);
 const consumer = app.slice(consumerStart, consumerEnd);
-assert.match(consumer,/\['Energy needed'/);
+assert.match(consumer,/context:energyNeed !== null \? `Energy needed/);
 assert.match(consumer,/\['Planned today'/);
 assert.match(consumer,/\['Still to plan'/);
-assert.match(consumer,/\['Connection'/);
+assert.match(consumer,/relationshipLabel:relation/);
+assert.match(consumer,/relationshipTarget:chargerTarget/);
 assert.match(consumer,/energyAssetFoldStack/);
 assert.match(consumer,/energyAssetDiagnostics/);
 assert.doesNotMatch(consumer,/rt\.assetName\(chargerId\)/,"consumer connection identity must come from backend-published display truth");

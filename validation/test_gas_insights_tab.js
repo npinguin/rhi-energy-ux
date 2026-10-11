@@ -18,6 +18,8 @@ assert.doesNotMatch(app,/gasTotalEntityId\(\)/);
 assert.match(app,/row\.logical_object_class==='gas_meter'/);
 assert.doesNotMatch(app,/rt\.gasStatisticsEntityId\(/);
 assert.match(app,/hui-statistics-graph-card/);
+assert.match(app,/gasStatisticsHost rhiUxChartViewport/);
+assert.match(app,/gasHistoryPanel rhiUxChartPanel/);
 assert.match(app,/stat_types:\['change'\]/);
 assert.match(app,/period:'day'/);
 assert.match(app,/days_to_show:\(\{week:7,month:30,quarter:90,year:365\}/);

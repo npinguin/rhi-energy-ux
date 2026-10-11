@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "ux_version": "4.3.36-rc.5",
+  "ux_version": "4.3.36-rc.6",
   "energy_contract": {
     "minimum": "RHI_ENERGY_CANONICAL_PROPERTY_V2",
     "minimum_backend": "E0.15.116",
@@ -22,8 +22,8 @@
   },
   "ux_core": {
     "package": "rhi-ux-core",
-    "version": "1.6.3",
-    "source_commit": "2eff5c50408e32ec604fc2877cf9a404808ecaab",
+    "version": "1.6.4",
+    "source_commit": "501caa2c038f21f299933e68aa320e3d40198709",
     "runtime_dependency": false,
     "branding_owner": "rhi-ux-core"
   },
