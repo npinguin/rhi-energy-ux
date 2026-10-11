@@ -188,15 +188,25 @@
     nativePlanningHorizon(horizonId = 'D0') {
       const horizon=String(horizonId || '').toUpperCase();
       if (horizon !== 'D0' && horizon !== 'D1') return Object.freeze({available:false,details:null});
+      // The Energy producer publishes the effective plan's buckets and asset/lane
+      // allocations under attributes.details. Never interpret an inventory row,
+      // incomplete horizon, baseline, or duplicate publisher as executable truth.
       const matches=Object.values(this.hass?.states || {}).filter(state=>
         state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1' &&
         state?.attributes?.canonical_source === 'rhi_energy.runtime' &&
-        state?.attributes?.horizon_id === horizon);
+        state?.attributes?.horizon_id === horizon &&
+        state?.attributes?.variant === 'effective');
       if (matches.length !== 1) return Object.freeze({available:false,details:null});
-      const state=matches[0], attrs=state.attributes || {};
-      if (!['AVAILABLE','COMPLETE'].includes(String(attrs.availability || '').toUpperCase()) ||
-          !Array.isArray(attrs.buckets)) return Object.freeze({available:false,details:null});
-      return Object.freeze({available:true,details:attrs});
+      const attrs=matches[0].attributes || {};
+      const details=attrs.details;
+      if (String(attrs.availability || '').toUpperCase() !== 'AVAILABLE' ||
+          attrs.totals_complete !== true ||
+          !details || typeof details !== 'object' || Array.isArray(details) ||
+          !Array.isArray(details.buckets) ||
+          (details.horizon_id != null && details.horizon_id !== horizon)) {
+        return Object.freeze({available:false,details:null});
+      }
+      return Object.freeze({available:true,details,metadata:attrs});
     }
 
     nativeMetric(metricKey = '') {
