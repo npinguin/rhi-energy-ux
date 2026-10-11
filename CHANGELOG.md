@@ -1,10 +1,14 @@
-## 4.3.36-rc.2 — Structural canonical Energy recovery (engineering, unpublished)
+## 4.3.36-rc.2 — Native canonical-only Energy HACS test candidate
 
-- preserve physical hierarchy, device provenance and duplicate-property rejection;
-- use native Home Consumption, D0/D1 planning totals and selected-period financial value;
-- expose explicit unavailable product states, align contract and product documents;
-- regenerate HACS dist without modifying the immutable rc.1 release;
-- legacy aggregate cutover and real HA acceptance remain blocking, no publication.
+- remove all retired Public V2 product readers, gateway, registry and display consumers;
+- materialize native canonical objects, commands and published configuration values;
+- retain the strict fail-closed canonical property index and object identity semantics;
+- restore structural capability navigation presence independent of telemetry value;
+- use exact effective D0/D1 `attributes.details`, native totals and selected-period finance;
+- migrate obsolete regression fixtures to actual native producer contracts and make zero legacy references a hard package gate;
+- rebuild the complete committed HACS distribution with byte-identical deterministic checks;
+- bind minimum releases to Energy E0.15.116, Foundation F1.8.44 and Mobility M0.10.44;
+- target Home Assistant functional proof and stable promotion remain blocked.
 
 ## 4.3.36-rc.1 — Experimental canonical planning HACS candidate
 
