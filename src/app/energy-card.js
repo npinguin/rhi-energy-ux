@@ -355,19 +355,19 @@
       };
     }
     footerModel() {
-      const v2 = this.publicV2();
       const backendStatus = this.backendStatus();
+      const release=this.releaseAttrs();
       return {
         uxVersion: UX_VERSION,
-        backendVersion: v2.release || 'Unknown',
-        releaseContractEntity: UX_INTERFACES.publicV2,
-        contractVersion: v2.contractVersion || 'Unknown',
-        runtimeTrusted: backendStatus.runtimeTrusted,
-        failedHardGates: [],
-        diagnosticsNotes: [],
-        statusText: backendStatus.statusText,
-        warningText: '',
-        showMainWarning: false
+        backendVersion:String(release.backend_release || 'Unknown'),
+        releaseContractEntity:RELEASE_ENTITY,
+        contractVersion:'RHI_ENERGY_CANONICAL_PROPERTY_V2',
+        runtimeTrusted:backendStatus.runtimeTrusted,
+        failedHardGates:backendStatus.failedHardGates,
+        diagnosticsNotes:backendStatus.diagnosticsNotes,
+        statusText:backendStatus.statusText,
+        warningText:backendStatus.warningText,
+        showMainWarning:backendStatus.showMainWarning
       };
     }
     publicV2() {
@@ -390,10 +390,32 @@
     contractEntityId() { return this.publicV2().envelope.entityId; }
     assetProjection(assetId) { return selectEnergyAsset(this.publicV2(), assetId); }
     overviewProjection() { return selectEnergyOverview(this.publicV2()); }
-    planningProjection(horizon = 'D0') { return selectEnergyPlanning(this.publicV2(), horizon); }
+    planningProjection(horizon = 'D0') {
+      const native=readPlanningContract(this,horizon);
+      return Object.freeze({...native,
+        lane_totals:native.laneTotals,
+        planning_objects:native.planningAssets,
+        source:'rhi_energy.runtime/native_metric'
+      });
+    }
     strategyProjection() { return selectEnergyStrategies(this.publicV2()); }
     pricingProjection() { return selectEnergyPricing(this.publicV2()); }
-    valueProjection(period = 'today') { return selectEnergyValue(this.publicV2(), period); }
+    valueProjection(period = 'today') {
+      const requested=String(period || '').toLowerCase();
+      const native=this.nativeMetric('net_financial_result_eur');
+      const selected=String(native.period || '').toLowerCase();
+      const valid=native.available === true && !!selected && selected === requested;
+      const amount=valid ? Number(native.value) : null;
+      return Object.freeze({
+        available:valid,
+        period_id:requested,
+        value:Object.freeze({net_financial_result_eur:amount}),
+        net_financial_result_eur:amount,
+        net_financial_result:valid ? Object.freeze({value:amount,unit:'EUR',status:'AVAILABLE'}) : Object.freeze({}),
+        reason:valid ? '' : (selected && selected !== requested ? 'financial_period_not_published' : native.reason || 'financial_period_unavailable'),
+        source:'rhi_energy.runtime/native_metric'
+      });
+    }
     meteringProjection(period = 'today') { return selectEnergyMetering(this.publicV2(), period); }
     activityProjection() { return selectEnergyActivity(this.publicV2()); }
     commandProjection(assetId = '') { return selectEnergyCommands(this.publicV2(), assetId); }
@@ -745,15 +767,14 @@
 
     planningIndexRows() {
       if (this._planningOutcomes) return this._planningOutcomes;
-      const v2=this.publicV2();
-      this._planningOutcomes=(v2.layers?.planning_objects || [])
-        .map((row,i)=>({
-          planning_id:row.planning_id || row.id || row.plan_id || `planning_${i+1}`,
-          entity_id:v2.envelope.entityId,
-          ...objectFrom(row),
-          asset_id:row.asset_id || row.target_asset_id || row.flexible_asset_id || row.planning_target_asset_id
-        }))
-        .filter(row=>row.asset_id);
+      this._planningOutcomes=['D0','D1'].flatMap(id=>{
+        const native=this.planningProjection(id);
+        return native.planningAssets
+          .filter(row=>row && String(row.asset_id || '').trim())
+          .map(row=>Object.freeze({...row,horizon_id:id,
+            planning_id:String(row.planning_id || row.id || `${id}:${row.asset_id}`),
+            contract_source:'RHI_ENERGY_PLANNING_HORIZON_V1'}));
+      });
       return this._planningOutcomes;
     }
     planningOutcomeFor(assetId) {
@@ -761,9 +782,10 @@
     }
 
     planningHorizons() {
-      const planning=this.publicV2().planning || {};
-      const horizons=planning.horizons && typeof planning.horizons === 'object' ? planning.horizons : {};
-      return Object.entries(horizons).map(([id,value])=>({ horizon_id:String(id).toUpperCase(), ...planningObject(value) }));
+      // Only the two backend-supported native horizons exist. An incomplete
+      // horizon remains visible as incomplete rather than vanishing or using
+      // a retired aggregate to fill missing totals.
+      return ['D0','D1'].map(id=>this.planningProjection(id).horizon);
     }
     planningHorizon(id = 'D0') {
       return this.planningProjection(id).horizon || null;

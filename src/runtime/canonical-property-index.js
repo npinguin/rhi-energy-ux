@@ -310,7 +310,11 @@ function readNativeEnergyMetric(hass = {}, metricKey = '') {
       (invalidQuality ? 'invalid_native_energy_metric_quality' :
        (availability === 'AVAILABLE' && !validNumber ? 'invalid_native_energy_metric' :
         (availability || 'native_energy_metric_unavailable')))),
-    metric_key:key
+    metric_key:key,
+    // The net financial metric belongs to exactly one backend-selected period.
+    // A missing period must not be treated as today's financial result.
+    period:String(attrs.period || ''),
+    actual_complete:attrs.actual_complete === true
   });
 }
 

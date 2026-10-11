@@ -187,6 +187,13 @@ for (const invalid of ['NaN','Infinity','-Infinity','garbage','','unknown','unav
   assert.equal(result.value,null);
 }
 assert.equal(readMetric({states:metricState('17.5','STALE')},'planning_today_required_kwh').available,false);
+const financial=readMetric({states:{'sensor.financial':{state:'1.25',attributes:{
+  metric_key:'net_financial_result_eur',canonical_source:'rhi_energy.runtime',availability:'AVAILABLE',
+  period:'month',actual_complete:true
+}}}},'net_financial_result_eur');
+assert.equal(financial.value,'1.25');
+assert.equal(financial.period,'month');
+assert.equal(financial.actual_complete,true);
 console.log('PASS native metric numeric integrity, zero and availability');
 
 
