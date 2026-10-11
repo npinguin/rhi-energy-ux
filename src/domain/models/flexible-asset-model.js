@@ -142,7 +142,9 @@
     inventory() { return this.consumerFacing(); }
     participating() { return this.consumerFacing().filter(vm => vm.isParticipating); }
     planningParticipants() {
-      return this.participating().filter(vm => vm.raw?.planning_input_ready !== false);
+      // Backend-owned readiness is positive evidence. Unknown/missing does
+      // not mean eligible and must never synthesize a schedulable consumer.
+      return this.participating().filter(vm => vm.raw?.planning_input_ready === true);
     }
     disabled() { return this.consumerFacing().filter(vm => vm.isDisabled); }
     infrastructure() { return this.all().filter(vm => vm.isInfrastructure); }
