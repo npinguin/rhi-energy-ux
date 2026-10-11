@@ -1,0 +1,37 @@
+name: Reconcile Energy recovery branch with main (single use)
+on:
+  push:
+    branches: [work/ux-structural-closure-20261011]
+    paths: [.github/workflows/align-energy-main-20261011.yml]
+permissions:
+  contents: write
+jobs:
+  merge-base:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/ux-structural-closure-20261011
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Preserve main documentation while merging live work
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          if ! git merge --no-commit --no-ff origin/main; then
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+            printf 'Conflicts: %s\n' "${conflicts[*]}"
+            test "${#conflicts[@]}" -eq 1
+            test "${conflicts[0]}" = 'docs/ENGINEERING_RECOVERY_HANDOVER_2026-10-11.md'
+            git checkout --theirs docs/ENGINEERING_RECOVERY_HANDOVER_2026-10-11.md
+            git add docs/ENGINEERING_RECOVERY_HANDOVER_2026-10-11.md
+          fi
+          # Main's historical notice is maintained verbatim; the new audit is
+          # the current technical truth and does not rewrite old handover facts.
+          git rm .github/workflows/align-energy-main-20261011.yml
+          git diff --cached --check
+          git commit -m 'merge: incorporate main governance notice into native Energy recovery'
+          git push origin HEAD:refs/heads/work/ux-structural-closure-20261011
