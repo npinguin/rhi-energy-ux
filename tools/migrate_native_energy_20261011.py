@@ -42,6 +42,10 @@ new=block(native,"    canonicalProduct() {","    experiencePresence() {")
 current=current.replace(old,new,1)
 exact("this.publicV2()","this.canonicalProduct()")
 exact("rt.publicV2()","rt.canonicalProduct()")
+# Nested runtime references also route to the new canonical product boundary.
+current=current.replace(".publicV2()",".canonicalProduct()")
+# Provenance labels must name the actually consulted native HA authority.
+current=current.replace("RHI_ENERGY_PUBLIC_CONTRACT_V2","RHI_ENERGY_CANONICAL_PROPERTY_V2")
 
 # The runtime command inventory is direct native button publication. It must
 # not be intersected with an absent aggregate command listing.
