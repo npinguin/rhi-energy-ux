@@ -4066,9 +4066,11 @@
       const targetId = firstDefined(d.recommended_target_asset_id, rt.value('energy_intelligence.recommended_target_asset_id', null), '');
       const assetDomain = this.flexibleAssetDomain(rt);
       const loads = assetDomain.consumerFacing().map(vm => vm.raw);
-      const participating = loads.filter(load => !assetDomain.byId(load.asset_id)?.isDisabled);
+      const participating = loads.filter(load => assetDomain.byId(load.asset_id)?.isParticipating && load.planning_input_ready === true);
+      const unassessed = loads.filter(load => !assetDomain.byId(load.asset_id)?.isDisabled && !(assetDomain.byId(load.asset_id)?.isParticipating && load.planning_input_ready === true));
       const disabled = loads.filter(load => assetDomain.byId(load.asset_id)?.isDisabled);
       const cards = participating.map(load => this.operationalLoadCard(rt, load, recommendation, targetId)).join('');
+      const unassessedCards = unassessed.map(load => this.consumerExplorerCard(rt,load)).join('');
       const disabledCards = disabled.map(load => this.disabledFlexibleAssetCard(rt, load, load.energy_planning || rt.planningOutcomeFor(load.asset_id) || {})).join('');
       const active = participating.filter(load => (asNumber(load.power_kw) || 0) > 0.05 || /running|charging|executing/i.test(String(load.operating_state || load.current_status || ''))).length;
       const planned = participating.filter(load => {
@@ -4091,7 +4093,8 @@
         : executionPolicy.configuredMode === 'advice'
           ? 'Home Intelligence calculates the same plan but cannot dispatch it autonomously.'
           : 'Home Intelligence keeps calculating planning insight but managed plan execution is blocked.';
-      const executeAction = executePlan && rt.commandVisible(executePlan)
+      const effectivePlanAvailable = rt.nativePlanningHorizon('D0')?.available === true;
+      const executeAction = effectivePlanAvailable && executePlan && rt.commandVisible(executePlan)
         ? this.componentActionButton(executePlan, executePlan.label || (executionPolicy.configuredMode === 'advice' ? 'Apply current plan' : 'Run current plan now'), 'energy')
         : '';
       const authorityCard = this.productStoryCard({
@@ -4108,6 +4111,7 @@
       });
       return `${this.tabExperienceHeader(rt,'operational-planning',pageVm)}${this.bodyContextBar(rt,'operational-planning','operational-planning-body')}<div id="operational-planning-body" class="operationalPlanningPage">${authorityCard}
         <section class="panel operationalPlanningLoads"><div class="energySectionHead"><div><h2>${escapeHtml(rhiEnergyT(this._hass,'section.flexible_loads',{},'Flexible loads'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.flexible_loads_desc',{},'Current execution, next action, requested power and operational reason. Hardware configuration is not shown here.'))}</p></div></div><div class="flexLoadList">${cards || '<div class="empty"><b>No participating flexible loads</b><span>No controllable load currently participates in operational planning.</span></div>'}</div></section>
+        ${unassessedCards ? `<section class="panel operationalPlanningLoads"><div class="energySectionHead"><div><h2>Not plan-ready</h2><p>Published flexible loads without confirmed planning participation or complete inputs. No schedule or command readiness is inferred.</p></div></div><div class="flexLoadList">${unassessedCards}</div></section>` : ''}
         ${disabledCards ? `<details class="panel compactDisclosure"><summary>${escapeHtml(rhiEnergyT(this._hass,"asset.other",{},"Other assets"))} (${disabled.length})</summary><p>${escapeHtml(rhiEnergyT(this._hass,"asset.excluded_planning",{},"These assets are excluded from operational planning."))}</p><div class="disabledAssetList">${disabledCards}</div></details>` : ''}
       </div>`;
     }
