@@ -19,16 +19,32 @@
     }
     return planningObject(parsed);
   }
-  function readPlanningContract(runtime, horizonId = 'D0') {
+  function readPlanningContract(runtime, horizonId = 'D0', variant = 'effective') {
     const normalized=String(horizonId || '').toUpperCase();
-    const today=runtime.nativePlanningTotals('D0');
-    const tomorrow=runtime.nativePlanningTotals('D1');
-    const supported=normalized==='D0' || normalized==='D1';
+    const preview = variant === 'baseline';
+    const validVariant = ['effective','baseline'].includes(variant);
+    const requiredFields=['required_kwh','planned_kwh','still_to_plan_kwh',
+      'flexible_required_kwh','flexible_planned_kwh','flexible_still_to_plan_kwh'];
+    const baselineTotals = id => {
+      const detail = runtime.nativePlanningHorizon?.(id,'baseline');
+      const facts = detail?.available === true ? planningObject(detail.details) : {};
+      const values=Object.fromEntries(requiredFields.map(key => {
+        const value=facts[key];
+        const valid=typeof value === 'number' && Number.isFinite(value);
+        return [key,{available:valid,value:valid?value:null}];
+      }));
+      const missing=requiredFields.filter(key=>values[key].available!==true);
+      return {available:detail?.available === true && !missing.length,
+        values,missing};
+    };
+    const today=preview ? baselineTotals('D0') : runtime.nativePlanningTotals('D0');
+    const tomorrow=preview ? baselineTotals('D1') : runtime.nativePlanningTotals('D1');
+    const supported=validVariant && (normalized==='D0' || normalized==='D1');
     const selected=supported ? (normalized==='D1' ? tomorrow : today) : {
       available:false, missing:['unsupported_planning_horizon'], values:{}
     };
     const nativeHorizon = supported && typeof runtime.nativePlanningHorizon === 'function'
-      ? runtime.nativePlanningHorizon(normalized) : null;
+      ? runtime.nativePlanningHorizon(normalized,variant) : null;
     const published = nativeHorizon?.available === true ? nativeHorizon : null;
     const horizonDetails = published?.details || {};
     const publicationMetadata = nativeHorizon?.metadata || {};
@@ -39,7 +55,7 @@
       nativeHorizon?.published===true ? 'INCOMPLETE' :
         nativeHorizon?.status || 'UNAVAILABLE';
     const requestedProvider=String(publicationMetadata.requested_provider||'');
-    const effectiveProvider=String(publicationMetadata.provider_id||'');
+    const effectiveProvider=preview ? '' : String(publicationMetadata.provider_id||'');
     const providerHold=!!requestedProvider&&!effectiveProvider;
     const planningAssets = published && Array.isArray(horizonDetails.planning_assets)
       ? horizonDetails.planning_assets : [];
@@ -50,6 +66,7 @@
       horizon_id:normalized,
       ...totals(selected),
       status:publicationStatus,
+      summary:Object.freeze(planningObject(horizonDetails.summary)),
       quality:Object.freeze({availability:publicationStatus,
         missing:selected.missing,
         effective_horizon:effectiveAvailable,
@@ -59,6 +76,7 @@
     return Object.freeze({
       entityId:null,
       contractVersion:'ENERGY_NATIVE_PLANNING',
+      variant,previewOnly:preview,
       available:effectiveAvailable,
       totalsAvailable:selected.available===true,
       provisionalTotals:selected.available===true&&!effectiveAvailable,
@@ -66,7 +84,7 @@
       publicationStatus,
       requestedProvider,effectiveProvider,providerHold,
       reasonCode:effectiveAvailable?'':String(nativeHorizon?.reason||publicationMetadata.reason_code||'effective_horizon_not_published'),
-      executionAuthorized:effectiveAvailable&&publicationMetadata.execution_authorized===true,
+      executionAuthorized:!preview&&effectiveAvailable&&publicationMetadata.execution_authorized===true,
       attrs:Object.freeze({}),
       planId:published ? publicationMetadata.plan_id ?? horizonDetails.plan_id ?? null : null,
       providerId:published ? publicationMetadata.provider_id ?? horizonDetails.provider_id ?? null : null,
@@ -86,18 +104,18 @@
       planningCombinedTotals:Object.freeze({}),
       horizonsById:Object.freeze({D0:todayTotals,D1:tomorrowTotals}),
       horizonId:normalized,horizon,summary:horizon,
-      laneTotals:Object.freeze(totals(selected)),
+      laneTotals:Object.freeze(preview ? planningObject(horizonDetails.summary?.lane_totals) : totals(selected)),
       buckets:Object.freeze(Array.isArray(horizonDetails.buckets) ? horizonDetails.buckets : []),
       // The producer may explicitly identify the current bucket; otherwise it is unknown.
       currentPlanningBucket:Object.freeze(planningObject(horizonDetails.current_bucket)),
-      currentActionIntent:Object.freeze(published && horizonDetails.execution_policy && typeof horizonDetails.execution_policy === 'object' ? horizonDetails.execution_policy : {}),
+      currentActionIntent:Object.freeze(!preview && published && horizonDetails.execution_policy && typeof horizonDetails.execution_policy === 'object' ? horizonDetails.execution_policy : {}),
       missingContractCapabilities:Object.freeze([
         ...(!published ? ['native_effective_horizon','native_planning_buckets'] : []),
         ...(!published || !Array.isArray(horizonDetails.planning_assets) ? ['native_planning_assets'] : []),
-        ...(!published || !horizonDetails.execution_policy || typeof horizonDetails.execution_policy !== 'object' || Array.isArray(horizonDetails.execution_policy)
+        ...(!preview && (!published || !horizonDetails.execution_policy || typeof horizonDetails.execution_policy !== 'object' || Array.isArray(horizonDetails.execution_policy))
           ? ['native_planning_actions'] : [])
       ]),
-      totalsSource:'rhi_energy.runtime/native_metric'
+      totalsSource:preview?'rhi_energy.runtime/native_baseline_horizon':'rhi_energy.runtime/native_metric'
     });
   }
 
