@@ -63,44 +63,39 @@ function createBatteryCurrentFlowViewModel(gateway) {
   const capacity = readTypedPropertyContract(gateway, 'battery', 'battery.capacity_kwh');
   const reserve = readTypedPropertyContract(gateway, 'battery', 'battery.reserve_target_pct');
   const state = canonicalBatteryState(stateProperty.value);
-  const projectedPowerKw = signed.number === null ? null : Math.abs(signed.number);
-  let displayPowerKw = projectedPowerKw;
-  let signedFlowKw = signed.number;
-  let direction = 'unknown';
-  let label = 'Unavailable';
-  let detail = 'Battery flow unavailable';
-
-  if (state === 'charging') {
-    direction = 'into_storage';
-    label = 'Charging';
-    detail = 'Charging from Home Bus';
-    signedFlowKw = projectedPowerKw === null ? null : -projectedPowerKw;
-  } else if (state === 'discharging') {
-    direction = 'out_of_storage';
-    label = 'Discharging';
-    detail = 'Supplying the Home Bus';
-    signedFlowKw = projectedPowerKw;
-  } else if (state === 'idle') {
-    displayPowerKw = signed.number === null ? null : Math.abs(signed.number);
-    signedFlowKw = signed.number === null ? null : 0;
-    direction = 'idle';
-    label = 'Idle';
-    detail = 'No active battery flow';
-  }
-
-  const health = signed.health === 'AVAILABLE' && stateProperty.health === 'AVAILABLE' ? 'OK' : 'UNAVAILABLE';
+  const signedReady = signed.health === 'AVAILABLE' && signed.number !== null;
+  const projectedPowerKw = signedReady ? Math.abs(signed.number) : null;
+  // Energy owns canonical sign (+ discharge, - charge) and its derived state.
+  // Contradictory, missing or stale direction is NOT a measured zero.
+  const matchesCharge = signedReady && state === 'charging' && signed.number < -0.05;
+  const matchesDischarge = signedReady && state === 'discharging' && signed.number > 0.05;
+  const matchesIdle = signedReady && state === 'idle' && Math.abs(signed.number) <= 0.05;
+  const direction = matchesCharge ? 'into_storage'
+    : matchesDischarge ? 'out_of_storage'
+    : matchesIdle ? 'idle' : 'unknown';
+  const displayPowerKw = direction === 'unknown' ? null : projectedPowerKw;
+  const label = direction === 'into_storage' ? 'Charging'
+    : direction === 'out_of_storage' ? 'Discharging'
+    : direction === 'idle' ? 'Idle' : 'Unavailable';
+  const detail = direction === 'into_storage' ? 'Charging from Home Bus'
+    : direction === 'out_of_storage' ? 'Supplying the Home Bus'
+    : direction === 'idle' ? 'No active battery flow'
+    : 'Battery charge/discharge direction is unavailable or inconsistent';
+  const contradictory = signedReady && ['charging','discharging','idle'].includes(state) && direction === 'unknown';
+  const reason = contradictory ? 'battery_state_power_conflict'
+    : signedReady && state === 'unavailable' ? 'battery_direction_not_available'
+    : String(firstDefined(stateProperty.reason, signed.reason, 'battery_flow_unavailable'));
+  const health = direction === 'unknown' ? 'UNAVAILABLE' : 'OK';
   return Object.freeze({
-    state,
-    health,
-    reason:String(firstDefined(signed.reason, stateProperty.reason, '')),
+    state,health,reason,
     signedPowerKw:signed.number,
-    chargePowerKw:state === 'charging' ? projectedPowerKw : (signed.number === null ? null : 0),
-    dischargePowerKw:state === 'discharging' ? projectedPowerKw : (signed.number === null ? null : 0),
+    chargePowerKw:direction === 'into_storage' ? projectedPowerKw
+      : direction === 'out_of_storage' || direction === 'idle' ? 0 : null,
+    dischargePowerKw:direction === 'out_of_storage' ? projectedPowerKw
+      : direction === 'into_storage' || direction === 'idle' ? 0 : null,
     displayPowerKw,
-    signedFlowKw,
-    direction,
-    label,
-    detail,
+    signedFlowKw:direction === 'unknown' ? null : direction === 'idle' ? 0 : signed.number,
+    direction,label,detail,
     flowRole:direction === 'out_of_storage' ? 'producer' : direction === 'into_storage' ? 'consumer' : 'inactive',
     uxVisible:displayPowerKw !== null,
     socPct:soc.number,
@@ -118,14 +113,31 @@ function createGridCurrentFlowViewModel(gateway) {
   const directionProperty = readTypedPropertyContract(gateway, 'grid', 'grid.flow_direction');
   const rawDirection = String(firstDefined(directionProperty.value, '') || '').toLowerCase();
   const direction = /export/.test(rawDirection) ? 'exporting' : /import/.test(rawDirection) ? 'importing' : /balanc|idle|none/.test(rawDirection) ? 'balanced' : 'unknown';
-  const displayPowerKw = direction === 'exporting' ? exportPower.number : direction === 'importing' ? importPower.number : direction === 'balanced' ? 0 : (netPower.number === null ? null : Math.abs(netPower.number));
+  // A net reading without producer-owned flow direction is diagnostic truth,
+  // not a trustworthy Grid Import, Grid Export or confirmed zero state.
+  const consistent = direction === 'importing'
+    ? importPower.number !== null && importPower.number >= 0
+      && (netPower.number === null || netPower.number >= 0)
+    : direction === 'exporting'
+      ? exportPower.number !== null && exportPower.number >= 0
+        && (netPower.number === null || netPower.number <= 0)
+      : direction === 'balanced'
+        ? netPower.number !== null && Math.abs(netPower.number) <= 0.05
+        : false;
+  const effectiveDirection = consistent ? direction : 'unknown';
+  const displayPowerKw = effectiveDirection === 'exporting' ? exportPower.number
+    : effectiveDirection === 'importing' ? importPower.number
+    : effectiveDirection === 'balanced' ? 0 : null;
   return Object.freeze({
     netPowerKw:netPower.number,
     importPowerKw:importPower.number,
     exportPowerKw:exportPower.number,
     displayPowerKw,
-    direction,
-    label:direction === 'exporting' ? 'Exporting' : direction === 'importing' ? 'Importing' : direction === 'balanced' ? 'Balanced' : 'Unavailable'
+    direction:effectiveDirection,
+    reason:effectiveDirection === 'unknown' ? 'grid_direction_not_available_or_inconsistent' : '',
+    label:effectiveDirection === 'exporting' ? 'Exporting'
+      : effectiveDirection === 'importing' ? 'Importing'
+      : effectiveDirection === 'balanced' ? 'Balanced' : 'Unavailable'
   });
 }
 

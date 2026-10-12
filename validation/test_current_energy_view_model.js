@@ -84,3 +84,58 @@ console.log('PASS native Energy current values and exact object scope; no aggreg
 const siteDuplicate={...nativeStates,'sensor.duplicate_site':nativeStates['sensor.site_consumption_metric']};
 assert.equal(context.readLiveConsumptionContract(fromRows(rows,siteDuplicate)).siteConsumptionKw,null,'duplicate site metric cannot win');
 console.log('PASS target HA site 1.865 kW, physical flex 0, zero vs missing and native authority');
+vm.runInContext('this.createBatteryCurrentFlowViewModel=createBatteryCurrentFlowViewModel;this.createGridCurrentFlowViewModel=createGridCurrentFlowViewModel;',context);
+const withFlow=(batteryPower,batteryState,gridNet,gridFlow,gridImport,gridExport)=>fromRows([
+  property('battery_system','battery_system','battery.power_kw',batteryPower),
+  ...(batteryState===null?[]:[property('battery_system','battery_system','battery.state',batteryState)]),
+  property('grid_connection','grid_connection','grid.net_power_kw',gridNet),
+  ...(gridFlow===null?[]:[property('grid_connection','grid_connection','grid.flow_direction',gridFlow)]),
+  ...(gridImport===null?[]:[property('grid_connection','grid_connection','grid_import.power_kw',gridImport)]),
+  ...(gridExport===null?[]:[property('grid_connection','grid_connection','grid_export.power_kw',gridExport)])
+]);
+
+// Signed backend battery facts dictate placement; the browser may not guess.
+const charging=context.createBatteryCurrentFlowViewModel(withFlow(-2.3,'charging',0,'balanced',0,0));
+assert.equal(charging.direction,'into_storage');
+assert.equal(charging.chargePowerKw,2.3);
+assert.equal(charging.dischargePowerKw,0);
+assert.equal(charging.flowRole,'consumer');
+const discharging=context.createBatteryCurrentFlowViewModel(withFlow(2.3,'discharging',0,'balanced',0,0));
+assert.equal(discharging.direction,'out_of_storage');
+assert.equal(discharging.dischargePowerKw,2.3);
+assert.equal(discharging.chargePowerKw,0);
+assert.equal(discharging.flowRole,'producer');
+const idle=context.createBatteryCurrentFlowViewModel(withFlow(0,'idle',0,'balanced',0,0));
+assert.equal(idle.chargePowerKw,0);
+assert.equal(idle.dischargePowerKw,0);
+const batteryUnpublished=context.createBatteryCurrentFlowViewModel(withFlow(-2.3,null,0,'balanced',0,0));
+assert.equal(batteryUnpublished.direction,'unknown');
+assert.equal(batteryUnpublished.chargePowerKw,null);
+assert.equal(batteryUnpublished.dischargePowerKw,null);
+assert.equal(batteryUnpublished.displayPowerKw,null);
+const conflictingBattery=context.createBatteryCurrentFlowViewModel(withFlow(2.3,'charging',0,'balanced',0,0));
+assert.equal(conflictingBattery.direction,'unknown');
+assert.equal(conflictingBattery.reason,'battery_state_power_conflict');
+const unknownGrid=context.createGridCurrentFlowViewModel(withFlow(-2.3,'charging',0,null,null,null));
+assert.equal(unknownGrid.displayPowerKw,null,'0 kW with unknown grid direction must not appear verified');
+assert.equal(unknownGrid.direction,'unknown');
+const importing=context.createGridCurrentFlowViewModel(withFlow(0,'idle',1.7,'importing',1.7,0));
+assert.equal(importing.direction,'importing');
+assert.equal(importing.displayPowerKw,1.7);
+const exporting=context.createGridCurrentFlowViewModel(withFlow(0,'idle',-1.7,'exporting',0,1.7));
+assert.equal(exporting.direction,'exporting');
+assert.equal(exporting.displayPowerKw,1.7);
+const contradictoryGrid=context.createGridCurrentFlowViewModel(withFlow(0,'idle',-1.7,'importing',1.7,0));
+assert.equal(contradictoryGrid.direction,'unknown');
+assert.equal(contradictoryGrid.displayPowerKw,null);
+
+const overview=fs.readFileSync('src/app/energy-card.js','utf8');
+const section=overview.slice(overview.indexOf('    overview(rt) {'),overview.indexOf('    commandForLoad(rt',overview.indexOf('    overview(rt) {')));
+for(const token of ['balanceVm.batteryDischargeKw','batteryChargeRow','balanceVm.batteryChargeKw',
+  'balanceVm.gridImportKw','balanceVm.grid.exportPowerKw','Site Consumption',
+  'overview.battery_flow_reason','overview.grid_flow_reason']){
+  assert.ok(section.includes(token),'Overview supply/consumption boundary missing '+token);
+}
+assert.ok(!section.includes('homeConsumptionKw +'),'Overview must not invent Site Consumption from frontend arithmetic');
+console.log('PASS battery and grid direction, zero versus unknown, and site demand placement');
+

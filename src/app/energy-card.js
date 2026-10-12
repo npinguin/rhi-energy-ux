@@ -2930,17 +2930,24 @@
       const reservePct = this.batteryReservePct(rt);
       const sourceRows = [];
       if (balanceVm.solarKw !== null && balanceVm.solarKw > 0.05) sourceRows.push(this.overviewEnergyRow({icon:'☀',label:rhiEnergyT(this._hass,'nav.solar',{},'Solar'),subtitle:rhiEnergyT(this._hass,'overview.producing_now',{},'Producing now'),value:fmtKw(balanceVm.solarKw),progress:this.progress(balanceVm.solarKw)}));
-      if (balanceVm.battery.direction === 'out_of_storage' && balanceVm.battery.displayPowerKw !== null) sourceRows.push(this.overviewEnergyRow({icon:'▣',label:rhiEnergyT(this._hass,'nav.battery',{},'Home Battery'),subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}));
+      if (balanceVm.battery.direction === 'out_of_storage' && balanceVm.batteryDischargeKw !== null) sourceRows.push(this.overviewEnergyRow({icon:'▣',label:rhiEnergyT(this._hass,'overview.battery_discharge',{},'Battery Discharge'),subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.batteryDischargeKw),progress:this.progress(balanceVm.batteryDischargeKw)}));
       if (balanceVm.gridImportKw !== null && balanceVm.gridImportKw > 0.05) sourceRows.push(this.overviewEnergyRow({icon:'⚡',label:rhiEnergyT(this._hass,'overview.grid_import',{},'Grid Import'),subtitle:rhiEnergyT(this._hass,'overview.importing',{},'Importing'),value:fmtKw(balanceVm.gridImportKw),progress:this.progress(balanceVm.gridImportKw)}));
       const contributors = balanceVm.flexible.filter(row => row.powerKw !== null && row.powerKw > 0.05);
       const contributorRows = contributors.map(row => this.overviewEnergyRow({icon:this.flexibleAssetIcon(row.raw || {display_name:row.name}),asset:row.raw || null,label:row.name,subtitle:rhiEnergyT(this._hass,'overview.flex_contributor',{},'Flexible Load contributor'),value:fmtKw(row.powerKw,'—'),variant:'child'})).join('');
       const siteConsumptionText = fmtKw(balanceVm.siteConsumptionKw,'—');
       const homeConsumptionSubtitle = balanceVm.homeConsumptionKw === null
-        ? (String(balanceVm.homeStatus || '').toUpperCase() === 'INCOMPLETE' ? 'Unavailable · Flexible Load power incomplete' : 'Household consumption unavailable')
-        : 'Household consumption excluding Flexible Loads';
+        ? (String(balanceVm.consumption.homeStatus || '').toUpperCase() === 'INCOMPLETE' ? 'Unavailable · Flexible Load power incomplete' : 'Household consumption unavailable')
+        : rhiEnergyT(this._hass,'overview.home_excludes_storage',{},'Household consumption excluding Flexible Loads and Battery Charge');
       const flexibleLoadsSubtitle = balanceVm.flexibleLoadsKw === null
         ? (String(balanceVm.flexibleStatus || '').toUpperCase() === 'INCOMPLETE' ? 'Measurement incomplete' : 'Measurement unavailable')
         : `${contributors.length} active contributor${contributors.length===1?'':'s'}`;
+      const batteryPresent = rt.experiencePresence().battery === true;
+      const batteryChargeRow = batteryPresent && balanceVm.battery.direction === 'into_storage'
+        ? this.overviewEnergyRow({icon:'▣',label:rhiEnergyT(this._hass,'overview.battery_charge',{},'Battery Charge'),subtitle:rhiEnergyT(this._hass,'overview.battery_charging',{},'Charging the home battery'),value:fmtKw(balanceVm.batteryChargeKw,'—'),progress:this.progress(balanceVm.batteryChargeKw)})
+        : batteryPresent && balanceVm.battery.direction === 'unknown'
+          ? this.overviewEnergyRow({icon:'▣',label:rhiEnergyT(this._hass,'overview.battery_flow_unavailable',{},'Battery flow unavailable'),subtitle:rhiEnergyT(this._hass,'overview.battery_flow_reason',{},'Charging or discharging cannot be confirmed'),value:'—',variant:'unavailable'})
+          : '';
+      if (balanceVm.grid.direction === 'unknown') sourceRows.push(this.overviewEnergyRow({icon:'⚡',label:rhiEnergyT(this._hass,'overview.grid_flow_unavailable',{},'Grid flow unavailable'),subtitle:rhiEnergyT(this._hass,'overview.grid_flow_reason',{},'Import or export cannot be confirmed'),value:'—',variant:'unavailable'}));
       const gridDirection = balanceVm.grid.label;
       const gridValue = balanceVm.grid.displayPowerKw;
       const balanceComplete = balanceVm.solarKw !== null
@@ -2950,14 +2957,21 @@
       const recommendation = balanceComplete
         ? String(firstDefined(d.what_text, d.recommendation_text, d.recommendation, d.summary, 'Monitoring current energy flow') || 'Monitoring current energy flow')
         : 'Energy assessment unavailable';
+      const missingDirections = [
+        batteryPresent && balanceVm.battery.direction === 'unknown'
+          ? rhiEnergyT(this._hass,'overview.battery_flow_reason',{},'Charging or discharging cannot be confirmed') : '',
+        balanceVm.grid.direction === 'unknown'
+          ? rhiEnergyT(this._hass,'overview.grid_flow_reason',{},'Import or export cannot be confirmed') : ''
+      ].filter(Boolean);
       const decisionReason = balanceComplete
         ? reason
-        : 'Current energy balance is incomplete. Home Intelligence will not make a positive recommendation until the required measurements are available.';
+        : [rhiEnergyT(this._hass,'overview.balance_incomplete',{},'The current site balance is not verified.'),
+           ...missingDirections].join(' ');
       return `${this.tabExperienceHeader(rt,'overview',pageVm)}
         <div class="overviewCoreGrid">
           <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon orange">☀</span><div><h2>${escapeHtml(rhiEnergyT(this._hass,'section.production_supply',{},'Production & supply'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.production_supply_desc',{},'Energy available to the home now.'))}</p></div></div>${sourceRows.join('') || `<div class="empty compact"><b>Supply unavailable</b><span>Current supply cannot be determined from the available measurements.</span></div>`}</section>
           <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(decisionReason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>${escapeHtml(rhiEnergyT(this._hass,"solar.grid",{},"Grid"))}</small><b>${escapeHtml(fmtKw(gridValue,'—'))} ${escapeHtml(gridDirection)}</b></div>${rt.experiencePresence().battery === true ? `<div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div>` : ''}</div></div></section>
-          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>${escapeHtml(rhiEnergyT(this._hass,'nav.consumption',{},'Consumption'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.consumption_desc',{},'Site demand and its active components.'))}</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'}) : ''}${contributorRows}${rt.experiencePresence().battery === true && balanceVm.battery.direction === 'into_storage' && balanceVm.battery.displayPowerKw !== null ? this.overviewEnergyRow({icon:'▣',label:rhiEnergyT(this._hass,'nav.battery',{},'Home Battery'),subtitle:balanceVm.battery.label,value:fmtKw(balanceVm.battery.displayPowerKw),progress:this.progress(balanceVm.battery.displayPowerKw)}) : ''}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${balanceVm.grid.direction === 'exporting' && balanceVm.grid.exportPowerKw !== null ? this.overviewEnergyRow({icon:'↗',label:'Grid Export',subtitle:'Exporting to grid',value:fmtKw(balanceVm.grid.exportPowerKw),variant:'boundary'}) : ''}</section>
+          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>${escapeHtml(rhiEnergyT(this._hass,'nav.consumption',{},'Consumption'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.consumption_desc',{},'Site demand and its active components.'))}</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'}) : ''}${contributorRows}${batteryChargeRow}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${balanceVm.grid.direction === 'exporting' && balanceVm.grid.exportPowerKw !== null ? this.overviewEnergyRow({icon:'↗',label:'Grid Export',subtitle:'Exporting to grid',value:fmtKw(balanceVm.grid.exportPowerKw),variant:'boundary'}) : ''}</section>
         </div>
         ${this.overviewExperiencePanel(rt)}`;
     }
