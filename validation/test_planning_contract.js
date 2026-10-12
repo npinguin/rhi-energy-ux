@@ -188,7 +188,7 @@ const unavailableRuntime={nativePlanningTotals(horizon){
 }};
 const unavailableContract=readPlanningContract(unavailableRuntime,'D0');
 assert.equal(unavailableContract.available,false);
-assert.equal(unavailableContract.laneTotals.planned_kwh,null);
+assert.equal(Object.keys(unavailableContract.laneTotals).length,0,'absent producer lane totals remain absent');
 assert.equal(unavailableContract.horizon.status,'UNAVAILABLE');
 console.log('PASS native Energy D0/D1 planning reader with explicit missing capabilities, zero and unavailable');
 
