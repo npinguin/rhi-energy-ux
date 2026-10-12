@@ -89,3 +89,17 @@ for(const requiredTruthGuard of [
 ]) if(!source.includes(requiredTruthGuard)) throw new Error("current-truth fail-closed guard missing: "+requiredTruthGuard);
 
 console.log("PASS literal product UX contract");
+
+const forecastSource=fs.readFileSync("src/app/energy-card.js","utf8");
+if(forecastSource.includes("firstDefined(demand.home_battery_charge_kwh,demand.battery_charge_kwh,0)") ||
+   forecastSource.includes("fmtKwh(storageDemand,'0.0 kWh')")) {
+  throw new Error("Unknown Home Battery forecast must never render a synthetic zero");
+}
+if(forecastSource.includes("planning.scheduled_kwh,planning.known_need_kwh")) {
+  throw new Error("Forecast per-device planned energy must not silently fall back to required energy");
+}
+
+if(!forecastSource.includes("firstDefined(planning.planned_tomorrow_kwh,planning.scheduled_tomorrow_kwh)") ||
+   !forecastSource.includes("firstDefined(planning.planned_today_kwh,planning.scheduled_today_kwh,planning.scheduled_kwh)")) {
+  throw new Error("D1 per-asset allocations must not be populated from D0 scheduled energy");
+}
