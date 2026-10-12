@@ -1,25 +1,26 @@
 {
   "product": "rhi-energy-ux",
-  "source_candidate_version": "4.3.36-rc.12",
+  "source_candidate_version": "4.3.36-rc.13",
   "stage": "test_candidate",
   "publication_authority": "github_releases",
   "publication_status": "test_candidate_pending_target_ha_qualification",
   "github_release_prerelease": false,
   "hacs_visibility": "test_candidate_normal_release_discovery",
   "contract": "RHI_ENERGY_CANONICAL_PROPERTY_V2",
-  "minimum_backend": "E0.15.116",
+  "minimum_backend": "E0.15.122",
   "static_validation": "required_before_publication",
   "hacs_validation": "required_before_publication",
   "target_runtime_proof": "see release/QUALIFICATION.json",
   "rollback": "immutable GitHub/HACS version selection",
   "stable_promotion": "blocked_until_target_qualification_pass",
-  "tested_backend": "E0.15.119",
+  "tested_backend": "E0.15.122",
   "required_contracts": [
     "RHI_ENERGY_CANONICAL_OBJECT_V2",
     "RHI_ENERGY_CANONICAL_PROPERTY_V2",
     "RHI_ENERGY_CANONICAL_COMMAND_V1",
     "RHI_ENERGY_PLANNING_HORIZON_V1",
-    "RHI_VISUAL_ASSET_REGISTRY_V2"
+    "RHI_VISUAL_ASSET_REGISTRY_V2",
+    "RHI_ENERGY_METERING_PERIOD_V1"
   ],
   "ux_core": {
     "package": "rhi-ux-core",

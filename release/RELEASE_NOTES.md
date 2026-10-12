@@ -1,9 +1,9 @@
-# v4.3.36-rc.12 — Measured individual flexible-load flows (HACS TEST CANDIDATE)
+# v4.3.36-rc.13 — Canonical Site Consumption and Metering (HACS TEST CANDIDATE)
 
-- Add individual measured flexible-load power sensors to the installed Power Flow Card Plus. Every row must have an unambiguous, available RHI canonical flexible_load.power_kw entity with a compatible W/kW unit.
-- Keep all flexible loads in the visible Flow inventory regardless of live sensor availability.
-- Exclude charger infrastructure and repeated sensor entity IDs from the individual flow, preventing duplicated charging electricity. Charger-to-vehicle connections remain in their own relationship list.
-- Do not synthesize missing home consumption, battery directions or EV charging power. If the required canonical site consumption source is missing, show the explicit unavailable state.
-- Keep every current hero, chart, brand asset and Energy tab unchanged.
+- Consume backend-owned `site_consumption_power_kw` native metric in Power Flow; strict W/kW, unique publisher and zero/unavailable semantics, no guessed Home/Site source.
+- Consume `RHI_ENERGY_METERING_PERIOD_V1` for hour/today/week/month/year from persisted Energy period evidence; per-field quality, stored kWh, cost evidence and individual flexible-load attribution remain backend-owned.
+- Preserve independent Home Consumption, charger infrastructure exclusion, no double counting and no optimistic command/readback inference.
+- Requires Energy E0.15.122 (Foundation F1.8.44 / Mobility M0.10.47 coordination).
+- Period Metering and Flow source/UX contract regressions are covered by static CI; target HA install, meter history persistence, planner and permissions remain unqualified.
 
-This HACS candidate has not been runtime-verified on the target HA installation. Rollback: v4.3.36-rc.11.
+This is an immutable TEST CANDIDATE, **not a stable approval**. Current EMHASS selected provider's required solar forecast slot has not been confirmed in target runtime. No simulated plan or automatic actuation is provided. Rollback: v4.3.36-rc.12.
