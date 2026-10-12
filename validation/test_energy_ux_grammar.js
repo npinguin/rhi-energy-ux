@@ -34,9 +34,15 @@ assert.ok(app.includes("commandActions:this.pageQuickActions(rt, tab)"));
 assert.match(app,/pageContextControls\(rt, tab\)/);
 assert.match(app,/bodyContextBar\(rt, tab/);
 assert.match(app,/rhiUxContextBar/);
-for (const tab of ["outlook","consumers","metering","planning","value"]) {
+for (const tab of ["consumers","metering","value"]) {
   assert.ok(app.includes(`tab === '${tab}'`), "missing body-scoped context case "+tab);
 }
+for (const tab of ["outlook","strategic-planning","planning","operational-planning"]) {
+  assert.ok(app.includes(`{value:'${tab}'`) || app.includes(`tab === '${tab}'`),
+    "missing shared planning view navigation "+tab);
+}
+assert.ok(app.includes('data-planning-horizon="D0"') && app.includes('data-planning-horizon="D1"'),
+  'all planning views must retain Today/Tomorrow context');
 const contextBlock=app.slice(app.indexOf("pageContextControls(rt, tab)"),app.indexOf("bodyContextBar(rt, tab"));
 for(const nav of ["Energy flow","Strategy","Tactical planning","Solar plan","Flexible loads","Usage history","Gas meter","Consumer list"]) {
   assert.ok(!contextBlock.includes(nav), "navigation leaked into body View controls: "+nav);
@@ -110,6 +116,7 @@ const intelligenceBlock = presentation.slice(presentation.indexOf('id:"intellige
 assert.ok(intelligenceBlock.lastIndexOf('id:"settings"') > intelligenceBlock.indexOf('id:"plan"'), "Settings must be the last Intelligence tab");
 assert.ok(!intelligenceBlock.includes('id:"operational-planning"') && !intelligenceBlock.includes('id:"tactical-planning"') && !intelligenceBlock.includes('id:"strategic-planning"'), "planning subviews must not return as top-level navigation tabs");
 assert.ok(app.includes("['operational-planning','planning','strategic-planning'].includes(tab)"), "Plan must expose operational/tactical/strategic internal views");
+assert.ok(app.includes("this.planningViewControls(tab)"), "Plan must use single forecast/strategic/tactical/operational navigation");
 assert.ok(!app.includes("understandingFooter(rt, this.view)"), "legacy Conclusion footer must not be injected into product views");
 assert.ok(!app.includes("understandingFooter(rt, tab)"), "legacy Conclusion component must be removed");
 assert.ok(app.includes("this.config?.show_diagnostics !== true"), "technical footer must be explicitly diagnostics-gated");
