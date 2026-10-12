@@ -1,6 +1,6 @@
 // Stable UX model builder for Planning. Renderers receive meaning, never backend paths.
-  function createPlanningViewModel({ runtime, horizonId, flexibleAssets = [], storage = null }) {
-    const contract = readPlanningContract(runtime, horizonId);
+  function createPlanningViewModel({ runtime, horizonId, flexibleAssets = [], storage = null, variant = 'effective' }) {
+    const contract = readPlanningContract(runtime, horizonId, variant);
     const laneTotals = normalizePlanningLaneTotals(contract.laneTotals);
     const rows = contract.buckets.map(bucket => adaptPlanningBucket(bucket, contract.contractVersion));
     const quality = planningObject(contract.horizon.quality);
@@ -8,6 +8,11 @@
     const stateText = String(firstDefined(contract.horizon.state, contract.horizon.status, quality.health, contract.horizon.quality, '')).toLowerCase();
     return Object.freeze({
       horizonId: contract.horizonId,
+      variant:contract.variant,
+      previewOnly:contract.previewOnly,
+      requestedProvider:contract.requestedProvider,
+      effectiveProvider:contract.effectiveProvider,
+      executionAuthorized:contract.executionAuthorized,
       horizon: contract.horizon,
       buckets: contract.buckets,
       assets: flexibleAssets,
