@@ -3240,7 +3240,7 @@ class FlexibleAssetDomainModel {
       planningTomorrowTotals:Object.freeze(tomorrowTotals),
       planningCombinedTotals:Object.freeze({}),
       horizonsById:Object.freeze({D0:todayTotals,D1:tomorrowTotals}),
-      horizonId:normalized,horizon,summary:horizon,
+      horizonId:normalized,horizon,summary:nativeSummary,
       // D0/D1 lane totals are backend-owned and must never be reconstructed
       // from flat numeric KPI readbacks.
       laneTotals:Object.freeze(planningObject(planningObject(horizonDetails.summary).lane_totals)),
