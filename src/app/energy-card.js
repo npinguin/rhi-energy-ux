@@ -215,6 +215,9 @@
       });
     }
 
+    nativeMetric(metricKey = '') {
+      return readNativeEnergyMetric(this.hass, metricKey);
+    }
     plannerSelection() {
       const matches=Object.entries(this.hass?.states || {}).filter(([id,state]) =>
         id.startsWith('select.') &&
@@ -232,9 +235,6 @@
       };
     }
 
-    nativeMetric(metricKey = '') {
-      return readNativeEnergyMetric(this.hass, metricKey);
-    }
     rawState(entityId) { return this.hass?.states?.[entityId] || null; }
     subscriptionEntityIds(surfaces = []) {
       const registryEntity = String(this.visualRegistry()?.entityId || '');
