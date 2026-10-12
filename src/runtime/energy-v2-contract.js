@@ -147,6 +147,40 @@ function readEnergyCanonicalProduct(gateway) {
     for(const row of horizons[id].planning_assets) if(row?.asset_id)
       planningObjects.push({...row,horizon_id:id});
   }
+  // Period-integrated Metering is a distinct producer-owned HA contract.
+  // Do not integrate instantaneous kW, guess periods or revive Public V2.
+  const meteringPeriods={},meteringConflicts=new Set();
+  for(const [entityId,state] of Object.entries(hass.states || {})) {
+    const a=state?.attributes || {};
+    if(a.contract_id !== 'RHI_ENERGY_METERING_PERIOD_V1' ||
+       a.canonical_source !== 'rhi_energy.runtime' || a.publisher !== 'rhi_energy') continue;
+    const periodId=String(a.period_id || '').toLowerCase();
+    if(!['hour','today','week','month','year'].includes(periodId)) continue;
+    if(meteringPeriods[periodId]) {meteringConflicts.add(periodId);continue;}
+    const measured=a.summary?.measured;
+    if(!measured || typeof measured !== 'object' || Array.isArray(measured)) continue;
+    meteringPeriods[periodId]=Object.freeze({
+      entity_id:entityId,period_id:periodId,
+      availability:String(a.availability || 'UNAVAILABLE'),
+      measurement_state:String(a.availability || 'UNAVAILABLE'),
+      quality:String(a.quality || 'UNKNOWN'),
+      summary:Object.freeze({measured:Object.freeze({...measured}),
+        quality:Object.freeze({...a.summary?.quality || {}}),
+        cost:Object.freeze({...a.summary?.cost || {}})}),
+      flexible_assets_kwh:Object.freeze({...a.flexible_assets_kwh || {}}),
+      field_quality:Object.freeze({...a.field_quality || {}}),
+      field_coverage_seconds:Object.freeze({...a.field_coverage_seconds || {}}),
+      baseline_reset_required:a.baseline_reset_required === true,
+      can_be_used_for_remaining:a.can_be_used_for_remaining === true
+    });
+  }
+  for(const id of meteringConflicts) delete meteringPeriods[id];
+  const metering=Object.freeze({
+    periods:Object.freeze(meteringPeriods),
+    available:Object.values(meteringPeriods).some(row=>row.availability === 'AVAILABLE'),
+    reason:meteringConflicts.size ? 'duplicate_native_metering_period' :
+      Object.keys(meteringPeriods).length ? '' : 'canonical_period_publication_unavailable'
+  });
   const nativeValue=readNativeEnergyMetric(hass,'net_financial_result_eur');
   const period=nativeValue?.period || null;
   const valueAccounting={selected_period_id:period,
@@ -199,7 +233,7 @@ function readEnergyCanonicalProduct(gateway) {
     health:envelope.available?'AVAILABLE':'UNAVAILABLE',
     core,summary:{},experience:{presence},presence,
     objects,profiles:[],relationships:[],connections:[],commands:nativeCommands,activity:[],
-    planning:{horizons},metering:{periods:{},available:false,reason:'canonical_period_publication_unavailable'},retrospective:{},intelligence:{},overview:{},
+    planning:{horizons},metering,retrospective:{},intelligence:{},overview:{},
     configuration,valueAccounting,layers:{planning_objects:planningObjects},
     flexibleAssets:Object.freeze(flexibleAssets),planningObjects:Object.freeze(planningObjects),
     objectById:byId,profileById:new Map(),
