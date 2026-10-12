@@ -1800,6 +1800,24 @@
       });
     }
     onChange(event) {
+      const nativePlanningSelect=event.target.closest('[data-planning-select]');
+      if(nativePlanningSelect && !nativePlanningSelect.disabled) {
+        const kind=String(nativePlanningSelect.dataset.planningSelect || '');
+        const contract=kind==='provider'?'RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1':
+          kind==='resolution'?'RHI_ENERGY_PLANNING_RESOLUTION_V1':null;
+        const entityId=String(nativePlanningSelect.dataset.planningEntity || '');
+        const source=this._hass?.states?.[entityId];
+        const option=String(nativePlanningSelect.value || '');
+        if(contract && entityId.startsWith('select.') &&
+           source?.attributes?.canonical_contract===contract &&
+           source?.attributes?.write_authority==='rhi_energy.config_entry.options' &&
+           asArray(source.attributes.options).includes(option)) {
+          // HA persists and reloads its single config entry. No speculative
+          // success or frontend planner state change before native readback.
+          this._hass.callService('select','select_option',{entity_id:entityId,option});
+        }
+        return;
+      }
       const commandSelect = event.target.closest('[data-hold-command-select]');
       if (commandSelect && !commandSelect.disabled) {
         const runtime = this.runtime();
@@ -5070,10 +5088,10 @@
         ? `<label class="settingsVariantSelect"><span>Policy set</span><select data-strategy-profile-select>${selectedGroup.map(profile=>`<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id)===String(selectedId)?' selected':''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>`
         : '';
 
-      const automationRow = rt.editableProperty('energy.automation_mode') || rt.row('energy.automation_mode');
+      const automationRow = rt.editableProperty('energy.operating_mode') || rt.row('energy.operating_mode');
       const automationMode = rowValue(automationRow, this.energyAutomationMode(rt,d) || 'advice');
       const automationOptions = allowedValuesForRow(automationRow).length
-        ? allowedValuesForRow(automationRow).map(value => ({ value, label:this.productStateLabel(value,human(value)), attrs:{'data-mode-value':value,'data-property-key':'energy.automation_mode'} }))
+        ? allowedValuesForRow(automationRow).map(value => ({ value, label:this.productStateLabel(value,human(value)), attrs:{'data-mode-value':value,'data-property-key':'energy.operating_mode'} }))
         : ['automatic','advice','disabled'].map(value => ({ value, label:this.productStateLabel(value,human(value)), attrs:{'data-mode-value':value,'data-property-key':'energy.automation_mode'} }));
       const automationControl = this.isWritableRow(automationRow)
         ? this.componentSegmentedControl(automationOptions, automationMode, 'automationModeControl')
@@ -5693,6 +5711,32 @@
       const value = participant.energyKwh;
       return `<span class="planningPowerValue ${signed ? 'planningImport' : ''} ${value <= 0.001 ? 'planningIdle' : ''}">${value.toFixed(1)}</span>`;
     }
+    planningProviderControls(rt) {
+      const states=rt.hass?.states || {};
+      const source=(contract)=>Object.entries(states).filter(([id,state])=>
+        id.startsWith('select.') && state?.attributes?.canonical_contract===contract &&
+        state?.attributes?.write_authority==='rhi_energy.config_entry.options');
+      const control=(contract,kind,label)=>{
+        const matches=source(contract);
+        if(matches.length!==1) return `<span class="planningControlUnavailable">${escapeHtml(label)}: Not available</span>`;
+        const [entityId,state]=matches[0];
+        const options=asArray(state.attributes?.options).filter(x=>typeof x==='string');
+        const selected=String(state.state || '');
+        return `<label class="settingsVariantSelect"><span>${escapeHtml(label)}</span><select data-planning-select="${kind}" data-planning-entity="${escapeHtml(entityId)}"${options.length?'':' disabled'}>${options.map(option=>`<option value="${escapeHtml(option)}"${option===selected?' selected':''}>${escapeHtml(kind==='resolution'?option+' min':human(option))}</option>`).join('')}</select></label>`;
+      };
+      const provider=source('RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1');
+      const attrs=provider.length===1?provider[0][1].attributes || {}:{};
+      const effective=String(attrs.effective_provider || '');
+      const reason=String(attrs.selection_reason || '');
+      const modeRow=rt.row('energy.operating_mode');
+      const mode=String(rowValue(modeRow,'advice') || 'advice');
+      return `<section class="panel compact planningConfiguration"><div class="meteringCardHead"><div><h2>Planning & automation</h2><p>One Energy planning contract for RHI and external planners.</p></div></div><div class="planningAggregateTotals">
+      ${control('RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1','provider','Planner')}
+      ${control('RHI_ENERGY_PLANNING_RESOLUTION_V1','resolution','Resolution')}
+      <span><small>Automation mode</small><b>${escapeHtml(human(mode))}</b><small>Editable in Settings</small></span>
+      <span><small>Effective planner</small><b>${escapeHtml(effective?human(effective):'On hold')}</b><small>${escapeHtml(!effective?humanReason(reason,'Missing source evidence'):'Energy-owned validated planning')}</small></span>
+      </div></section>`;
+    }
     planning(rt) {
       const vm = this.buildPlanningViewModel(rt);
       const horizonLabel = vm.horizonId === 'D1' ? 'Tomorrow' : 'Today';
@@ -5791,7 +5835,8 @@
       const displayRemaining = vm.complete ? remainingNeed : null;
       const planStatus = String(firstDefined(vm.currentActionIntent.action_state, vm.currentActionIntent.state, vm.summary.plan_status, vm.horizon.status, vm.horizon.state, vm.complete?'available':'unavailable'));
       const confidence = firstDefined(vm.quality.confidence, vm.horizon.confidence, 'Limited');
-      const statusLabel = /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
+      const statusLabel = vm.previewOnly ? 'Preview only · No execution' :
+        /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
       const plannedTotals = assetTotals.map(item => `<span class="planningFooterAsset">${this.assetVisual(item.asset,{size:'xs',fallbackIcon:this.planningAssetIcon(item.asset)})}<b>${escapeHtml(this.planningAssetName(item.asset))}</b> ${item.plannedEnergy===null?'—':item.plannedEnergy.toFixed(1)+' kWh'}</span>`).join('');
       const summaryItems = vm.horizonId === 'D1'
         ? [['Need entering tomorrow',displayNeed],['Planned tomorrow',displayPlanned],['Still after tomorrow',displayRemaining]]
@@ -5828,7 +5873,7 @@
         const reason=status.requested_provider
           ? `Planner ${requested} is on hold: ${observed}. ${alternative}`
           : 'No effective planning provider is currently published. Check the Energy planner configuration and source completeness.';
-        return `${this.tabExperienceHeader(rt,'planning',planningHeader)}${this.contractGap('Tactical planning unavailable',reason)}`;
+        return `${this.tabExperienceHeader(rt,'planning',planningHeader)}${this.planningProviderControls(rt)}${this.contractGap('Tactical planning unavailable',reason)}`;
       }
       const participatingCount = assetTotals.length;
       const nextLines = assetTotals.map(item => this.assetIdentityChip(item.asset,fmtKw(firstDefined(item.asset.requested_power_kw,item.asset.requested_charge_power_kw,item.asset.requested_power_kw_effective),'—'))).join('');
@@ -5850,8 +5895,10 @@
       }).join('');
       const incompletePlanningRows = asArray(vm.assets).filter(asset => asset && asset.planning_input_ready === false).map(asset => { const blockers=asArray(asset.planning_blockers); const userReason=blockers.includes('target_soc_not_configured')?'Set a target charge level.':blockers.includes('ready_by_not_configured')?'Set a ready-by time.':blockers.includes('charger_not_assigned')?'Assign a charger.':'Charging information is incomplete.'; return `<article class="planningLoadRow planningInputIncomplete"><div class="planningLoadIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.planningAssetIcon(asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(asset))}</b></div><small>${escapeHtml(userReason)}</small></div></div><div><small>Current charge</small><b>${fmtPct(asset.current_soc_pct)}</b></div><div><small>${escapeHtml(rhiEnergyT(this._hass,"planning.target",{},"Target"))}</small><b>${fmtPct(asset.target_soc_pct)}</b></div><div><small>Ready by</small><b>${escapeHtml(asset.ready_by || 'Not set')}</b></div><div><small>Charging power</small><b>${fmtKw(asset.max_power_kw,'—')}</b></div><div><small>Status</small><b class="planStatusBadge exception">Needs setup</b></div></article>`; }).join('');
       return `${this.tabExperienceHeader(rt,'planning',planningHeader)}
+      ${this.planningProviderControls(rt)}
+      ${vm.previewOnly ? '<section class="panel compact"><b>Read-only deterministic preview</b><p>Provider held or input evidence incomplete. No automatic execution is authorized.</p></section>' : ''}
       ${this.bodyContextBar(rt,'planning','planning-body')}
-      <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>${escapeHtml(rhiEnergyT(this._hass,'planning.hourly_desc',{},'Hourly view of expected production, consumption, storage and grid exchange.'))}</p></div><span>Energy per hour (kWh)</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>for this period</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Loads Home Intelligence is currently planning for this period.</p></div></div><div class="planningLoadList">${planningLoadRows || incompletePlanningRows || '<div class="empty"><b>No flexible loads currently need planning</b></div>'}</div></section>`;
+      <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} energy allocations</h2><p>${escapeHtml(rhiEnergyT(this._hass,'planning.hourly_desc',{},'Hourly view of expected production, consumption, storage and grid exchange.'))}</p></div><span>Energy per interval (kWh)</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>for this period</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Loads Home Intelligence is currently planning for this period.</p></div></div><div class="planningLoadList">${planningLoadRows || incompletePlanningRows || '<div class="empty"><b>No flexible loads currently need planning</b></div>'}</div></section>`;
     }
 
     strategicPlanning(rt) {
