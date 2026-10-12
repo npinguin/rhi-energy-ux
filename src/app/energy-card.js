@@ -4317,8 +4317,9 @@
       );
       const isChargerRow = row => {
         const id = String(firstDefined(row?.asset_id, row?.connection_asset_id, '') || '').trim();
-        const type = String(firstDefined(row?.asset_type, row?.object_class, row?.source_asset_kind, '') || '').trim().toLowerCase();
-        return chargerIds.has(id) || /(^|_)(charger|charging_point|charge_point)(_|$)/.test(type);
+        const types = [row?.asset_type,row?.object_class,row?.source_asset_kind,row?.energy_asset_role,row?.ux_asset_type,row?.participation_state].map(v=>String(v || '').trim().toLowerCase());
+        return row?.infrastructure_only === true || chargerIds.has(id)
+          || types.some(type=>/(^|_)(charger|charging_point|charge_point|infrastructure_only)(_|$)/.test(type));
       };
       const byId = new Map();
 
@@ -4327,7 +4328,7 @@
         const id = String(firstDefined(row.asset_id, row.flexible_asset_id, row.target_asset_id, '') || '').trim();
         if (!id || isChargerRow({...row,asset_id:id})) return;
         const vm = domain.byId(id);
-        if (vm?.isDisabled || vm?.isStorage) return;
+        if (vm?.isDisabled || vm?.isStorage || vm?.isInfrastructure) return;
         const materialized = vm?.raw ? { ...row, ...vm.raw, asset_id:id } : { ...row, asset_id:id };
         byId.set(id, { ...(byId.get(id) || {}), ...materialized });
       };
@@ -4551,7 +4552,14 @@
       // flow arrow. The battery itself must never disappear from Flow.
       const batteryFlowIntegrated = Boolean(buildRhiPowerFlowCardConfig(rt)?.entities?.battery);
       const connectionSnapshot = this.canonicalConnectionSnapshot(rt);
-      const rawConsumers = this.flowConsumers(rt, connectionSnapshot);
+      const consumerInventory = new Map(this.flexibleAssetDomain(rt).consumerFacing().map(vm=>[vm.id,vm.raw || {}]));
+      // Merge canonical consumer inventory and physical connection evidence by real consumer ID.
+      // Charging infrastructure is never an additional consumer or summed power.
+      this.flowConsumers(rt, connectionSnapshot).forEach(row => {
+        const id = String(row.asset_id || '');
+        if (id) consumerInventory.set(id,{...(consumerInventory.get(id)||{}),...row});
+      });
+      const rawConsumers = [...consumerInventory.values()];
       const rawChargers = connectionSnapshot.rows;
       const physicalFlow = buildPhysicalFlowViewModel(rt, rt.contractGateway(), rawConsumers, rawChargers, connectionSnapshot);
       const siteConsumption = physicalFlow.siteConsumptionKw;
