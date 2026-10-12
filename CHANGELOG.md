@@ -1,3 +1,8 @@
+## 4.3.36-rc.17 — Unreleased main fixes in immutable HACS test candidate
+
+- Restore native Forecast/Planning information and source-owned planning summaries (#241, #243).
+- Backend target E0.15.125; exact target HA runtime and rollback not yet qualified. No stable approval.
+
 ## 4.3.36-rc.16 — Trustworthy battery, grid and site consumption Overview
 
 - Place producer-confirmed Battery Charge within Site Consumption on the demand side, Battery Discharge with Supply, Grid Import with Supply and Grid Export as separate external demand.
