@@ -4373,7 +4373,10 @@
           effective_connection_id:firstDefined(asset.effective_connection_id, connection.connection_asset_id, connection.asset_id, ''),
           physical_connection_id:firstDefined(asset.physical_connection_id, connection.connection_asset_id, connection.asset_id, ''),
           visual_ref:firstDefined(asset.visual_ref, connection.connected_consumer_visual_ref, ''),
-          physical_power_kw:firstDefined(asset.physical_power_kw, asset.current_power_kw, asset.actual_power_kw, connection.physical_power_kw, connection.power_kw)
+          // A charger power measurement is not vehicle power without physical identity proof.
+          // Keep charger telemetry in the connection diagnostics; this consumer
+          // row may show only its own canonical asset-scoped power evidence.
+          physical_power_kw:firstDefined(asset.physical_power_kw, asset.power_kw, asset.current_power_kw, asset.actual_power_kw)
         });
       }
 
