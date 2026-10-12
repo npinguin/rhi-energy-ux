@@ -51,9 +51,22 @@
 
     const totals=reader=>Object.fromEntries(Object.entries(reader.values).map(([key,row])=>
       [key,row.available ? Number(row.value) : null]));
+    // Preserve native producer semantics.  Numeric KPI projections are not a
+    // substitute for the horizon's Supply / Demand / Balance publication.
+    // A deterministic baseline remains visibly preview-only and cannot grant
+    // planning/execution authority.
+    const nativeSummary=Object.freeze({
+      ...planningObject(horizonDetails.summary),
+      supply:planningObject(horizonDetails.supply),
+      demand:planningObject(horizonDetails.demand),
+      balance:planningObject(horizonDetails.balance),
+      mode:planningObject(horizonDetails.mode),
+      quality:planningObject(horizonDetails.quality)
+    });
     const horizon=Object.freeze({
       horizon_id:normalized,
       ...totals(selected),
+      summary:nativeSummary,
       status:publicationStatus,
       quality:Object.freeze({availability:publicationStatus,
         missing:selected.missing,

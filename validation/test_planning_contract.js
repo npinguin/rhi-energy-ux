@@ -398,3 +398,60 @@ assert.equal(baselinePreview.buckets.length,1);
 assert.equal(baselinePreview.laneTotals.sources.solar_kwh,0.3);
 assert.equal(baselinePreview.executionAuthorized,false);
 console.log('PASS native RHI deterministic interval lanes and read-only hold preview');
+
+
+// V1 semantic-parity gate: the native adapter must carry producer-owned
+// Supply, Demand and Grid Balance through to Forecast without recalculation.
+const nativeSemanticHorizon={
+  published:true, available:true,
+  metadata:{provider_id:'rhi_deterministic',requested_provider:'rhi_deterministic',
+    execution_authorized:false},
+  details:{
+    supply:{solar_forecast_kwh:35.8,solar_remaining_kwh:15.4,
+      grid_import_kwh:2.2,total_usable_supply_kwh:17.6},
+    demand:{home_consumption_forecast_kwh:8.0,flexible_known_need_kwh:6.4,
+      flexible_scheduled_kwh:4.2,total_expected_demand_kwh:12.2},
+    balance:{expected_grid_import_kwh:2.2,expected_grid_export_kwh:5.4,
+      grid_balance_kwh:-3.2},
+    quality:{availability:'AVAILABLE',confidence:'High'},
+    mode:{energy_mode:'advice'},
+    summary:{lane_totals:{sources:{solar_kwh:15.4,grid_in_kwh:2.2},
+      consumers:{home_kwh:8.0,flexible_loads_kwh:4.2},
+      boundary:{grid_out_kwh:5.4}}},
+    planning_assets:[{asset_id:'vehicle_id4',energy_need_kwh:6.4,
+      planned_today_kwh:4.2,still_to_plan_kwh:2.2}],
+    execution_policy:{configured_mode:'advice',autonomous_execution_allowed:false},
+    buckets:[{bucket_id:'D0-H14',duration_minutes:60}]
+  }
+};
+const nativeSemanticRuntime={...runtime,
+  nativePlanningHorizon:()=>nativeSemanticHorizon
+};
+const nativeSemanticView=readPlanningContract(nativeSemanticRuntime,'D0');
+assert.equal(nativeSemanticView.horizon.summary.supply.total_usable_supply_kwh,17.6);
+assert.equal(nativeSemanticView.horizon.summary.demand.total_expected_demand_kwh,12.2);
+assert.equal(nativeSemanticView.horizon.summary.balance.grid_balance_kwh,-3.2);
+assert.equal(nativeSemanticView.horizon.summary.quality.confidence,'High');
+assert.equal(nativeSemanticView.planningAssetsById.vehicle_id4.energy_need_kwh,6.4);
+assert.equal(normalizePlanningLaneTotals(nativeSemanticView.laneTotals).homeKwh,8);
+assert.equal(nativeSemanticView.executionAuthorized,false);
+
+// Baseline/held data can be viewed, never treated as effective or executable.
+const heldSemanticView=readPlanningContract({...runtime,
+  nativePlanningHorizon:(_horizon,variant)=>variant==='baseline'
+    ? {...nativeSemanticHorizon,available:true} : {
+      published:false,available:false,status:'INCOMPLETE',
+      metadata:{requested_provider:'emhass',provider_id:null}
+    }
+},'D0');
+assert.equal(heldSemanticView.horizon.summary.supply.total_usable_supply_kwh,17.6);
+assert.equal(heldSemanticView.horizon.status,'INCOMPLETE');
+assert.equal(heldSemanticView.previewOnly,true);
+assert.equal(heldSemanticView.executionAuthorized,false);
+assert.equal(heldSemanticView.available,false);
+
+// No producer summary: numeric totals cannot be promoted to energy balance.
+const missingSemantic=readPlanningContract(runtime,'D0');
+assert.equal(missingSemantic.horizon.summary.supply.total_usable_supply_kwh,undefined);
+assert.equal(missingSemantic.horizon.summary.balance.grid_balance_kwh,undefined);
+console.log('PASS V1->V2 native Forecast Supply/Demand/Balance semantic parity');
