@@ -203,6 +203,26 @@ function readEnergyCanonicalProduct(gateway) {
     });
   }
   if(retrospectiveCount!==1) retrospective=null;
+  // Exact planner selection/status is a native Energy entity, not an
+  // inference from a baseline or a favorable planning metric.
+  let plannerStatus=null,plannerPublishers=0;
+  for(const [entityId,state] of Object.entries(hass.states || {})) {
+    const a=state?.attributes || {};
+    if(a.canonical_contract !== 'RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1' ||
+       a.canonical_source !== 'rhi_energy.runtime' || a.publisher !== 'rhi_energy') continue;
+    plannerPublishers++;
+    plannerStatus=Object.freeze({
+      entity_id:entityId,status:String(state.state || 'UNAVAILABLE'),
+      requested_provider:a.requested_provider || null,
+      effective_provider:a.effective_provider || null,
+      selection_reason:a.selection_reason || null,
+      requested_runtime_reason:a.requested_runtime_reason || null,
+      requested_runtime_status:a.requested_runtime_status || null,
+      baseline_available:a.baseline_available === true,
+      execution_authorized:a.execution_authorized === true
+    });
+  }
+  if(plannerPublishers!==1) plannerStatus=null;
   const nativeValue=readNativeEnergyMetric(hass,'net_financial_result_eur');
   const period=nativeValue?.period || null;
   const valueAccounting={selected_period_id:period,
@@ -255,7 +275,7 @@ function readEnergyCanonicalProduct(gateway) {
     health:envelope.available?'AVAILABLE':'UNAVAILABLE',
     core,summary:{},experience:{presence},presence,
     objects,profiles:[],relationships:[],connections:[],commands:nativeCommands,activity:[],
-    planning:{horizons},metering,retrospective:retrospective||{},intelligence:{},overview:{},
+    planning:{horizons,provider_status:plannerStatus||{}},metering,retrospective:retrospective||{},intelligence:{},overview:{},
     configuration,valueAccounting,layers:{planning_objects:planningObjects},
     flexibleAssets:Object.freeze(flexibleAssets),planningObjects:Object.freeze(planningObjects),
     objectById:byId,profileById:new Map(),
