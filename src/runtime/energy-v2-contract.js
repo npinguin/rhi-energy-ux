@@ -119,7 +119,7 @@ function readEnergyCanonicalProduct(gateway) {
       ? gateway.host.nativePlanningTotals(id) : readNativeEnergyPlanningTotals(hass,id);
     const detail=typeof gateway.host?.nativePlanningHorizon==='function'
       ? gateway.host.nativePlanningHorizon(id):null;
-    const attrs=detail?.available === true ? detail.details || {} : {};
+    const attrs=detail?.published === true && detail.details ? detail.details : {};
     const numeric=(field)=>{
       const cell=native?.values?.[field];
       return cell?.available === true ? Number(cell.value) : null;
@@ -181,6 +181,48 @@ function readEnergyCanonicalProduct(gateway) {
     reason:meteringConflicts.size ? 'duplicate_native_metering_period' :
       Object.keys(meteringPeriods).length ? '' : 'canonical_period_publication_unavailable'
   });
+  // Retrospective is already published by Energy as a native HA sensor.
+  // Never synthesize a retrospective assessment in the browser. Preserve
+  // genuine PENDING/WAITING statuses and producer-owned prerequisites.
+  let retrospective=null;
+  let retrospectiveCount=0;
+  for(const [entityId,state] of Object.entries(hass.states || {})) {
+    const a=state?.attributes || {};
+    if(a.canonical_contract !== 'ENERGY_CANONICAL_RETROSPECTIVE_V1' ||
+       a.canonical_source !== 'rhi_energy.runtime' || a.publisher !== 'rhi_energy') continue;
+    retrospectiveCount++;
+    retrospective=Object.freeze({
+      status:String(state.state || 'UNAVAILABLE'),entity_id:entityId,
+      availability:a.availability || 'UNAVAILABLE',
+      reason:a.reason || '',prerequisites:Array.isArray(a.prerequisites)?a.prerequisites:[],
+      score:a.score ?? null,confidence:a.confidence ?? null,
+      evidence_coverage_pct:a.evidence_coverage_pct ?? null,
+      trend:a.trend ?? null,objectives:Array.isArray(a.objectives)?a.objectives:[],
+      execution_kpis:a.execution_kpis || {},score_semantics:a.score_semantics || null,
+      observed_at:a.observed_at || null
+    });
+  }
+  if(retrospectiveCount!==1) retrospective=null;
+  // Exact planner selection/status is a native Energy entity, not an
+  // inference from a baseline or a favorable planning metric.
+  let plannerStatus=null,plannerPublishers=0;
+  for(const [entityId,state] of Object.entries(hass.states || {})) {
+    const a=state?.attributes || {};
+    if(a.canonical_contract !== 'RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1' ||
+       a.canonical_source !== 'rhi_energy.runtime' || a.publisher !== 'rhi_energy') continue;
+    plannerPublishers++;
+    plannerStatus=Object.freeze({
+      entity_id:entityId,status:String(state.state || 'UNAVAILABLE'),
+      requested_provider:a.requested_provider || null,
+      effective_provider:a.effective_provider || null,
+      selection_reason:a.selection_reason || null,
+      requested_runtime_reason:a.requested_runtime_reason || null,
+      requested_runtime_status:a.requested_runtime_status || null,
+      baseline_available:a.baseline_available === true,
+      execution_authorized:a.execution_authorized === true
+    });
+  }
+  if(plannerPublishers!==1) plannerStatus=null;
   const nativeValue=readNativeEnergyMetric(hass,'net_financial_result_eur');
   const period=nativeValue?.period || null;
   const valueAccounting={selected_period_id:period,
@@ -233,7 +275,7 @@ function readEnergyCanonicalProduct(gateway) {
     health:envelope.available?'AVAILABLE':'UNAVAILABLE',
     core,summary:{},experience:{presence},presence,
     objects,profiles:[],relationships:[],connections:[],commands:nativeCommands,activity:[],
-    planning:{horizons},metering,retrospective:{},intelligence:{},overview:{},
+    planning:{horizons,provider_status:plannerStatus||{}},metering,retrospective:retrospective||{},intelligence:{},overview:{},
     configuration,valueAccounting,layers:{planning_objects:planningObjects},
     flexibleAssets:Object.freeze(flexibleAssets),planningObjects:Object.freeze(planningObjects),
     objectById:byId,profileById:new Map(),

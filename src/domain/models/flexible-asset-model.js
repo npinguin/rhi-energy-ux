@@ -134,10 +134,11 @@
       return this._all;
     }
     byId(assetId) { this.all(); return this._byId.get(String(assetId)) || null; }
-    // The canonical flexible_load inventory remains visible independently of
-    // operational readiness. A charger represented as a flexible_load is still
-    // an Energy consumer: do not hide it because its physical source is a charger.
-    consumerFacing() { return this.all().filter(vm => !vm.isStorage && String(vm.raw?.object_class || '') === 'flexible_load'); }
+    // Only a genuine flexible-load consumer is a consumption identity.
+    // Producer-owned charger/connection fallback projections may also have
+    // object_class=flexible_load; those remain connection infrastructure, not
+    // consumers to count or render a second time.
+    consumerFacing() { return this.all().filter(vm => !vm.isStorage && !vm.isInfrastructure && String(vm.raw?.object_class || '') === 'flexible_load'); }
     // Unknown participation is an inventory/readiness gap, not an active plan.
     inventory() { return this.consumerFacing(); }
     participating() { return this.consumerFacing().filter(vm => vm.isParticipating); }

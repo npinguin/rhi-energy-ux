@@ -1,3 +1,10 @@
+## 4.3.36-rc.14 — Energy Flow, forecast and planning consumer recovery
+
+- Combine native Site Consumption/period Metering, read-only deterministic D0/D1 baseline forecast, provider/resolution HA selectors and canonical Energy automation mode.
+- Present battery without inventing directional flow; real flexible consumers with kWh need, actual and requested kW, published charger relationship and navigation, charger diagnostics folded.
+- Restore Strategic, Tactical, Operational and Forecast screens on desktop/tablet/mobile, with backend-only authority for execution.
+- Automated contract, UX, HACS package, checksum and governance regression qualification; physical HA acceptance pending.
+
 ## 4.3.36-rc.13 — Native Site Consumption and canonical period metering
 
 - Exact native Energy Site Consumption metric in Power Flow with zero, unknown, quality and single publisher enforcement;

@@ -50,7 +50,16 @@ const states={
       write:{supported:true,service:'rhi_energy.write_property',
         data:{property_id:'battery.reserve_target_pct'}}}),
   'sensor.financial':native('net_financial_result_eur',1.23,{period:'today',actual_complete:true}),
-  'sensor.home_native':native('home_consumption_power_kw',1.8)
+  'sensor.home_native':native('home_consumption_power_kw',1.8),
+  'sensor.site_native':native('site_consumption_power_kw',2.6),
+  'sensor.flexible_native':native('flexible_loads_power_kw',0),
+  'sensor.energy_retrospective':{state:'WAITING_FOR_EVIDENCE',attributes:{
+    canonical_contract:'ENERGY_CANONICAL_RETROSPECTIVE_V1',canonical_source:'rhi_energy.runtime',
+    publisher:'rhi_energy',availability:'UNAVAILABLE',
+    reason:'planning_execution_metering_incomplete',
+    prerequisites:[{id:'planning_outcome',state:'PENDING'}],
+    score:null,confidence:null
+  }}
 };
 // Persisted interval evidence must be passed through by exact period identity.
 states['sensor.energy_metering_today']={state:'OK',attributes:{
@@ -97,6 +106,12 @@ assert.equal(view.metering.periods.today.flexible_assets_kwh.vehicle_a,1.2);
 assert.equal(view.metering.periods.week.quality,'PARTIAL');
 assert.equal(view.metering.periods.week.can_be_used_for_remaining,false);
 assert.equal(view.metering.periods.month,undefined);
+assert.equal(view.retrospective.status,'WAITING_FOR_EVIDENCE');
+assert.equal(view.retrospective.prerequisites.length,1);
+assert.equal(ctx.readEnergyCanonicalProduct({host:{hass:{states:{
+ 'sensor.s1':states['sensor.energy_retrospective'],'sensor.s2':states['sensor.energy_retrospective']
+}},canonicalIndex:ctx.createEnergyCanonicalPropertyIndex({states:{}})}}).retrospective.status,undefined,
+ 'duplicate native retrospective must fail closed');
 assert.equal(ctx.selectEnergyValue(view,'month').net_financial_result_eur,null);
 assert.equal(view.planning.horizons.D0.required_kwh,19.2);
 assert.equal(view.planning.horizons.D1.still_to_plan_kwh,7);

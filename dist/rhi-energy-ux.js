@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.36-rc.13';
+  const UX_VERSION = 'R4.3.36-rc.14';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Native Energy publication is discovered by exact canonical contract markers.
@@ -564,7 +564,7 @@ function readEnergyCanonicalProduct(gateway) {
       ? gateway.host.nativePlanningTotals(id) : readNativeEnergyPlanningTotals(hass,id);
     const detail=typeof gateway.host?.nativePlanningHorizon==='function'
       ? gateway.host.nativePlanningHorizon(id):null;
-    const attrs=detail?.available === true ? detail.details || {} : {};
+    const attrs=detail?.published === true && detail.details ? detail.details : {};
     const numeric=(field)=>{
       const cell=native?.values?.[field];
       return cell?.available === true ? Number(cell.value) : null;
@@ -626,6 +626,48 @@ function readEnergyCanonicalProduct(gateway) {
     reason:meteringConflicts.size ? 'duplicate_native_metering_period' :
       Object.keys(meteringPeriods).length ? '' : 'canonical_period_publication_unavailable'
   });
+  // Retrospective is already published by Energy as a native HA sensor.
+  // Never synthesize a retrospective assessment in the browser. Preserve
+  // genuine PENDING/WAITING statuses and producer-owned prerequisites.
+  let retrospective=null;
+  let retrospectiveCount=0;
+  for(const [entityId,state] of Object.entries(hass.states || {})) {
+    const a=state?.attributes || {};
+    if(a.canonical_contract !== 'ENERGY_CANONICAL_RETROSPECTIVE_V1' ||
+       a.canonical_source !== 'rhi_energy.runtime' || a.publisher !== 'rhi_energy') continue;
+    retrospectiveCount++;
+    retrospective=Object.freeze({
+      status:String(state.state || 'UNAVAILABLE'),entity_id:entityId,
+      availability:a.availability || 'UNAVAILABLE',
+      reason:a.reason || '',prerequisites:Array.isArray(a.prerequisites)?a.prerequisites:[],
+      score:a.score ?? null,confidence:a.confidence ?? null,
+      evidence_coverage_pct:a.evidence_coverage_pct ?? null,
+      trend:a.trend ?? null,objectives:Array.isArray(a.objectives)?a.objectives:[],
+      execution_kpis:a.execution_kpis || {},score_semantics:a.score_semantics || null,
+      observed_at:a.observed_at || null
+    });
+  }
+  if(retrospectiveCount!==1) retrospective=null;
+  // Exact planner selection/status is a native Energy entity, not an
+  // inference from a baseline or a favorable planning metric.
+  let plannerStatus=null,plannerPublishers=0;
+  for(const [entityId,state] of Object.entries(hass.states || {})) {
+    const a=state?.attributes || {};
+    if(a.canonical_contract !== 'RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1' ||
+       a.canonical_source !== 'rhi_energy.runtime' || a.publisher !== 'rhi_energy') continue;
+    plannerPublishers++;
+    plannerStatus=Object.freeze({
+      entity_id:entityId,status:String(state.state || 'UNAVAILABLE'),
+      requested_provider:a.requested_provider || null,
+      effective_provider:a.effective_provider || null,
+      selection_reason:a.selection_reason || null,
+      requested_runtime_reason:a.requested_runtime_reason || null,
+      requested_runtime_status:a.requested_runtime_status || null,
+      baseline_available:a.baseline_available === true,
+      execution_authorized:a.execution_authorized === true
+    });
+  }
+  if(plannerPublishers!==1) plannerStatus=null;
   const nativeValue=readNativeEnergyMetric(hass,'net_financial_result_eur');
   const period=nativeValue?.period || null;
   const valueAccounting={selected_period_id:period,
@@ -678,7 +720,7 @@ function readEnergyCanonicalProduct(gateway) {
     health:envelope.available?'AVAILABLE':'UNAVAILABLE',
     core,summary:{},experience:{presence},presence,
     objects,profiles:[],relationships:[],connections:[],commands:nativeCommands,activity:[],
-    planning:{horizons},metering,retrospective:{},intelligence:{},overview:{},
+    planning:{horizons,provider_status:plannerStatus||{}},metering,retrospective:retrospective||{},intelligence:{},overview:{},
     configuration,valueAccounting,layers:{planning_objects:planningObjects},
     flexibleAssets:Object.freeze(flexibleAssets),planningObjects:Object.freeze(planningObjects),
     objectById:byId,profileById:new Map(),
@@ -1135,7 +1177,16 @@ function energyAssetPublicationGap(gateway,assetId='') {
 // Current Energy consumption is read only from backend-owned canonical property
 // entities. No Public V2, source-provider, aggregate or derived-power fallback.
 function readLiveConsumptionContract(gateway) {
-  const site=readTypedPropertyContract(gateway,'consumption','site_consumption.power_kw');
+  // Energy publishes Site Consumption as a *native metric* on energy_site.
+  // There is no canonical logical object of class site_consumption: reading a
+  // property for that imaginary class always produced '—' despite 1.865 kW
+  // of valid producer-owned site balance in runtime diagnostics.
+  const siteMetric=readNativeEnergyMetric(gateway?.host?.hass || {},'site_consumption_power_kw');
+  const site=Object.freeze({
+    number:siteMetric.available === true ? Number(siteMetric.value) : null,
+    health:siteMetric.available === true ? 'AVAILABLE' : 'UNAVAILABLE',
+    reason:siteMetric.reason || 'native_site_consumption_unavailable'
+  });
   // Home consumption is published as a dedicated native HA metric by Energy.
   // Do not treat a second property-path guess as fallback or recompute it from
   // solar/grid/battery flows. The producer's availability is authoritative.
@@ -1146,8 +1197,15 @@ function readLiveConsumptionContract(gateway) {
     reason:homeMetric.reason || ''
   });
   // Flexible power is independently published by the backend, if present.
-  const flexible=readTypedPropertyContract(gateway,'consumption','flexible_loads.power_kw');
-  const attributed=readTypedPropertyContract(gateway,'consumption','flexible_loads.attributed_power_kw');
+  // This aggregate must also come from Energy-owned evidence, never a
+  // frontend sum over charger objects, vehicles or requested setpoints.
+  const flexibleMetric=readNativeEnergyMetric(gateway?.host?.hass || {},'flexible_loads_power_kw');
+  const flexible=Object.freeze({
+    number:flexibleMetric.available === true ? Number(flexibleMetric.value) : null,
+    health:flexibleMetric.available === true ? 'AVAILABLE' : 'UNAVAILABLE',
+    reason:flexibleMetric.reason || 'native_flexible_loads_power_unavailable'
+  });
+  const attributed=Object.freeze({number:null,health:'UNAVAILABLE',reason:'attribution_metric_not_published'});
   return Object.freeze({
     envelope:Object.freeze({source:'RHI_ENERGY_CANONICAL_PROPERTY_V2'}),
     siteConsumptionKw:site.number,
@@ -1367,6 +1425,18 @@ function buildRhiPowerFlowCardConfig(rt) {
     if (unit && unit !== 'w' && unit !== 'kw') return '';
     return id;
   };
+  // SoC is a percentage, never a power sensor. Its use is optional and must
+  // not create a battery flow node without direction-safe energy measurements.
+  const socSensor = () => {
+    const rows = (index?.rowsForProperty?.('battery.soc_pct') || [])
+      .filter(r => r.logical_object_class === 'battery_system');
+    if (rows.length !== 1) return '';
+    const row = rows[0];
+    const id = String(row.entity_id || '');
+    const unit = String(row.unit || row.unit_of_measurement || row.native_unit_of_measurement || '').toLowerCase();
+    return row.availability === 'AVAILABLE' && /^sensor\.[a-z0-9_]+$/.test(id)
+      && (!unit || unit === '%') ? id : '';
+  };
   const entities = {};
   const importId = sensor('grid_import.power_kw', 'grid_connection');
   const exportId = sensor('grid_export.power_kw', 'grid_connection');
@@ -1378,8 +1448,22 @@ function buildRhiPowerFlowCardConfig(rt) {
   }
   const solarId = sensor('solar.power_kw', 'solar_production');
   if (solarId) entities.solar = {entity:solarId};
-  // battery.power_kw sign is not contractually the direction convention
-  // required by Power Flow Card Plus. Do not map it without separate signed evidence.
+  // The Power Flow Card Plus battery consumes explicit *directional* sensors:
+  // consumption = charging the storage; production = discharging storage.
+  // battery.power_kw by itself does not publish a compatible signed convention.
+  // A partial, ambiguous or stale pair must not animate a misleading arrow.
+  const batteryChargeId = sensor('battery.charge_power_kw', 'battery_system');
+  const batteryDischargeId = sensor('battery.discharge_power_kw', 'battery_system');
+  if (batteryChargeId && batteryDischargeId && batteryChargeId !== batteryDischargeId) {
+    entities.battery = {
+      entity:{consumption:batteryChargeId, production:batteryDischargeId},
+      display_state:'one_way', name:'Home Battery'
+    };
+    const socId = socSensor();
+    if (socId) entities.battery.state_of_charge = socId;
+  }
+  // Never use battery.power_kw alone: its direction is not card-compatible
+  // without producer-published positive/negative convention metadata.
   // Site Consumption is a producer-owned native Energy metric, not a logical
   // object of class site_consumption (the logical inventory has no such class).
   // Do not substitute Home Consumption: it excludes flexible loads and battery
@@ -1392,32 +1476,11 @@ function buildRhiPowerFlowCardConfig(rt) {
   if (site?.available !== true || !/^sensor\.[a-z0-9_]+$/.test(siteId) ||
       !['w','kw'].includes(siteUnit)) return null;
   entities.home = {entity:siteId, override_state:true, name:'Site consumption'};
-  // Physical load circles use only one unambiguous canonical per-asset sensor.
-  // A charger is connection infrastructure, not an additional energy load.
-  const allPower = (index?.rowsForProperty?.('flexible_load.power_kw') || [])
-    .filter(row => row.logical_object_class === 'flexible_load');
-  const byAsset = new Map();
-  for (const row of allPower) {
-    const id = String(row?.asset_id || '').trim();
-    if (id) byAsset.set(id, [...(byAsset.get(id) || []), row]);
-  }
-  const used = new Set([importId,exportId,solarId,siteId].filter(Boolean));
-  const individuals = [];
-  for (const [id, rows] of byAsset) {
-    if (rows.length !== 1) continue;
-    const row = rows[0];
-    const entityId = String(row?.entity_id || '');
-    const unit = String(row?.unit || row?.unit_of_measurement || row?.native_unit_of_measurement || '').toLowerCase();
-    if (row.availability !== 'AVAILABLE' || !/^sensor\.[a-z0-9_]+$/.test(entityId) || (unit && unit !== 'w' && unit !== 'kw')) continue;
-    if (used.has(entityId)) continue;
-    const asset = rt?.asset?.(id) || {};
-    const role = [asset.asset_type,asset.source_asset_kind,asset.object_class,asset.energy_asset_role,asset.participation_state]
-      .map(value=>String(value || '').toLowerCase());
-    if (asset.infrastructure_only === true || role.some(value=>/charger|charging_point|charge_point|infrastructure_only/.test(value))) continue;
-    used.add(entityId);
-    individuals.push({entity:entityId,name:String(row.asset_display_name || asset.display_name || id),display_zero:true});
-  }
-  if (individuals.length) entities.individual = individuals;
+  // Individual flexible consumers belong below the physical supply flow,
+  // where Energy can show true consumer identity, energy needed, actual vs
+  // requested power and the published charging relationship. Do not render
+  // the same load inside the flow diagram or expose charger infrastructure
+  // as another consumption node.
   if (!entities.grid && !entities.solar) return null;
   return {
     type:'custom:power-flow-card-plus',
@@ -1717,33 +1780,36 @@ function readEnergyCommandContract(gateway) {
     nativePlanningTotals(horizonId = 'D0') {
       return readNativeEnergyPlanningTotals(this.hass, horizonId);
     }
-    nativePlanningHorizon(horizonId = 'D0') {
+    nativePlanningHorizon(horizonId = 'D0', variant = 'effective') {
       const horizon=String(horizonId || '').toUpperCase();
+      if(!['effective','baseline'].includes(variant)) return Object.freeze({published:false,available:false,details:null});
       if (horizon !== 'D0' && horizon !== 'D1') return Object.freeze({available:false,details:null});
-      // The Energy producer publishes the effective plan's buckets and asset/lane
-      // allocations under attributes.details. Never interpret an inventory row,
-      // incomplete horizon, baseline, or duplicate publisher as executable truth.
+      // Baseline and INCOMPLETE horizons may be read as preview only.
+      // They never authorize physical action or masquerade as effective plans.
+      const contract=variant==='baseline'
+        ? 'RHI_ENERGY_BASELINE_PLANNING_HORIZON_V1'
+        : 'RHI_ENERGY_PLANNING_HORIZON_V1';
       const matches=Object.values(this.hass?.states || {}).filter(state=>
-        state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1' &&
+        state?.attributes?.canonical_contract === contract &&
         state?.attributes?.canonical_source === 'rhi_energy.runtime' &&
         state?.attributes?.horizon_id === horizon &&
-        state?.attributes?.variant === 'effective');
+        state?.attributes?.variant === variant);
       if (matches.length !== 1) return Object.freeze({
         published:false,available:false,status:'UNAVAILABLE',details:null,
-        metadata:null,reason:matches.length>1?'duplicate_effective_horizon':'effective_horizon_not_published'
+        metadata:null,reason:matches.length>1?'duplicate_native_horizon':'native_horizon_not_published'
       });
       const attrs=matches[0].attributes || {};
       const details=attrs.details;
-      const ready=String(attrs.availability || '').toUpperCase() === 'AVAILABLE' &&
-        attrs.totals_complete === true &&
-        details && typeof details === 'object' && !Array.isArray(details) &&
-        Array.isArray(details.buckets) &&
+      const structurallyValid=details && typeof details === 'object' &&
+        !Array.isArray(details) && Array.isArray(details.buckets) &&
         (details.horizon_id == null || details.horizon_id === horizon);
+      const ready=String(attrs.availability || '').toUpperCase() === 'AVAILABLE' &&
+        attrs.totals_complete === true && structurallyValid && variant==='effective';
       return Object.freeze({
         published:true,available:!!ready,
         status:ready?'AVAILABLE':String(attrs.availability || 'INCOMPLETE').toUpperCase(),
         reason:ready?'':String(attrs.reason_code || 'effective_horizon_incomplete'),
-        details:ready?details:null,metadata:attrs
+        details:structurallyValid?details:null,metadata:attrs
       });
     }
 
@@ -1761,13 +1827,20 @@ function readEnergyCommandContract(gateway) {
       const nativeMetrics = Object.entries(this.hass?.states || {})
         .filter(([,state])=>String(state?.attributes?.canonical_source || '') === 'rhi_energy.runtime'
           && (!!String(state?.attributes?.metric_key || '').trim() ||
-            state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1'))
+            ['RHI_ENERGY_PLANNING_HORIZON_V1','RHI_ENERGY_BASELINE_PLANNING_HORIZON_V1']
+              .includes(state?.attributes?.canonical_contract)))
         .map(([entityId])=>entityId);
       const objectIds=this.canonicalIndex?.objectEntityIds?.() || [];
+      const planningConfigIds=Object.entries(this.hass?.states || {})
+        .filter(([id,state])=>id.startsWith('select.') &&
+          ['RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1','RHI_ENERGY_PLANNING_RESOLUTION_V1']
+            .includes(state?.attributes?.canonical_contract) &&
+          state?.attributes?.write_authority==='rhi_energy.config_entry.options')
+        .map(([id])=>id);
       const commandIds=Object.entries(this.hass?.states || {})
         .filter(([,state])=>state?.attributes?.canonical_contract === 'RHI_ENERGY_CANONICAL_COMMAND_V1')
         .map(([id])=>id);
-      return [...new Set([...canonicalIds, ...objectIds, ...nativeMetrics, ...commandIds, registryEntity].filter(Boolean))];
+      return [...new Set([...canonicalIds, ...objectIds, ...nativeMetrics, ...commandIds, ...planningConfigIds, registryEntity].filter(Boolean))];
     }
     entitySignature(entityIds = []) {
       return (entityIds || []).map(id => {
@@ -2840,10 +2913,11 @@ class FlexibleAssetDomainModel {
       return this._all;
     }
     byId(assetId) { this.all(); return this._byId.get(String(assetId)) || null; }
-    // The canonical flexible_load inventory remains visible independently of
-    // operational readiness. A charger represented as a flexible_load is still
-    // an Energy consumer: do not hide it because its physical source is a charger.
-    consumerFacing() { return this.all().filter(vm => !vm.isStorage && String(vm.raw?.object_class || '') === 'flexible_load'); }
+    // Only a genuine flexible-load consumer is a consumption identity.
+    // Producer-owned charger/connection fallback projections may also have
+    // object_class=flexible_load; those remain connection infrastructure, not
+    // consumers to count or render a second time.
+    consumerFacing() { return this.all().filter(vm => !vm.isStorage && !vm.isInfrastructure && String(vm.raw?.object_class || '') === 'flexible_load'); }
     // Unknown participation is an inventory/readiness gap, not an active plan.
     inventory() { return this.consumerFacing(); }
     participating() { return this.consumerFacing().filter(vm => vm.isParticipating); }
@@ -2951,8 +3025,11 @@ class FlexibleAssetDomainModel {
       // promote an old R1.79.x advisory transport to native authority.
       const durationMinutes=asNumber(bucket.duration_minutes);
       const allocations=planningArray(bucket.asset_allocations);
-      const sourceRows=planningArray(bucket.source_lane);
-      const consumerRows=planningArray(bucket.consumer_lane);
+      // Authoritative Energy interval lanes are published as advisory_*.
+      // No power-to-energy or consumer inference is permitted in this adapter.
+      const sourceRows=planningArray(firstDefined(bucket.advisory_source_lane,bucket.source_lane));
+      const consumerRows=planningArray(firstDefined(bucket.advisory_consumer_lane,bucket.consumer_lane));
+      const boundary=objectFrom(firstDefined(bucket.advisory_boundary_flows,bucket.boundary_flows,{}));
       const nativeRow=(row,role)=>({
         ...row, participantId:planningParticipantId(row),laneRole:role,
         energyKwh:asNumber(firstDefined(row.planned_energy_kwh,row.planned_demand_kwh,row.planned_supply_kwh)),
@@ -2972,8 +3049,8 @@ class FlexibleAssetDomainModel {
         durationMinutes,
         sources:sourceRows.map(row=>nativeRow(row,'source')),
         consumers,
-        boundary:{gridExportKwh:asNumber(bucket.grid_export_kwh)},
-        balanceDeltaKwh:asNumber(bucket.balance_delta_kwh),
+        boundary:{gridExportKwh:asNumber(firstDefined(boundary.grid_export_kwh,bucket.grid_export_kwh))},
+        balanceDeltaKwh:asNumber(firstDefined(bucket.advisory_lane_balance_delta_kwh,bucket.balance_delta_kwh)),
         state:String(firstDefined(bucket.planning_state,bucket.state,'')||'').toLowerCase(),
         reason:firstDefined(bucket.reason_code,bucket.reason,''),
         confidence:firstDefined(bucket.confidence,''),
@@ -3076,15 +3153,20 @@ class FlexibleAssetDomainModel {
     };
     const nativeHorizon = supported && typeof runtime.nativePlanningHorizon === 'function'
       ? runtime.nativePlanningHorizon(normalized) : null;
-    const published = nativeHorizon?.available === true ? nativeHorizon : null;
-    const horizonDetails = published?.details || {};
+    // Keep incomplete native evidence and baseline preview visible; it does
+    // not obtain action authority or masquerade as the selected provider.
+    const effectivePublished=nativeHorizon?.published===true && nativeHorizon?.details ? nativeHorizon : null;
+    const baseline=(!effectivePublished && typeof runtime.nativePlanningHorizon==='function')
+      ? runtime.nativePlanningHorizon(normalized,'baseline') : null;
+    const published=effectivePublished || (baseline?.published===true && baseline.details ? baseline : null);
+    const previewOnly=!!published && (published!==effectivePublished || published.available!==true);
+    const horizonDetails=published?.details || {};
     const publicationMetadata = nativeHorizon?.metadata || {};
     // Native numeric totals remain available as measurement evidence but never
     // authorize an effective schedule without one quality-complete horizon.
-    const effectiveAvailable = selected.available===true && !!published;
+    const effectiveAvailable = selected.available===true && effectivePublished?.available===true;
     const publicationStatus = effectiveAvailable ? 'AVAILABLE' :
-      nativeHorizon?.published===true ? 'INCOMPLETE' :
-        nativeHorizon?.status || 'UNAVAILABLE';
+      published ? 'INCOMPLETE' : nativeHorizon?.status || 'UNAVAILABLE';
     const requestedProvider=String(publicationMetadata.requested_provider||'');
     const effectiveProvider=String(publicationMetadata.provider_id||'');
     const providerHold=!!requestedProvider&&!effectiveProvider;
@@ -3109,6 +3191,7 @@ class FlexibleAssetDomainModel {
       available:effectiveAvailable,
       totalsAvailable:selected.available===true,
       provisionalTotals:selected.available===true&&!effectiveAvailable,
+      previewOnly,previewSource:published===baseline?'rhi_deterministic_baseline':previewOnly?'incomplete_effective':'effective',
       published:nativeHorizon?.published===true||!!published,
       publicationStatus,
       requestedProvider,effectiveProvider,providerHold,
@@ -3133,13 +3216,16 @@ class FlexibleAssetDomainModel {
       planningCombinedTotals:Object.freeze({}),
       horizonsById:Object.freeze({D0:todayTotals,D1:tomorrowTotals}),
       horizonId:normalized,horizon,summary:horizon,
-      laneTotals:Object.freeze(totals(selected)),
+      // D0/D1 lane totals are backend-owned and must never be reconstructed
+      // from flat numeric KPI readbacks.
+      laneTotals:Object.freeze(planningObject(planningObject(horizonDetails.summary).lane_totals)),
       buckets:Object.freeze(Array.isArray(horizonDetails.buckets) ? horizonDetails.buckets : []),
       // The producer may explicitly identify the current bucket; otherwise it is unknown.
       currentPlanningBucket:Object.freeze(planningObject(horizonDetails.current_bucket)),
       currentActionIntent:Object.freeze(published && horizonDetails.execution_policy && typeof horizonDetails.execution_policy === 'object' ? horizonDetails.execution_policy : {}),
       missingContractCapabilities:Object.freeze([
-        ...(!published ? ['native_effective_horizon','native_planning_buckets'] : []),
+        ...(!effectiveAvailable ? ['native_effective_horizon'] : []),
+        ...(!published ? ['native_planning_buckets'] : []),
         ...(!published || !Array.isArray(horizonDetails.planning_assets) ? ['native_planning_assets'] : []),
         ...(!published || !horizonDetails.execution_policy || typeof horizonDetails.execution_policy !== 'object' || Array.isArray(horizonDetails.execution_policy)
           ? ['native_planning_actions'] : [])
@@ -3203,7 +3289,7 @@ class FlexibleAssetDomainModel {
     const laneTotals = normalizePlanningLaneTotals(contract.laneTotals);
     const rows = contract.buckets.map(bucket => adaptPlanningBucket(bucket, contract.contractVersion));
     const quality = planningObject(contract.horizon.quality);
-    const contractSupported = contract.available === true && contract.contractVersion === 'ENERGY_NATIVE_PLANNING';
+    const contractSupported = contract.published === true && contract.contractVersion === 'ENERGY_NATIVE_PLANNING';
     const stateText = String(firstDefined(contract.horizon.state, contract.horizon.status, quality.health, contract.horizon.quality, '')).toLowerCase();
     return Object.freeze({
       horizonId: contract.horizonId,
@@ -3223,9 +3309,12 @@ class FlexibleAssetDomainModel {
       currentActionIntent: contract.currentActionIntent,
       contractVersion: contract.contractVersion,
       contractSupported,
+      previewOnly:contract.previewOnly===true,previewSource:contract.previewSource,
+      effectiveProvider:contract.effectiveProvider,requestedProvider:contract.requestedProvider,
+      reasonCode:contract.reasonCode,
       currentBucketId: String(contract.currentPlanningBucket.bucket_id || ''),
       totalsSource: contract.totalsSource,
-      complete: contractSupported && contract.missingContractCapabilities.length === 0 && !/incomplete|partial|unavailable/.test(stateText)
+      complete: contract.available === true && !contract.previewOnly && contract.missingContractCapabilities.length === 0 && !/incomplete|partial|unavailable/.test(stateText)
     });
   }
 
@@ -3609,7 +3698,10 @@ const HB_ENERGY_NAVIGATION_SPEC = Object.freeze([
   {
     id:"intelligence", labelKey:"nav.intelligence", fallback:"Intelligence",
     items:[
-      { id:"plan", labelKey:"nav.plan", fallback:"Plan", view:"planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
+      { id:"forecast", labelKey:"nav.forecast", fallback:"Forecast", view:"outlook", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
+      { id:"strategic", labelKey:"nav.strategic", fallback:"Strategic", view:"strategic-planning", titleKey:"hero.strategic.title", descriptionKey:"hero.strategic.description" },
+      { id:"plan", labelKey:"nav.tactical", fallback:"Tactical", view:"planning", titleKey:"hero.plan.title", descriptionKey:"hero.plan.description" },
+      { id:"operational", labelKey:"nav.operational", fallback:"Operational", view:"operational-planning", titleKey:"hero.operational.title", descriptionKey:"hero.operational.description" },
       { id:"settings", labelKey:"nav.settings", fallback:"Settings", view:"strategies", titleKey:"hero.settings.title", descriptionKey:"hero.settings.description" }
     ]
   },
@@ -4024,10 +4116,10 @@ function rhiEnergyVisualPickerStyles() {
       if (bySection && byItem) return { section:bySection.id, item:byItem.id, view:byItem.view };
       const legacy = {
         overview:['energy','overview'], flow:['energy','flow'], battery:['energy','battery'], consumers:['energy','consumers'], gas:['energy','gas'],
-        strategies:['intelligence','settings'], intelligence:['intelligence','settings'], solar:['energy','solar'], 'operational-planning':['intelligence','plan'],
+        strategies:['intelligence','settings'], intelligence:['intelligence','settings'], solar:['energy','solar'], 'operational-planning':['intelligence','operational'],
         planning:['intelligence','plan'], outlook:['intelligence','plan'],
         metering:['insights','metering'], value:['insights','value'], retrospective:['insights','retrospective'],
-        'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','plan']
+        'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','strategic']
       };
       const [fallbackSection,fallbackItem] = legacy[String(legacyView || '')] || ['energy','overview'];
       const section = sections.find(row => row.id === fallbackSection) || sections[0];
@@ -4404,6 +4496,24 @@ function rhiEnergyVisualPickerStyles() {
       });
     }
     onChange(event) {
+      const nativePlanningSelect=event.target.closest('[data-planning-select]');
+      if(nativePlanningSelect && !nativePlanningSelect.disabled) {
+        const kind=String(nativePlanningSelect.dataset.planningSelect || '');
+        const contract=kind==='provider'?'RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1':
+          kind==='resolution'?'RHI_ENERGY_PLANNING_RESOLUTION_V1':null;
+        const entityId=String(nativePlanningSelect.dataset.planningEntity || '');
+        const source=this.runtime().rawState(entityId);
+        const option=String(nativePlanningSelect.value || '');
+        if(contract && entityId.startsWith('select.') &&
+           source?.attributes?.canonical_contract===contract &&
+           source?.attributes?.write_authority==='rhi_energy.config_entry.options' &&
+           asArray(source.attributes.options).includes(option)) {
+          // HA persists and reloads its single config entry. No speculative
+          // success or frontend planner state change before native readback.
+          this._hass.callService('select','select_option',{entity_id:entityId,option});
+        }
+        return;
+      }
       const commandSelect = event.target.closest('[data-hold-command-select]');
       if (commandSelect && !commandSelect.disabled) {
         const runtime = this.runtime();
@@ -5108,14 +5218,27 @@ function rhiEnergyVisualPickerStyles() {
       const verifiedStates = new Set(['trusted','verified','complete','ok','ready']);
       const verificationStates = new Set(['pending','verification_required','verify','reset_required','untrusted','baseline_untrusted','baseline_required','configuration_required']);
       const partialStates = new Set(['partial','estimated','incomplete']);
-      const qualityState = verifiedStates.has(health) ? 'verified' : verificationStates.has(health) ? 'verification_required' : partialStates.has(health) ? 'partial' : 'unavailable';
-      const qualityLabel = qualityState === 'verified' ? 'Verified' : qualityState === 'verification_required' ? 'Verification required' : qualityState === 'partial' ? 'Partial' : 'Unavailable';
+      const rowStates=allRows.filter(row=>row.value !== null && row.value !== undefined).map(row=>String(row.status || 'UNKNOWN').toUpperCase());
+      const allFieldsTrusted=rowStates.length>0 && rowStates.every(state=>state==='OK');
+      const siteTotal=asNumber(measured.site_consumption_kwh);
+      const flexibleTotal=asNumber(measured.flexible_loads_energy_in_kwh);
+      const impossibleBalance=siteTotal !== null && flexibleTotal !== null &&
+        flexibleTotal > siteTotal + 0.2;
+      // The period-level 'OK' flag cannot overrule missing field evidence or
+      // impossible energy conservation (e.g. 28.6 kWh flexible > 16.6 kWh site).
+      const qualityState=impossibleBalance ? 'partial' :
+        verifiedStates.has(health) && allFieldsTrusted ? 'verified' :
+        verificationStates.has(health) ? 'verification_required' :
+        rowStates.length || partialStates.has(health) ? 'partial' : 'unavailable';
+      const qualityLabel = impossibleBalance ? 'Inconsistent totals' : qualityState === 'verified' ? 'Verified' : qualityState === 'verification_required' ? 'Verification required' : qualityState === 'partial' ? 'Partial' : 'Unavailable';
       const remediations = rt.meteringRemediationsForPeriod(periodId);
       const label = this.periodLabel(period);
       const remediation = remediations[0] || null;
       const userActionRequired = asBool(firstDefined(quality.user_action_required,effectivePeriod.user_action_required,false),false);
       const command = remediation && userActionRequired ? (remediation.command || rt.meteringResetCommandFor(remediation, periodId)) : null;
-      const conclusion = qualityState === 'verified'
+      const conclusion = impossibleBalance
+        ? {title:`${label} totals need reconciliation`,why:'Flexible Load energy exceeds measured Site Consumption. Do not trust the period totals until the Energy producer resolves this inconsistency.',recommendation:'Inspect physical meters and attribution; do not reset or invent measurements.',tone:'orange'}
+        : qualityState === 'verified'
         ? { title:`${label} totals are verified`, why:'These totals are measured and ready to use.', recommendation:'No action is needed.', tone:'green' }
         : qualityState === 'partial'
           ? { title:`${label} totals are partial`, why:'Measured values are available, but the selected period is not yet complete.', recommendation:'Use the available totals with the shown completeness in mind.', tone:'orange' }
@@ -6914,7 +7037,27 @@ function rhiEnergyVisualPickerStyles() {
       const relation = charger ? this.userRelationshipLabel(chargerDisplay, 'Assigned charger') : '';
       const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
-      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(relation ? `${relation} · ${state}` : state)}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+      const energyNeed = this.targetEnergyForAsset(id, consumer);
+      const display = escapeHtml(consumer.display_name || rt.assetName(id) || human(id));
+      const chargerId = String(charger || '').trim();
+      const chargerPath = chargerId ? (rhiUxResolveDomainAssetNavigation('rhi_mobility',chargerId) || rhiUxResolveDomainAssetNavigation('mobility',chargerId)) : '';
+      const sourceKind = String(firstDefined(consumer.source_asset_kind,consumer.asset_type,'') || '').toLowerCase();
+      const consumerPath = rt.sourceAssetNavigation(consumer) || (/vehicle|car/.test(sourceKind)
+        ? (rhiUxResolveDomainAssetNavigation('rhi_mobility',id) || rhiUxResolveDomainAssetNavigation('mobility',id)) : '');
+      const connection = chargerId ? (chargerPath
+        ? `<button type="button" class="rhiFlowLinkedAsset" data-source-asset-nav="${escapeHtml(chargerPath)}" aria-label="Open charger details">${escapeHtml(chargerDisplay || rt.assetName(chargerId) || 'Charger')} <span aria-hidden="true">›</span></button>`
+        : `<span>${escapeHtml(chargerDisplay || rt.assetName(chargerId) || 'Charger')}</span>`)
+        : '<span>No charger identified</span>';
+      return `<article class="flowPhysicalConsumerCard rhiFlowConsumerCard">
+        <div class="rhiFlowConsumerIdentity">${art}<div><b>${display}</b><small>${escapeHtml(state)}</small></div></div>
+        <div class="rhiFlowConsumerFacts">
+          <span><small>Energy needed</small><b>${escapeHtml(energyNeed === null ? '—' : fmtKwh(energyNeed))}</b></span>
+          <span><small>Power now</small><b>${escapeHtml(powerText)}</b></span>
+          <span><small>Requested power</small><b>${escapeHtml(requested === null ? '—' : fmtKw(requested))}</b></span>
+        </div>
+        <div class="rhiFlowConsumerRelation"><small>Charging via</small>${connection}</div>
+        ${consumerPath ? `<button type="button" class="rhiFlowConsumerDetails" data-source-asset-nav="${escapeHtml(consumerPath)}">Details <span aria-hidden="true">›</span></button>` : ''}
+      </article>`;
     }
     flowConsumers(rt, connectionSnapshot = { rows:[] }) {
       const domain = this.flexibleAssetDomain(rt);
@@ -6931,8 +7074,9 @@ function rhiEnergyVisualPickerStyles() {
       );
       const isChargerRow = row => {
         const id = String(firstDefined(row?.asset_id, row?.connection_asset_id, '') || '').trim();
-        const type = String(firstDefined(row?.asset_type, row?.object_class, row?.source_asset_kind, '') || '').trim().toLowerCase();
-        return chargerIds.has(id) || /(^|_)(charger|charging_point|charge_point)(_|$)/.test(type);
+        const types = [row?.asset_type,row?.object_class,row?.source_asset_kind,row?.energy_asset_role,row?.ux_asset_type,row?.participation_state].map(v=>String(v || '').trim().toLowerCase());
+        return row?.infrastructure_only === true || chargerIds.has(id)
+          || types.some(type=>/(^|_)(charger|charging_point|charge_point|infrastructure_only)(_|$)/.test(type));
       };
       const byId = new Map();
 
@@ -6941,7 +7085,7 @@ function rhiEnergyVisualPickerStyles() {
         const id = String(firstDefined(row.asset_id, row.flexible_asset_id, row.target_asset_id, '') || '').trim();
         if (!id || isChargerRow({...row,asset_id:id})) return;
         const vm = domain.byId(id);
-        if (vm?.isDisabled || vm?.isStorage) return;
+        if (vm?.isDisabled || vm?.isStorage || vm?.isInfrastructure) return;
         const materialized = vm?.raw ? { ...row, ...vm.raw, asset_id:id } : { ...row, asset_id:id };
         byId.set(id, { ...(byId.get(id) || {}), ...materialized });
       };
@@ -6966,7 +7110,10 @@ function rhiEnergyVisualPickerStyles() {
           effective_connection_id:firstDefined(asset.effective_connection_id, connection.connection_asset_id, connection.asset_id, ''),
           physical_connection_id:firstDefined(asset.physical_connection_id, connection.connection_asset_id, connection.asset_id, ''),
           visual_ref:firstDefined(asset.visual_ref, connection.connected_consumer_visual_ref, ''),
-          physical_power_kw:firstDefined(asset.physical_power_kw, asset.current_power_kw, asset.actual_power_kw, connection.physical_power_kw, connection.power_kw)
+          // A charger power measurement is not vehicle power without physical identity proof.
+          // Keep charger telemetry in the connection diagnostics; this consumer
+          // row may show only its own canonical asset-scoped power evidence.
+          physical_power_kw:firstDefined(asset.physical_power_kw, asset.power_kw, asset.current_power_kw, asset.actual_power_kw)
         });
       }
 
@@ -7161,8 +7308,18 @@ function rhiEnergyVisualPickerStyles() {
       const gridImport = current.grid.importPowerKw;
       const gridExport = current.grid.exportPowerKw;
       const battery = current.battery;
+      // Only a validated charge/discharge pair may draw a directional battery
+      // flow arrow. The battery itself must never disappear from Flow.
+      const batteryFlowIntegrated = Boolean(buildRhiPowerFlowCardConfig(rt)?.entities?.battery);
       const connectionSnapshot = this.canonicalConnectionSnapshot(rt);
-      const rawConsumers = this.flowConsumers(rt, connectionSnapshot);
+      const consumerInventory = new Map(this.flexibleAssetDomain(rt).consumerFacing().map(vm=>[vm.id,vm.raw || {}]));
+      // Merge canonical consumer inventory and physical connection evidence by real consumer ID.
+      // Charging infrastructure is never an additional consumer or summed power.
+      this.flowConsumers(rt, connectionSnapshot).forEach(row => {
+        const id = String(row.asset_id || '');
+        if (id) consumerInventory.set(id,{...(consumerInventory.get(id)||{}),...row});
+      });
+      const rawConsumers = [...consumerInventory.values()];
       const rawChargers = connectionSnapshot.rows;
       const physicalFlow = buildPhysicalFlowViewModel(rt, rt.contractGateway(), rawConsumers, rawChargers, connectionSnapshot);
       const siteConsumption = physicalFlow.siteConsumptionKw;
@@ -7177,15 +7334,23 @@ function rhiEnergyVisualPickerStyles() {
         <section class="panel rhiPowerFlowPanel">
           <div class="flowHeader"><div><h2>Live power flow</h2><p>Powered by Power Flow Card Plus. Only published, measured sources can animate; missing energy values are not estimated.</p></div></div>
           <div class="rhiPowerFlowHost rhiUxChartViewport" data-rhi-power-flow-host role="region" aria-label="Interactive energy flow"></div>
-          <p class="rhiFlowMeasurementNote">Battery power is displayed separately unless a direction-compatible signed sensor is published. Charger and vehicle power are never added together.</p>
+          <div class="rhiFlowBatteryPresence" aria-label="Home Battery on energy flow">
+            <div class="rhiFlowBatteryIdentity"><span class="rhiFlowBatteryIcon" aria-hidden="true">▣</span><div><b>Home Battery</b><small>${escapeHtml(battery.health === 'OK' ? battery.label : 'Measurement unavailable')}</small></div></div>
+            <div class="rhiFlowBatteryFacts"><span><small>Power now</small><b>${escapeHtml(battery.valueAvailable ? fmtKw(battery.displayPowerKw) : '—')}</b></span><span><small>State of charge</small><b>${escapeHtml(battery.socPct === null ? '—' : fmtPct(battery.socPct))}</b></span></div>
+            <span class="rhiFlowBatteryProof">${batteryFlowIntegrated ? 'Direction measured · shown in flow above' : 'Direction not proven · no animated battery flow'}</span>
+            <button type="button" data-tab-target="battery" class="rhiFlowBatteryDetails">Battery details <span aria-hidden="true">›</span></button>
+          </div>
+          <p class="rhiFlowMeasurementNote">Only direction-compatible battery sensors are allowed to animate. Charger and vehicle power are never added together.</p>
         </section>
-        <section class="panel rhiFlowAllLoads"><div class="flowHeader"><div><h2>All flexible loads</h2><p>Full canonical inventory, including idle and currently unavailable assets. Chargers remain connection interfaces, not duplicate consumers.</p></div></div>
-          ${this.flexibleAssetDomain(rt).consumerFacing().filter(vm=>!vm.isStorage).map(vm=>this.consumerCard(rt,vm.raw||{})).join('') || '<div class="empty compact"><b>No flexible loads published</b><span>The Energy inventory currently has no canonical consumers.</span></div>'}
+        <section class="panel rhiFlowAllLoads">
+          <div class="flowHeader"><div><h2>Flexible consumers</h2><p>Real consumers only. Need, actual power and requested power are separate; a charger is a connection, not an extra load.</p></div></div>
+          <div class="rhiFlowConsumerList">${consumers.map(consumer => this.consumerCard(rt,consumer)).join('') || '<div class="empty compact"><b>No flexible consumers published</b><span>No verified flexible-load consumer is available.</span></div>'}</div>
         </section>
-        <div class="flowDetailsGrid flowDetailsGridTwoUp">
-          <section class="panel"><h2>${escapeHtml(rhiEnergyT(this._hass,'flow.charging_connections',{},'Charging connections'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'flow.charging_connections_desc',{},'Chargers and vehicle assignments currently visible to Energy.'))}</p>${chargers.map(charger => this.connectorCard(rt, charger)).join('') || `<div class="empty"><b>${connectionSnapshot.available ? 'No charging connections available' : 'Connection data unavailable'}</b><span>${connectionSnapshot.available ? 'No charger or vehicle assignment is currently available.' : 'Connection information is not available right now.'}</span></div>`}</section>
-          <section class="panel"><h2>${escapeHtml(rhiEnergyT(this._hass,'flow.physical_consumers',{},'Physical consumers'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'flow.physical_consumers_desc',{},'Participating loads and their current charging connection; idle assets remain visible.'))}</p>${consumers.map(consumer => this.consumerCard(rt, consumer)).join('') || `<div class="empty"><b>No flexible consumers available</b><span>No controllable loads are currently available.</span></div>`}</section>
-        </div>
+        <details class="panel rhiFlowConnectionDiagnostics">
+          <summary>Charging connection diagnostics</summary>
+          <p>Physical charger interfaces and published assignments. They are not additional consumers.</p>
+          ${chargers.map(charger=>this.connectorCard(rt,charger)).join('') || '<div class="empty compact"><b>No charging connection evidence</b><span>Connection information is currently unavailable.</span></div>'}
+        </details>
       </div>`;
     }
     propertyRow(row, label = null, formatter = null) {
@@ -7661,10 +7826,10 @@ function rhiEnergyVisualPickerStyles() {
         ? `<label class="settingsVariantSelect"><span>Policy set</span><select data-strategy-profile-select>${selectedGroup.map(profile=>`<option value="${escapeHtml(profile.profile_id)}"${String(profile.profile_id)===String(selectedId)?' selected':''}>${escapeHtml(this.profileUserLabel(profile))}</option>`).join('')}</select></label>`
         : '';
 
-      const automationRow = rt.editableProperty('energy.automation_mode') || rt.row('energy.automation_mode');
+      const automationRow = rt.editableProperty('energy.operating_mode') || rt.row('energy.operating_mode');
       const automationMode = rowValue(automationRow, this.energyAutomationMode(rt,d) || 'advice');
       const automationOptions = allowedValuesForRow(automationRow).length
-        ? allowedValuesForRow(automationRow).map(value => ({ value, label:this.productStateLabel(value,human(value)), attrs:{'data-mode-value':value,'data-property-key':'energy.automation_mode'} }))
+        ? allowedValuesForRow(automationRow).map(value => ({ value, label:this.productStateLabel(value,human(value)), attrs:{'data-mode-value':value,'data-property-key':'energy.operating_mode'} }))
         : ['automatic','advice','disabled'].map(value => ({ value, label:this.productStateLabel(value,human(value)), attrs:{'data-mode-value':value,'data-property-key':'energy.automation_mode'} }));
       const automationControl = this.isWritableRow(automationRow)
         ? this.componentSegmentedControl(automationOptions, automationMode, 'automationModeControl')
@@ -7808,8 +7973,21 @@ function rhiEnergyVisualPickerStyles() {
         sub:row?.missing ? 'Not available' : ''
       };
     }
-    flexibleLoadMeteringRows(_rt, _periodId = 'today') {
-      return [];
+    flexibleLoadMeteringRows(rt, periodId = 'today') {
+      const period=rt.meteringPeriods().find(row=>row.period_id===String(periodId || 'today'));
+      const attributed=period?.flexible_assets_kwh;
+      if(!attributed || typeof attributed !== 'object' || Array.isArray(attributed)) return [];
+      const quality=String(period?.field_quality?.flexible_loads_energy_in_kwh || 'UNKNOWN').toUpperCase();
+      return Object.entries(attributed).filter(([id,value])=>
+        !!String(id || '').trim() && value !== null && value !== undefined &&
+        Number.isFinite(Number(value)) && Number(value)>=0
+      ).map(([asset_id,value])=>({
+        asset_id,label:rt.assetName(asset_id) || asset_id,value:Number(value),unit:'kWh',
+        measurement_state:quality,status:quality,
+        status_label:quality==='OK'?'Measured':'Measurement needs verification',
+        metric_key:'flexible_assets_kwh',
+        source:'RHI_ENERGY_METERING_PERIOD_V1',ux_visible:true
+      }));
     }
 
     meteringRowsFromRecords(_rt, periodId = 'today') {
@@ -7826,7 +8004,23 @@ function rhiEnergyVisualPickerStyles() {
       const quality = objectFrom(period?.summary?.quality || {});
       const status = String(firstDefined(quality.measurement_state,quality.health,quality.status,period?.measurement_state,period?.health,'UNAVAILABLE'));
       const statusLabel = String(firstDefined(quality.status_label,period?.status_label,''));
-      const row = (label, metricKey) => ({ label, metric_key:metricKey, value:asNumber(valueAtPath(measured,metricKey)), unit:'kWh', status, measurement_state:status, status_label:statusLabel, user_action_required:asBool(firstDefined(quality.user_action_required,period?.user_action_required,false),false) });
+      const sourceFields={
+        solar_production_kwh:'solar_kwh',grid_import_kwh:'grid_import_kwh',
+        grid_export_kwh:'grid_export_kwh',site_consumption_kwh:'site_consumption_kwh',
+        home_consumption_kwh:'home_consumption_kwh',
+        flexible_loads_energy_in_kwh:'flexible_loads_energy_in_kwh',
+        battery_charge_kwh:'battery_charge_kwh',
+        battery_discharge_kwh:'battery_discharge_kwh'
+      };
+      const fieldQuality=objectFrom(quality.field_quality || period?.field_quality || {});
+      const row = (label, metricKey) => {
+        const value=asNumber(valueAtPath(measured,metricKey));
+        const fieldState=String(fieldQuality[sourceFields[metricKey]] || 'UNKNOWN').toUpperCase();
+        return {label,metric_key:metricKey,value,unit:'kWh',
+          status:fieldState,measurement_state:fieldState,
+          status_label:fieldState==='OK'?'Measured':fieldState==='PARTIAL'?'Incomplete measurement':'Unknown measurement quality',
+          user_action_required:asBool(firstDefined(quality.user_action_required,period?.user_action_required,false),false)};
+      };
       return {
         supply:[row('Solar production','solar_production_kwh'),row('Grid import','grid_import_kwh'),row('Home Battery discharge','battery_discharge_kwh')],
         demand:[row('Site Consumption','site_consumption_kwh'),row('Home Consumption','home_consumption_kwh'),row('Flexible Loads','flexible_loads_energy_in_kwh'),row('Home Battery charge','battery_charge_kwh')],
@@ -8255,6 +8449,32 @@ function rhiEnergyVisualPickerStyles() {
       const value = participant.energyKwh;
       return `<span class="planningPowerValue ${signed ? 'planningImport' : ''} ${value <= 0.001 ? 'planningIdle' : ''}">${value.toFixed(1)}</span>`;
     }
+    planningProviderControls(rt) {
+      const states=rt.hass?.states || {};
+      const source=(contract)=>Object.entries(states).filter(([id,state])=>
+        id.startsWith('select.') && state?.attributes?.canonical_contract===contract &&
+        state?.attributes?.write_authority==='rhi_energy.config_entry.options');
+      const control=(contract,kind,label)=>{
+        const matches=source(contract);
+        if(matches.length!==1) return `<span class="planningControlUnavailable">${escapeHtml(label)}: Not available</span>`;
+        const [entityId,state]=matches[0];
+        const options=asArray(state.attributes?.options).filter(x=>typeof x==='string');
+        const selected=String(state.state || '');
+        return `<label class="settingsVariantSelect"><span>${escapeHtml(label)}</span><select data-planning-select="${kind}" data-planning-entity="${escapeHtml(entityId)}"${options.length?'':' disabled'}>${options.map(option=>`<option value="${escapeHtml(option)}"${option===selected?' selected':''}>${escapeHtml(kind==='resolution'?option+' min':human(option))}</option>`).join('')}</select></label>`;
+      };
+      const provider=source('RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1');
+      const attrs=provider.length===1?provider[0][1].attributes || {}:{};
+      const effective=String(attrs.effective_provider || '');
+      const reason=String(attrs.selection_reason || '');
+      const modeRow=rt.row('energy.operating_mode');
+      const mode=String(rowValue(modeRow,'advice') || 'advice');
+      return `<section class="panel compact planningConfiguration"><div class="meteringCardHead"><div><h2>Planning & automation</h2><p>One Energy planning contract for RHI and external planners.</p></div></div><div class="planningAggregateTotals">
+      ${control('RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1','provider','Planner')}
+      ${control('RHI_ENERGY_PLANNING_RESOLUTION_V1','resolution','Resolution')}
+      <span><small>Automation mode</small><b>${escapeHtml(human(mode))}</b><small>Editable in Settings</small></span>
+      <span><small>Effective planner</small><b>${escapeHtml(effective?human(effective):'On hold')}</b><small>${escapeHtml(!effective?humanReason(reason,'Missing source evidence'):'Energy-owned validated planning')}</small></span>
+      </div></section>`;
+    }
     planning(rt) {
       const vm = this.buildPlanningViewModel(rt);
       const horizonLabel = vm.horizonId === 'D1' ? 'Tomorrow' : 'Today';
@@ -8353,7 +8573,8 @@ function rhiEnergyVisualPickerStyles() {
       const displayRemaining = vm.complete ? remainingNeed : null;
       const planStatus = String(firstDefined(vm.currentActionIntent.action_state, vm.currentActionIntent.state, vm.summary.plan_status, vm.horizon.status, vm.horizon.state, vm.complete?'available':'unavailable'));
       const confidence = firstDefined(vm.quality.confidence, vm.horizon.confidence, 'Limited');
-      const statusLabel = /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
+      const statusLabel = vm.previewOnly ? 'Preview only · No execution' :
+        /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
       const plannedTotals = assetTotals.map(item => `<span class="planningFooterAsset">${this.assetVisual(item.asset,{size:'xs',fallbackIcon:this.planningAssetIcon(item.asset)})}<b>${escapeHtml(this.planningAssetName(item.asset))}</b> ${item.plannedEnergy===null?'—':item.plannedEnergy.toFixed(1)+' kWh'}</span>`).join('');
       const summaryItems = vm.horizonId === 'D1'
         ? [['Need entering tomorrow',displayNeed],['Planned tomorrow',displayPlanned],['Still after tomorrow',displayRemaining]]
@@ -8380,7 +8601,18 @@ function rhiEnergyVisualPickerStyles() {
           ['✓','Confidence',this.productStateLabel(confidence,'Limited'),'Planning confidence']
         ]
       };
-      if (!vm.contractSupported) return `${this.tabExperienceHeader(rt,'planning',planningHeader)}${this.contractGap('Tactical planning unavailable','Planning information is not available right now.')}`;
+      if (!vm.contractSupported) {
+        const status=objectFrom(rt.canonicalProduct()?.planning?.provider_status || {});
+        const requested=String(status.requested_provider || 'Selected planner');
+        const observed=String(status.requested_runtime_reason || status.selection_reason || 'No complete effective provider output');
+        const alternative=status.baseline_available === true
+          ? 'A deterministic baseline is available, but it is not the selected effective plan. No automatic fallback or physical execution is permitted.'
+          : 'No provider-owned baseline is currently published.';
+        const reason=status.requested_provider
+          ? `Planner ${requested} is on hold: ${observed}. ${alternative}`
+          : 'No effective planning provider is currently published. Check the Energy planner configuration and source completeness.';
+        return `${this.tabExperienceHeader(rt,'planning',planningHeader)}${this.planningProviderControls(rt)}${this.contractGap('Tactical planning unavailable',reason)}`;
+      }
       const participatingCount = assetTotals.length;
       const nextLines = assetTotals.map(item => this.assetIdentityChip(item.asset,fmtKw(firstDefined(item.asset.requested_power_kw,item.asset.requested_charge_power_kw,item.asset.requested_power_kw_effective),'—'))).join('');
       const planningLoadRows = assetTotals.map(item => {
@@ -8401,8 +8633,10 @@ function rhiEnergyVisualPickerStyles() {
       }).join('');
       const incompletePlanningRows = asArray(vm.assets).filter(asset => asset && asset.planning_input_ready === false).map(asset => { const blockers=asArray(asset.planning_blockers); const userReason=blockers.includes('target_soc_not_configured')?'Set a target charge level.':blockers.includes('ready_by_not_configured')?'Set a ready-by time.':blockers.includes('charger_not_assigned')?'Assign a charger.':'Charging information is incomplete.'; return `<article class="planningLoadRow planningInputIncomplete"><div class="planningLoadIdentity">${this.assetVisual(asset,{size:'sm',fallbackIcon:this.planningAssetIcon(asset)})}<div><div class="planningLoadName"><b>${escapeHtml(this.planningAssetName(asset))}</b></div><small>${escapeHtml(userReason)}</small></div></div><div><small>Current charge</small><b>${fmtPct(asset.current_soc_pct)}</b></div><div><small>${escapeHtml(rhiEnergyT(this._hass,"planning.target",{},"Target"))}</small><b>${fmtPct(asset.target_soc_pct)}</b></div><div><small>Ready by</small><b>${escapeHtml(asset.ready_by || 'Not set')}</b></div><div><small>Charging power</small><b>${fmtKw(asset.max_power_kw,'—')}</b></div><div><small>Status</small><b class="planStatusBadge exception">Needs setup</b></div></article>`; }).join('');
       return `${this.tabExperienceHeader(rt,'planning',planningHeader)}
+      ${this.planningProviderControls(rt)}
+      ${vm.previewOnly ? '<section class="panel compact"><b>Read-only deterministic preview</b><p>Provider held or input evidence incomplete. No automatic execution is authorized.</p></section>' : ''}
       ${this.bodyContextBar(rt,'planning','planning-body')}
-      <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} hourly energy lanes</h2><p>${escapeHtml(rhiEnergyT(this._hass,'planning.hourly_desc',{},'Hourly view of expected production, consumption, storage and grid exchange.'))}</p></div><span>Energy per hour (kWh)</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>for this period</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Loads Home Intelligence is currently planning for this period.</p></div></div><div class="planningLoadList">${planningLoadRows || incompletePlanningRows || '<div class="empty"><b>No flexible loads currently need planning</b></div>'}</div></section>`;
+      <div id="planning-body" class="planningPage"><section class="panel planningMatrixPanel"><div class="planningMatrixHead"><div><h2>${horizonLabel} energy allocations</h2><p>${escapeHtml(rhiEnergyT(this._hass,'planning.hourly_desc',{},'Hourly view of expected production, consumption, storage and grid exchange.'))}</p></div><span>Energy per interval (kWh)</span></div><div class="planningTableWrap"><table class="planningTable planningLaneTable"><thead><tr class="planningLaneGroups"><th rowspan="2"><span class="planningSystemHead">${this.planningIconBadge('◷','blue','system')}<b>Time</b></span></th>${sourceLaneCount?`<th colspan="${sourceLaneCount}">Sources</th>`:''}${consumerLaneCount?`<th colspan="${consumerLaneCount}">Consumers</th>`:''}${boundaryLaneCount?`<th colspan="${boundaryLaneCount}">Boundary</th>`:''}</tr><tr>${systemHeaders}${assetHeaders}${boundaryHeaders}</tr></thead><tbody>${rows}<tr class="planningTotalSpacer" aria-hidden="true"><td colspan="${1+sourceLaneCount+consumerLaneCount+boundaryLaneCount}"></td></tr><tr class="planningTotalRow"><th><b>TOTAL</b><small>for this period</small></th>${fixedTotalCells}${assetTotalCells}${boundaryTotalCells}</tr></tbody></table></div><div class="planningFooter"><div><small>Planned flexible energy (${horizonLabel.toLowerCase()})</small><div>${plannedTotals || '<span>—</span>'}</div>${summaryTotals}</div><div><small>Planning balance</small><b>${escapeHtml(balanceLabel)}</b></div><div><small>Confidence</small><b>${escapeHtml(this.productStateLabel(confidence,'Limited'))}</b></div><div><small>Operational rule</small><b>${escapeHtml(disclosure)}</b></div></div></section></div><section class="panel plannedFlexibleLoads" id="planning-flexible-loads"><div class="energySectionHead"><div><h2>Planned flexible loads</h2><p>Loads Home Intelligence is currently planning for this period.</p></div></div><div class="planningLoadList">${planningLoadRows || incompletePlanningRows || '<div class="empty"><b>No flexible loads currently need planning</b></div>'}</div></section>`;
     }
 
     strategicPlanning(rt) {
@@ -9032,6 +9266,55 @@ function rhiEnergyVisualPickerStyles() {
 .overviewSupportFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
 .chargingConnectionGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.chargingConnectionGrid>.empty{grid-column:1/-1}
 .flowDetailsGrid.flowDetailsGridTwoUp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}.flowDetailsGrid.flowDetailsGridTwoUp>.panel{min-width:0;height:100%}
+/* Battery remains discoverable when bidirectional flow evidence is missing. */
+/* Planning controls: planner/provider selection separate from automation mode. */
+.rhiPlannerControls{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;justify-content:space-between;min-height:52px;padding:9px 12px;margin:6px 0 9px;background:#fff;border:1px solid var(--line);border-radius:10px}
+.rhiPlannerControls>div:first-child{display:grid;gap:3px;min-width:0}
+.rhiPlannerControls small{font-size:10px;color:var(--muted)}
+.rhiPlannerSelect{display:inline-flex;align-items:center;gap:8px;font-size:11px}
+.rhiPlannerSelect select{min-height:38px;min-width:140px;max-width:260px;padding:6px 9px;border:1px solid var(--line);border-radius:9px;background:#fff;color:#17305b;font:inherit}
+.rhiPlanningBaselineNotice{display:flex;gap:8px;align-items:center;padding:10px 12px;margin:7px 0;border:1px solid #dce7f4;border-radius:10px;background:#f7fbff}
+.rhiPlanningBaselineNotice b{font-size:11px;white-space:nowrap}
+.rhiPlanningBaselineNotice span{font-size:10.5px;line-height:1.35;color:#53677e}
+@media(max-width:700px){.rhiPlannerControls{align-items:stretch;flex-direction:column}.rhiPlannerSelect select{min-width:0;max-width:100%}.rhiPlanningBaselineNotice{flex-direction:column;align-items:flex-start}}
+.rhiFlowBatteryPresence{display:flex;align-items:center;flex-wrap:wrap;gap:10px 20px;min-height:66px;padding:10px 12px;margin:8px 0 0;border:1px solid var(--line);border-radius:10px;background:#fbfcff}
+.rhiFlowBatteryIdentity{display:flex;align-items:center;gap:9px;min-width:150px;flex:1 1 180px}
+.rhiFlowBatteryIdentity b{display:block;font-size:12px;color:#14264a}
+.rhiFlowBatteryIdentity small{display:block;font-size:10px;color:var(--muted);margin-top:3px}
+.rhiFlowBatteryIcon{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:#edf4ff;color:#1467f5;font-size:17px}
+.rhiFlowBatteryFacts{display:grid;grid-template-columns:repeat(2,minmax(78px,1fr));gap:12px;flex:1 1 165px}
+.rhiFlowBatteryFacts small{display:block;font-size:9.5px;color:var(--muted)}
+.rhiFlowBatteryFacts b{display:block;font-size:12px;font-variant-numeric:tabular-nums;margin-top:3px}
+.rhiFlowBatteryProof{font-size:10.5px;color:#64748b;flex:1 1 195px;min-width:0}
+.rhiFlowBatteryDetails{display:inline-flex;align-items:center;gap:5px;margin-left:auto;height:38px;min-height:38px;padding:0 11px;border:1px solid #dce7f4;border-radius:10px;background:#fff;color:#075fd8;font:inherit;font-size:11px;font-weight:650;cursor:pointer;white-space:nowrap}
+.rhiFlowBatteryDetails span{font-size:19px;line-height:1}
+@media(max-width:700px){.rhiFlowBatteryPresence{gap:9px;padding:9px}.rhiFlowBatteryFacts{order:2;flex:1 1 100%}.rhiFlowBatteryProof{order:3;flex:1 1 100%}.rhiFlowBatteryDetails{order:4;margin-left:0}}
+/* Flow: one Mobility-style consumer identity row with separate measured facts. */
+.rhiFlowConsumerList{display:grid;gap:7px}
+.rhiFlowConsumerList .rhiFlowConsumerCard{display:grid;grid-template-columns:minmax(175px,1.15fr) minmax(230px,1.3fr) minmax(125px,.8fr) auto;align-items:center;gap:12px;min-height:70px;margin:0;padding:9px 11px;border:1px solid var(--line);border-radius:11px;background:#fff;box-shadow:none}
+.rhiFlowConsumerIdentity{display:flex;align-items:center;gap:9px;min-width:0}
+.rhiFlowConsumerIdentity>div:last-child{min-width:0}
+.rhiFlowConsumerIdentity b{display:block;font-size:12px;line-height:1.25;overflow-wrap:break-word}
+.rhiFlowConsumerIdentity small{display:block;margin-top:3px;font-size:10px;color:var(--muted)}
+.rhiFlowConsumerCard .flowAssetVisual{width:78px;height:54px;flex:0 0 78px}
+.rhiFlowConsumerCard .flowAssetVisual img{max-width:74px;max-height:50px}
+.rhiFlowConsumerFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;min-width:0}
+.rhiFlowConsumerFacts>span{min-width:0;padding:6px 9px}
+.rhiFlowConsumerFacts>span+span{border-left:1px solid #e5edf5}
+.rhiFlowConsumerFacts small,.rhiFlowConsumerRelation>small{display:block;color:var(--muted);font-size:9px;line-height:1.2}
+.rhiFlowConsumerFacts b{display:block;margin-top:4px;font-size:12px;font-weight:650;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rhiFlowConsumerRelation{min-width:0;font-size:11px}
+.rhiFlowConsumerRelation span{font-size:11px}
+.rhiFlowLinkedAsset,.rhiFlowConsumerDetails{display:inline-flex;align-items:center;gap:5px;padding:0;border:0;background:transparent;color:#075fd8;font:inherit;font-size:11px;font-weight:650;cursor:pointer;text-align:left;max-width:100%}
+.rhiFlowLinkedAsset{margin-top:5px;white-space:normal;overflow-wrap:break-word}
+.rhiFlowLinkedAsset span,.rhiFlowConsumerDetails span{font-size:17px;line-height:1}
+.rhiFlowConsumerDetails{justify-self:end;white-space:nowrap;min-height:38px;padding:0 11px;border:1px solid #dce7f4;border-radius:10px;background:#fff}
+.rhiFlowLinkedAsset:focus-visible,.rhiFlowConsumerDetails:focus-visible{outline:2px solid #1467f5;outline-offset:2px}
+.rhiFlowConnectionDiagnostics{padding:10px 13px;min-width:0}
+.rhiFlowConnectionDiagnostics summary{cursor:pointer;color:#526685;font-size:11px;font-weight:650;min-height:26px}
+.rhiFlowConnectionDiagnostics>p{font-size:10.5px;color:var(--muted);margin:4px 0 9px}
+@media(max-width:1050px){.rhiFlowConsumerList .rhiFlowConsumerCard{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)}.rhiFlowConsumerRelation{grid-column:1}.rhiFlowConsumerDetails{grid-column:2}.rhiFlowConsumerCard .flowAssetVisual{width:64px;height:48px;flex-basis:64px}.rhiFlowConsumerCard .flowAssetVisual img{max-width:62px;max-height:46px}}
+@media(max-width:700px){.rhiFlowConsumerList .rhiFlowConsumerCard{grid-template-columns:1fr;gap:7px}.rhiFlowConsumerRelation,.rhiFlowConsumerDetails{grid-column:1}.rhiFlowConsumerDetails{justify-self:end}.rhiFlowConsumerCard .flowAssetVisual{width:78px;height:54px;flex-basis:78px}}
 .flowConnectionCard,.flowPhysicalConsumerCard{display:grid;grid-template-columns:auto minmax(0,1fr) 76px;align-items:center;gap:10px;min-height:64px;padding:9px 10px;margin:6px 0;border:1px solid var(--line);border-radius:10px;background:#fff;box-sizing:border-box}.flowAssetVisual{width:54px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#f5f7fa;overflow:hidden}.flowAssetVisual img{display:block;max-width:50px;max-height:42px;object-fit:contain}.flowConnectionCard>div,.flowPhysicalConsumerCard>div{min-width:0}.flowConnectionCard b,.flowPhysicalConsumerCard b{display:block;font-size:12.5px;line-height:1.2;font-weight:600}.flowConnectionCard span,.flowPhysicalConsumerCard span{display:block;margin-top:3px;font-size:10.5px;line-height:1.25;color:var(--muted);white-space:normal}.flowConnectionCard strong,.flowPhysicalConsumerCard strong{min-width:76px;text-align:right;font-size:12.5px;line-height:1.2;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.flowConnectionCard small{display:block;margin-top:4px;font-size:9.5px;color:var(--muted)}
 .batteryContributorList{display:grid;gap:10px}.batteryContributorCard{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:stretch;min-height:148px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#fff,#fbfcfe);overflow:hidden}.batteryContributorVisual{display:flex;align-items:center;justify-content:center;padding:10px;background:linear-gradient(180deg,#f7f9fb,#eef2f5);overflow:hidden}.batteryContributorVisual .assetVisual{width:88px;height:108px;max-width:88px;max-height:108px;padding:5px;box-sizing:border-box;border:0;background:transparent;overflow:hidden}.batteryContributorVisual .assetVisual img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center center}.batteryContributorBody{min-width:0;padding:13px 14px;display:flex;flex-direction:column;justify-content:center;gap:7px}.batteryContributorHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.batteryContributorHeader>div{min-width:0}.batteryContributorHeader b{display:block;font-size:14px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}.batteryContributorHeader strong{flex:0 0 auto;font-size:22px;line-height:1;font-variant-numeric:tabular-nums}.batteryHealth{display:inline-flex;margin-top:5px;padding:3px 7px;border-radius:999px;background:#eef8f2;color:#2f6d4b;font-size:10px;font-weight:700}.batteryContributorMeta{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#526178}.batteryContributorMeta b{font-size:12px;color:#172033;font-variant-numeric:tabular-nums}.batteryContributorFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.batteryContributorFacts span{min-width:0;padding:6px 7px;border-radius:8px;background:#f8fafc}.batteryContributorFacts small,.batteryContributorFacts b{display:block}.batteryContributorFacts small{font-size:8px;color:#64748b}.batteryContributorFacts b{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.batteryContributorState{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;min-width:0}.batteryContributorState span{font-size:10.5px;font-weight:700;color:#265c3b;white-space:nowrap}.batteryContributorState small{min-width:0;font-size:10px;line-height:1.25;color:var(--muted);white-space:normal}.batteryContributorCard .bar{margin-top:2px}
 @media(max-width:1050px){.overviewCoreGrid{grid-template-columns:1fr 1fr}.overviewDecisionPanel{grid-column:1/-1;grid-row:1}.chargingConnectionGrid{grid-template-columns:1fr}.batteryContributorCard{grid-template-columns:104px minmax(0,1fr)}.batteryContributorVisual .assetVisual{width:80px;height:102px;max-width:80px;max-height:102px}.batteryContributorFacts{grid-template-columns:repeat(2,minmax(0,1fr))}}

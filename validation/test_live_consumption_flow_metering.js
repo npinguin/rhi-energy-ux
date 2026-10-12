@@ -39,12 +39,12 @@ for(const token of [
 for(const token of [
   "metering.selected_period","meteringPeriodControl",
   "componentPeriodSelector(vm.periods, vm.periodId, 'metering-period')",
-  "strategyAutomationMode","energy.automation_mode","alwaysEditable:true"
+  "strategyAutomationMode","energy.operating_mode","alwaysEditable:true"
 ]) if(!fs.readFileSync('src/app/energy-card.js','utf8').includes(token))
   throw new Error('missing editable UI affordance '+token);
 
 const card=fs.readFileSync('src/app/energy-card.js','utf8');
-if(!card.includes("data-property-key':'energy.automation_mode'")) throw new Error('automation mode must bind canonical property write');
+if(!card.includes("data-property-key':'energy.operating_mode'")) throw new Error('automation mode must bind canonical property write');
 if(!card.includes("requestPropertyWrite('metering.selected_period'")) throw new Error('metering period must bind canonical property write');
 console.log('PASS Metering period, Automation mode and policy settings expose canonical write paths');
 
@@ -59,7 +59,7 @@ for(const token of [
   'for(const id of meteringConflicts) delete meteringPeriods[id]',
   "Object.freeze(meteringPeriods)",
   "canonical_period_publication_unavailable",
-  'retrospective:{}','valueAccounting',
+  'ENERGY_CANONICAL_RETROSPECTIVE_V1','valueAccounting',
   'readNativeEnergyMetric(hass,\'net_financial_result_eur\')'
 ]) if(!native.includes(token)) throw new Error('native Metering/Value contract invariant '+token);
 
@@ -69,6 +69,8 @@ for(const token of [
   'rawPeriod.baseline_reset_required',
   'vm.quality?.user_action_required === true && vm.command',
   'const retrospective=objectFrom(this.runtime().canonicalProduct().retrospective || {})',
+  'flexible_assets_kwh',
+  'impossibleBalance',
   'Waiting for measured evidence',
   'blocking_property_ids'
 ]) if(!card.includes(token)) throw new Error('missing Metering/Value/Retrospective UX invariant '+token);

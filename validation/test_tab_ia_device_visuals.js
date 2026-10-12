@@ -29,7 +29,10 @@ const method = name => {
 };
 
 assert.match(presentation, /id:"solar", labelKey:"nav\.solar", fallback:"Solar", view:"solar"/);
-assert.match(presentation, /id:"plan", labelKey:"nav\.plan", fallback:"Plan", view:"planning"/);
+assert.match(presentation, /id:"plan", labelKey:"nav\.tactical", fallback:"Tactical", view:"planning"/);
+assert.match(presentation, /id:"forecast", labelKey:"nav\.forecast", fallback:"Forecast", view:"outlook"/);
+assert.match(presentation, /id:"strategic", labelKey:"nav\.strategic", fallback:"Strategic", view:"strategic-planning"/);
+assert.match(presentation, /id:"operational", labelKey:"nav\.operational", fallback:"Operational", view:"operational-planning"/);
 assert.doesNotMatch(presentation, /id:"operational-planning", labelKey:"nav\.operational_plan"/);
 assert.match(app, /\['operational-planning','planning','strategic-planning'\]\.includes\(tab\)/);
 

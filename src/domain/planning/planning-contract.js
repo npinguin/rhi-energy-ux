@@ -29,15 +29,20 @@
     };
     const nativeHorizon = supported && typeof runtime.nativePlanningHorizon === 'function'
       ? runtime.nativePlanningHorizon(normalized) : null;
-    const published = nativeHorizon?.available === true ? nativeHorizon : null;
-    const horizonDetails = published?.details || {};
+    // Keep incomplete native evidence and baseline preview visible; it does
+    // not obtain action authority or masquerade as the selected provider.
+    const effectivePublished=nativeHorizon?.published===true && nativeHorizon?.details ? nativeHorizon : null;
+    const baseline=(!effectivePublished && typeof runtime.nativePlanningHorizon==='function')
+      ? runtime.nativePlanningHorizon(normalized,'baseline') : null;
+    const published=effectivePublished || (baseline?.published===true && baseline.details ? baseline : null);
+    const previewOnly=!!published && (published!==effectivePublished || published.available!==true);
+    const horizonDetails=published?.details || {};
     const publicationMetadata = nativeHorizon?.metadata || {};
     // Native numeric totals remain available as measurement evidence but never
     // authorize an effective schedule without one quality-complete horizon.
-    const effectiveAvailable = selected.available===true && !!published;
+    const effectiveAvailable = selected.available===true && effectivePublished?.available===true;
     const publicationStatus = effectiveAvailable ? 'AVAILABLE' :
-      nativeHorizon?.published===true ? 'INCOMPLETE' :
-        nativeHorizon?.status || 'UNAVAILABLE';
+      published ? 'INCOMPLETE' : nativeHorizon?.status || 'UNAVAILABLE';
     const requestedProvider=String(publicationMetadata.requested_provider||'');
     const effectiveProvider=String(publicationMetadata.provider_id||'');
     const providerHold=!!requestedProvider&&!effectiveProvider;
@@ -62,6 +67,7 @@
       available:effectiveAvailable,
       totalsAvailable:selected.available===true,
       provisionalTotals:selected.available===true&&!effectiveAvailable,
+      previewOnly,previewSource:published===baseline?'rhi_deterministic_baseline':previewOnly?'incomplete_effective':'effective',
       published:nativeHorizon?.published===true||!!published,
       publicationStatus,
       requestedProvider,effectiveProvider,providerHold,
@@ -86,13 +92,16 @@
       planningCombinedTotals:Object.freeze({}),
       horizonsById:Object.freeze({D0:todayTotals,D1:tomorrowTotals}),
       horizonId:normalized,horizon,summary:horizon,
-      laneTotals:Object.freeze(totals(selected)),
+      // D0/D1 lane totals are backend-owned and must never be reconstructed
+      // from flat numeric KPI readbacks.
+      laneTotals:Object.freeze(planningObject(planningObject(horizonDetails.summary).lane_totals)),
       buckets:Object.freeze(Array.isArray(horizonDetails.buckets) ? horizonDetails.buckets : []),
       // The producer may explicitly identify the current bucket; otherwise it is unknown.
       currentPlanningBucket:Object.freeze(planningObject(horizonDetails.current_bucket)),
       currentActionIntent:Object.freeze(published && horizonDetails.execution_policy && typeof horizonDetails.execution_policy === 'object' ? horizonDetails.execution_policy : {}),
       missingContractCapabilities:Object.freeze([
-        ...(!published ? ['native_effective_horizon','native_planning_buckets'] : []),
+        ...(!effectiveAvailable ? ['native_effective_horizon'] : []),
+        ...(!published ? ['native_planning_buckets'] : []),
         ...(!published || !Array.isArray(horizonDetails.planning_assets) ? ['native_planning_assets'] : []),
         ...(!published || !horizonDetails.execution_policy || typeof horizonDetails.execution_policy !== 'object' || Array.isArray(horizonDetails.execution_policy)
           ? ['native_planning_actions'] : [])

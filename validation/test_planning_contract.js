@@ -156,7 +156,7 @@ assert.equal(d0Contract.buckets.length,0);
 const nativeBucket={bucket_id:'D0-H12',asset_allocations:[{asset_id:'vehicle_carole',planned_energy_kwh:2}]};
 const withNativeDetail={
   ...runtime,
-  nativePlanningHorizon(horizon){return {available:horizon==='D0',details:horizon==='D0'
+  nativePlanningHorizon(horizon){return {published:horizon==='D0',available:horizon==='D0',details:horizon==='D0'
     ? {buckets:[nativeBucket],planning_assets:[{asset_id:'vehicle_carole',planned_today_kwh:2}],execution_policy:{configured_mode:'advice',manual_plan_execution_allowed:true},provider_id:'emhass',plan_id:'plan-42',source_lanes:{solar:3},consumer_lanes:{home:2},balance:{grid:1},availability:'AVAILABLE'} : null};}
 };
 const publishedD0=readPlanningContract(withNativeDetail,'D0');
@@ -181,14 +181,14 @@ assert.equal(readPlanningContract(withNativeDetail,'D1').buckets.length,0);
 assert.equal(d0Contract.planningAssets.length,0);
 assert.ok(d0Contract.missingContractCapabilities.includes('native_planning_buckets'));
 assert.deepEqual(Object.keys(d0Contract.planningCombinedTotals),[]);
-assert.equal(normalizePlanningLaneTotals(d1Contract.laneTotals).flexibleLoadsKwh,5);
+assert.equal(normalizePlanningLaneTotals(d1Contract.laneTotals).flexibleLoadsKwh,null,'unpublished lane ledger cannot be inferred from flat KPIs');
 const unavailableRuntime={nativePlanningTotals(horizon){
   const data=runtime.nativePlanningTotals(horizon);
   return {available:false,horizon,values:{...data.values,planned_kwh:mk('planned_kwh',null,false)},missing:['planned_kwh']};
 }};
 const unavailableContract=readPlanningContract(unavailableRuntime,'D0');
 assert.equal(unavailableContract.available,false);
-assert.equal(unavailableContract.laneTotals.planned_kwh,null);
+assert.equal(Object.keys(unavailableContract.laneTotals).length,0,'absent producer lane totals remain absent');
 assert.equal(unavailableContract.horizon.status,'UNAVAILABLE');
 console.log('PASS native Energy D0/D1 planning reader with explicit missing capabilities, zero and unavailable');
 
@@ -289,7 +289,7 @@ console.log('PASS native Energy duplicate authority and same-host state revision
 // Backend producer fixture: custom_components/rhi_energy/runtime/planning_publication.py
 // publishes the horizon itself under attributes.details; the top-level metadata
 // owns completeness, quality, plan, provider and effective/baseline selection.
-const nativeReaderMatch = card.match(/    nativePlanningHorizon\(horizonId = 'D0'\) \{[\s\S]*?\n    \}\n\n    nativeMetric/);
+const nativeReaderMatch = card.match(/    nativePlanningHorizon\(horizonId = 'D0', variant = 'effective'\) \{[\s\S]*?\n    \}\n\n    nativeMetric/);
 assert.ok(nativeReaderMatch, 'native reader must be present in source');
 const nativeReader = vm.runInNewContext(
   '({' + nativeReaderMatch[0].replace(/\n\n    nativeMetric$/, '') + '}).nativePlanningHorizon'
@@ -331,7 +331,7 @@ const producerHeld=nativeUnavailable({...producerAttributes,availability:'INCOMP
 assert.equal(producerHeld.published,true);
 assert.equal(producerHeld.status,'INCOMPLETE');
 assert.equal(producerHeld.metadata.requested_provider,'emhass');
-assert.equal(producerHeld.details,null);
+assert.equal(producerHeld.details,producerDetails,'INCOMPLETE has preview evidence, not execution rights');
 const heldContract=readPlanningContract({...runtime,nativePlanningHorizon:()=>producerHeld},'D0');
 assert.equal(heldContract.available,false);
 assert.equal(heldContract.totalsAvailable,true);
@@ -341,8 +341,10 @@ assert.equal(heldContract.providerHold,true);
 assert.equal(heldContract.requestedProvider,'emhass');
 assert.equal(heldContract.effectiveProvider,'');
 assert.equal(heldContract.reasonCode,'native_optimizer_not_available');
-assert.equal(heldContract.planningAssets.length,0);
-assert.equal(heldContract.currentActionIntent.manual_plan_execution_allowed,undefined);
+assert.equal(heldContract.planningAssets.length,1);
+assert.equal(heldContract.previewOnly,true);
+assert.equal(heldContract.currentActionIntent.manual_plan_execution_allowed,false);
+assert.equal(heldContract.executionAuthorized,false);
 assert.ok(heldContract.missingContractCapabilities.includes('native_effective_horizon'));
 assert.equal(nativeUnavailable({...producerAttributes,totals_complete:false}).available,false);
 assert.equal(nativeUnavailable({...producerAttributes,details:{...producerDetails,buckets:null}}).available,false);
@@ -353,3 +355,46 @@ assert.equal(nativeReader.call({hass:{states:{
 }}},'D0').available,false);
 assert.equal(nativeReader.call({hass:{states:states(producerAttributes)}},'D1').available,false);
 console.log('PASS native producer attributes.details schema, D0/D1 identity, duplicate, incomplete, baseline, zero and readback policy');
+
+
+// Target E0.15.122 15/30/60min canonical advisory lane names.
+const realSlot=adaptPlanningBucket({
+ bucket_id:'D0:2026-10-12T10:15:00+02:00',duration_minutes:15,
+ start_time:'2026-10-12T10:15:00+02:00',
+ advisory_source_lane:[
+  {participant_id:'solar',planned_supply_kwh:0.3},
+  {participant_id:'battery',planned_supply_kwh:0.1},
+  {participant_id:'grid',planned_supply_kwh:0.2}],
+ advisory_consumer_lane:[
+  {participant_id:'home',planned_demand_kwh:0.15},
+  {participant_id:'vehicle_q8',planned_demand_kwh:0.4}],
+ advisory_boundary_flows:{grid_export_kwh:0.05},
+ advisory_lane_balance_delta_kwh:0
+},'ENERGY_NATIVE_PLANNING');
+assert.equal(realSlot.durationMinutes,15);
+assert.equal(realSlot.sources.length,3);
+assert.equal(realSlot.consumers.length,2);
+assert.equal(realSlot.sources.find(x=>x.participantId==='battery').energyKwh,0.1);
+assert.equal(realSlot.consumers.find(x=>x.participantId==='vehicle_q8').energyKwh,0.4);
+assert.equal(realSlot.boundary.gridExportKwh,0.05);
+assert.equal(realSlot.balanceDeltaKwh,0);
+const baselinePreview=readPlanningContract({
+ ...runtime,nativePlanningHorizon(id,variant){
+  if(variant==='baseline')return {published:true,available:false,details:{
+   horizon_id:id,buckets:[realSlot.raw],
+   summary:{lane_totals:{sources:{solar_kwh:0.3,battery_out_kwh:0.1,grid_in_kwh:0.2},
+     consumers:{home_kwh:0.15,flexible_loads_kwh:0.4},
+     boundary:{grid_out_kwh:0.05},source_total_kwh:0.6,use_total_kwh:0.6,balance_delta_kwh:0}},
+   planning_assets:[],execution_policy:{autonomous_execution_allowed:false}
+  },metadata:{provider_id:'rhi_deterministic'}};
+  return {published:true,available:false,details:null,
+    metadata:{requested_provider:'emhass'}};
+ }
+},'D0');
+assert.equal(baselinePreview.previewOnly,true);
+assert.equal(baselinePreview.previewSource,'rhi_deterministic_baseline');
+assert.equal(baselinePreview.available,false);
+assert.equal(baselinePreview.buckets.length,1);
+assert.equal(baselinePreview.laneTotals.sources.solar_kwh,0.3);
+assert.equal(baselinePreview.executionAuthorized,false);
+console.log('PASS native RHI deterministic interval lanes and read-only hold preview');
