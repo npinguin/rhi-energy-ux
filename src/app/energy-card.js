@@ -1410,10 +1410,10 @@
       if (bySection && byItem) return { section:bySection.id, item:byItem.id, view:byItem.view };
       const legacy = {
         overview:['energy','overview'], flow:['energy','flow'], battery:['energy','battery'], consumers:['energy','consumers'], gas:['energy','gas'],
-        strategies:['intelligence','settings'], intelligence:['intelligence','settings'], solar:['energy','solar'], 'operational-planning':['intelligence','plan'],
+        strategies:['intelligence','settings'], intelligence:['intelligence','settings'], solar:['energy','solar'], 'operational-planning':['intelligence','operational'],
         planning:['intelligence','plan'], outlook:['intelligence','plan'],
         metering:['insights','metering'], value:['insights','value'], retrospective:['insights','retrospective'],
-        'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','plan']
+        'solar-generation':['energy','solar'], 'strategic-planning':['intelligence','strategic']
       };
       const [fallbackSection,fallbackItem] = legacy[String(legacyView || '')] || ['energy','overview'];
       const section = sections.find(row => row.id === fallbackSection) || sections[0];
@@ -5808,7 +5808,18 @@
           ['✓','Confidence',this.productStateLabel(confidence,'Limited'),'Planning confidence']
         ]
       };
-      if (!vm.contractSupported) return `${this.tabExperienceHeader(rt,'planning',planningHeader)}${this.contractGap('Tactical planning unavailable','Planning information is not available right now.')}`;
+      if (!vm.contractSupported) {
+        const status=objectFrom(rt.canonicalProduct()?.planning?.provider_status || {});
+        const requested=String(status.requested_provider || 'Selected planner');
+        const observed=String(status.requested_runtime_reason || status.selection_reason || 'No complete effective provider output');
+        const alternative=status.baseline_available === true
+          ? 'A deterministic baseline is available, but it is not the selected effective plan. No automatic fallback or physical execution is permitted.'
+          : 'No provider-owned baseline is currently published.';
+        const reason=status.requested_provider
+          ? `Planner ${requested} is on hold: ${observed}. ${alternative}`
+          : 'No effective planning provider is currently published. Check the Energy planner configuration and source completeness.';
+        return `${this.tabExperienceHeader(rt,'planning',planningHeader)}${this.contractGap('Tactical planning unavailable',reason)}`;
+      }
       const participatingCount = assetTotals.length;
       const nextLines = assetTotals.map(item => this.assetIdentityChip(item.asset,fmtKw(firstDefined(item.asset.requested_power_kw,item.asset.requested_charge_power_kw,item.asset.requested_power_kw_effective),'—'))).join('');
       const planningLoadRows = assetTotals.map(item => {
