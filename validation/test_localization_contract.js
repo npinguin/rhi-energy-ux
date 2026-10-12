@@ -25,7 +25,9 @@ if(t("nl-BE","nav.battery")!=="Thuisbatterij") throw new Error("nl-BE fallback f
 if(t("fr-BE","nav.value")!=="Valeur") throw new Error("fr-BE fallback failed");
 if(t("en","hero.overview.title")!=="Energy Overview") throw new Error("English baseline drifted");
 for(const locale of ["en","nl","fr"]){
-  for(const key of ["hero.strategic.title","hero.strategic.description","hero.operational.title","hero.operational.description","nav.forecast"]){
+  for(const key of ["hero.strategic.title","hero.strategic.description","hero.operational.title","hero.operational.description","nav.forecast",
+    "forecast.incomplete_title","forecast.incomplete_desc","forecast.flexible_scheduled","forecast.flexible_known",
+    "forecast.flexible_unknown","forecast.per_asset_missing","forecast.row_planned","forecast.row_needed","forecast.grid_unavailable"]){
     const translated=t(locale,key);
     if(!translated || translated===key) throw new Error(`Untranslated Energy Intelligence UX: ${locale}:${key}`);
   }
