@@ -185,33 +185,36 @@
     nativePlanningTotals(horizonId = 'D0') {
       return readNativeEnergyPlanningTotals(this.hass, horizonId);
     }
-    nativePlanningHorizon(horizonId = 'D0') {
+    nativePlanningHorizon(horizonId = 'D0', variant = 'effective') {
       const horizon=String(horizonId || '').toUpperCase();
+      if(!['effective','baseline'].includes(variant)) return Object.freeze({published:false,available:false,details:null});
       if (horizon !== 'D0' && horizon !== 'D1') return Object.freeze({available:false,details:null});
-      // The Energy producer publishes the effective plan's buckets and asset/lane
-      // allocations under attributes.details. Never interpret an inventory row,
-      // incomplete horizon, baseline, or duplicate publisher as executable truth.
+      // Baseline and INCOMPLETE horizons may be read as preview only.
+      // They never authorize physical action or masquerade as effective plans.
+      const contract=variant==='baseline'
+        ? 'RHI_ENERGY_BASELINE_PLANNING_HORIZON_V1'
+        : 'RHI_ENERGY_PLANNING_HORIZON_V1';
       const matches=Object.values(this.hass?.states || {}).filter(state=>
-        state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1' &&
+        state?.attributes?.canonical_contract === contract &&
         state?.attributes?.canonical_source === 'rhi_energy.runtime' &&
         state?.attributes?.horizon_id === horizon &&
-        state?.attributes?.variant === 'effective');
+        state?.attributes?.variant === variant);
       if (matches.length !== 1) return Object.freeze({
         published:false,available:false,status:'UNAVAILABLE',details:null,
-        metadata:null,reason:matches.length>1?'duplicate_effective_horizon':'effective_horizon_not_published'
+        metadata:null,reason:matches.length>1?'duplicate_native_horizon':'native_horizon_not_published'
       });
       const attrs=matches[0].attributes || {};
       const details=attrs.details;
-      const ready=String(attrs.availability || '').toUpperCase() === 'AVAILABLE' &&
-        attrs.totals_complete === true &&
-        details && typeof details === 'object' && !Array.isArray(details) &&
-        Array.isArray(details.buckets) &&
+      const structurallyValid=details && typeof details === 'object' &&
+        !Array.isArray(details) && Array.isArray(details.buckets) &&
         (details.horizon_id == null || details.horizon_id === horizon);
+      const ready=String(attrs.availability || '').toUpperCase() === 'AVAILABLE' &&
+        attrs.totals_complete === true && structurallyValid && variant==='effective';
       return Object.freeze({
         published:true,available:!!ready,
         status:ready?'AVAILABLE':String(attrs.availability || 'INCOMPLETE').toUpperCase(),
         reason:ready?'':String(attrs.reason_code || 'effective_horizon_incomplete'),
-        details:ready?details:null,metadata:attrs
+        details:structurallyValid?details:null,metadata:attrs
       });
     }
 
@@ -229,13 +232,20 @@
       const nativeMetrics = Object.entries(this.hass?.states || {})
         .filter(([,state])=>String(state?.attributes?.canonical_source || '') === 'rhi_energy.runtime'
           && (!!String(state?.attributes?.metric_key || '').trim() ||
-            state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1'))
+            ['RHI_ENERGY_PLANNING_HORIZON_V1','RHI_ENERGY_BASELINE_PLANNING_HORIZON_V1']
+              .includes(state?.attributes?.canonical_contract)))
         .map(([entityId])=>entityId);
       const objectIds=this.canonicalIndex?.objectEntityIds?.() || [];
+      const planningConfigIds=Object.entries(this.hass?.states || {})
+        .filter(([id,state])=>id.startsWith('select.') &&
+          ['RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1','RHI_ENERGY_PLANNING_RESOLUTION_V1']
+            .includes(state?.attributes?.canonical_contract) &&
+          state?.attributes?.write_authority==='rhi_energy.config_entry.options')
+        .map(([id])=>id);
       const commandIds=Object.entries(this.hass?.states || {})
         .filter(([,state])=>state?.attributes?.canonical_contract === 'RHI_ENERGY_CANONICAL_COMMAND_V1')
         .map(([id])=>id);
-      return [...new Set([...canonicalIds, ...objectIds, ...nativeMetrics, ...commandIds, registryEntity].filter(Boolean))];
+      return [...new Set([...canonicalIds, ...objectIds, ...nativeMetrics, ...commandIds, ...planningConfigIds, registryEntity].filter(Boolean))];
     }
     entitySignature(entityIds = []) {
       return (entityIds || []).map(id => {
