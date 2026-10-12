@@ -1,3 +1,9 @@
+## 4.3.36-rc.15 — RHI Deterministic Planning
+
+- Coordinate with E0.15.123 default RHI planning, native 15/30/60-minute selector and D0/D1 owner-published hourly/subhourly allocations.
+- Forecast, Strategic, Tactical, Operational, Settings, Site Consumption, Flexible Loads and Retrospective remain on their single canonical Energy producer contracts.
+- Runtime and physical command qualification still blocked; immutable HACS test candidate, rollback rc.14.
+
 ## 4.3.36-rc.14 — Energy Flow, forecast and planning consumer recovery
 
 - Combine native Site Consumption/period Metering, read-only deterministic D0/D1 baseline forecast, provider/resolution HA selectors and canonical Energy automation mode.

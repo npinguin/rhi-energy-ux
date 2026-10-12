@@ -1,12 +1,15 @@
-# v4.3.36-rc.14 — Energy Flow & Intelligence recovery (HACS TEST CANDIDATE)
+# v4.3.36-rc.15 — Deterministic Energy planning and configuration HACS TEST CANDIDATE
 
-- Restore separate Forecast, Strategic, Tactical, Operational and Settings journeys for native Today (D0) / Tomorrow (D1).
-- Show read-only RHI deterministic baseline when a requested external provider has no validated effective result; never issue commands on baseline.
-- Select operational planner and resolution using exact backend-owned HA selectors and readback; Energy automation mode through canonical energy.operating_mode, no fabricated setting.
-- Read actual canonical D0/D1 source/consumer lanes, completeness and financial evidence without phantom allocations or estimated zeros.
-- Flow presents Home Battery even when direction-safe separate charge/discharge signals do not exist; animation is enabled only with verified sign-compatible sensors.
-- Flow shows one real Flexible consumers list with identity, Energy needed (kWh), Power now (kW), Requested power (kW), associated charger and owner detail navigation. Physical charger interfaces are not duplicate loads; technical connections fold into diagnostics.
-- Consume backend-native Site Consumption, Flexible Loads instantaneous power and canonical Metering/Retrospective from E0.15.122.
-- Tests include canonical ownership, no unproven charger-to-vehicle attribution, independent battery direction, native planner/readback, cross-surface UI and HACS deterministic build.
+Paired and tested backend source candidate: **E0.15.123**; Foundation F1.8.44 and Mobility M0.10.47.
 
-**Target HA hardware/runtime and real backend E0.15.122 + companion pending planner controls remain unqualified.** This is an immutable candidate, not stable. No fallback execution, no hardware actuation by a shadow provider. Rollback: v4.3.36-rc.13.
+- Intelligence navigation exposes Forecast, Strategic, Tactical, Operational and Settings as dedicated existing views with a single Home Intelligence style and data contract.
+- Tactical displays D0/D1 day horizons, Solar/Grid/Battery/Home energy source/consumer lanes, per-flexible-load energy allocations, remaining needs and producer-owned kWh totals, honoring the backend's 15/30/60-minute resolution.
+- Native Energy provider selector defaults to RHI Deterministic for unset configurations and native resolution selector writes 15/30/60 minutes through HA config-entry options and readback. User configurations explicitly selecting EMHASS must be changed by the user to RHI.
+- Existing Energy UI contracts consume Site Consumption, native Flexible Loads power, trustworthy hour/day/week/month/year Metering and Retrospective evidence from Energy E0.15.123 without creating values in the browser.
+- Retain fail-closed forecast and planning evidence status. External optimizers use the same planner input/output/admission concepts, not a parallel UI or physical command path.
+
+## HACS candidate, not stable
+
+Static CI, page contracts, checksum and HACS packaging are verifiable at build time; real HA 2026.10.x, physical forecast coverage, price history, per-load allocations, automation readback, command confirmation, restart and rollback remain **NOT EXECUTED** until a target installation produces proof. Do not infer a working plan where the provider still reports missing input.
+
+Rollback: v4.3.36-rc.14. Do not overwrite historical tags.
