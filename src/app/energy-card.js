@@ -1841,6 +1841,25 @@
         this.render();
         return;
       }
+      const plannerPick=event.target.closest('[data-planner-provider-select]');
+      if(plannerPick && !plannerPick.disabled){
+        const catalog=this.plannerSelection();
+        const option=String(plannerPick.value || '');
+        if(!catalog || !catalog.options.includes(option) || !this._hass?.callService)return;
+        if(option === catalog.requested)return;
+        this.plannerWriteStatus={option,state:'pending'};
+        Promise.resolve(this._hass.callService('select','select_option',{
+          entity_id:catalog.entityId,option
+        })).then(()=>{
+          this.plannerWriteStatus={option,state:'verifying'};
+          this.render();
+        }).catch(error=>{
+          this.plannerWriteStatus={option,state:'rejected',
+            reason:String(error?.message || 'Planner request rejected')};
+          this.render();
+        });
+        return;
+      }
       const input = event.target.closest('[data-property-key]');
       if (!input || input.disabled) return;
       if (input.dataset.strategyProfileField && this.strategyEditProfileId) {
@@ -2342,8 +2361,12 @@
       const picker=state && state.options.length
         ? `<label class="rhiPlannerSelect"><span>Planner</span><select data-planner-provider-select>${state.options.map(id=>`<option value="${escapeHtml(id)}"${id===state.requested?' selected':''}>${escapeHtml(label(id))}</option>`).join('')}</select></label>`
         : '<span>Planner selection is not available from this backend.</span>';
+      const pending=this.plannerWriteStatus;
+      const message=pending && pending.option !== state?.requested
+        ? `<small role="status">${escapeHtml(pending.state==='rejected' ? pending.reason : 'Waiting for Home Assistant readback')}</small>` : '';
+      if(pending && pending.option === state?.requested)this.plannerWriteStatus=null;
       return `<section class="rhiPlannerControls" aria-label="Planner and automation">
-        <div>${picker}${state?`<small>Effective: ${escapeHtml(state.effective?label(state.effective):'None · HOLD')}</small>`:''}</div>
+        <div>${picker}${state?`<small>Effective: ${escapeHtml(state.effective?label(state.effective):'None · HOLD')}</small>`:''}${message}</div>
         ${this.automationQuickInline(rt,this.automationModeValue(rt,'advice'))}
       </section>`;
     }
