@@ -215,6 +215,23 @@
       });
     }
 
+    plannerSelection() {
+      const matches=Object.entries(this.hass?.states || {}).filter(([id,state]) =>
+        id.startsWith('select.') &&
+        state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1' &&
+        state?.attributes?.write_authority === 'rhi_energy.config_entry.options');
+      if(matches.length!==1)return null;
+      const [entityId,state]=matches[0], attrs=state.attributes;
+      return {
+        entityId,
+        requested:String(attrs.requested_provider || state.state || ''),
+        effective:String(attrs.effective_provider || ''),
+        executionAuthorized:attrs.execution_authorized===true,
+        options:Array.isArray(attrs.options) ? attrs.options.map(String) : [],
+        capabilities:Array.isArray(attrs.provider_capabilities)?attrs.provider_capabilities:[]
+      };
+    }
+
     nativeMetric(metricKey = '') {
       return readNativeEnergyMetric(this.hass, metricKey);
     }
@@ -2349,22 +2366,7 @@
     pilotReadinessPanel(rt) { return ''; }
 
 
-    plannerSelection() {
-      const matches=Object.entries(this._hass?.states || {}).filter(([id,state]) =>
-        id.startsWith('select.') &&
-        state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1' &&
-        state?.attributes?.write_authority === 'rhi_energy.config_entry.options');
-      if(matches.length!==1)return null;
-      const [entityId,state]=matches[0], attrs=state.attributes;
-      return {
-        entityId,
-        requested:String(attrs.requested_provider || state.state || ''),
-        effective:String(attrs.effective_provider || ''),
-        executionAuthorized:attrs.execution_authorized===true,
-        options:Array.isArray(attrs.options) ? attrs.options.map(String) : [],
-        capabilities:Array.isArray(attrs.provider_capabilities)?attrs.provider_capabilities:[]
-      };
-    }
+    plannerSelection() { return this.runtime().plannerSelection(); }
     plannerControl(rt) {
       const state=this.plannerSelection();
       const label=id=>state?.capabilities.find(row=>row.provider_id===id)?.name || id || 'Unavailable';
