@@ -24,6 +24,12 @@ const t=(locale,key)=>vm.runInContext(`rhiUxTranslate(RHI_ENERGY_TRANSLATIONS,${
 if(t("nl-BE","nav.battery")!=="Thuisbatterij") throw new Error("nl-BE fallback failed");
 if(t("fr-BE","nav.value")!=="Valeur") throw new Error("fr-BE fallback failed");
 if(t("en","hero.overview.title")!=="Energy Overview") throw new Error("English baseline drifted");
+for(const locale of ["en","nl","fr"]){
+  for(const key of ["hero.strategic.title","hero.strategic.description","hero.operational.title","hero.operational.description","nav.forecast"]){
+    const translated=t(locale,key);
+    if(!translated || translated===key) throw new Error(`Untranslated Energy Intelligence UX: ${locale}:${key}`);
+  }
+}
 
 const machineTokens=[/sensor\./i,/RHI_[A-Z0-9_]+/i,/property_key/i,/command_key/i,/asset_id/i,/contract_id/i];
 for(const locale of ["en","nl","fr"]){
