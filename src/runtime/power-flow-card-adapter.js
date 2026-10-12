@@ -26,11 +26,18 @@ function buildRhiPowerFlowCardConfig(rt) {
   if (solarId) entities.solar = {entity:solarId};
   // battery.power_kw sign is not contractually the direction convention
   // required by Power Flow Card Plus. Do not map it without separate signed evidence.
-  const homeId = sensor('site_consumption.power_kw', 'site_consumption');
-  // Power Flow Card Plus otherwise computes Home by adding the input sources.
-  // The RHI site balance may be incomplete; never invent household demand.
-  if (!homeId) return null;
-  entities.home = {entity:homeId, override_state:true, name:'Site consumption'};
+  // Site Consumption is a producer-owned native Energy metric, not a logical
+  // object of class site_consumption (the logical inventory has no such class).
+  // Do not substitute Home Consumption: it excludes flexible loads and battery
+  // charging, whereas this card needs the full measured site balance.
+  const site = rt?.nativeMetric?.('site_consumption_power_kw');
+  const siteId = String(site?.entity_id || '');
+  const siteUnit = String(site?.unit || '').toLowerCase();
+  // A unique available native metric_key is the only supported route.
+  // The metric reader rejects duplicates, stale or invalid values.
+  if (site?.available !== true || !/^sensor\.[a-z0-9_]+$/.test(siteId) ||
+      !['w','kw'].includes(siteUnit)) return null;
+  entities.home = {entity:siteId, override_state:true, name:'Site consumption'};
   // Physical load circles use only one unambiguous canonical per-asset sensor.
   // A charger is connection infrastructure, not an additional energy load.
   const allPower = (index?.rowsForProperty?.('flexible_load.power_kw') || [])
@@ -40,7 +47,7 @@ function buildRhiPowerFlowCardConfig(rt) {
     const id = String(row?.asset_id || '').trim();
     if (id) byAsset.set(id, [...(byAsset.get(id) || []), row]);
   }
-  const used = new Set([importId,exportId,solarId,homeId].filter(Boolean));
+  const used = new Set([importId,exportId,solarId,siteId].filter(Boolean));
   const individuals = [];
   for (const [id, rows] of byAsset) {
     if (rows.length !== 1) continue;
