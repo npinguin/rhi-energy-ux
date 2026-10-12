@@ -119,7 +119,7 @@ function readEnergyCanonicalProduct(gateway) {
       ? gateway.host.nativePlanningTotals(id) : readNativeEnergyPlanningTotals(hass,id);
     const detail=typeof gateway.host?.nativePlanningHorizon==='function'
       ? gateway.host.nativePlanningHorizon(id):null;
-    const attrs=detail?.available === true ? detail.details || {} : {};
+    const attrs=detail?.published === true && detail.details ? detail.details : {};
     const numeric=(field)=>{
       const cell=native?.values?.[field];
       return cell?.available === true ? Number(cell.value) : null;
