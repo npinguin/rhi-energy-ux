@@ -3187,9 +3187,22 @@ class FlexibleAssetDomainModel {
 
     const totals=reader=>Object.fromEntries(Object.entries(reader.values).map(([key,row])=>
       [key,row.available ? Number(row.value) : null]));
+    // Preserve native producer semantics.  Numeric KPI projections are not a
+    // substitute for the horizon's Supply / Demand / Balance publication.
+    // A deterministic baseline remains visibly preview-only and cannot grant
+    // planning/execution authority.
+    const nativeSummary=Object.freeze({
+      ...planningObject(horizonDetails.summary),
+      supply:planningObject(horizonDetails.supply),
+      demand:planningObject(horizonDetails.demand),
+      balance:planningObject(horizonDetails.balance),
+      mode:planningObject(horizonDetails.mode),
+      quality:planningObject(horizonDetails.quality)
+    });
     const horizon=Object.freeze({
       horizon_id:normalized,
       ...totals(selected),
+      summary:nativeSummary,
       status:publicationStatus,
       quality:Object.freeze({availability:publicationStatus,
         missing:selected.missing,
@@ -5872,6 +5885,7 @@ function rhiEnergyVisualPickerStyles() {
     }
     automationModeRow(rt) {
       const exactKeys = [
+        'energy.operating_mode',
         'energy_intelligence.automation_mode',
         'consumer.automation_mode',
         'energy.automation_mode',
@@ -6990,7 +7004,7 @@ function rhiEnergyVisualPickerStyles() {
       const solarRemaining = asNumber(supply.solar_remaining_kwh);
       const batteryAboveReserve = asNumber(firstDefined(supply.battery_available_above_reserve_kwh,supply.available_above_reserve_kwh));
       const batteryReserve = asNumber(firstDefined(supply.battery_reserve_kwh,supply.protected_reserve_kwh));
-      const totalAvailable = asNumber(firstDefined(supply.total_available_kwh,supply.expected_available_kwh));
+      const totalAvailable = asNumber(supply.total_usable_supply_kwh);
       const homeConsumption = asNumber(firstDefined(demand.home_consumption_forecast_kwh,demand.base_load_forecast_kwh,demand.home_load_forecast_kwh));
       const knownNeed = asNumber(firstDefined(demand.flexible_known_need_kwh,demand.known_flexible_need_kwh));
       const scheduledFlexible = asNumber(firstDefined(demand.flexible_scheduled_kwh,demand.scheduled_flexible_load_kwh));
@@ -8515,7 +8529,7 @@ function rhiEnergyVisualPickerStyles() {
       return `<section class="panel compact planningConfiguration"><div class="meteringCardHead"><div><h2>Planning & automation</h2><p>One Energy planning contract for RHI and external planners.</p></div></div><div class="planningAggregateTotals">
       ${control('RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1','provider','Planner')}
       ${control('RHI_ENERGY_PLANNING_RESOLUTION_V1','resolution','Resolution')}
-      <span><small>Automation mode</small><b>${escapeHtml(human(mode))}</b><small>Editable in Settings</small></span>
+      <div class="planningModeControl">${this.modeSelector(rt,mode)}<small>Off: observe only · Advice: recommend and await approval · Automatic: act only within strategy and physical safety gates.</small></div>
       <span><small>Effective planner</small><b>${escapeHtml(effective?human(effective):'On hold')}</b><small>${escapeHtml(!effective?humanReason(reason,'Missing source evidence'):'Energy-owned validated planning')}</small></span>
       </div></section>`;
     }
@@ -8539,9 +8553,9 @@ function rhiEnergyVisualPickerStyles() {
         return {
           asset,
           canonical,
-          need: asNumber(firstDefined(canonical.need_kwh,published.energy_need_kwh,published.need_kwh,published.remaining_need_kwh)),
+          need: asNumber(firstDefined(canonical.energy_need_kwh,canonical.need_kwh,published.energy_need_kwh)),
           plannedEnergy: vm.horizonId === 'D1' ? asNumber(canonical.planned_tomorrow_kwh) : asNumber(canonical.planned_today_kwh),
-          remainingNeed: asNumber(firstDefined(canonical.unresolved_horizon_kwh,published.remaining_need_kwh,published.unresolved_need_kwh))
+          remainingNeed: asNumber(firstDefined(canonical.still_to_plan_kwh,canonical.unresolved_horizon_kwh,published.remaining_need_kwh))
         };
       });
       const hourlyAssetEnergy = assetId => vm.rows.reduce((sum,row) => {
