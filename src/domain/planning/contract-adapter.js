@@ -33,8 +33,11 @@
       // promote an old R1.79.x advisory transport to native authority.
       const durationMinutes=asNumber(bucket.duration_minutes);
       const allocations=planningArray(bucket.asset_allocations);
-      const sourceRows=planningArray(bucket.source_lane);
-      const consumerRows=planningArray(bucket.consumer_lane);
+      // Authoritative Energy interval lanes are published as advisory_*.
+      // No power-to-energy or consumer inference is permitted in this adapter.
+      const sourceRows=planningArray(firstDefined(bucket.advisory_source_lane,bucket.source_lane));
+      const consumerRows=planningArray(firstDefined(bucket.advisory_consumer_lane,bucket.consumer_lane));
+      const boundary=planningObject(firstDefined(bucket.advisory_boundary_flows,bucket.boundary_flows,{}));
       const nativeRow=(row,role)=>({
         ...row, participantId:planningParticipantId(row),laneRole:role,
         energyKwh:asNumber(firstDefined(row.planned_energy_kwh,row.planned_demand_kwh,row.planned_supply_kwh)),
@@ -54,8 +57,8 @@
         durationMinutes,
         sources:sourceRows.map(row=>nativeRow(row,'source')),
         consumers,
-        boundary:{gridExportKwh:asNumber(bucket.grid_export_kwh)},
-        balanceDeltaKwh:asNumber(bucket.balance_delta_kwh),
+        boundary:{gridExportKwh:asNumber(firstDefined(boundary.grid_export_kwh,bucket.grid_export_kwh))},
+        balanceDeltaKwh:asNumber(firstDefined(bucket.advisory_lane_balance_delta_kwh,bucket.balance_delta_kwh)),
         state:String(firstDefined(bucket.planning_state,bucket.state,'')||'').toLowerCase(),
         reason:firstDefined(bucket.reason_code,bucket.reason,''),
         confidence:firstDefined(bucket.confidence,''),
