@@ -1659,6 +1659,7 @@
       const planningHorizon = event.target.closest('[data-planning-horizon]');
       if (planningHorizon && !planningHorizon.disabled) {
         this.selectedPlanningHorizonId = planningHorizon.dataset.planningHorizon || 'D0';
+        this.selectedOutlookHorizonId = this.selectedPlanningHorizonId;
         this.persistInteractionContext();
         this._forceRender = true;
         this.render();
@@ -2319,21 +2320,24 @@
     pilotReadinessPanel(rt) { return ''; }
 
 
+    planningViewControls(tab) {
+      const views=[
+        {value:'outlook',label:'Forecast',attrs:{'data-tab-target':'outlook'}},
+        {value:'strategic-planning',label:'Strategic',attrs:{'data-tab-target':'strategic-planning'}},
+        {value:'planning',label:'Tactical',attrs:{'data-tab-target':'planning'}},
+        {value:'operational-planning',label:'Operational',attrs:{'data-tab-target':'operational-planning'}}
+      ];
+      const nav=this.componentSegmentedControl(views,tab,'planningViewSelector');
+      const id=this.selectedPlanningHorizonId==='D1'?'D1':'D0';
+      return nav+`<div class="scopeSelector" aria-label="Planning horizon">
+        <button type="button" class="scopeOption ${id==='D0'?'active':''}" data-planning-horizon="D0" aria-pressed="${id==='D0'}">Today</button>
+        <button type="button" class="scopeOption ${id==='D1'?'active':''}" data-planning-horizon="D1" aria-pressed="${id==='D1'}">Tomorrow</button></div>`;
+    }
     pageContextControls(rt, tab) {
-      if (tab === 'outlook') return this.componentHorizonSelector('outlook', rt.outlookHorizons(), this.selectedOutlookHorizonId);
+      if (tab === 'outlook') return this.planningViewControls(tab);
       if (tab === 'consumers') return `<label class="hiQuickSelect"><span>Group</span><select data-consumer-filter-select>${this.consumerFilterOptions().map(([id,label])=>`<option value="${id}"${this.consumerFilter===id?' selected':''}>${label}</option>`).join('')}</select></label><label class="hiQuickSelect"><span>${escapeHtml(rhiEnergyT(this._hass,"common.sort",{},"Sort"))}</span><select data-consumer-sort-select>${this.consumerSortOptions().map(([id,label])=>`<option value="${id}"${this.consumerSort===id?' selected':''}>${label}</option>`).join('')}</select></label>`;
       if (tab === 'metering') return this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId) + this.componentMeteringSort();
-      if (['operational-planning','planning','strategic-planning'].includes(tab)) {
-        const selector = this.componentSegmentedControl([
-          { value:'operational-planning', label:rhiEnergyT(this._hass,'nav.operational_plan',{},'Now'), attrs:{'data-tab-target':'operational-planning'} },
-          { value:'planning', label:rhiEnergyT(this._hass,'nav.tactical_plan',{},'Today & Tomorrow'), attrs:{'data-tab-target':'planning'} },
-          { value:'strategic-planning', label:rhiEnergyT(this._hass,'nav.strategic_plan',{},'Long term'), attrs:{'data-tab-target':'strategic-planning'} }
-        ], tab, 'planningViewSelector');
-        const horizon = tab === 'planning'
-          ? `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">Today</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">Tomorrow</button></div>`
-          : '';
-        return selector + horizon;
-      }
+      if (['operational-planning','planning','strategic-planning'].includes(tab)) return this.planningViewControls(tab);
       if (tab === 'value') return this.componentPeriodSelector(rt.meteringPeriods().length ? rt.meteringPeriods() : this.defaultMeteringPeriods(), this.selectedMeteringPeriodId, 'value');
       return '';
     }
