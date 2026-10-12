@@ -37,6 +37,26 @@ Acceptance still open: test with VW ID4, two distinct Audi Q8 identities, unassi
 - **E-FLOW-06**: physical power must not be attributed to a vehicle from mere charger assignment: connected identity proof is independent from configured/effective relation. Keep measured charger connection power distinct.
 - **E-FLOW-07**: maintain a consistent Energy ↔ Mobility navigation contract for vehicle/charger Details and a predictable Back journey.
 
+## Issue E-PLAN-01 — Previously working forecast and planning disappeared
+
+**Confirmed cause in code:** Energy backend publishes separate effective and RHI deterministic baseline D0/D1 horizon contracts. The UX consumed only effective horizons and did not carry their nested forecast summary into the Outlook view. An unvalidated external planner enters HOLD without erasing the independent baseline.
+
+Source recovery on work branch: explicit read-only baseline horizon, no command authority; restored Forecast / Strategic / Tactical / Operational navigation with Today/Tomorrow; preserve published supply/demand summary, bucket allocations and vehicle identities. Effective plan remains the only source of execution permission.
+
+Runtime proof pending: selected deterministic versus EMHASS HOLD, baseline absent/partial/stale, two batteries, PV, price curves, D0 and D1, totals and per-device allocation.
+
+## Issue E-PLAN-02 — Planner and automation selector
+
+Backend already exposes HA select unique ID rhi_energy:planning:requested_provider and RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1, with registry-assigned entity ID and native selection/readback. Deterministic planner is SUPPORTED, EMHASS ADVISORY_ONLY, HAEO and EOS DESIGN_ONLY. Canonical automation mode is a separate property-controlled Off/Advice/Automatic selector.
+
+WIP UX presents requested/effective planner and native options alongside existing automation control. Changes use the HA native select service; no frontend-only override or silent execution fallback. Real HA reload, readback, error, HOLD and authorization still need proof.
+
+## Issue E-PLAN-03 — Restore the different planning levels
+
+Forecast: independent source, quality and provenance. Strategic: goals, constraints and strategy. Tactical: actual D0/D1 buckets, energy demand and sources. Operational: what is active now, next actions, effective plan and command readback. A tomorrow preview must never be treated as an action to execute now.
+
+Full user acceptance, exact previous-working-runtime comparison and cross-device qualification remain open. No merge or release before closure.
+
 ## Gates
 
 Static: canonical contract, domain projection, split battery sensor validation, cross-domain visual/navigation, source ownership, public hygiene, test ownership and deterministic build. Record evidence on draft PR only.
