@@ -178,6 +178,45 @@ assert.equal(publishedD0.buckets[0].asset_allocations[0].planned_energy_kwh,2);
 assert.equal(publishedD0.missingContractCapabilities.includes('native_planning_buckets'),false);
 assert.equal(readPlanningContract(withNativeDetail,'D1').buckets.length,0);
 
+// Regression: external planner in HOLD must never erase the independently
+// published deterministic forecast/plan or turn it into execution permission.
+const baselineHorizon=id=>({
+  published:true,available:true,status:'AVAILABLE',
+  metadata:{provider_id:'rhi_deterministic',variant:'baseline',
+    execution_authorized:false,requested_provider:'emhass'},
+  details:{
+    horizon_id:id,required_kwh:9,planned_kwh:6,still_to_plan_kwh:3,
+    flexible_required_kwh:4,flexible_planned_kwh:2,flexible_still_to_plan_kwh:2,
+    buckets:[{bucket_id:id+'-09',duration_minutes:60,
+      source_lane:[{participant_id:'solar',planned_energy_kwh:1}],
+      consumer_lane:[{participant_id:'vehicle_id4',planned_energy_kwh:1}],
+      grid_export_kwh:0}],
+    planning_assets:[{asset_id:'vehicle_id4',need_kwh:4,
+      planned_today_kwh:id==='D0'?2:0,planned_tomorrow_kwh:id==='D1'?2:0}],
+    summary:{supply:{solar_forecast_kwh:8},
+      demand:{home_consumption_forecast_kwh:4,flexible_known_need_kwh:4},
+      lane_totals:{sources:{solar_kwh:8},consumers:{home_kwh:4,flexible_loads_kwh:2}}}
+  }
+});
+const holdRuntime={...runtime,nativePlanningHorizon:(id,variant='effective')=>
+  variant==='baseline'?baselineHorizon(id):{
+    published:true,available:false,status:'INCOMPLETE',
+    reason:'no_validated_plan_hold',
+    metadata:{requested_provider:'emhass',provider_id:null}
+  }};
+const heldEffective=readPlanningContract(holdRuntime,'D0');
+const heldBaseline=readPlanningContract(holdRuntime,'D0','baseline');
+assert.equal(heldEffective.available,false,'invalid selected planner cannot authorize execution');
+assert.equal(heldEffective.buckets.length,0,'baseline must never silently become effective');
+assert.equal(heldBaseline.available,true,'RHI published baseline remains visible in HOLD');
+assert.equal(heldBaseline.previewOnly,true);
+assert.equal(heldBaseline.executionAuthorized,false);
+assert.equal(heldBaseline.horizon.summary.supply.solar_forecast_kwh,8,'forecast source survives projection');
+assert.equal(heldBaseline.buckets.length,1);
+assert.equal(heldBaseline.planningAssets[0].asset_id,'vehicle_id4');
+assert.equal(heldBaseline.planningTomorrowTotals.flexible_planned_kwh,2,'Tomorrow is preserved');
+assert.equal(heldBaseline.currentActionIntent.manual_plan_execution_allowed,undefined);
+assert.equal(readPlanningContract(holdRuntime,'D1','baseline').horizon.horizon_id,'D1');
 assert.equal(d0Contract.planningAssets.length,0);
 assert.ok(d0Contract.missingContractCapabilities.includes('native_planning_buckets'));
 assert.deepEqual(Object.keys(d0Contract.planningCombinedTotals),[]);
