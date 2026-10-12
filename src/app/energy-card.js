@@ -4300,7 +4300,27 @@
       const relation = charger ? this.userRelationshipLabel(chargerDisplay, 'Assigned charger') : '';
       const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
-      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(relation ? `${relation} · ${state}` : state)}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+      const energyNeed = this.targetEnergyForAsset(id, consumer);
+      const display = escapeHtml(consumer.display_name || rt.assetName(id) || human(id));
+      const chargerId = String(charger || '').trim();
+      const chargerPath = chargerId ? (rhiUxResolveDomainAssetNavigation('rhi_mobility',chargerId) || rhiUxResolveDomainAssetNavigation('mobility',chargerId)) : '';
+      const sourceKind = String(firstDefined(consumer.source_asset_kind,consumer.asset_type,'') || '').toLowerCase();
+      const consumerPath = rt.sourceAssetNavigation(consumer) || (/vehicle|car/.test(sourceKind)
+        ? (rhiUxResolveDomainAssetNavigation('rhi_mobility',id) || rhiUxResolveDomainAssetNavigation('mobility',id)) : '');
+      const connection = chargerId ? (chargerPath
+        ? `<button type="button" class="rhiFlowLinkedAsset" data-source-asset-nav="${escapeHtml(chargerPath)}" aria-label="Open charger details">${escapeHtml(chargerDisplay || rt.assetName(chargerId) || 'Charger')} <span aria-hidden="true">›</span></button>`
+        : `<span>${escapeHtml(chargerDisplay || rt.assetName(chargerId) || 'Charger')}</span>`)
+        : '<span>No charger identified</span>';
+      return `<article class="flowPhysicalConsumerCard rhiFlowConsumerCard">
+        <div class="rhiFlowConsumerIdentity">${art}<div><b>${display}</b><small>${escapeHtml(state)}</small></div></div>
+        <div class="rhiFlowConsumerFacts">
+          <span><small>Energy needed</small><b>${escapeHtml(energyNeed === null ? '—' : fmtKwh(energyNeed))}</b></span>
+          <span><small>Power now</small><b>${escapeHtml(powerText)}</b></span>
+          <span><small>Requested power</small><b>${escapeHtml(requested === null ? '—' : fmtKw(requested))}</b></span>
+        </div>
+        <div class="rhiFlowConsumerRelation"><small>Charging via</small>${connection}</div>
+        ${consumerPath ? `<button type="button" class="rhiFlowConsumerDetails" data-source-asset-nav="${escapeHtml(consumerPath)}">Details <span aria-hidden="true">›</span></button>` : ''}
+      </article>`;
     }
     flowConsumers(rt, connectionSnapshot = { rows:[] }) {
       const domain = this.flexibleAssetDomain(rt);
