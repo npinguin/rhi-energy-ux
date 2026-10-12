@@ -59,7 +59,7 @@ for(const token of [
   'for(const id of meteringConflicts) delete meteringPeriods[id]',
   "Object.freeze(meteringPeriods)",
   "canonical_period_publication_unavailable",
-  'retrospective:{}','valueAccounting',
+  'ENERGY_CANONICAL_RETROSPECTIVE_V1','valueAccounting',
   'readNativeEnergyMetric(hass,\'net_financial_result_eur\')'
 ]) if(!native.includes(token)) throw new Error('native Metering/Value contract invariant '+token);
 
@@ -69,6 +69,8 @@ for(const token of [
   'rawPeriod.baseline_reset_required',
   'vm.quality?.user_action_required === true && vm.command',
   'const retrospective=objectFrom(this.runtime().canonicalProduct().retrospective || {})',
+  'flexible_assets_kwh',
+  'impossibleBalance',
   'Waiting for measured evidence',
   'blocking_property_ids'
 ]) if(!card.includes(token)) throw new Error('missing Metering/Value/Retrospective UX invariant '+token);
