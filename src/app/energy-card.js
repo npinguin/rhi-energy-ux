@@ -185,20 +185,19 @@
     nativePlanningTotals(horizonId = 'D0') {
       return readNativeEnergyPlanningTotals(this.hass, horizonId);
     }
-    nativePlanningHorizon(horizonId = 'D0') {
+    nativePlanningHorizon(horizonId = 'D0', variant = 'effective') {
       const horizon=String(horizonId || '').toUpperCase();
-      if (horizon !== 'D0' && horizon !== 'D1') return Object.freeze({available:false,details:null});
-      // The Energy producer publishes the effective plan's buckets and asset/lane
-      // allocations under attributes.details. Never interpret an inventory row,
-      // incomplete horizon, baseline, or duplicate publisher as executable truth.
+      if (horizon !== 'D0' && horizon !== 'D1' || !['effective','baseline'].includes(variant)) return Object.freeze({available:false,details:null});
+      // Effective and baseline are distinct, producer-owned native horizon contracts.
+      // Baseline is READ-ONLY planning/forecast evidence, never an executable plan.
       const matches=Object.values(this.hass?.states || {}).filter(state=>
-        state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1' &&
+        state?.attributes?.canonical_contract === (variant === 'baseline' ? 'RHI_ENERGY_BASELINE_PLANNING_HORIZON_V1' : 'RHI_ENERGY_PLANNING_HORIZON_V1') &&
         state?.attributes?.canonical_source === 'rhi_energy.runtime' &&
         state?.attributes?.horizon_id === horizon &&
-        state?.attributes?.variant === 'effective');
+        state?.attributes?.variant === variant);
       if (matches.length !== 1) return Object.freeze({
         published:false,available:false,status:'UNAVAILABLE',details:null,
-        metadata:null,reason:matches.length>1?'duplicate_effective_horizon':'effective_horizon_not_published'
+        metadata:null,reason:matches.length>1?`duplicate_${variant}_horizon`:`${variant}_horizon_not_published`
       });
       const attrs=matches[0].attributes || {};
       const details=attrs.details;
@@ -206,11 +205,12 @@
         attrs.totals_complete === true &&
         details && typeof details === 'object' && !Array.isArray(details) &&
         Array.isArray(details.buckets) &&
-        (details.horizon_id == null || details.horizon_id === horizon);
+        (details.horizon_id == null || details.horizon_id === horizon) &&
+        (variant !== 'baseline' || attrs.execution_authorized !== true);
       return Object.freeze({
         published:true,available:!!ready,
         status:ready?'AVAILABLE':String(attrs.availability || 'INCOMPLETE').toUpperCase(),
-        reason:ready?'':String(attrs.reason_code || 'effective_horizon_incomplete'),
+        reason:ready?'':String(attrs.reason_code || `${variant}_horizon_incomplete`),
         details:ready?details:null,metadata:attrs
       });
     }
@@ -229,7 +229,7 @@
       const nativeMetrics = Object.entries(this.hass?.states || {})
         .filter(([,state])=>String(state?.attributes?.canonical_source || '') === 'rhi_energy.runtime'
           && (!!String(state?.attributes?.metric_key || '').trim() ||
-            state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNING_HORIZON_V1'))
+            ['RHI_ENERGY_PLANNING_HORIZON_V1','RHI_ENERGY_BASELINE_PLANNING_HORIZON_V1'].includes(state?.attributes?.canonical_contract)))
         .map(([entityId])=>entityId);
       const objectIds=this.canonicalIndex?.objectEntityIds?.() || [];
       const commandIds=Object.entries(this.hass?.states || {})
