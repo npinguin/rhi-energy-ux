@@ -23,6 +23,10 @@ if (!app.includes("if(item.id === 'value') return showValue")) throw new Error('
 if (!app.includes("experiencePresence()")) throw new Error('Presence not exposed through EnergyRuntime');
 if (!app.includes("rt.experiencePresence().battery === true")) throw new Error('Overview battery surfaces not presence-gated');
 if (!app.includes("rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow")) throw new Error('Overview flexible-load aggregate not presence-gated');
-if (!app.includes("rt.experiencePresence().battery === true && balanceVm.battery.direction")) throw new Error('Overview battery flow participant not presence-gated');
+if (!app.includes("const batteryPresent = rt.experiencePresence().battery === true;") ||
+    !app.includes("batteryPresent && balanceVm.battery.direction === 'into_storage'") ||
+    !app.includes("batteryPresent && balanceVm.battery.direction === 'unknown'")) {
+  throw new Error('Overview battery charge and unknown-state rows must be presence-gated');
+}
 
 console.log('PASS native structural capability presence UX, independent of transient telemetry');
