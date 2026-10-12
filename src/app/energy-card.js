@@ -1806,7 +1806,7 @@
         const contract=kind==='provider'?'RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1':
           kind==='resolution'?'RHI_ENERGY_PLANNING_RESOLUTION_V1':null;
         const entityId=String(nativePlanningSelect.dataset.planningEntity || '');
-        const source=this._hass?.states?.[entityId];
+        const source=this.runtime().rawState(entityId);
         const option=String(nativePlanningSelect.value || '');
         if(contract && entityId.startsWith('select.') &&
            source?.attributes?.canonical_contract===contract &&
