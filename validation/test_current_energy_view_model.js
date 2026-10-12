@@ -30,6 +30,14 @@ const rows=[
   property('home_consumption','home_consumption','home_consumption.power_kw',0.878)
 ];
 const nativeStates={
+  'sensor.site_consumption_metric':{state:'1.865',attributes:{
+    metric_key:'site_consumption_power_kw',canonical_source:'rhi_energy.runtime',
+    availability:'AVAILABLE',unit_of_measurement:'kW'
+  }},
+  'sensor.flexible_loads_metric':{state:'0',attributes:{
+    metric_key:'flexible_loads_power_kw',canonical_source:'rhi_energy.runtime',
+    availability:'AVAILABLE',unit_of_measurement:'kW'
+  }},
   'sensor.home_consumption_metric':{state:'0.878',attributes:{
     metric_key:'home_consumption_power_kw',canonical_source:'rhi_energy.runtime',
     availability:'AVAILABLE',quality:'CANONICAL',unit_of_measurement:'kW'
@@ -48,10 +56,13 @@ assert.equal(read('grid.net_power_kw').number,-0.021);
 assert.equal(read('home_consumption.power_kw').number,0.878);
 const consumption=context.readLiveConsumptionContract(gateway);
 assert.equal(consumption.homeConsumptionKw,0.878);
-assert.equal(consumption.siteConsumptionKw,null);
+assert.equal(consumption.siteConsumptionKw,1.865);
 assert.equal(consumption.source,'RHI_ENERGY_CANONICAL_PROPERTY_V2');
-assert.equal(consumption.flexibleLoadsKw,null);
+assert.equal(consumption.flexibleLoadsKw,0);
 // The native metric, not a similarly named aggregate/property, is Home consumption truth.
+// An imaginary logical object of class site_consumption is not a source.
+const directCanonicalSite=fromRows([...rows,property('site','site_consumption','site_consumption.power_kw',99)],{});
+assert.equal(context.readLiveConsumptionContract(directCanonicalSite).siteConsumptionKw,null);
 const onlyCanonicalHome=fromRows(rows,{});
 assert.equal(context.readLiveConsumptionContract(onlyCanonicalHome).homeConsumptionKw,null);
 const numericZero={...nativeStates,'sensor.home_consumption_metric':{
@@ -69,3 +80,7 @@ assert.equal(context.readTypedPropertyContract(duplicate,'','battery.power_kw').
 assert.equal(context.readTypedPropertyContract(duplicate,'','battery.power_kw').reason,'ambiguous_canonical_property');
 assert.equal(context.readTypedPropertyContract(fromRows([]),'','solar.power_kw').value,null);
 console.log('PASS native Energy current values and exact object scope; no aggregate fallback');
+
+const siteDuplicate={...nativeStates,'sensor.duplicate_site':nativeStates['sensor.site_consumption_metric']};
+assert.equal(context.readLiveConsumptionContract(fromRows(rows,siteDuplicate)).siteConsumptionKw,null,'duplicate site metric cannot win');
+console.log('PASS target HA site 1.865 kW, physical flex 0, zero vs missing and native authority');
