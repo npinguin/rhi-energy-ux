@@ -3023,7 +3023,7 @@ class FlexibleAssetDomainModel {
       // No power-to-energy or consumer inference is permitted in this adapter.
       const sourceRows=planningArray(firstDefined(bucket.advisory_source_lane,bucket.source_lane));
       const consumerRows=planningArray(firstDefined(bucket.advisory_consumer_lane,bucket.consumer_lane));
-      const boundary=planningObject(firstDefined(bucket.advisory_boundary_flows,bucket.boundary_flows,{}));
+      const boundary=objectFrom(firstDefined(bucket.advisory_boundary_flows,bucket.boundary_flows,{}));
       const nativeRow=(row,role)=>({
         ...row, participantId:planningParticipantId(row),laneRole:role,
         energyKwh:asNumber(firstDefined(row.planned_energy_kwh,row.planned_demand_kwh,row.planned_supply_kwh)),
