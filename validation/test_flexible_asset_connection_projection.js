@@ -152,6 +152,7 @@ console.log('PASS physical consumer rows are connection targets, never charger i
 assert.ok(card.includes('<h2>Flexible consumers</h2>'),'Flow should expose one actual-consumer list');
 assert.ok(card.includes('consumers.map(consumer => this.consumerCard(rt,consumer))'),'primary Flow list must be de-duplicated canonical consumer identities');
 assert.ok(card.includes('rhiFlowConnectionDiagnostics'),'technical connection rows are depth, not a duplicate primary list');
+assert.ok(!card.includes('asset.actual_power_kw, connection.physical_power_kw, connection.power_kw'),'a charger power measurement must never be attributed to a vehicle from assignment alone');
 assert.ok(!card.includes('<h2>All flexible loads</h2>'),'technical inventory list may not duplicate consumer cards');
 assert.ok(!card.includes('section><h2>Physical consumers</h2>'),'duplicate physical consumer section must be removed');
 const consumerStart = card.indexOf('    consumerCard(rt, consumer) {');
