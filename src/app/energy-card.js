@@ -4276,7 +4276,11 @@
       const basis = human(firstDefined(supply.solar_basis,supply.forecast_basis,isTomorrow?'Full day forecast':'Remaining forecast'));
       const planningRows = this.flexibleAssetDomain(rt).planningParticipants().map(vm => {
         const load=vm.raw||{}; const id=load.asset_id||load.flexible_asset_id||''; const planning=load.energy_planning||rt.planningOutcomeFor(id)||{};
-        const planned=asNumber(firstDefined(planning.planned_today_kwh,planning.scheduled_kwh));
+        // D0 and D1 are separate backend-owned periods; never report today's
+        // allocation as a tomorrow allocation.
+        const planned=asNumber(isTomorrow
+          ? firstDefined(planning.planned_tomorrow_kwh,planning.scheduled_tomorrow_kwh)
+          : firstDefined(planning.planned_today_kwh,planning.scheduled_today_kwh,planning.scheduled_kwh));
         const needed=asNumber(firstDefined(planning.known_need_kwh,planning.energy_to_target_kwh,load.energy_to_target_kwh,load.required_energy_kwh));
         const amount=planned!==null?planned:needed;
         if(amount===null) return null;
