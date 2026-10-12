@@ -52,6 +52,22 @@ const states={
   'sensor.financial':native('net_financial_result_eur',1.23,{period:'today',actual_complete:true}),
   'sensor.home_native':native('home_consumption_power_kw',1.8)
 };
+// Persisted interval evidence must be passed through by exact period identity.
+states['sensor.energy_metering_today']={state:'OK',attributes:{
+  contract_id:'RHI_ENERGY_METERING_PERIOD_V1',canonical_source:'rhi_energy.runtime',
+  publisher:'rhi_energy',period_id:'today',availability:'AVAILABLE',quality:'OK',
+  summary:{measured:{solar_production_kwh:0,home_consumption_kwh:2.5},
+    quality:{period:'OK',field_quality:{solar_kwh:'OK'}},
+    cost:{import_cost_eur:1.5}},
+  flexible_assets_kwh:{vehicle_a:1.2},
+  field_quality:{solar_kwh:'OK'},field_coverage_seconds:{solar_kwh:3600},
+  can_be_used_for_remaining:true
+}};
+states['sensor.energy_metering_week']={state:'PARTIAL',attributes:{
+  contract_id:'RHI_ENERGY_METERING_PERIOD_V1',canonical_source:'rhi_energy.runtime',
+  publisher:'rhi_energy',period_id:'week',availability:'AVAILABLE',quality:'PARTIAL',
+  summary:{measured:{grid_import_kwh:11},quality:{period:'PARTIAL'},cost:{}}
+}};
 const totals=['required_kwh','planned_kwh','still_to_plan_kwh',
   'flexible_required_kwh','flexible_planned_kwh','flexible_still_to_plan_kwh'];
 for(const [day,values] of [['today',[19.2,19.2,0,8,5,3]],['tomorrow',[11,4,7,7,1,6]]])
@@ -75,6 +91,12 @@ assert.equal(view.field('battery.reserve_target_pct','configuration:battery').ed
 assert.equal(view.configuration.strategy.profiles.length,1);
 assert.equal(view.configuration.strategy.profiles[0].profile_id,'battery');
 assert.equal(view.valueAccounting.periods.today.net_financial_result_eur,1.23);
+assert.equal(view.metering.periods.today.summary.measured.solar_production_kwh,0);
+assert.equal(view.metering.periods.today.summary.measured.home_consumption_kwh,2.5);
+assert.equal(view.metering.periods.today.flexible_assets_kwh.vehicle_a,1.2);
+assert.equal(view.metering.periods.week.quality,'PARTIAL');
+assert.equal(view.metering.periods.week.can_be_used_for_remaining,false);
+assert.equal(view.metering.periods.month,undefined);
 assert.equal(ctx.selectEnergyValue(view,'month').net_financial_result_eur,null);
 assert.equal(view.planning.horizons.D0.required_kwh,19.2);
 assert.equal(view.planning.horizons.D1.still_to_plan_kwh,7);
@@ -90,4 +112,10 @@ assert.equal(duplicate.field('battery.soc_pct','battery_a').resolved,false);
 assert.equal(duplicate.field('battery.soc_pct','battery_a').value,null);
 assert.equal(ctx.readEnergyCanonicalProduct({host:{hass:{states:{}},
   canonicalIndex:ctx.createEnergyCanonicalPropertyIndex({states:{}})}}).available,false);
-console.log('PASS native Energy object hierarchy, visual identity, asset-scoped properties, pricing, plan, finance and duplicate guards');
+const duplicatedPeriod={states:{...states,
+ 'sensor.energy_metering_today_duplicate':states['sensor.energy_metering_today']}};
+const duplicatedView=ctx.readEnergyCanonicalProduct({host:{
+ hass:duplicatedPeriod,canonicalIndex:ctx.createEnergyCanonicalPropertyIndex(duplicatedPeriod)
+}});
+assert.equal(duplicatedView.metering.periods.today,undefined,'duplicate period evidence must fail closed');
+console.log('PASS native Energy metering periods, zero, partial, attribution, duplicates and canonical projections');
