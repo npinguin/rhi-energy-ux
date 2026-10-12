@@ -1,15 +1,14 @@
-# v4.3.36-rc.15 — Deterministic Energy planning and configuration HACS TEST CANDIDATE
+# v4.3.36-rc.16 — Trusted Energy Balance HACS TEST CANDIDATE
 
-Paired and tested backend source candidate: **E0.15.123**; Foundation F1.8.44 and Mobility M0.10.47.
+Paired target backend: **E0.15.124**; Foundation **F1.8.44**, Mobility **M0.10.48**.
 
-- Intelligence navigation exposes Forecast, Strategic, Tactical, Operational and Settings as dedicated existing views with a single Home Intelligence style and data contract.
-- Tactical displays D0/D1 day horizons, Solar/Grid/Battery/Home energy source/consumer lanes, per-flexible-load energy allocations, remaining needs and producer-owned kWh totals, honoring the backend's 15/30/60-minute resolution.
-- Native Energy provider selector defaults to RHI Deterministic for unset configurations and native resolution selector writes 15/30/60 minutes through HA config-entry options and readback. User configurations explicitly selecting EMHASS must be changed by the user to RHI.
-- Existing Energy UI contracts consume Site Consumption, native Flexible Loads power, trustworthy hour/day/week/month/year Metering and Retrospective evidence from Energy E0.15.123 without creating values in the browser.
-- Retain fail-closed forecast and planning evidence status. External optimizers use the same planner input/output/admission concepts, not a parallel UI or physical command path.
+- Correct Overview supply/demand accounting: Battery Discharge and Grid Import on Supply; Battery Charge is part of Site Consumption with Home Consumption and Flexible Loads; Grid Export is a separate outflow on the right.
+- Do not publish false 0.0 kW with Unavailable. Missing or contradictory canonical battery/grid direction becomes a visible and explained unverified state, never inferred from child batteries.
+- Read true producer-owned canonical Site Consumption without browser arithmetic. EN/NL/FR copy and direction/unknown-state regressions included.
+- Includes rc.15 fixes for Strategic/Operational untranslated hero text, and Energy #294/#297 signed/typed charging need guard via paired E0.15.124.
 
-## HACS candidate, not stable
+## HACS test candidate — not stable
 
-Static CI, page contracts, checksum and HACS packaging are verifiable at build time; real HA 2026.10.x, physical forecast coverage, price history, per-load allocations, automation readback, command confirmation, restart and rollback remain **NOT EXECUTED** until a target installation produces proof. Do not infer a working plan where the provider still reports missing input.
+Real target Home Assistant must verify two SolarEdge charging batteries, the aggregate signed battery power and state, grid import/export direction, site demand reconciliation, source quality, D0/D1 plan and financial/history data, configuration write/readback, restart and rollback. Backend discrepancy tracked by npinguin/rhi-energy#299. No autonomous execution when evidence is incomplete.
 
-Rollback: v4.3.36-rc.14. Do not overwrite historical tags.
+Rollback: v4.3.36-rc.15. Do not overwrite historical tags.
