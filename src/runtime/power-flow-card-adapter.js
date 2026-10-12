@@ -13,6 +13,18 @@ function buildRhiPowerFlowCardConfig(rt) {
     if (unit && unit !== 'w' && unit !== 'kw') return '';
     return id;
   };
+  // SoC is a percentage, never a power sensor. Its use is optional and must
+  // not create a battery flow node without direction-safe energy measurements.
+  const socSensor = () => {
+    const rows = (index?.rowsForProperty?.('battery.soc_pct') || [])
+      .filter(r => r.logical_object_class === 'battery_system');
+    if (rows.length !== 1) return '';
+    const row = rows[0];
+    const id = String(row.entity_id || '');
+    const unit = String(row.unit || row.unit_of_measurement || row.native_unit_of_measurement || '').toLowerCase();
+    return row.availability === 'AVAILABLE' && /^sensor\\.[a-z0-9_]+$/.test(id)
+      && (!unit || unit === '%') ? id : '';
+  };
   const entities = {};
   const importId = sensor('grid_import.power_kw', 'grid_connection');
   const exportId = sensor('grid_export.power_kw', 'grid_connection');
@@ -24,8 +36,22 @@ function buildRhiPowerFlowCardConfig(rt) {
   }
   const solarId = sensor('solar.power_kw', 'solar_production');
   if (solarId) entities.solar = {entity:solarId};
-  // battery.power_kw sign is not contractually the direction convention
-  // required by Power Flow Card Plus. Do not map it without separate signed evidence.
+  // The Power Flow Card Plus battery consumes explicit *directional* sensors:
+  // consumption = charging the storage; production = discharging storage.
+  // battery.power_kw by itself does not publish a compatible signed convention.
+  // A partial, ambiguous or stale pair must not animate a misleading arrow.
+  const batteryChargeId = sensor('battery.charge_power_kw', 'battery_system');
+  const batteryDischargeId = sensor('battery.discharge_power_kw', 'battery_system');
+  if (batteryChargeId && batteryDischargeId && batteryChargeId !== batteryDischargeId) {
+    entities.battery = {
+      entity:{consumption:batteryChargeId, production:batteryDischargeId},
+      display_state:'one_way', name:'Home Battery'
+    };
+    const socId = socSensor();
+    if (socId) entities.battery.state_of_charge = socId;
+  }
+  // Never use battery.power_kw alone: its direction is not card-compatible
+  // without producer-published positive/negative convention metadata.
   // Site Consumption is a producer-owned native Energy metric, not a logical
   // object of class site_consumption (the logical inventory has no such class).
   // Do not substitute Home Consumption: it excludes flexible loads and battery
