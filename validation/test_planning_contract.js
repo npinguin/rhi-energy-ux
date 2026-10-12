@@ -289,7 +289,7 @@ console.log('PASS native Energy duplicate authority and same-host state revision
 // Backend producer fixture: custom_components/rhi_energy/runtime/planning_publication.py
 // publishes the horizon itself under attributes.details; the top-level metadata
 // owns completeness, quality, plan, provider and effective/baseline selection.
-const nativeReaderMatch = card.match(/    nativePlanningHorizon\(horizonId = 'D0'\) \{[\s\S]*?\n    \}\n\n    nativeMetric/);
+const nativeReaderMatch = card.match(/    nativePlanningHorizon\(horizonId = 'D0', variant = 'effective'\) \{[\s\S]*?\n    \}\n\n    nativeMetric/);
 assert.ok(nativeReaderMatch, 'native reader must be present in source');
 const nativeReader = vm.runInNewContext(
   '({' + nativeReaderMatch[0].replace(/\n\n    nativeMetric$/, '') + '}).nativePlanningHorizon'
