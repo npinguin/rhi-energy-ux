@@ -168,6 +168,28 @@ assert.equal(publishedD0.planningAssets.length,1);
 assert.equal(publishedD0.currentActionIntent.configured_mode,'advice');
 assert.equal(publishedD0.providerId,'emhass');
 assert.equal(publishedD0.planId,'plan-42');
+
+// V1 product parity: native producer semantics must survive both reader
+// shapes. The frontend must not reconstruct Supply/Demand/Grid figures.
+const nativeParity = readPlanningContract({
+  ...runtime,
+  nativePlanningHorizon(horizon) {
+    return {published:true,available:true,details:{
+      summary:{lane_totals:{sources:{solar_kwh:2},consumers:{home_kwh:1},boundary:{grid_out_kwh:1}}},
+      supply:{solar_forecast_kwh:2,total_usable_supply_kwh:3},
+      demand:{home_consumption_forecast_kwh:1,total_expected_demand_kwh:2},
+      balance:{expected_grid_import_kwh:1,expected_grid_export_kwh:0},
+      quality:{availability:'AVAILABLE'},planning_assets:[],
+      buckets:[],execution_policy:{configured_mode:'advice'}
+    }};
+  }
+},'D0');
+assert.equal(nativeParity.summary.supply.total_usable_supply_kwh,3);
+assert.equal(nativeParity.summary.demand.total_expected_demand_kwh,2);
+assert.equal(nativeParity.summary.balance.expected_grid_import_kwh,1);
+assert.equal(nativeParity.horizon.summary.supply.solar_forecast_kwh,2);
+assert.equal(nativeParity.laneTotals.sources.solar_kwh,2);
+
 assert.equal(publishedD0.sourceLanes.solar,3);
 assert.equal(publishedD0.consumerLanes.home,2);
 assert.equal(publishedD0.balance.grid,1);
