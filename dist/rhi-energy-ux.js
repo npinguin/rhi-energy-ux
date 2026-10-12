@@ -626,6 +626,28 @@ function readEnergyCanonicalProduct(gateway) {
     reason:meteringConflicts.size ? 'duplicate_native_metering_period' :
       Object.keys(meteringPeriods).length ? '' : 'canonical_period_publication_unavailable'
   });
+  // Retrospective is already published by Energy as a native HA sensor.
+  // Never synthesize a retrospective assessment in the browser. Preserve
+  // genuine PENDING/WAITING statuses and producer-owned prerequisites.
+  let retrospective=null;
+  let retrospectiveCount=0;
+  for(const [entityId,state] of Object.entries(hass.states || {})) {
+    const a=state?.attributes || {};
+    if(a.canonical_contract !== 'ENERGY_CANONICAL_RETROSPECTIVE_V1' ||
+       a.canonical_source !== 'rhi_energy.runtime' || a.publisher !== 'rhi_energy') continue;
+    retrospectiveCount++;
+    retrospective=Object.freeze({
+      status:String(state.state || 'UNAVAILABLE'),entity_id:entityId,
+      availability:a.availability || 'UNAVAILABLE',
+      reason:a.reason || '',prerequisites:Array.isArray(a.prerequisites)?a.prerequisites:[],
+      score:a.score ?? null,confidence:a.confidence ?? null,
+      evidence_coverage_pct:a.evidence_coverage_pct ?? null,
+      trend:a.trend ?? null,objectives:Array.isArray(a.objectives)?a.objectives:[],
+      execution_kpis:a.execution_kpis || {},score_semantics:a.score_semantics || null,
+      observed_at:a.observed_at || null
+    });
+  }
+  if(retrospectiveCount!==1) retrospective=null;
   const nativeValue=readNativeEnergyMetric(hass,'net_financial_result_eur');
   const period=nativeValue?.period || null;
   const valueAccounting={selected_period_id:period,
@@ -678,7 +700,7 @@ function readEnergyCanonicalProduct(gateway) {
     health:envelope.available?'AVAILABLE':'UNAVAILABLE',
     core,summary:{},experience:{presence},presence,
     objects,profiles:[],relationships:[],connections:[],commands:nativeCommands,activity:[],
-    planning:{horizons},metering,retrospective:{},intelligence:{},overview:{},
+    planning:{horizons},metering,retrospective:retrospective||{},intelligence:{},overview:{},
     configuration,valueAccounting,layers:{planning_objects:planningObjects},
     flexibleAssets:Object.freeze(flexibleAssets),planningObjects:Object.freeze(planningObjects),
     objectById:byId,profileById:new Map(),
@@ -1135,7 +1157,16 @@ function energyAssetPublicationGap(gateway,assetId='') {
 // Current Energy consumption is read only from backend-owned canonical property
 // entities. No Public V2, source-provider, aggregate or derived-power fallback.
 function readLiveConsumptionContract(gateway) {
-  const site=readTypedPropertyContract(gateway,'consumption','site_consumption.power_kw');
+  // Energy publishes Site Consumption as a *native metric* on energy_site.
+  // There is no canonical logical object of class site_consumption: reading a
+  // property for that imaginary class always produced '—' despite 1.865 kW
+  // of valid producer-owned site balance in runtime diagnostics.
+  const siteMetric=readNativeEnergyMetric(gateway?.host?.hass || {},'site_consumption_power_kw');
+  const site=Object.freeze({
+    number:siteMetric.available === true ? Number(siteMetric.value) : null,
+    health:siteMetric.available === true ? 'AVAILABLE' : 'UNAVAILABLE',
+    reason:siteMetric.reason || 'native_site_consumption_unavailable'
+  });
   // Home consumption is published as a dedicated native HA metric by Energy.
   // Do not treat a second property-path guess as fallback or recompute it from
   // solar/grid/battery flows. The producer's availability is authoritative.
@@ -1146,8 +1177,15 @@ function readLiveConsumptionContract(gateway) {
     reason:homeMetric.reason || ''
   });
   // Flexible power is independently published by the backend, if present.
-  const flexible=readTypedPropertyContract(gateway,'consumption','flexible_loads.power_kw');
-  const attributed=readTypedPropertyContract(gateway,'consumption','flexible_loads.attributed_power_kw');
+  // This aggregate must also come from Energy-owned evidence, never a
+  // frontend sum over charger objects, vehicles or requested setpoints.
+  const flexibleMetric=readNativeEnergyMetric(gateway?.host?.hass || {},'flexible_loads_power_kw');
+  const flexible=Object.freeze({
+    number:flexibleMetric.available === true ? Number(flexibleMetric.value) : null,
+    health:flexibleMetric.available === true ? 'AVAILABLE' : 'UNAVAILABLE',
+    reason:flexibleMetric.reason || 'native_flexible_loads_power_unavailable'
+  });
+  const attributed=Object.freeze({number:null,health:'UNAVAILABLE',reason:'attribution_metric_not_published'});
   return Object.freeze({
     envelope:Object.freeze({source:'RHI_ENERGY_CANONICAL_PROPERTY_V2'}),
     siteConsumptionKw:site.number,
@@ -5108,14 +5146,27 @@ function rhiEnergyVisualPickerStyles() {
       const verifiedStates = new Set(['trusted','verified','complete','ok','ready']);
       const verificationStates = new Set(['pending','verification_required','verify','reset_required','untrusted','baseline_untrusted','baseline_required','configuration_required']);
       const partialStates = new Set(['partial','estimated','incomplete']);
-      const qualityState = verifiedStates.has(health) ? 'verified' : verificationStates.has(health) ? 'verification_required' : partialStates.has(health) ? 'partial' : 'unavailable';
-      const qualityLabel = qualityState === 'verified' ? 'Verified' : qualityState === 'verification_required' ? 'Verification required' : qualityState === 'partial' ? 'Partial' : 'Unavailable';
+      const rowStates=allRows.filter(row=>row.value !== null && row.value !== undefined).map(row=>String(row.status || 'UNKNOWN').toUpperCase());
+      const allFieldsTrusted=rowStates.length>0 && rowStates.every(state=>state==='OK');
+      const siteTotal=asNumber(measured.site_consumption_kwh);
+      const flexibleTotal=asNumber(measured.flexible_loads_energy_in_kwh);
+      const impossibleBalance=siteTotal !== null && flexibleTotal !== null &&
+        flexibleTotal > siteTotal + 0.2;
+      // The period-level 'OK' flag cannot overrule missing field evidence or
+      // impossible energy conservation (e.g. 28.6 kWh flexible > 16.6 kWh site).
+      const qualityState=impossibleBalance ? 'partial' :
+        verifiedStates.has(health) && allFieldsTrusted ? 'verified' :
+        verificationStates.has(health) ? 'verification_required' :
+        rowStates.length || partialStates.has(health) ? 'partial' : 'unavailable';
+      const qualityLabel = impossibleBalance ? 'Inconsistent totals' : qualityState === 'verified' ? 'Verified' : qualityState === 'verification_required' ? 'Verification required' : qualityState === 'partial' ? 'Partial' : 'Unavailable';
       const remediations = rt.meteringRemediationsForPeriod(periodId);
       const label = this.periodLabel(period);
       const remediation = remediations[0] || null;
       const userActionRequired = asBool(firstDefined(quality.user_action_required,effectivePeriod.user_action_required,false),false);
       const command = remediation && userActionRequired ? (remediation.command || rt.meteringResetCommandFor(remediation, periodId)) : null;
-      const conclusion = qualityState === 'verified'
+      const conclusion = impossibleBalance
+        ? {title:`${label} totals need reconciliation`,why:'Flexible Load energy exceeds measured Site Consumption. Do not trust the period totals until the Energy producer resolves this inconsistency.',recommendation:'Inspect physical meters and attribution; do not reset or invent measurements.',tone:'orange'}
+        : qualityState === 'verified'
         ? { title:`${label} totals are verified`, why:'These totals are measured and ready to use.', recommendation:'No action is needed.', tone:'green' }
         : qualityState === 'partial'
           ? { title:`${label} totals are partial`, why:'Measured values are available, but the selected period is not yet complete.', recommendation:'Use the available totals with the shown completeness in mind.', tone:'orange' }
@@ -7808,8 +7859,21 @@ function rhiEnergyVisualPickerStyles() {
         sub:row?.missing ? 'Not available' : ''
       };
     }
-    flexibleLoadMeteringRows(_rt, _periodId = 'today') {
-      return [];
+    flexibleLoadMeteringRows(rt, periodId = 'today') {
+      const period=rt.meteringPeriods().find(row=>row.period_id===String(periodId || 'today'));
+      const attributed=period?.flexible_assets_kwh;
+      if(!attributed || typeof attributed !== 'object' || Array.isArray(attributed)) return [];
+      const quality=String(period?.field_quality?.flexible_loads_energy_in_kwh || 'UNKNOWN').toUpperCase();
+      return Object.entries(attributed).filter(([id,value])=>
+        !!String(id || '').trim() && value !== null && value !== undefined &&
+        Number.isFinite(Number(value)) && Number(value)>=0
+      ).map(([asset_id,value])=>({
+        asset_id,label:rt.assetName(asset_id) || asset_id,value:Number(value),unit:'kWh',
+        measurement_state:quality,status:quality,
+        status_label:quality==='OK'?'Measured':'Measurement needs verification',
+        metric_key:'flexible_assets_kwh',
+        source:'RHI_ENERGY_METERING_PERIOD_V1',ux_visible:true
+      }));
     }
 
     meteringRowsFromRecords(_rt, periodId = 'today') {
@@ -7826,7 +7890,23 @@ function rhiEnergyVisualPickerStyles() {
       const quality = objectFrom(period?.summary?.quality || {});
       const status = String(firstDefined(quality.measurement_state,quality.health,quality.status,period?.measurement_state,period?.health,'UNAVAILABLE'));
       const statusLabel = String(firstDefined(quality.status_label,period?.status_label,''));
-      const row = (label, metricKey) => ({ label, metric_key:metricKey, value:asNumber(valueAtPath(measured,metricKey)), unit:'kWh', status, measurement_state:status, status_label:statusLabel, user_action_required:asBool(firstDefined(quality.user_action_required,period?.user_action_required,false),false) });
+      const sourceFields={
+        solar_production_kwh:'solar_kwh',grid_import_kwh:'grid_import_kwh',
+        grid_export_kwh:'grid_export_kwh',site_consumption_kwh:'site_consumption_kwh',
+        home_consumption_kwh:'home_consumption_kwh',
+        flexible_loads_energy_in_kwh:'flexible_loads_energy_in_kwh',
+        battery_charge_kwh:'battery_charge_kwh',
+        battery_discharge_kwh:'battery_discharge_kwh'
+      };
+      const fieldQuality=objectFrom(quality.field_quality || period?.field_quality || {});
+      const row = (label, metricKey) => {
+        const value=asNumber(valueAtPath(measured,metricKey));
+        const fieldState=String(fieldQuality[sourceFields[metricKey]] || 'UNKNOWN').toUpperCase();
+        return {label,metric_key:metricKey,value,unit:'kWh',
+          status:fieldState,measurement_state:fieldState,
+          status_label:fieldState==='OK'?'Measured':fieldState==='PARTIAL'?'Incomplete measurement':'Unknown measurement quality',
+          user_action_required:asBool(firstDefined(quality.user_action_required,period?.user_action_required,false),false)};
+      };
       return {
         supply:[row('Solar production','solar_production_kwh'),row('Grid import','grid_import_kwh'),row('Home Battery discharge','battery_discharge_kwh')],
         demand:[row('Site Consumption','site_consumption_kwh'),row('Home Consumption','home_consumption_kwh'),row('Flexible Loads','flexible_loads_energy_in_kwh'),row('Home Battery charge','battery_charge_kwh')],
