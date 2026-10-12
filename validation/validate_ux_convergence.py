@@ -40,9 +40,14 @@ for forbidden in (
 context_start = APP.find("pageContextControls(rt, tab)")
 context_end = APP.find("bodyContextBar(rt, tab")
 context_block = APP[context_start:context_end]
-for expected in ("outlook","consumers","metering","planning","value"):
-    if f"tab === '{expected}'" not in context_block:
+for expected in ("outlook","consumers","metering","value"):
+    if f"tab === '{expected}'" not in context_block and f"value:'{expected}'" not in APP:
         errors.append(f"missing body-scoped context case: {expected}")
+for expected in ("outlook","strategic-planning","planning","operational-planning"):
+    if f"value:'{expected}'" not in APP:
+        errors.append(f"missing shared planning subview: {expected}")
+if "data-planning-horizon=\"D0\"" not in APP or "data-planning-horizon=\"D1\"" not in APP:
+    errors.append("planning Today/Tomorrow selector missing")
 for forbidden_view_nav in ("Energy flow","Tactical planning","Gas meter","Consumer list"):
     if forbidden_view_nav in context_block:
         errors.append(f"navigation shortcut leaked into body View controls: {forbidden_view_nav}")
