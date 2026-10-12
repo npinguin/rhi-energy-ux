@@ -106,7 +106,7 @@ if (energy.items.map(item => item.id).join('|') !== 'overview|flow|solar') throw
 if (intelligence.items.map(item => item.id).join('|') !== 'forecast|strategic|plan|operational|settings') throw new Error('Intelligence navigation order drifted');
 if (insights.items.map(item => item.id).join('|') !== 'metering|retrospective') throw new Error('minimal structural-presence Insights navigation drifted');
 if (recreated.resolveNavigation('', '', 'solar').item !== 'solar') throw new Error('Solar must resolve to the Energy Solar tab');
-if (recreated.resolveNavigation('', '', 'operational-planning').item !== 'plan') throw new Error('Operational Planning must resolve inside Plan');
+if (recreated.resolveNavigation('', '', 'operational-planning').item !== 'operational') throw new Error('Operational Planning must resolve to its own view');
 if (recreated.resolveNavigation('', '', 'planning').item !== 'plan') throw new Error('legacy Planning must resolve inside Plan');
 if (recreated.resolveNavigation('', '', 'intelligence').item !== 'settings') throw new Error('legacy Intelligence must migrate to Settings');
 const navMarkup = recreated.nav();
