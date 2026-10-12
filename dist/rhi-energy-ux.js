@@ -7004,6 +7004,7 @@ function rhiEnergyVisualPickerStyles() {
       const solarRemaining = asNumber(supply.solar_remaining_kwh);
       const batteryAboveReserve = asNumber(firstDefined(supply.battery_available_above_reserve_kwh,supply.available_above_reserve_kwh));
       const batteryReserve = asNumber(firstDefined(supply.battery_reserve_kwh,supply.protected_reserve_kwh));
+      const batterySupport = asNumber(supply.battery_support_kwh);
       const totalAvailable = asNumber(supply.total_usable_supply_kwh);
       const homeConsumption = asNumber(firstDefined(demand.home_consumption_forecast_kwh,demand.base_load_forecast_kwh,demand.home_load_forecast_kwh));
       const knownNeed = asNumber(firstDefined(demand.flexible_known_need_kwh,demand.known_flexible_need_kwh));
@@ -7013,10 +7014,10 @@ function rhiEnergyVisualPickerStyles() {
       const totalDemand = asNumber(firstDefined(demand.total_expected_demand_kwh,demand.expected_demand_kwh));
       const gridImport = asNumber(firstDefined(balanceGroup.expected_grid_import_kwh,balanceGroup.grid_import_kwh));
       const gridExport = asNumber(firstDefined(balanceGroup.expected_grid_export_kwh,balanceGroup.grid_export_kwh));
-      const gridBalance = gridImport !== null && gridExport !== null ? gridImport-gridExport : null;
+      const gridBalance = asNumber(balanceGroup.grid_balance_kwh);
       const confidence = human(firstDefined(quality.confidence,horizon.confidence,'Not available'));
       const basis = human(firstDefined(supply.solar_basis,supply.forecast_basis,isTomorrow?'Full day forecast':'Remaining forecast'));
-      const planningRows = this.flexibleAssetDomain(rt).planningParticipants().map(vm => {
+      const planningRows = this.flexibleAssetDomain(rt).consumerFacing().map(vm => {
         const load=vm.raw||{}; const id=load.asset_id||load.flexible_asset_id||''; const planning=load.energy_planning||rt.planningOutcomeFor(id)||{};
         // D0 and D1 are separate backend-owned periods; never report today's
         // allocation as a tomorrow allocation.
@@ -7025,17 +7026,21 @@ function rhiEnergyVisualPickerStyles() {
           : firstDefined(planning.planned_today_kwh,planning.scheduled_today_kwh,planning.scheduled_kwh));
         const needed=asNumber(firstDefined(planning.known_need_kwh,planning.energy_to_target_kwh,load.energy_to_target_kwh,load.required_energy_kwh));
         const amount=planned!==null?planned:needed;
-        if(amount===null) return null;
+        // Inventory remains visible when need is unknown; unknown is not zero.
+        const demandText = amount===null ? '—' : fmtKwh(amount);
         const evidenceLabel=planned!==null
           ? rhiEnergyT(this._hass,'forecast.row_planned',{},'Planned')
-          : rhiEnergyT(this._hass,'forecast.row_needed',{},'Needed, not scheduled');
-        return `<div class="outlookChildRow">${this.assetVisual(load,{size:'xs',fallbackIcon:this.flexibleAssetIcon(load)})}<b>${escapeHtml(load.display_name||rt.assetName(id)||human(id))}</b><strong>${escapeHtml(fmtKwh(amount))}<small>${escapeHtml(evidenceLabel)}</small></strong></div>`;
+          : needed!==null ? rhiEnergyT(this._hass,'forecast.row_needed',{},'Needed, not scheduled') : 'Need unavailable';
+        return `<div class="outlookChildRow">${this.assetVisual(load,{size:'xs',fallbackIcon:this.flexibleAssetIcon(load)})}<b>${escapeHtml(load.display_name||rt.assetName(id)||human(id))}</b><strong>${escapeHtml(demandText)}<small>${escapeHtml(evidenceLabel)}</small></strong></div>`;
       }).filter(Boolean).join('');
       const storageDemand = asNumber(firstDefined(demand.home_battery_charge_kwh,demand.battery_charge_kwh));
       const incompleteForecast = [totalAvailable,totalDemand,gridBalance].some(value=>value===null);
+      const actualNow=this.currentEnergyModel(rt);
+      // Actual now is kW; future D0/D1 projections are kWh. Never add them.
+      const actualStrip=`<section class="outlookActualPower outlookSummaryStrip" aria-label="Actual energy power now"><div><small>Actual solar production now</small><b>${escapeHtml(fmtKw(actualNow.solar.powerKw,'—'))}</b></div><div><small>Actual site consumption now</small><b>${escapeHtml(fmtKw(actualNow.consumption.siteConsumptionKw,'—'))}</b></div><div><small>Actual home consumption now</small><b>${escapeHtml(fmtKw(actualNow.consumption.homeConsumptionKw,'—'))}</b></div></section>`;
       const totalRow=(label,value,formatter=fmtKwh)=>`<div class="outlookTotalRow"><span>${escapeHtml(label)}</span><b>${escapeHtml(formatter(value,'—'))}</b></div>`;
-      return `${this.tabExperienceHeader(rt,'outlook',pageVm)}${this.bodyContextBar(rt,'outlook','outlook-body')}<div class="outlookPage outlookPageV2" id="outlook-body">${incompleteForecast?`<section class="panel outlookEvidenceNotice"><b>${escapeHtml(rhiEnergyT(this._hass,'forecast.incomplete_title',{},'Forecast is incomplete'))}</b><p>${escapeHtml(rhiEnergyT(this._hass,'forecast.incomplete_desc',{},'Some supply, demand or grid totals are not published. The available values do not form a complete energy balance.'))}</p></section>`:''}<div class="outlookThreeGrid">
-        <section class="panel outlookBalanceCard"><h2>${escapeHtml(rhiEnergyT(this._hass,'section.supply',{},'Supply'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.supply_desc',{},'Expected usable energy for the selected horizon.'))}</p>${isTomorrow?this.kv('Solar forecast',fmtKwh(solarForecast)):this.kv('Solar remaining',fmtKwh(solarRemaining))}${batteryAboveReserve!==null?this.kv('Home Battery above reserve',fmtKwh(batteryAboveReserve)):''}${batteryReserve!==null?this.kv('Protected reserve',fmtKwh(batteryReserve)):''}${totalRow('Total usable supply',totalAvailable)}</section>
+      return `${this.tabExperienceHeader(rt,'outlook',pageVm)}${this.bodyContextBar(rt,'outlook','outlook-body')}<div class="outlookPage outlookPageV2" id="outlook-body">${actualStrip}${incompleteForecast?`<section class="panel outlookEvidenceNotice"><b>${escapeHtml(rhiEnergyT(this._hass,'forecast.incomplete_title',{},'Forecast is incomplete'))}</b><p>${escapeHtml(rhiEnergyT(this._hass,'forecast.incomplete_desc',{},'Some supply, demand or grid totals are not published. The available values do not form a complete energy balance.'))}</p></section>`:''}<div class="outlookThreeGrid">
+        <section class="panel outlookBalanceCard"><h2>${escapeHtml(rhiEnergyT(this._hass,'section.supply',{},'Supply'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.supply_desc',{},'Expected usable energy for the selected horizon.'))}</p>${isTomorrow?this.kv('Solar forecast',fmtKwh(solarForecast)):this.kv('Solar remaining',fmtKwh(solarRemaining))}${batteryAboveReserve!==null?this.kv('Home Battery above reserve',fmtKwh(batteryAboveReserve)):''}${batterySupport!==null?this.kv('Battery support',fmtKwh(batterySupport)):''}${batteryReserve!==null?this.kv('Protected reserve',fmtKwh(batteryReserve)):''}${totalRow('Total usable supply',totalAvailable)}</section>
         <section class="panel outlookBalanceCard"><h2>${escapeHtml(rhiEnergyT(this._hass,'section.demand',{},'Demand'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.demand_desc',{},'Expected Home Consumption, Flexible Loads and storage charging.'))}</p>${this.kv('Home Consumption forecast',fmtKwh(homeConsumption))}<div class="outlookAggregateRow"><span>${escapeHtml(rhiEnergyT(this._hass,flexibleLabelKey,{},'Flexible load demand'))}</span><b>${escapeHtml(fmtKwh(flexibleTotal,'—'))}</b></div><div class="outlookChildren">${planningRows||`<span class="muted">${escapeHtml(rhiEnergyT(this._hass,'forecast.per_asset_missing',{},'Individual charging needs are not published for this horizon.'))}</span>`}</div>${storageDemand!==null?this.kv('Home Battery',fmtKwh(storageDemand)):''}${totalRow('Total expected demand',totalDemand)}</section>
         <section class="panel outlookBalanceCard"><h2>${escapeHtml(rhiEnergyT(this._hass,'section.grid_impact',{},'Grid impact'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.grid_impact_desc',{},'Expected grid exchange for the selected horizon.'))}</p>${this.kv('Expected Grid Import',fmtKwh(gridImport,'—'))}${this.kv('Expected Grid Export',fmtKwh(gridExport,'—'))}${totalRow('Grid Balance',gridBalance,v=>v===null?'—':`${v.toFixed(1)} kWh`)}<small class="outlookBalanceMeaning">${gridBalance===null?escapeHtml(rhiEnergyT(this._hass,'forecast.grid_unavailable',{},'Grid balance requires both import and export forecasts.')):gridBalance<0?`${Math.abs(gridBalance).toFixed(1)} kWh net export`:gridBalance>0?`${gridBalance.toFixed(1)} kWh net import`:'Balanced'}</small></section>
       </div></div>`;
@@ -8553,7 +8558,7 @@ function rhiEnergyVisualPickerStyles() {
         return {
           asset,
           canonical,
-          need: asNumber(firstDefined(canonical.energy_need_kwh,canonical.need_kwh,published.energy_need_kwh)),
+          need: asNumber(firstDefined(canonical.energy_need_kwh,canonical.need_kwh,published.energy_need_kwh,asset.energy_to_target_kwh)),
           plannedEnergy: vm.horizonId === 'D1' ? asNumber(canonical.planned_tomorrow_kwh) : asNumber(canonical.planned_today_kwh),
           remainingNeed: asNumber(firstDefined(canonical.still_to_plan_kwh,canonical.unresolved_horizon_kwh,published.remaining_need_kwh))
         };
@@ -8682,8 +8687,11 @@ function rhiEnergyVisualPickerStyles() {
         const eligibility = canonical.planning_eligible === true ? 'Planning ready' : String(firstDefined(canonical.user_status,item.asset.user_status,'Incomplete'));
         const planStatus = firstDefined(canonical.planning_status,canonical.plan_conformance_label,canonical.exception_label,canonical.risk_label,eligibility);
         const facts=[
+          ['Energy needed',fmtKwh(item.need,'—')],
+          ['Planned today',fmtKwh(asNumber(canonical.planned_today_kwh),'—')],
+          ['Planned tomorrow',fmtKwh(asNumber(canonical.planned_tomorrow_kwh),'—')],
+          ['Still to plan',fmtKwh(item.remainingNeed,'—')],
           ['Requested power',fmtKw(firstDefined(item.asset.requested_power_kw_effective,item.asset.requested_power_kw,item.asset.requested_charge_power_kw),'—')],
-          [vm.horizonId==='D1'?'Planned tomorrow':'Planned today',fmtKwh(item.plannedEnergy,'—')],
           next ? ['Next action',next] : null,
           why ? ['Reason',why] : null
         ].filter(Boolean);
