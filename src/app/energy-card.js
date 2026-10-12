@@ -2320,6 +2320,33 @@
     pilotReadinessPanel(rt) { return ''; }
 
 
+    plannerSelection() {
+      const matches=Object.entries(this._hass?.states || {}).filter(([id,state]) =>
+        id.startsWith('select.') &&
+        state?.attributes?.canonical_contract === 'RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1' &&
+        state?.attributes?.write_authority === 'rhi_energy.config_entry.options');
+      if(matches.length!==1)return null;
+      const [entityId,state]=matches[0], attrs=state.attributes;
+      return {
+        entityId,
+        requested:String(attrs.requested_provider || state.state || ''),
+        effective:String(attrs.effective_provider || ''),
+        executionAuthorized:attrs.execution_authorized===true,
+        options:Array.isArray(attrs.options) ? attrs.options.map(String) : [],
+        capabilities:Array.isArray(attrs.provider_capabilities)?attrs.provider_capabilities:[]
+      };
+    }
+    plannerControl(rt) {
+      const state=this.plannerSelection();
+      const label=id=>state?.capabilities.find(row=>row.provider_id===id)?.name || id || 'Unavailable';
+      const picker=state && state.options.length
+        ? `<label class="rhiPlannerSelect"><span>Planner</span><select data-planner-provider-select>${state.options.map(id=>`<option value="${escapeHtml(id)}"${id===state.requested?' selected':''}>${escapeHtml(label(id))}</option>`).join('')}</select></label>`
+        : '<span>Planner selection is not available from this backend.</span>';
+      return `<section class="rhiPlannerControls" aria-label="Planner and automation">
+        <div>${picker}${state?`<small>Effective: ${escapeHtml(state.effective?label(state.effective):'None · HOLD')}</small>`:''}</div>
+        ${this.automationQuickInline(rt,this.automationModeValue(rt,'advice'))}
+      </section>`;
+    }
     planningViewControls(tab) {
       const views=[
         {value:'outlook',label:'Forecast',attrs:{'data-tab-target':'outlook'}},
