@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.36-rc.12';
+  const UX_VERSION = 'R4.3.36-rc.13';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Native Energy publication is discovered by exact canonical contract markers.

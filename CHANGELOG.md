@@ -1,3 +1,10 @@
+## 4.3.36-rc.13 — Native Site Consumption and canonical period metering
+
+- Exact native Energy Site Consumption metric in Power Flow with zero, unknown, quality and single publisher enforcement;
+- producer-owned Metering hour/today/week/month/year, stored period kWh, partial quality and consumer attribution;
+- new minimum/tested source candidate E0.15.122; release/target HA and real hardware qualification remain blocked;
+- generated HACS dist checksum, package inventory and rollback version updated coherently.
+
 ## 4.3.36-rc.12 — Individually measured flexible-load flow channels
 
 - render canonical per-asset measured flexible-load channels in Power Flow Card Plus;

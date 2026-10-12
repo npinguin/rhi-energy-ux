@@ -1,18 +1,19 @@
 {
   "schema_version": 1,
-  "ux_version": "4.3.36-rc.12",
+  "ux_version": "4.3.36-rc.13",
   "energy_contract": {
     "minimum": "RHI_ENERGY_CANONICAL_PROPERTY_V2",
-    "minimum_backend": "E0.15.116",
+    "minimum_backend": "E0.15.122",
     "tested_backend_releases": [
-      "E0.15.119"
+      "E0.15.122"
     ],
     "required_contracts": [
       "RHI_ENERGY_CANONICAL_OBJECT_V2",
       "RHI_ENERGY_CANONICAL_PROPERTY_V2",
       "RHI_ENERGY_CANONICAL_COMMAND_V1",
       "RHI_ENERGY_PLANNING_HORIZON_V1",
-      "RHI_VISUAL_ASSET_REGISTRY_V2"
+      "RHI_VISUAL_ASSET_REGISTRY_V2",
+      "RHI_ENERGY_METERING_PERIOD_V1"
     ]
   },
   "deployment": {
