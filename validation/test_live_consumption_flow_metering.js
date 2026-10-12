@@ -39,12 +39,12 @@ for(const token of [
 for(const token of [
   "metering.selected_period","meteringPeriodControl",
   "componentPeriodSelector(vm.periods, vm.periodId, 'metering-period')",
-  "strategyAutomationMode","energy.automation_mode","alwaysEditable:true"
+  "strategyAutomationMode","energy.operating_mode","alwaysEditable:true"
 ]) if(!fs.readFileSync('src/app/energy-card.js','utf8').includes(token))
   throw new Error('missing editable UI affordance '+token);
 
 const card=fs.readFileSync('src/app/energy-card.js','utf8');
-if(!card.includes("data-property-key':'energy.automation_mode'")) throw new Error('automation mode must bind canonical property write');
+if(!card.includes("data-property-key':'energy.operating_mode'")) throw new Error('automation mode must bind canonical property write');
 if(!card.includes("requestPropertyWrite('metering.selected_period'")) throw new Error('metering period must bind canonical property write');
 console.log('PASS Metering period, Automation mode and policy settings expose canonical write paths');
 
