@@ -50,13 +50,18 @@ console.log('PASS Metering period, Automation mode and policy settings expose ca
 
 
 const native=fs.readFileSync('src/runtime/energy-v2-contract.js','utf8');
-// Backend currently publishes per-period metrics, not a fully reconciled
-// metering-period or retrospective canonical entity. The product must fail
-// closed here, never synthesize period totals or retrospective scores.
+// Producer-owned RHI_ENERGY_METERING_PERIOD_V1 replaces the old permanently
+// unavailable period placeholder. The UX must not invent missing period
+// evidence, merge conflicting publishers, or calculate kWh from current kW.
 for(const token of [
-  'metering:{periods:{},available:false,reason:\'canonical_period_publication_unavailable\'}','retrospective:{}','valueAccounting',
+  'RHI_ENERGY_METERING_PERIOD_V1',
+  'meteringConflicts.add(periodId)',
+  'for(const id of meteringConflicts) delete meteringPeriods[id]',
+  "Object.freeze(meteringPeriods)",
+  "canonical_period_publication_unavailable",
+  'retrospective:{}','valueAccounting',
   'readNativeEnergyMetric(hass,\'net_financial_result_eur\')'
-]) if(!native.includes(token)) throw new Error('native Metering/Value missing-data invariant '+token);
+]) if(!native.includes(token)) throw new Error('native Metering/Value contract invariant '+token);
 
 for(const token of [
   'const periods=objectFrom(v2.metering?.periods || {})',
