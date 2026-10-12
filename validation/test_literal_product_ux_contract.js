@@ -98,3 +98,8 @@ if(forecastSource.includes("firstDefined(demand.home_battery_charge_kwh,demand.b
 if(forecastSource.includes("planning.scheduled_kwh,planning.known_need_kwh")) {
   throw new Error("Forecast per-device planned energy must not silently fall back to required energy");
 }
+
+if(!forecastSource.includes("firstDefined(planning.planned_tomorrow_kwh,planning.scheduled_tomorrow_kwh)") ||
+   !forecastSource.includes("firstDefined(planning.planned_today_kwh,planning.scheduled_today_kwh,planning.scheduled_kwh)")) {
+  throw new Error("D1 per-asset allocations must not be populated from D0 scheduled energy");
+}
