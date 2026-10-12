@@ -89,6 +89,24 @@ assert.equal(domain.infrastructure().length,1,'technical charger fallback remain
 assert.equal(domain.infrastructure()[0].id,'charger_driveway');
 assert.equal(domain.planningParticipants().length,1,'only planning-ready managed consumers are Tactical participants');
 assert.equal(domain.consumerFacing().find(vm=>vm.id==='vehicle_waiting').isInfrastructure,false);
+
+const infrastructureFallback = new context.FlexibleAssetDomainModel({
+  ...runtime,
+  primaryFlexibleAssets:()=>[...runtime.primaryFlexibleAssets(),{
+    asset_id:'charger_unassigned_fallback',
+    object_class:'flexible_load',
+    asset_type:'flexible_load',
+    source_asset_kind:'charger',
+    participation_state:'participating',
+    energy_asset_role:'connection',
+    current_power_kw:0,
+    visual_ref:'mobility.charger.wallbox.white'
+  }]
+});
+assert.equal(infrastructureFallback.all().length,4,'canonical source inventory retains infrastructure for diagnostics');
+assert.equal(infrastructureFallback.consumerFacing().length,2,'flexible_load charger fallback must not appear as an actual consumer');
+assert.equal(infrastructureFallback.infrastructure().length,2,'technical and flexible_load charger projections remain infrastructure');
+
 assert.equal(domain.planningRows()[0].asset_id,'vehicle_id4');
 assert.equal(domain.physicalFlowParticipants()[0].id,'vehicle_id4');
 assert.equal(domain.physicalFlowParticipants().length,1,'charger-linked idle vehicle must remain in physical topology');
@@ -101,7 +119,7 @@ assert.ok(card.includes('rt.connectedRelationships().forEach'));
 assert.ok(card.includes('asset.effective_connection_id'));
 assert.ok(card.includes('asset.assigned_connection_id'));
 assert.ok(card.includes('rt.assets().filter(isCharger)'));
-assert.ok(card.includes('No charging connections available'));
+assert.ok(card.includes('No charging connection evidence'),'missing topology stays a diagnostic fact rather than a main-page load');
 assert.ok(card.includes("visual_ref:firstDefined(vm.visualRef, raw.visual_ref, published.visual_ref, '')"), 'Consumers must preserve canonical producer visual_ref before any secondary projection');
 assert.ok(!card.includes('Canonical physical connection telemetry is not published by E0.15.48.'));
 
@@ -130,6 +148,51 @@ assert.ok(card.includes('consumer.effective_connection_id'));
 assert.ok(card.includes('consumer.assigned_connection_id'));
 assert.ok(card.includes('consumer.physical_connection_id'));
 console.log('PASS physical consumer rows are connection targets, never charger infrastructure');
+
+assert.ok(card.includes('<h2>Flexible consumers</h2>'),'Flow should expose one actual-consumer list');
+assert.ok(card.includes('consumers.map(consumer => this.consumerCard(rt,consumer))'),'primary Flow list must be de-duplicated canonical consumer identities');
+assert.ok(card.includes('rhiFlowConnectionDiagnostics'),'technical connection rows are depth, not a duplicate primary list');
+assert.ok(!card.includes('asset.actual_power_kw, connection.physical_power_kw, connection.power_kw'),'a charger power measurement must never be attributed to a vehicle from assignment alone');
+assert.ok(!card.includes('<h2>All flexible loads</h2>'),'technical inventory list may not duplicate consumer cards');
+assert.ok(!card.includes('section><h2>Physical consumers</h2>'),'duplicate physical consumer section must be removed');
+const consumerStart = card.indexOf('    consumerCard(rt, consumer) {');
+const consumerEnd = card.indexOf('    flowConsumers(rt, connectionSnapshot',consumerStart);
+assert.ok(consumerStart>=0 && consumerEnd>consumerStart);
+const consumerContext={
+  firstDefined:(...values)=>values.find(value=>value!==undefined && value!==null),
+  asNumber:value=>value===undefined || value===null || value==='' || Number.isNaN(Number(value))?null:Number(value),
+  asBool:(value,fallback=false)=>value===undefined || value===null ? fallback : Boolean(value),
+  fmtKw:value=>value===null?'—':Number(value).toFixed(2)+' kW',
+  fmtKwh:value=>value===null?'—':Number(value).toFixed(1)+' kWh',
+  escapeHtml:value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+  human:value=>String(value??''),
+  rhiUxResolveDomainAssetNavigation:(domain,id)=>domain==='rhi_mobility' ? '/mobility/asset-detail?asset='+encodeURIComponent(id) : ''
+};
+vm.createContext(consumerContext);
+const renderer=vm.runInContext('({'+card.slice(consumerStart,consumerEnd)+'})',consumerContext);
+const rendered=renderer.consumerCard.call({
+  targetEnergyForAsset:()=>8.5,userRelationshipLabel:name=>name
+},{
+  resolveVisualRef:()=>({url:'/hacsfiles/mobility/id4.webp',filter:'none'}),
+  assetName:id=>id==='charger_driveway'?'Peblar Charger':'VW ID4',
+  sourceAssetNavigation:()=>'/mobility/asset-detail?asset=vehicle_id4',
+  value:(_key,fallback)=>fallback
+},{
+  asset_id:'vehicle_id4',object_class:'flexible_load',source_asset_kind:'vehicle',asset_type:'vehicle',
+  display_name:'VW ID4',visual_ref:'mobility.vehicle.volkswagen.id4',
+  current_power_kw:3.6,requested_power_kw:5.1,effective_connection_id:'charger_driveway',
+  effective_charger_display_name:'Peblar Charger',operating_state:'charging'
+});
+assert.match(rendered,/VW ID4/,'preserve real Mobility vehicle identity');
+assert.match(rendered,/8.5 kWh/,'energy still needed is a measured/producer requested kWh');
+assert.match(rendered,/3.60 kW/,'actual power now comes from consumer physical power');
+assert.match(rendered,/5.10 kW/,'requested power stays separate from measured power');
+assert.match(rendered,/Peblar Charger/,'charger relationship is visible without a duplicate consumer');
+assert.match(rendered,/data-source-asset-nav="\/mobility\/asset-detail\?asset=vehicle_id4"/,'consumer links to owner detail');
+assert.match(rendered,/asset=charger_driveway/,'charger links to owner details');
+assert.equal((rendered.match(/class="rhiFlowConsumerCard"/g)||[]).length,0,'consumer card uses normal Flow identity and fact wrapper');
+assert.ok(rendered.includes('flowPhysicalConsumerCard rhiFlowConsumerCard'),'consumer facts use one uniform card shell');
+
 
 
 assert.ok(card.includes('rows.set(chargerKey, row)'), 'connection identity must be charger-only');

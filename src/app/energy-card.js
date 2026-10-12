@@ -4341,7 +4341,27 @@
       const relation = charger ? this.userRelationshipLabel(chargerDisplay, 'Assigned charger') : '';
       const visual = rt.resolveVisualRef(consumer.visual_ref, 'card');
       const art = `<div class="flowAssetVisual">${visual?.url ? `<img src="${escapeHtml(visual.url)}" alt="" style="filter:${escapeHtml(visual.filter || 'none')}">` : ''}</div>`;
-      return `<div class="flowPhysicalConsumerCard">${art}<div><b>${escapeHtml(consumer.display_name || rt.assetName(id) || human(id))}</b><span>${escapeHtml(relation ? `${relation} · ${state}` : state)}</span></div><strong>${escapeHtml(powerText)}</strong></div>`;
+      const energyNeed = this.targetEnergyForAsset(id, consumer);
+      const display = escapeHtml(consumer.display_name || rt.assetName(id) || human(id));
+      const chargerId = String(charger || '').trim();
+      const chargerPath = chargerId ? (rhiUxResolveDomainAssetNavigation('rhi_mobility',chargerId) || rhiUxResolveDomainAssetNavigation('mobility',chargerId)) : '';
+      const sourceKind = String(firstDefined(consumer.source_asset_kind,consumer.asset_type,'') || '').toLowerCase();
+      const consumerPath = rt.sourceAssetNavigation(consumer) || (/vehicle|car/.test(sourceKind)
+        ? (rhiUxResolveDomainAssetNavigation('rhi_mobility',id) || rhiUxResolveDomainAssetNavigation('mobility',id)) : '');
+      const connection = chargerId ? (chargerPath
+        ? `<button type="button" class="rhiFlowLinkedAsset" data-source-asset-nav="${escapeHtml(chargerPath)}" aria-label="Open charger details">${escapeHtml(chargerDisplay || rt.assetName(chargerId) || 'Charger')} <span aria-hidden="true">›</span></button>`
+        : `<span>${escapeHtml(chargerDisplay || rt.assetName(chargerId) || 'Charger')}</span>`)
+        : '<span>No charger identified</span>';
+      return `<article class="flowPhysicalConsumerCard rhiFlowConsumerCard">
+        <div class="rhiFlowConsumerIdentity">${art}<div><b>${display}</b><small>${escapeHtml(state)}</small></div></div>
+        <div class="rhiFlowConsumerFacts">
+          <span><small>Energy needed</small><b>${escapeHtml(energyNeed === null ? '—' : fmtKwh(energyNeed))}</b></span>
+          <span><small>Power now</small><b>${escapeHtml(powerText)}</b></span>
+          <span><small>Requested power</small><b>${escapeHtml(requested === null ? '—' : fmtKw(requested))}</b></span>
+        </div>
+        <div class="rhiFlowConsumerRelation"><small>Charging via</small>${connection}</div>
+        ${consumerPath ? `<button type="button" class="rhiFlowConsumerDetails" data-source-asset-nav="${escapeHtml(consumerPath)}">Details <span aria-hidden="true">›</span></button>` : ''}
+      </article>`;
     }
     flowConsumers(rt, connectionSnapshot = { rows:[] }) {
       const domain = this.flexibleAssetDomain(rt);
@@ -4358,8 +4378,9 @@
       );
       const isChargerRow = row => {
         const id = String(firstDefined(row?.asset_id, row?.connection_asset_id, '') || '').trim();
-        const type = String(firstDefined(row?.asset_type, row?.object_class, row?.source_asset_kind, '') || '').trim().toLowerCase();
-        return chargerIds.has(id) || /(^|_)(charger|charging_point|charge_point)(_|$)/.test(type);
+        const types = [row?.asset_type,row?.object_class,row?.source_asset_kind,row?.energy_asset_role,row?.ux_asset_type,row?.participation_state].map(v=>String(v || '').trim().toLowerCase());
+        return row?.infrastructure_only === true || chargerIds.has(id)
+          || types.some(type=>/(^|_)(charger|charging_point|charge_point|infrastructure_only)(_|$)/.test(type));
       };
       const byId = new Map();
 
@@ -4368,7 +4389,7 @@
         const id = String(firstDefined(row.asset_id, row.flexible_asset_id, row.target_asset_id, '') || '').trim();
         if (!id || isChargerRow({...row,asset_id:id})) return;
         const vm = domain.byId(id);
-        if (vm?.isDisabled || vm?.isStorage) return;
+        if (vm?.isDisabled || vm?.isStorage || vm?.isInfrastructure) return;
         const materialized = vm?.raw ? { ...row, ...vm.raw, asset_id:id } : { ...row, asset_id:id };
         byId.set(id, { ...(byId.get(id) || {}), ...materialized });
       };
@@ -4393,7 +4414,10 @@
           effective_connection_id:firstDefined(asset.effective_connection_id, connection.connection_asset_id, connection.asset_id, ''),
           physical_connection_id:firstDefined(asset.physical_connection_id, connection.connection_asset_id, connection.asset_id, ''),
           visual_ref:firstDefined(asset.visual_ref, connection.connected_consumer_visual_ref, ''),
-          physical_power_kw:firstDefined(asset.physical_power_kw, asset.current_power_kw, asset.actual_power_kw, connection.physical_power_kw, connection.power_kw)
+          // A charger power measurement is not vehicle power without physical identity proof.
+          // Keep charger telemetry in the connection diagnostics; this consumer
+          // row may show only its own canonical asset-scoped power evidence.
+          physical_power_kw:firstDefined(asset.physical_power_kw, asset.power_kw, asset.current_power_kw, asset.actual_power_kw)
         });
       }
 
@@ -4588,8 +4612,18 @@
       const gridImport = current.grid.importPowerKw;
       const gridExport = current.grid.exportPowerKw;
       const battery = current.battery;
+      // Only a validated charge/discharge pair may draw a directional battery
+      // flow arrow. The battery itself must never disappear from Flow.
+      const batteryFlowIntegrated = Boolean(buildRhiPowerFlowCardConfig(rt)?.entities?.battery);
       const connectionSnapshot = this.canonicalConnectionSnapshot(rt);
-      const rawConsumers = this.flowConsumers(rt, connectionSnapshot);
+      const consumerInventory = new Map(this.flexibleAssetDomain(rt).consumerFacing().map(vm=>[vm.id,vm.raw || {}]));
+      // Merge canonical consumer inventory and physical connection evidence by real consumer ID.
+      // Charging infrastructure is never an additional consumer or summed power.
+      this.flowConsumers(rt, connectionSnapshot).forEach(row => {
+        const id = String(row.asset_id || '');
+        if (id) consumerInventory.set(id,{...(consumerInventory.get(id)||{}),...row});
+      });
+      const rawConsumers = [...consumerInventory.values()];
       const rawChargers = connectionSnapshot.rows;
       const physicalFlow = buildPhysicalFlowViewModel(rt, rt.contractGateway(), rawConsumers, rawChargers, connectionSnapshot);
       const siteConsumption = physicalFlow.siteConsumptionKw;
@@ -4604,15 +4638,23 @@
         <section class="panel rhiPowerFlowPanel">
           <div class="flowHeader"><div><h2>Live power flow</h2><p>Powered by Power Flow Card Plus. Only published, measured sources can animate; missing energy values are not estimated.</p></div></div>
           <div class="rhiPowerFlowHost rhiUxChartViewport" data-rhi-power-flow-host role="region" aria-label="Interactive energy flow"></div>
-          <p class="rhiFlowMeasurementNote">Battery power is displayed separately unless a direction-compatible signed sensor is published. Charger and vehicle power are never added together.</p>
+          <div class="rhiFlowBatteryPresence" aria-label="Home Battery on energy flow">
+            <div class="rhiFlowBatteryIdentity"><span class="rhiFlowBatteryIcon" aria-hidden="true">▣</span><div><b>Home Battery</b><small>${escapeHtml(battery.health === 'OK' ? battery.label : 'Measurement unavailable')}</small></div></div>
+            <div class="rhiFlowBatteryFacts"><span><small>Power now</small><b>${escapeHtml(battery.valueAvailable ? fmtKw(battery.displayPowerKw) : '—')}</b></span><span><small>State of charge</small><b>${escapeHtml(battery.socPct === null ? '—' : fmtPct(battery.socPct))}</b></span></div>
+            <span class="rhiFlowBatteryProof">${batteryFlowIntegrated ? 'Direction measured · shown in flow above' : 'Direction not proven · no animated battery flow'}</span>
+            <button type="button" data-tab-target="battery" class="rhiFlowBatteryDetails">Battery details <span aria-hidden="true">›</span></button>
+          </div>
+          <p class="rhiFlowMeasurementNote">Only direction-compatible battery sensors are allowed to animate. Charger and vehicle power are never added together.</p>
         </section>
-        <section class="panel rhiFlowAllLoads"><div class="flowHeader"><div><h2>All flexible loads</h2><p>Full canonical inventory, including idle and currently unavailable assets. Chargers remain connection interfaces, not duplicate consumers.</p></div></div>
-          ${this.flexibleAssetDomain(rt).consumerFacing().filter(vm=>!vm.isStorage).map(vm=>this.consumerCard(rt,vm.raw||{})).join('') || '<div class="empty compact"><b>No flexible loads published</b><span>The Energy inventory currently has no canonical consumers.</span></div>'}
+        <section class="panel rhiFlowAllLoads">
+          <div class="flowHeader"><div><h2>Flexible consumers</h2><p>Real consumers only. Need, actual power and requested power are separate; a charger is a connection, not an extra load.</p></div></div>
+          <div class="rhiFlowConsumerList">${consumers.map(consumer => this.consumerCard(rt,consumer)).join('') || '<div class="empty compact"><b>No flexible consumers published</b><span>No verified flexible-load consumer is available.</span></div>'}</div>
         </section>
-        <div class="flowDetailsGrid flowDetailsGridTwoUp">
-          <section class="panel"><h2>${escapeHtml(rhiEnergyT(this._hass,'flow.charging_connections',{},'Charging connections'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'flow.charging_connections_desc',{},'Chargers and vehicle assignments currently visible to Energy.'))}</p>${chargers.map(charger => this.connectorCard(rt, charger)).join('') || `<div class="empty"><b>${connectionSnapshot.available ? 'No charging connections available' : 'Connection data unavailable'}</b><span>${connectionSnapshot.available ? 'No charger or vehicle assignment is currently available.' : 'Connection information is not available right now.'}</span></div>`}</section>
-          <section class="panel"><h2>${escapeHtml(rhiEnergyT(this._hass,'flow.physical_consumers',{},'Physical consumers'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'flow.physical_consumers_desc',{},'Participating loads and their current charging connection; idle assets remain visible.'))}</p>${consumers.map(consumer => this.consumerCard(rt, consumer)).join('') || `<div class="empty"><b>No flexible consumers available</b><span>No controllable loads are currently available.</span></div>`}</section>
-        </div>
+        <details class="panel rhiFlowConnectionDiagnostics">
+          <summary>Charging connection diagnostics</summary>
+          <p>Physical charger interfaces and published assignments. They are not additional consumers.</p>
+          ${chargers.map(charger=>this.connectorCard(rt,charger)).join('') || '<div class="empty compact"><b>No charging connection evidence</b><span>Connection information is currently unavailable.</span></div>'}
+        </details>
       </div>`;
     }
     propertyRow(row, label = null, formatter = null) {
@@ -6528,6 +6570,55 @@
 .overviewSupportFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
 .chargingConnectionGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.chargingConnectionGrid>.empty{grid-column:1/-1}
 .flowDetailsGrid.flowDetailsGridTwoUp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}.flowDetailsGrid.flowDetailsGridTwoUp>.panel{min-width:0;height:100%}
+/* Battery remains discoverable when bidirectional flow evidence is missing. */
+/* Planning controls: planner/provider selection separate from automation mode. */
+.rhiPlannerControls{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;justify-content:space-between;min-height:52px;padding:9px 12px;margin:6px 0 9px;background:#fff;border:1px solid var(--line);border-radius:10px}
+.rhiPlannerControls>div:first-child{display:grid;gap:3px;min-width:0}
+.rhiPlannerControls small{font-size:10px;color:var(--muted)}
+.rhiPlannerSelect{display:inline-flex;align-items:center;gap:8px;font-size:11px}
+.rhiPlannerSelect select{min-height:38px;min-width:140px;max-width:260px;padding:6px 9px;border:1px solid var(--line);border-radius:9px;background:#fff;color:#17305b;font:inherit}
+.rhiPlanningBaselineNotice{display:flex;gap:8px;align-items:center;padding:10px 12px;margin:7px 0;border:1px solid #dce7f4;border-radius:10px;background:#f7fbff}
+.rhiPlanningBaselineNotice b{font-size:11px;white-space:nowrap}
+.rhiPlanningBaselineNotice span{font-size:10.5px;line-height:1.35;color:#53677e}
+@media(max-width:700px){.rhiPlannerControls{align-items:stretch;flex-direction:column}.rhiPlannerSelect select{min-width:0;max-width:100%}.rhiPlanningBaselineNotice{flex-direction:column;align-items:flex-start}}
+.rhiFlowBatteryPresence{display:flex;align-items:center;flex-wrap:wrap;gap:10px 20px;min-height:66px;padding:10px 12px;margin:8px 0 0;border:1px solid var(--line);border-radius:10px;background:#fbfcff}
+.rhiFlowBatteryIdentity{display:flex;align-items:center;gap:9px;min-width:150px;flex:1 1 180px}
+.rhiFlowBatteryIdentity b{display:block;font-size:12px;color:#14264a}
+.rhiFlowBatteryIdentity small{display:block;font-size:10px;color:var(--muted);margin-top:3px}
+.rhiFlowBatteryIcon{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:#edf4ff;color:#1467f5;font-size:17px}
+.rhiFlowBatteryFacts{display:grid;grid-template-columns:repeat(2,minmax(78px,1fr));gap:12px;flex:1 1 165px}
+.rhiFlowBatteryFacts small{display:block;font-size:9.5px;color:var(--muted)}
+.rhiFlowBatteryFacts b{display:block;font-size:12px;font-variant-numeric:tabular-nums;margin-top:3px}
+.rhiFlowBatteryProof{font-size:10.5px;color:#64748b;flex:1 1 195px;min-width:0}
+.rhiFlowBatteryDetails{display:inline-flex;align-items:center;gap:5px;margin-left:auto;height:38px;min-height:38px;padding:0 11px;border:1px solid #dce7f4;border-radius:10px;background:#fff;color:#075fd8;font:inherit;font-size:11px;font-weight:650;cursor:pointer;white-space:nowrap}
+.rhiFlowBatteryDetails span{font-size:19px;line-height:1}
+@media(max-width:700px){.rhiFlowBatteryPresence{gap:9px;padding:9px}.rhiFlowBatteryFacts{order:2;flex:1 1 100%}.rhiFlowBatteryProof{order:3;flex:1 1 100%}.rhiFlowBatteryDetails{order:4;margin-left:0}}
+/* Flow: one Mobility-style consumer identity row with separate measured facts. */
+.rhiFlowConsumerList{display:grid;gap:7px}
+.rhiFlowConsumerList .rhiFlowConsumerCard{display:grid;grid-template-columns:minmax(175px,1.15fr) minmax(230px,1.3fr) minmax(125px,.8fr) auto;align-items:center;gap:12px;min-height:70px;margin:0;padding:9px 11px;border:1px solid var(--line);border-radius:11px;background:#fff;box-shadow:none}
+.rhiFlowConsumerIdentity{display:flex;align-items:center;gap:9px;min-width:0}
+.rhiFlowConsumerIdentity>div:last-child{min-width:0}
+.rhiFlowConsumerIdentity b{display:block;font-size:12px;line-height:1.25;overflow-wrap:break-word}
+.rhiFlowConsumerIdentity small{display:block;margin-top:3px;font-size:10px;color:var(--muted)}
+.rhiFlowConsumerCard .flowAssetVisual{width:78px;height:54px;flex:0 0 78px}
+.rhiFlowConsumerCard .flowAssetVisual img{max-width:74px;max-height:50px}
+.rhiFlowConsumerFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;min-width:0}
+.rhiFlowConsumerFacts>span{min-width:0;padding:6px 9px}
+.rhiFlowConsumerFacts>span+span{border-left:1px solid #e5edf5}
+.rhiFlowConsumerFacts small,.rhiFlowConsumerRelation>small{display:block;color:var(--muted);font-size:9px;line-height:1.2}
+.rhiFlowConsumerFacts b{display:block;margin-top:4px;font-size:12px;font-weight:650;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rhiFlowConsumerRelation{min-width:0;font-size:11px}
+.rhiFlowConsumerRelation span{font-size:11px}
+.rhiFlowLinkedAsset,.rhiFlowConsumerDetails{display:inline-flex;align-items:center;gap:5px;padding:0;border:0;background:transparent;color:#075fd8;font:inherit;font-size:11px;font-weight:650;cursor:pointer;text-align:left;max-width:100%}
+.rhiFlowLinkedAsset{margin-top:5px;white-space:normal;overflow-wrap:break-word}
+.rhiFlowLinkedAsset span,.rhiFlowConsumerDetails span{font-size:17px;line-height:1}
+.rhiFlowConsumerDetails{justify-self:end;white-space:nowrap;min-height:38px;padding:0 11px;border:1px solid #dce7f4;border-radius:10px;background:#fff}
+.rhiFlowLinkedAsset:focus-visible,.rhiFlowConsumerDetails:focus-visible{outline:2px solid #1467f5;outline-offset:2px}
+.rhiFlowConnectionDiagnostics{padding:10px 13px;min-width:0}
+.rhiFlowConnectionDiagnostics summary{cursor:pointer;color:#526685;font-size:11px;font-weight:650;min-height:26px}
+.rhiFlowConnectionDiagnostics>p{font-size:10.5px;color:var(--muted);margin:4px 0 9px}
+@media(max-width:1050px){.rhiFlowConsumerList .rhiFlowConsumerCard{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)}.rhiFlowConsumerRelation{grid-column:1}.rhiFlowConsumerDetails{grid-column:2}.rhiFlowConsumerCard .flowAssetVisual{width:64px;height:48px;flex-basis:64px}.rhiFlowConsumerCard .flowAssetVisual img{max-width:62px;max-height:46px}}
+@media(max-width:700px){.rhiFlowConsumerList .rhiFlowConsumerCard{grid-template-columns:1fr;gap:7px}.rhiFlowConsumerRelation,.rhiFlowConsumerDetails{grid-column:1}.rhiFlowConsumerDetails{justify-self:end}.rhiFlowConsumerCard .flowAssetVisual{width:78px;height:54px;flex-basis:78px}}
 .flowConnectionCard,.flowPhysicalConsumerCard{display:grid;grid-template-columns:auto minmax(0,1fr) 76px;align-items:center;gap:10px;min-height:64px;padding:9px 10px;margin:6px 0;border:1px solid var(--line);border-radius:10px;background:#fff;box-sizing:border-box}.flowAssetVisual{width:54px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#f5f7fa;overflow:hidden}.flowAssetVisual img{display:block;max-width:50px;max-height:42px;object-fit:contain}.flowConnectionCard>div,.flowPhysicalConsumerCard>div{min-width:0}.flowConnectionCard b,.flowPhysicalConsumerCard b{display:block;font-size:12.5px;line-height:1.2;font-weight:600}.flowConnectionCard span,.flowPhysicalConsumerCard span{display:block;margin-top:3px;font-size:10.5px;line-height:1.25;color:var(--muted);white-space:normal}.flowConnectionCard strong,.flowPhysicalConsumerCard strong{min-width:76px;text-align:right;font-size:12.5px;line-height:1.2;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.flowConnectionCard small{display:block;margin-top:4px;font-size:9.5px;color:var(--muted)}
 .batteryContributorList{display:grid;gap:10px}.batteryContributorCard{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:stretch;min-height:148px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#fff,#fbfcfe);overflow:hidden}.batteryContributorVisual{display:flex;align-items:center;justify-content:center;padding:10px;background:linear-gradient(180deg,#f7f9fb,#eef2f5);overflow:hidden}.batteryContributorVisual .assetVisual{width:88px;height:108px;max-width:88px;max-height:108px;padding:5px;box-sizing:border-box;border:0;background:transparent;overflow:hidden}.batteryContributorVisual .assetVisual img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center center}.batteryContributorBody{min-width:0;padding:13px 14px;display:flex;flex-direction:column;justify-content:center;gap:7px}.batteryContributorHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.batteryContributorHeader>div{min-width:0}.batteryContributorHeader b{display:block;font-size:14px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}.batteryContributorHeader strong{flex:0 0 auto;font-size:22px;line-height:1;font-variant-numeric:tabular-nums}.batteryHealth{display:inline-flex;margin-top:5px;padding:3px 7px;border-radius:999px;background:#eef8f2;color:#2f6d4b;font-size:10px;font-weight:700}.batteryContributorMeta{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#526178}.batteryContributorMeta b{font-size:12px;color:#172033;font-variant-numeric:tabular-nums}.batteryContributorFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.batteryContributorFacts span{min-width:0;padding:6px 7px;border-radius:8px;background:#f8fafc}.batteryContributorFacts small,.batteryContributorFacts b{display:block}.batteryContributorFacts small{font-size:8px;color:#64748b}.batteryContributorFacts b{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.batteryContributorState{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;min-width:0}.batteryContributorState span{font-size:10.5px;font-weight:700;color:#265c3b;white-space:nowrap}.batteryContributorState small{min-width:0;font-size:10px;line-height:1.25;color:var(--muted);white-space:normal}.batteryContributorCard .bar{margin-top:2px}
 @media(max-width:1050px){.overviewCoreGrid{grid-template-columns:1fr 1fr}.overviewDecisionPanel{grid-column:1/-1;grid-row:1}.chargingConnectionGrid{grid-template-columns:1fr}.batteryContributorCard{grid-template-columns:104px minmax(0,1fr)}.batteryContributorVisual .assetVisual{width:80px;height:102px;max-width:80px;max-height:102px}.batteryContributorFacts{grid-template-columns:repeat(2,minmax(0,1fr))}}
