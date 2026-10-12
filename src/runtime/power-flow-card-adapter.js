@@ -22,7 +22,7 @@ function buildRhiPowerFlowCardConfig(rt) {
     const row = rows[0];
     const id = String(row.entity_id || '');
     const unit = String(row.unit || row.unit_of_measurement || row.native_unit_of_measurement || '').toLowerCase();
-    return row.availability === 'AVAILABLE' && /^sensor\\.[a-z0-9_]+$/.test(id)
+    return row.availability === 'AVAILABLE' && /^sensor\.[a-z0-9_]+$/.test(id)
       && (!unit || unit === '%') ? id : '';
   };
   const entities = {};
