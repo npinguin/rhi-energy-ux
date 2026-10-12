@@ -1284,6 +1284,16 @@
       this._hass = hass;
       rhiEnergySetLocaleFromHass(hass);
 
+      // The selected planner and native D0/D1 horizons are HA-published but
+      // not canonical_property_v2 rows. Their updates must still invalidate the
+      // visible forecast/planning screens and restore write-readback feedback.
+      const nativePlanningChanged=!!previous && Object.entries(hass?.states || {}).some(([id,state])=>{
+        const a=state?.attributes || {};
+        const relevant=(a.canonical_source==='rhi_energy.runtime'
+          && (a.metric_key || ['RHI_ENERGY_PLANNING_HORIZON_V1','RHI_ENERGY_BASELINE_PLANNING_HORIZON_V1'].includes(a.canonical_contract)))
+          || (id.startsWith('select.') && a.canonical_contract==='RHI_ENERGY_PLANNER_PROVIDER_CATALOG_V1');
+        return relevant && previous.states?.[id] !== state;
+      });
       let canonicalChanged = null;
       if (!this._canonicalIndex) this._canonicalIndex = createEnergyCanonicalPropertyIndex(hass);
       else canonicalChanged = this._canonicalIndex.refresh(hass);
@@ -1295,9 +1305,9 @@
         const affected = this._canonicalIndex.affectedComponents(canonicalChanged)
           .filter(item => relevant.has(item.entity_id));
         const localeChanged = rhiEnergyLocale(previous) !== rhiEnergyLocale(hass);
-        if (!affected.length && !localeChanged && !this._forceRender) return;
+        if (!affected.length && !localeChanged && !this._forceRender && !nativePlanningChanged) return;
 
-        if (!localeChanged && !this._forceRender && affected.length) {
+        if (!localeChanged && !this._forceRender && !nativePlanningChanged && affected.length) {
           const visible = affected.filter(item => this.isCanonicalSurfaceVisible(item.surface));
           if (!visible.length) {
             affected.forEach(item => this._deferredCanonicalSurfaces.add(item.surface));
