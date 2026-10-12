@@ -173,15 +173,15 @@ const renderer=vm.runInContext('({'+card.slice(consumerStart,consumerEnd)+'})',c
 const rendered=renderer.consumerCard.call({
   targetEnergyForAsset:()=>8.5,userRelationshipLabel:name=>name
 },{
-  asset_id:'vehicle_id4',object_class:'flexible_load',source_asset_kind:'vehicle',asset_type:'vehicle',
-  display_name:'VW ID4',visual_ref:'mobility.vehicle.volkswagen.id4',
-  current_power_kw:3.6,requested_power_kw:5.1,effective_connection_id:'charger_driveway',
-  effective_charger_display_name:'Peblar Charger',operating_state:'charging'
-},{
   resolveVisualRef:()=>({url:'/hacsfiles/mobility/id4.webp',filter:'none'}),
   assetName:id=>id==='charger_driveway'?'Peblar Charger':'VW ID4',
   sourceAssetNavigation:()=>'/mobility/asset-detail?asset=vehicle_id4',
   value:(_key,fallback)=>fallback
+},{
+  asset_id:'vehicle_id4',object_class:'flexible_load',source_asset_kind:'vehicle',asset_type:'vehicle',
+  display_name:'VW ID4',visual_ref:'mobility.vehicle.volkswagen.id4',
+  current_power_kw:3.6,requested_power_kw:5.1,effective_connection_id:'charger_driveway',
+  effective_charger_display_name:'Peblar Charger',operating_state:'charging'
 });
 assert.match(rendered,/VW ID4/,'preserve real Mobility vehicle identity');
 assert.match(rendered,/8.5 kWh/,'energy still needed is a measured/producer requested kWh');
