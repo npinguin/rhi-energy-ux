@@ -455,3 +455,59 @@ const missingSemantic=readPlanningContract(runtime,'D0');
 assert.equal(missingSemantic.horizon.summary.supply.total_usable_supply_kwh,undefined);
 assert.equal(missingSemantic.horizon.summary.balance.grid_balance_kwh,undefined);
 console.log('PASS V1->V2 native Forecast Supply/Demand/Balance semantic parity');
+
+
+// Render the actual HACS Energy card, not source-text regexes: V1 semantic
+// parity must survive the entire domain-contract -> Forecast DOM path.
+class ParityElement { attachShadow() { return {querySelector:()=>null,querySelectorAll:()=>[],innerHTML:''}; } }
+const parityRegistry=new Map();
+const parityStorage=new Map();
+const parityContext={
+  console,HTMLElement:ParityElement,
+  customElements:{get:n=>parityRegistry.get(n),define:(n,c)=>parityRegistry.set(n,c)},
+  window:{customCards:[],sessionStorage:{
+    getItem:k=>parityStorage.get(k)??null,setItem:(k,v)=>parityStorage.set(k,String(v)),
+    removeItem:k=>parityStorage.delete(k)
+  },scrollX:0,scrollY:0,scrollTo:()=>{}},
+  document:{},setTimeout,clearTimeout,globalThis:null
+};
+parityContext.globalThis=parityContext;
+parityContext.window.window=parityContext.window;
+vm.createContext(parityContext);
+vm.runInContext(fs.readFileSync('dist/rhi-energy-ux.js','utf8'),parityContext,{timeout:10000});
+const ParityCard=parityRegistry.get('homebrain-energy-card');
+assert.ok(ParityCard,'real HACS card must register');
+const cardView=new ParityCard();
+cardView.buildPageViewModel=()=>({});
+cardView.tabExperienceHeader=()=>'';
+cardView.bodyContextBar=()=>'';
+cardView.selectedHorizon=rows=>rows[0]||null;
+cardView.isFutureHorizon=()=>false;
+cardView.assetVisual=()=>'';
+cardView.flexibleAssetDomain=()=>({consumerFacing:()=>[
+  {raw:{asset_id:'vehicle_id4',display_name:'VW ID4',
+    energy_to_target_kwh:6.4,
+    energy_planning:{planned_today_kwh:4.2,known_need_kwh:6.4}}},
+  {raw:{asset_id:'vehicle_q8',display_name:'Audi Q8',
+    planning_input_ready:false,energy_to_target_kwh:null,
+    energy_planning:{}}}
+]});
+cardView.currentEnergyModel=()=>({
+  solar:{powerKw:3.1},
+  consumption:{siteConsumptionKw:2.2,homeConsumptionKw:1.7}
+});
+const parityRuntime={
+  outlookHorizons:()=>[nativeSemanticView.horizon],
+  planningOutcomeFor:()=>({}),
+  assetName:id=>id,
+};
+const actualRendered=cardView.outlook(parityRuntime);
+for(const proof of ['Actual solar production now','3.1 kW',
+  'Actual site consumption now','2.2 kW','Actual home consumption now','1.7 kW',
+  'Total usable supply','17.6 kWh','Total expected demand','12.2 kWh',
+  'Grid Balance','3.2 kWh net export','VW ID4','Audi Q8','Need unavailable']) {
+  assert.ok(actualRendered.includes(proof),'Forecast must visibly render '+proof);
+}
+assert.ok(!actualRendered.includes('0.0 kWh</b>'),
+  'no unproven storage/battery zero may be displayed as actual or forecast');
+console.log('PASS real HACS Forecast render: V1 parity, actual kW, forecast kWh and unknown EV');
