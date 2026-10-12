@@ -1,3 +1,10 @@
+## 4.3.36-rc.16 — Trustworthy battery, grid and site consumption Overview
+
+- Place producer-confirmed Battery Charge within Site Consumption on the demand side, Battery Discharge with Supply, Grid Import with Supply and Grid Export as separate external demand.
+- Surface unexplained aggregate battery/grid state instead of hiding a physical participant or showing 0 kW labeled Unavailable.
+- Add actual directional contract tests including valid zero, unknown and contradictory evidence; preserve source authority.
+- Coordinate F1.8.44 + M0.10.48 + E0.15.124 HACS TEST CANDIDATE, with target HA proof still pending.
+
 ## 4.3.36-rc.15 — RHI Deterministic Planning
 
 - Coordinate with E0.15.123 default RHI planning, native 15/30/60-minute selector and D0/D1 owner-published hourly/subhourly allocations.
