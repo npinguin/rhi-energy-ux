@@ -4547,6 +4547,9 @@
       const gridImport = current.grid.importPowerKw;
       const gridExport = current.grid.exportPowerKw;
       const battery = current.battery;
+      // Only a validated charge/discharge pair may draw a directional battery
+      // flow arrow. The battery itself must never disappear from Flow.
+      const batteryFlowIntegrated = Boolean(buildRhiPowerFlowCardConfig(rt)?.entities?.battery);
       const connectionSnapshot = this.canonicalConnectionSnapshot(rt);
       const rawConsumers = this.flowConsumers(rt, connectionSnapshot);
       const rawChargers = connectionSnapshot.rows;
@@ -4563,7 +4566,13 @@
         <section class="panel rhiPowerFlowPanel">
           <div class="flowHeader"><div><h2>Live power flow</h2><p>Powered by Power Flow Card Plus. Only published, measured sources can animate; missing energy values are not estimated.</p></div></div>
           <div class="rhiPowerFlowHost rhiUxChartViewport" data-rhi-power-flow-host role="region" aria-label="Interactive energy flow"></div>
-          <p class="rhiFlowMeasurementNote">Battery power is displayed separately unless a direction-compatible signed sensor is published. Charger and vehicle power are never added together.</p>
+          <div class="rhiFlowBatteryPresence" aria-label="Home Battery on energy flow">
+            <div class="rhiFlowBatteryIdentity"><span class="rhiFlowBatteryIcon" aria-hidden="true">▣</span><div><b>Home Battery</b><small>${escapeHtml(battery.health === 'OK' ? battery.label : 'Measurement unavailable')}</small></div></div>
+            <div class="rhiFlowBatteryFacts"><span><small>Power now</small><b>${escapeHtml(battery.valueAvailable ? fmtKw(battery.displayPowerKw) : '—')}</b></span><span><small>State of charge</small><b>${escapeHtml(battery.socPct === null ? '—' : fmtPct(battery.socPct))}</b></span></div>
+            <span class="rhiFlowBatteryProof">${batteryFlowIntegrated ? 'Direction measured · shown in flow above' : 'Direction not proven · no animated battery flow'}</span>
+            <button type="button" data-tab-target="battery" class="rhiFlowBatteryDetails">Battery details <span aria-hidden="true">›</span></button>
+          </div>
+          <p class="rhiFlowMeasurementNote">Only direction-compatible battery sensors are allowed to animate. Charger and vehicle power are never added together.</p>
         </section>
         <section class="panel rhiFlowAllLoads"><div class="flowHeader"><div><h2>All flexible loads</h2><p>Full canonical inventory, including idle and currently unavailable assets. Chargers remain connection interfaces, not duplicate consumers.</p></div></div>
           ${this.flexibleAssetDomain(rt).consumerFacing().filter(vm=>!vm.isStorage).map(vm=>this.consumerCard(rt,vm.raw||{})).join('') || '<div class="empty compact"><b>No flexible loads published</b><span>The Energy inventory currently has no canonical consumers.</span></div>'}
@@ -6418,6 +6427,19 @@
 .overviewSupportFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
 .chargingConnectionGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.chargingConnectionGrid>.empty{grid-column:1/-1}
 .flowDetailsGrid.flowDetailsGridTwoUp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}.flowDetailsGrid.flowDetailsGridTwoUp>.panel{min-width:0;height:100%}
+/* Battery remains discoverable when bidirectional flow evidence is missing. */
+.rhiFlowBatteryPresence{display:flex;align-items:center;flex-wrap:wrap;gap:10px 20px;min-height:66px;padding:10px 12px;margin:8px 0 0;border:1px solid var(--line);border-radius:10px;background:#fbfcff}
+.rhiFlowBatteryIdentity{display:flex;align-items:center;gap:9px;min-width:150px;flex:1 1 180px}
+.rhiFlowBatteryIdentity b{display:block;font-size:12px;color:#14264a}
+.rhiFlowBatteryIdentity small{display:block;font-size:10px;color:var(--muted);margin-top:3px}
+.rhiFlowBatteryIcon{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:#edf4ff;color:#1467f5;font-size:17px}
+.rhiFlowBatteryFacts{display:grid;grid-template-columns:repeat(2,minmax(78px,1fr));gap:12px;flex:1 1 165px}
+.rhiFlowBatteryFacts small{display:block;font-size:9.5px;color:var(--muted)}
+.rhiFlowBatteryFacts b{display:block;font-size:12px;font-variant-numeric:tabular-nums;margin-top:3px}
+.rhiFlowBatteryProof{font-size:10.5px;color:#64748b;flex:1 1 195px;min-width:0}
+.rhiFlowBatteryDetails{display:inline-flex;align-items:center;gap:5px;margin-left:auto;height:38px;min-height:38px;padding:0 11px;border:1px solid #dce7f4;border-radius:10px;background:#fff;color:#075fd8;font:inherit;font-size:11px;font-weight:650;cursor:pointer;white-space:nowrap}
+.rhiFlowBatteryDetails span{font-size:19px;line-height:1}
+@media(max-width:700px){.rhiFlowBatteryPresence{gap:9px;padding:9px}.rhiFlowBatteryFacts{order:2;flex:1 1 100%}.rhiFlowBatteryProof{order:3;flex:1 1 100%}.rhiFlowBatteryDetails{order:4;margin-left:0}}
 .flowConnectionCard,.flowPhysicalConsumerCard{display:grid;grid-template-columns:auto minmax(0,1fr) 76px;align-items:center;gap:10px;min-height:64px;padding:9px 10px;margin:6px 0;border:1px solid var(--line);border-radius:10px;background:#fff;box-sizing:border-box}.flowAssetVisual{width:54px;height:46px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#f5f7fa;overflow:hidden}.flowAssetVisual img{display:block;max-width:50px;max-height:42px;object-fit:contain}.flowConnectionCard>div,.flowPhysicalConsumerCard>div{min-width:0}.flowConnectionCard b,.flowPhysicalConsumerCard b{display:block;font-size:12.5px;line-height:1.2;font-weight:600}.flowConnectionCard span,.flowPhysicalConsumerCard span{display:block;margin-top:3px;font-size:10.5px;line-height:1.25;color:var(--muted);white-space:normal}.flowConnectionCard strong,.flowPhysicalConsumerCard strong{min-width:76px;text-align:right;font-size:12.5px;line-height:1.2;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.flowConnectionCard small{display:block;margin-top:4px;font-size:9.5px;color:var(--muted)}
 .batteryContributorList{display:grid;gap:10px}.batteryContributorCard{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:stretch;min-height:148px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#fff,#fbfcfe);overflow:hidden}.batteryContributorVisual{display:flex;align-items:center;justify-content:center;padding:10px;background:linear-gradient(180deg,#f7f9fb,#eef2f5);overflow:hidden}.batteryContributorVisual .assetVisual{width:88px;height:108px;max-width:88px;max-height:108px;padding:5px;box-sizing:border-box;border:0;background:transparent;overflow:hidden}.batteryContributorVisual .assetVisual img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center center}.batteryContributorBody{min-width:0;padding:13px 14px;display:flex;flex-direction:column;justify-content:center;gap:7px}.batteryContributorHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.batteryContributorHeader>div{min-width:0}.batteryContributorHeader b{display:block;font-size:14px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}.batteryContributorHeader strong{flex:0 0 auto;font-size:22px;line-height:1;font-variant-numeric:tabular-nums}.batteryHealth{display:inline-flex;margin-top:5px;padding:3px 7px;border-radius:999px;background:#eef8f2;color:#2f6d4b;font-size:10px;font-weight:700}.batteryContributorMeta{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#526178}.batteryContributorMeta b{font-size:12px;color:#172033;font-variant-numeric:tabular-nums}.batteryContributorFacts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.batteryContributorFacts span{min-width:0;padding:6px 7px;border-radius:8px;background:#f8fafc}.batteryContributorFacts small,.batteryContributorFacts b{display:block}.batteryContributorFacts small{font-size:8px;color:#64748b}.batteryContributorFacts b{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.batteryContributorState{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;min-width:0}.batteryContributorState span{font-size:10.5px;font-weight:700;color:#265c3b;white-space:nowrap}.batteryContributorState small{min-width:0;font-size:10px;line-height:1.25;color:var(--muted);white-space:normal}.batteryContributorCard .bar{margin-top:2px}
 @media(max-width:1050px){.overviewCoreGrid{grid-template-columns:1fr 1fr}.overviewDecisionPanel{grid-column:1/-1;grid-row:1}.chargingConnectionGrid{grid-template-columns:1fr}.batteryContributorCard{grid-template-columns:104px minmax(0,1fr)}.batteryContributorVisual .assetVisual{width:80px;height:102px;max-width:80px;max-height:102px}.batteryContributorFacts{grid-template-columns:repeat(2,minmax(0,1fr))}}
