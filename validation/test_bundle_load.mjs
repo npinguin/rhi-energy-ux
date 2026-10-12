@@ -103,7 +103,7 @@ const energy = model.find(section => section.id === 'energy');
 const intelligence = model.find(section => section.id === 'intelligence');
 const insights = model.find(section => section.id === 'insights');
 if (energy.items.map(item => item.id).join('|') !== 'overview|flow|solar') throw new Error('minimal structural-presence Energy navigation drifted');
-if (intelligence.items.map(item => item.id).join('|') !== 'plan|settings') throw new Error('Intelligence navigation order drifted');
+if (intelligence.items.map(item => item.id).join('|') !== 'forecast|strategic|plan|operational|settings') throw new Error('Intelligence navigation order drifted');
 if (insights.items.map(item => item.id).join('|') !== 'metering|retrospective') throw new Error('minimal structural-presence Insights navigation drifted');
 if (recreated.resolveNavigation('', '', 'solar').item !== 'solar') throw new Error('Solar must resolve to the Energy Solar tab');
 if (recreated.resolveNavigation('', '', 'operational-planning').item !== 'plan') throw new Error('Operational Planning must resolve inside Plan');
