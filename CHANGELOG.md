@@ -1,3 +1,10 @@
+## 4.3.36-rc.18 — V1 parity Actual/Forecast and per-load D0/D1 candidate
+
+- Preserve measured Solar, Site Consumption and Home Consumption in kW separate from D0/D1 forecast kWh; include battery support and producer Grid Balance (#245).
+- Show available flexible-consumer need, both daily schedules and still-to-plan without treating unknown as zero.
+- Preserve the canonical source/policy boundary: charger infrastructure excluded; Automatic mode still requires explicit permissions and physical gates.
+- Exact F1.8.44 + M0.10.49 + E0.15.125 target stack; runtime and rollback remain unqualified, NOT STABLE.
+
 ## 4.3.36-rc.17 — Unreleased main fixes in immutable HACS test candidate
 
 - Restore native Forecast/Planning information and source-owned planning summaries (#241, #243).
