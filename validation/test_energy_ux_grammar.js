@@ -58,7 +58,7 @@ assert.match(app,/OPTIMIZER \/ PANEL/);
 assert.doesNotMatch(app,/No panels linked to this zone/);
 assert.match(app,/solarTopologyDetails/);
 assert.match(app,/solarTopologyDiagnostics/);
-assert.match(app,/No charging connections available/);
+assert.match(app,/No charging connection evidence/);
 
 for (const token of [
   "battery_system.generic",
