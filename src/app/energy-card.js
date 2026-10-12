@@ -2373,7 +2373,9 @@
       const controls = this.pageContextControls(rt, tab);
       if (!controls) return '';
       const aria = controlsId ? ` aria-controls="${escapeHtml(controlsId)}"` : '';
-      return `<section class="rhiUxContextBar" aria-label="View"${aria}><small>View</small><div class="rhiUxContextControls">${controls}</div></section>`;
+      const planner=['outlook','planning','operational-planning','strategic-planning'].includes(tab)
+        ? this.plannerControl(rt) : '';
+      return `<section class="rhiUxContextBar" aria-label="View"${aria}><small>View</small><div class="rhiUxContextControls">${controls}</div></section>${planner}`;
     }
 
     valueStateLabel(state) {
@@ -6511,6 +6513,16 @@
 .chargingConnectionGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.chargingConnectionGrid>.empty{grid-column:1/-1}
 .flowDetailsGrid.flowDetailsGridTwoUp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}.flowDetailsGrid.flowDetailsGridTwoUp>.panel{min-width:0;height:100%}
 /* Battery remains discoverable when bidirectional flow evidence is missing. */
+/* Planning controls: planner/provider selection separate from automation mode. */
+.rhiPlannerControls{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;justify-content:space-between;min-height:52px;padding:9px 12px;margin:6px 0 9px;background:#fff;border:1px solid var(--line);border-radius:10px}
+.rhiPlannerControls>div:first-child{display:grid;gap:3px;min-width:0}
+.rhiPlannerControls small{font-size:10px;color:var(--muted)}
+.rhiPlannerSelect{display:inline-flex;align-items:center;gap:8px;font-size:11px}
+.rhiPlannerSelect select{min-height:38px;min-width:140px;max-width:260px;padding:6px 9px;border:1px solid var(--line);border-radius:9px;background:#fff;color:#17305b;font:inherit}
+.rhiPlanningBaselineNotice{display:flex;gap:8px;align-items:center;padding:10px 12px;margin:7px 0;border:1px solid #dce7f4;border-radius:10px;background:#f7fbff}
+.rhiPlanningBaselineNotice b{font-size:11px;white-space:nowrap}
+.rhiPlanningBaselineNotice span{font-size:10.5px;line-height:1.35;color:#53677e}
+@media(max-width:700px){.rhiPlannerControls{align-items:stretch;flex-direction:column}.rhiPlannerSelect select{min-width:0;max-width:100%}.rhiPlanningBaselineNotice{flex-direction:column;align-items:flex-start}}
 .rhiFlowBatteryPresence{display:flex;align-items:center;flex-wrap:wrap;gap:10px 20px;min-height:66px;padding:10px 12px;margin:8px 0 0;border:1px solid var(--line);border-radius:10px;background:#fbfcff}
 .rhiFlowBatteryIdentity{display:flex;align-items:center;gap:9px;min-width:150px;flex:1 1 180px}
 .rhiFlowBatteryIdentity b{display:block;font-size:12px;color:#14264a}
