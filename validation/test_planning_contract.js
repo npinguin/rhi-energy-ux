@@ -565,7 +565,6 @@ assert.equal(projected.available,false);
 assert.equal(projected.horizon.summary.known_demand_projection.grid_balance_kwh,19.2);
 assert.equal(projected.horizon.summary.known_demand_projection.execution_authorized,false);
 assert.equal(projected.horizon.summary.balance.grid_balance_kwh,null);
-const fs = require('node:fs');
 const cardSource=fs.readFileSync(require('node:path').join(__dirname,'../src/app/energy-card.js'),'utf8');
 assert.match(cardSource,/knownLoadsPartial/);
 assert.match(cardSource,/Known home and solar baseline only/);
