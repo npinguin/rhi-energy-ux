@@ -537,7 +537,7 @@ console.log('PASS real HACS Forecast render: V1 parity, actual kW, forecast kWh 
 
 // Wessels: the UX must preserve producer-owned known home/solar forecast,
  // not infer that missing vehicle needs equal zero.
-const { readPlanningContract } = require('../src/domain/planning/planning-contract.js');
+const { readPlanningContract: readPlanningContractRegression } = require('../src/domain/planning/planning-contract.js');
 const native = {
   published:true, available:false,
   details: {
@@ -560,7 +560,7 @@ const nativeRuntime = {
   nativePlanningTotals:()=>({available:false,missing:['unknown_vehicle_need'],values:{}}),
   nativePlanningHorizon:()=>native,
 };
-const projected = readPlanningContract(nativeRuntime,'D1');
+const projected = readPlanningContractRegression(nativeRuntime,'D1');
 assert.equal(projected.available,false);
 assert.equal(projected.horizon.summary.known_demand_projection.grid_balance_kwh,19.2);
 assert.equal(projected.horizon.summary.known_demand_projection.execution_authorized,false);
