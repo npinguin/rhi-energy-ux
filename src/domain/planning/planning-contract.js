@@ -60,6 +60,7 @@
       supply:planningObject(horizonDetails.supply),
       demand:planningObject(horizonDetails.demand),
       balance:planningObject(horizonDetails.balance),
+      known_demand_projection:planningObject(horizonDetails.known_demand_projection),
       mode:planningObject(horizonDetails.mode),
       quality:planningObject(horizonDetails.quality)
     });
