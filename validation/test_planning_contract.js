@@ -533,3 +533,40 @@ for(const proof of ['Actual solar production now','3.1 kW',
 assert.ok(!actualRendered.includes('0.0 kWh</b>'),
   'no unproven storage/battery zero may be displayed as actual or forecast');
 console.log('PASS real HACS Forecast render: V1 parity, actual kW, forecast kWh and unknown EV');
+
+
+// Wessels: the UX must preserve producer-owned known home/solar forecast,
+ // not infer that missing vehicle needs equal zero.
+const { readPlanningContract } = require('../src/domain/planning/planning-contract.js');
+const native = {
+  published:true, available:false,
+  details: {
+    summary:{lane_totals:{}},
+    supply:{solar_forecast_kwh:20.5,total_usable_supply_kwh:null},
+    demand:{home_consumption_forecast_kwh:39.7,total_expected_demand_kwh:39.7},
+    balance:{grid_balance_kwh:null,expected_grid_import_kwh:null},
+    known_demand_projection:{
+      basis:'solar_plus_home_baseload_only_no_battery_dispatch',
+      complete:false, excluded_unknown_loads:true, unknown_flexible_load_count:4,
+      expected_grid_import_kwh:19.2,expected_grid_export_kwh:0,
+      grid_balance_kwh:19.2,total_usable_supply_kwh:39.7,
+      execution_authorized:false,
+    },
+    buckets:[],planning_assets:[],execution_policy:{},
+  },
+  metadata:{requested_provider:'emhass',provider_id:null},
+};
+const nativeRuntime = {
+  nativePlanningTotals:()=>({available:false,missing:['unknown_vehicle_need'],values:{}}),
+  nativePlanningHorizon:()=>native,
+};
+const projected = readPlanningContract(nativeRuntime,'D1');
+assert.equal(projected.available,false);
+assert.equal(projected.horizon.summary.known_demand_projection.grid_balance_kwh,19.2);
+assert.equal(projected.horizon.summary.known_demand_projection.execution_authorized,false);
+assert.equal(projected.horizon.summary.balance.grid_balance_kwh,null);
+const fs = require('node:fs');
+const cardSource=fs.readFileSync(require('node:path').join(__dirname,'../src/app/energy-card.js'),'utf8');
+assert.match(cardSource,/knownLoadsPartial/);
+assert.match(cardSource,/Known home and solar baseline only/);
+assert.match(cardSource,/knownLoadValue\(asNumber\(balanceGroup.grid_balance_kwh\), knownLoads.grid_balance_kwh\)/);
