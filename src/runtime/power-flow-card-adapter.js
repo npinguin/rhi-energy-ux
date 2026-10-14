@@ -40,7 +40,7 @@ function buildRhiPowerFlowCardConfig(rt) {
   // consumption = charging the storage; production = discharging storage.
   // battery.power_kw by itself does not publish a compatible signed convention.
   // A partial, ambiguous or stale pair must not animate a misleading arrow.
-  // Directional values are producer-owned non-negative magnitudes (E0.15.130).
+  // Directional values are producer-owned non-negative magnitudes.
   // Check actual canonical value/quality as well as identity: a stale, negative
   // or non-numeric publication must never animate a physical flow.
   const directionalSensor = key => {
