@@ -1,5 +1,5 @@
 (() => {
-  const UX_VERSION = 'R4.3.36-rc.19';
+  const UX_VERSION = 'R4.3.36-rc.20';
   const RELEASE_ENTITY = 'sensor.rhi_energy_release';
   // ---- src/runtime/public-interface-registry.js ----
 // Native Energy publication is discovered by exact canonical contract markers.
@@ -1464,12 +1464,30 @@ function buildRhiPowerFlowCardConfig(rt) {
   // consumption = charging the storage; production = discharging storage.
   // battery.power_kw by itself does not publish a compatible signed convention.
   // A partial, ambiguous or stale pair must not animate a misleading arrow.
-  const batteryChargeId = sensor('battery.charge_power_kw', 'battery_system');
-  const batteryDischargeId = sensor('battery.discharge_power_kw', 'battery_system');
+  // Directional values are producer-owned non-negative magnitudes (E0.15.130).
+  // Check actual canonical value/quality as well as identity: a stale, negative
+  // or non-numeric publication must never animate a physical flow.
+  const directionalSensor = key => {
+    const id = sensor(key, 'battery_system');
+    if (!id) return '';
+    const row = (index.rowsForProperty(key) || [])[0];
+    const raw = row?.value;
+    const unit = String(row?.unit || row?.unit_of_measurement || row?.native_unit_of_measurement || '').toLowerCase();
+    const quality = String(row?.quality || '').toUpperCase();
+    if (!['w','kw'].includes(unit) || raw === null || raw === undefined ||
+        typeof raw === 'boolean' || String(raw).trim() === '' ||
+        !Number.isFinite(Number(raw)) || Number(raw) < 0 ||
+        ['STALE','INVALID','UNKNOWN'].includes(quality)) return '';
+    return id;
+  };
+  const batteryChargeId = directionalSensor('battery.charge_power_kw');
+  const batteryDischargeId = directionalSensor('battery.discharge_power_kw');
   if (batteryChargeId && batteryDischargeId && batteryChargeId !== batteryDischargeId) {
     entities.battery = {
       entity:{consumption:batteryChargeId, production:batteryDischargeId},
-      display_state:'one_way', name:'Home Battery'
+      // Multiple physical units may charge and discharge simultaneously.
+      // one_way hides a real direction in that case; two_way preserves both.
+      display_state:'two_way', name:'Home Battery'
     };
     const socId = socSensor();
     if (socId) entities.battery.state_of_charge = socId;
