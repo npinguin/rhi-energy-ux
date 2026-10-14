@@ -1,7 +1,8 @@
-# v4.3.36-rc.19 — HACS TEST CANDIDATE
+# v4.3.36-rc.20 — Canonical Battery Flow, Source Validation Only
 
-- Restore producer-owned known Home Consumption + Solar forecasting, usable Supply and Grid Impact evidence even when unknown vehicle needs block the complete executable plan (Energy #309/#310, Energy UX #247).
-- Explicitly disclose the known-load-only boundary; it **excludes unknown vehicle demand and battery dispatch**, and grants no scheduling/physical execution authority.
-- Reconciled source history: historical Energy UX Flow/Planning branches were closed superseded by #236/#245; their complete old branches must NOT be merged. Target runtime Flow exception is still an open P0.
-- Coordinated source target: Foundation **F1.8.45**, Mobility **M0.10.50**, Energy **E0.15.128**, Energy UX **v4.3.36-rc.19**.
-- Target HA desktop/tablet/mobile, physical write/readback, restart, install and rollback **NOT EXECUTED**; stable **NO-GO**, rollback to **v4.3.36-rc.18**.
+- Coordinates Foundation **F1.8.45**, Mobility **M0.10.50**, Energy **E0.15.130** (canonical model **1.4.5**) and Energy UX **v4.3.36-rc.20**. Compatible producer now declares `battery.charge_power_kw` and `battery.discharge_power_kw` on the canonical battery system.
+- The Power Flow Card Plus adapter consumes only unique, available, finite and **non-negative** backend directional measurements with explicit W/kW units. Unsupported, stale, negative and non-numeric values fail closed; observed zero remains valid.
+- Card battery `display_state: two_way` preserves simultaneous battery charging and discharging across multiple physical units, unlike `one_way`. Charge is card consumption; discharge is production. Grid and Solar follow their existing canonical owners.
+- Includes the existing post-rc.19 fixes merged to `main` for shared runtime version/health footer and two-decimal display formatting; published generated JS/assets/checksum are locked to the candidate.
+- **TEST CANDIDATE ONLY.** Physical Wessels Flow browser exception, selected native readback/quality, actual mixed-direction conditions, power-flow-card-plus resource registration, desktop/tablet/mobile, Molas/Sonnen, charging and rollback remain **NOT EXECUTED**. Stable **NO-GO**. Source static green does not constitute runtime proof.
+- Rollback: **v4.3.36-rc.19**. Central blocker and resume authority: [Foundation #129](https://github.com/npinguin/rhi-foundation/issues/129).

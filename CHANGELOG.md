@@ -1,3 +1,10 @@
+## 4.3.36-rc.20 — Canonical Battery Flow, Source-Only Candidate
+
+- E0.15.130 native battery_system direction pair is consumed without UX-derived signs or system power inference; both opposed physical battery flows can be shown simultaneously (Power Flow Card Plus `two_way`).
+- Guard W/kW, finite non-negative physical readings, unique entities and explicit availability; invalid/missing/stale source values do not animate.
+- Include reviewed footer health/version and capped displayed precision source updates that landed after the immutable rc.19 tag; checked-in HACS dist uses the same canonical source and is deterministic.
+- Static QA source-only; physical Wessels/Molas/Sonnen acceptance, Flow browser exception, complete planning/finance, Mobility readback and rollback remain BLOCKED, Foundation #129. Rollback rc.19.
+
 ## 4.3.36-rc.19 — Reconciled Native Forecast Outlook
 
 - Energy UX #247: consume producer-owned partial home + solar outlook independently of incomplete vehicle planning, with honest coverage disclosure and without browser-side energy arithmetic.

@@ -1,5 +1,10 @@
 # Engineer handover — RHI Energy UX
 
+## Current coordinated Flow candidate and handover (14 October 2026)
+
+The canonical Energy backend **E0.15.130** (model **1.4.5**) provides optional native battery-system charge/discharge power. This UX repository's next immutable candidate is **v4.3.36-rc.20**, minimum/tested source E0.15.130. It preserves simultaneous mixed directions on Power Flow Card Plus, but must not fabricate a battery arrow from signed net power or treat missing measurements as zero. Source validation/HACS publication do not qualify physical Wessels Flow rendering. The central execution and defect ledger is [Foundation #129](https://github.com/npinguin/rhi-foundation/issues/129); use its latest comment for exact verified SHA/CI and unresolved exceptions. Wessels/Huis 1 → Molas/Huawei → separate Sonnen/SMA. Do not silently change the immutable v4.3.36-rc.19 tag. Stable remains NO-GO.
+
+
 ## Active engineering recovery — 2026-10-11
 
 **Read [ENGINEERING_RECOVERY_HANDOVER_2026-10-11.md](ENGINEERING_RECOVERY_HANDOVER_2026-10-11.md) first.** It identifies the exact unreleased Foundation/Energy/Mobility producer branches, 34 Public V2 source violations, native D0/D1 schema mismatch, execution plan, test gates and blocked release qualification. The legacy Public V2 gateway below is **historical implementation debt, not an endorsed product authority**. Do not merge/release the current Energy UX recovery candidate until the canonical-only cutover and target-HA evidence are complete.
