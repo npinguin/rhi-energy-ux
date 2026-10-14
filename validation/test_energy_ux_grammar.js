@@ -135,3 +135,7 @@ assert.ok(footerBody.includes("rhiUxTechnicalFooter({"), "Energy release footer 
 assert.ok(!footerBody.includes("show_diagnostics"), "Energy version/status must be visible with diagnostics off");
 assert.ok(footerBody.includes("backendVersion:backend"), "Energy footer must expose actual backend release");
 assert.ok(footerBody.includes("Status ${status}"), "Energy footer must expose runtime status when healthy");
+
+// UI-only precision guard: raw Energy facts/planning retain source precision.
+assert.ok(app.includes('n.toFixed(Math.max(0, Math.min(2, decimals)))'), 'Energy visual precision must never exceed two decimals');
+assert.ok(!app.includes('balanceDelta.toFixed(3)'), 'Planning energy balance must not expose three decimal places');
