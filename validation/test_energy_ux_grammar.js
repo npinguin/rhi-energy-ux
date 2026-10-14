@@ -128,3 +128,10 @@ for (const needle of [
 ]) assert.ok(app.includes(needle), "target-HA UX closure missing: "+needle);
 assert.ok(!app.includes("Configured · physical identity not proven"), "Energy normal UX must not expose technical physical-identity wording");
 console.log("PASS target-HA product-safe actions, Gas capability copy and phone flow closure");
+
+// Technical release identity is a public UX invariant, not engineer-only diagnostics.
+const footerBody = app.match(/    renderFooter\(rt, tab, footer\) \{([\s\S]*?)\n    \}/)?.[1] || "";
+assert.ok(footerBody.includes("rhiUxTechnicalFooter({"), "Energy release footer must use UX Core");
+assert.ok(!footerBody.includes("show_diagnostics"), "Energy version/status must be visible with diagnostics off");
+assert.ok(footerBody.includes("backendVersion:backend"), "Energy footer must expose actual backend release");
+assert.ok(footerBody.includes("Status ${status}"), "Energy footer must expose runtime status when healthy");
