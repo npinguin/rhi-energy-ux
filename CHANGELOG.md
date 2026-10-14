@@ -1,3 +1,9 @@
+## v4.3.36-rc.19 — Reconciled Native Forecast Outlook
+
+- Energy UX #247: consume producer-owned partial home + solar outlook independently of incomplete vehicle planning, with honest coverage disclosure and without browser-side energy arithmetic.
+- Reconciled discarded historical UX branches #233/#234/#235/#242: their accepted feature changes live in main via #236/#245 and later fixes; no obsolete branches merged.
+- Coordinated TEST stack F1.8.45, M0.10.50, E0.15.128, UX v4.3.36-rc.19. Physical HA runtime, Flow exception, Huawei capacity, EMHASS horizon and command readback still not qualified. Stable NO-GO.
+
 ## 4.3.36-rc.18 — V1 parity Actual/Forecast and per-load D0/D1 candidate
 
 - Preserve measured Solar, Site Consumption and Home Consumption in kW separate from D0/D1 forecast kWh; include battery support and producer Grid Balance (#245).
