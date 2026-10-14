@@ -1,4 +1,4 @@
-## v4.3.36-rc.19 — Reconciled Native Forecast Outlook
+## 4.3.36-rc.19 — Reconciled Native Forecast Outlook
 
 - Energy UX #247: consume producer-owned partial home + solar outlook independently of incomplete vehicle planning, with honest coverage disclosure and without browser-side energy arithmetic.
 - Reconciled discarded historical UX branches #233/#234/#235/#242: their accepted feature changes live in main via #236/#245 and later fixes; no obsolete branches merged.
