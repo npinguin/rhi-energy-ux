@@ -6081,7 +6081,7 @@
       return '';
     }
     renderFooter(rt, tab, footer) {
-      if (this.config?.show_diagnostics !== true) return '';
+      // Release identity and health are always visible; only expanded diagnostic details are optional.
       const backend = footer.backendVersion || 'Unknown';
       const contract = footer.contractVersion || 'Unknown';
       const issue = this.releaseIssueModel(rt, tab, footer);
