@@ -57,7 +57,7 @@
   };
   const fmtNumber = (value, decimals = 1, fallback = '—') => {
     const n = asNumber(value);
-    return n === null ? fallback : n.toFixed(decimals);
+    return n === null ? fallback : n.toFixed(Math.max(0, Math.min(2, decimals)));
   };
   const fmtKw = (value, fallback = '—') => {
     const n = asNumber(value);
@@ -5926,7 +5926,7 @@
         : [['Need entering today',displayNeed],['Planned today',displayPlanned],['Still after today',displayRemaining]];
       const summaryTotals = `<div class="planningAggregateTotals">${summaryItems.map(([label,value])=>`<span><small>${label}</small><b>${value===null?'—':value.toFixed(1)+' kWh'}</b></span>`).join('')}</div>`;
       const disclosure = firstDefined(vm.rows.find(row=>row.disclosure)?.disclosure, vm.quality.basis ? `Planning basis: ${human(vm.quality.basis)}. Actual execution follows the current operational intent.` : 'Future buckets are advisory. Actual execution follows the current operational intent.');
-      const balanceLabel = sourceTotal===null || useTotal===null ? 'Planning balance unavailable' : `${sourceTotal.toFixed(1)} kWh source · ${useTotal.toFixed(1)} kWh use${balanceDelta===null?'':` · Δ ${balanceDelta.toFixed(3)} kWh`}`;
+      const balanceLabel = sourceTotal===null || useTotal===null ? 'Planning balance unavailable' : `${sourceTotal.toFixed(1)} kWh source · ${useTotal.toFixed(1)} kWh use${balanceDelta===null?'':` · Δ ${balanceDelta.toFixed(2)} kWh`}`;
       const heroValue = displayPlanned===null ? '—' : displayPlanned.toFixed(1)+' kWh';
       const planningHeader = {
         image:hbEnergyHeroAsset('solar-generation'),
