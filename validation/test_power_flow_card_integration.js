@@ -35,13 +35,22 @@ const split = env.buildRhiPowerFlowCardConfig(runtime([...data,charge,discharge,
 assert.equal(split.entities.battery.entity.consumption,charge.entity_id,'canonical charge power enters storage');
 assert.equal(split.entities.battery.entity.production,discharge.entity_id,'canonical discharge power leaves storage');
 assert.equal(split.entities.battery.state_of_charge,soc.entity_id,'battery SoC is a separate percentage property');
-assert.equal(split.entities.battery.display_state,'one_way');
+assert.equal(split.entities.battery.display_state,'two_way','opposed physical battery flows must both remain visible');
 assert.ok(!env.buildRhiPowerFlowCardConfig(runtime([...data,charge])).entities.battery,'a one-sided pair cannot animate battery power');
 assert.ok(!env.buildRhiPowerFlowCardConfig(runtime([...data,charge,{...discharge,availability:'UNAVAILABLE'}])).entities.battery,'unavailable discharge cannot masquerade as valid');
 assert.ok(!env.buildRhiPowerFlowCardConfig(runtime([...data,charge,charge,discharge])).entities.battery,'ambiguous charge publisher must fail closed');
 assert.ok(!env.buildRhiPowerFlowCardConfig(runtime([...data,charge,{...discharge,entity_id:charge.entity_id}])).entities.battery,'same bidirectional physical sensor cannot become two directional channels');
 assert.ok(!env.buildRhiPowerFlowCardConfig(runtime([...data,charge,{...discharge,unit:'kWh'}])).entities.battery,'battery accumulated kWh cannot animate kW flow');
 assert.ok(!env.buildRhiPowerFlowCardConfig(runtime([...data,charge,discharge,{...soc,availability:'UNAVAILABLE'}])).entities.battery.state_of_charge,'unavailable SoC cannot appear as measured');
+assert.ok(!env.buildRhiPowerFlowCardConfig(runtime([...data,{...charge,value:-0.5},discharge])).entities.battery,'negative signed source cannot be passed as directional magnitude');
+assert.ok(!env.buildRhiPowerFlowCardConfig(runtime([...data,{...charge,value:'unknown'},discharge])).entities.battery,'non-numeric charging truth cannot animate');
+assert.ok(!env.buildRhiPowerFlowCardConfig(runtime([...data,charge,{...discharge,value:Infinity}])).entities.battery,'non-finite discharge cannot animate');
+assert.ok(!env.buildRhiPowerFlowCardConfig(runtime([...data,charge,{...discharge,value:null}])).entities.battery,'missing discharge must remain unavailable');
+assert.ok(!env.buildRhiPowerFlowCardConfig(runtime([...data,charge,{...discharge,unit:''}])).entities.battery,'directional unit must be explicit');
+assert.ok(!env.buildRhiPowerFlowCardConfig(runtime([...data,{...charge,quality:'STALE'},discharge])).entities.battery,'stale positive battery readings fail closed');
+const simultaneous=env.buildRhiPowerFlowCardConfig(runtime([...data,{...charge,value:1.25},{...discharge,value:0.45}]));
+assert.equal(simultaneous.entities.battery.display_state,'two_way','mixed physical charge/discharge is not one-way');
+assert.deepEqual(Object.keys(simultaneous.entities.battery.entity).sort(),['consumption','production']);
 
 assert.ok(!config.entities.individual,'no inferred consumer sensors');
 const vehicle= {...good('flexible_load.power_kw','flexible_load','sensor.vehicle_power'),asset_id:'vehicle_a',asset_display_name:'EV A'};

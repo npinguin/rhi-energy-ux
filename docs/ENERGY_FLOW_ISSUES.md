@@ -1,6 +1,6 @@
 # Energy Flow — issue-by-issue UX recovery
 
-Status: **rc.14 HACS TEST CANDIDATE**. Target-HA runtime / physical controls / automation / rollback not yet qualified; no stable promotion.
+Status: **source validation for v4.3.36-rc.20**. E0.15.130 now publishes the two system-only native battery direction properties, but target-HA installation / browser exceptions / physical controls / rollback are **not qualified**; no stable promotion.
 
 ## Issue E-FLOW-01 — Home Battery missing from flow
 
@@ -14,7 +14,7 @@ Current workbranch fix:
 - a battery status row in the Flow panel remains visible even when the pair is unavailable, with a truthful label *Direction not proven*, numeric state where available and direct navigation to Home Battery;
 - never synthesizes a directional arrow from battery.power_kw or state text.
 
-Acceptance still open: verify the target backend actually publishes both directional properties. If not, the flow diagram battery circle remains intentionally absent until backend provides explicit direction-compatible data. Verify real charge, discharge, idle and unknown on Home Assistant; do not accept a false line animation.
+Source gate: E0.15.130 now declares and publishes both directional properties as optional native HA properties (model 1.4.5); source CI passed, while physical Wessels presence and readback remain open. The UX adapter requires non-negative finite values and uses `two_way` to preserve simultaneous opposing flows. If a physical source does not publish both available values, the flow diagram battery circle remains intentionally absent until backend provides explicit direction-compatible data. Verify real charge, discharge, idle and unknown on Home Assistant; do not accept a false line animation.
 
 ## Issue E-FLOW-02 — Multiple conflicting consumer lists / charger treated as load
 
