@@ -4712,19 +4712,27 @@ function rhiEnergyVisualPickerStyles() {
       Object.entries(this.writeFeedback).forEach(([propertyKey, fb]) => {
         if (!fb || !['pending','verifying'].includes(fb.state)) return;
         const row = runtime.row(fb.readbackProperty || propertyKey);
-        const lifecycle = String(firstDefined(row.write_state, row.write_status, row.lifecycle_state, row.last_write_status, '') || '').toUpperCase();
-        const reason = firstDefined(row.reason_text, row.validation_message, row.write_message, row.reason, '');
-        if (['REJECTED','FAILED','INVALID'].includes(lifecycle)) {
+        const operation = objectFrom(row?.operation || {});
+        const operationId = String(operation.operation_id || '').trim();
+        const newOperation = Boolean(operationId && operationId !== String(fb.previousOperationId || ''));
+        const lifecycle = String(firstDefined(operation.status, row.write_state, row.write_status, '') || '').toUpperCase();
+        const reason = firstDefined(operation.reason, row.reason_text, row.write_message, row.reason, '');
+        if (newOperation && ['REJECTED','FAILED','INVALID'].includes(lifecycle)) {
           this.writeFeedback[propertyKey] = { ...fb, state: 'rejected', reason: String(reason || 'Backend rejected the requested value'), updated: Date.now() };
           return;
         }
-        if (['TIMED_OUT','TIMEOUT'].includes(lifecycle) || Date.now() - fb.updated > 30000) {
+        if ((newOperation && ['TIMED_OUT','TIMEOUT'].includes(lifecycle)) || Date.now() - (fb.issuedAt || fb.updated) > 30000) {
           this.writeFeedback[propertyKey] = { ...fb, state: 'timed_out', reason: String(reason || 'No authoritative readback received'), updated: Date.now() };
           return;
         }
-        const availability = String(firstDefined(row.availability, row.availability_state, row.state_code, '') || '').toUpperCase();
-        if ((availability === 'AVAILABLE' || lifecycle === 'ACCEPTED') && this.valuesEqual(fb.value, rowValue(row, null))) {
-          this.writeFeedback[propertyKey] = { ...fb, state: 'accepted', acceptedValue: rowValue(row, null), updated: Date.now() };
+        // Transport completion and old equal-valued state are NOT proof.
+        // Require the exact new producer operation, its CONFIRMED status,
+        // matching requested/readback values and matching visible native state.
+        if (fb.transportComplete && newOperation && lifecycle === 'CONFIRMED'
+            && this.valuesEqual(fb.value, operation.requested_value)
+            && this.valuesEqual(fb.value, operation.readback_value)
+            && this.valuesEqual(fb.value, rowValue(row, null))) {
+          this.writeFeedback[propertyKey] = { ...fb, state: 'accepted', acceptedValue: rowValue(row, null), updated: Date.now(), confirmedOperationId: operationId };
           delete this.editDrafts[propertyKey];
         } else if (fb.transportComplete) {
           this.writeFeedback[propertyKey] = { ...fb, state: 'verifying' };
@@ -4757,7 +4765,7 @@ function rhiEnergyVisualPickerStyles() {
       const finalValue = coerceAllowedValue(effectiveRow, value);
       const propertyId = String(effectiveRow.property_id || effectiveRow.property_key || effectiveRow.key || propertyKey);
       const payload = { ...meta.data, property_id: String(meta.data.property_id || propertyId), [meta.valueParameter]: finalValue };
-      this.writeFeedback[propertyKey] = { state: 'pending', value: finalValue, readbackProperty: meta.readbackProperty || propertyKey, operationId: meta.operationId, updated: Date.now() };
+      this.writeFeedback[propertyKey] = { state: 'pending', value: finalValue, readbackProperty: meta.readbackProperty || propertyKey, operationId: meta.operationId, previousOperationId: String(objectFrom(row?.operation || effectiveRow?.operation || {}).operation_id || ''), issuedAt: Date.now(), updated: Date.now() };
       if (!this._hass?.callService) {
         this.writeFeedback[propertyKey] = { ...this.writeFeedback[propertyKey], state: 'rejected', reason: 'Public property writer unavailable', updated: Date.now() };
         this.render();
