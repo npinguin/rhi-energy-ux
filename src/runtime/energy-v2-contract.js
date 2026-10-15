@@ -223,16 +223,48 @@ function readEnergyCanonicalProduct(gateway) {
     });
   }
   if(plannerPublishers!==1) plannerStatus=null;
+  // Every period is published independently by Energy, including its own
+  // priced-interval proof. Do not calculate profit from cost/revenue in UX.
   const nativeValue=readNativeEnergyMetric(hass,'net_financial_result_eur');
   const period=nativeValue?.period || null;
-  const valueAccounting={selected_period_id:period,
-    periods:period && nativeValue.available ? {
-      [period]:{available:true,actual_complete:nativeValue.actual_complete === true,
-        net_financial_result_eur:Number(nativeValue.value),
-        quality:nativeValue.quality,reason:nativeValue.reason || ''}
-    } : {},
-    net_financial_result:period && nativeValue.available ?
-      {value:Number(nativeValue.value),period_id:period,actual_complete:nativeValue.actual_complete} : {}
+  const financialPeriods={};
+  for(const [id,row] of Object.entries(meteringPeriods)) {
+    const cost=row.summary?.cost || {};
+    const valid=cost.available === true &&
+      typeof cost.net_financial_result_eur === 'number' &&
+      Number.isFinite(cost.net_financial_result_eur);
+    financialPeriods[id]=Object.freeze({
+      entity_id:row.entity_id,period_id:id,available:valid,
+      net_financial_result_eur:valid ? cost.net_financial_result_eur : null,
+      actual_complete:valid && cost.actual_complete === true,
+      site_period_complete:valid && cost.site_period_complete === true,
+      quality:String(cost.quality || 'UNKNOWN'),
+      reason:String(cost.reason_code || 'financial_period_evidence_unavailable'),
+      evidence_method:cost.evidence_method || null
+    });
+  }
+  // The selected standalone metric is an older native HA projection. Preserve
+  // it only when per-period backend net proof is not yet published; never
+  // override explicit unavailable/invalid financial evidence from a period.
+  if(period && nativeValue?.available === true &&
+     Number.isFinite(Number(nativeValue.value)) &&
+     !(period in financialPeriods && 
+       Object.prototype.hasOwnProperty.call(meteringPeriods[period]?.summary?.cost || {}, 'available'))) {
+    financialPeriods[period]=Object.freeze({
+      entity_id:nativeValue.entity_id || null,period_id:period,available:true,
+      net_financial_result_eur:Number(nativeValue.value),
+      actual_complete:nativeValue.actual_complete === true,
+      site_period_complete:nativeValue.site_period_complete === true,
+      quality:String(nativeValue.quality || 'UNKNOWN'),reason:nativeValue.reason || '',
+      evidence_method:'selected_native_metric'
+    });
+  }
+  const valueAccounting={
+    selected_period_id:period,
+    periods:Object.freeze(financialPeriods),
+    net_financial_result:period && financialPeriods[period]?.available ?
+      {value:financialPeriods[period].net_financial_result_eur,period_id:period,
+       actual_complete:financialPeriods[period].actual_complete} : {}
   };
   const flexibleAssets=objects.filter(obj=>obj.object_class==='flexible_load').map(obj=>{
     const rows=obj.properties;
