@@ -885,7 +885,7 @@ function selectEnergyValue(store, period='today') {
   const periods=accounting.periods && typeof accounting.periods === 'object' ? accounting.periods : {};
   const row=periods[id] && typeof periods[id] === 'object' ? periods[id] : {};
   const raw=row.net_financial_result_eur;
-  const valid=store?.available === true && row.available === true &&
+  const valid=row.available === true &&
     typeof raw === 'number' && Number.isFinite(raw);
   return Object.freeze({
     available:valid,
