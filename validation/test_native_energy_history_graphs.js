@@ -19,6 +19,7 @@ const methods = [
   between('mountEnergyHistoryGraphs','mountGasStatisticsGraph')
 ].join(',');
 const context={escapeHtml:value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),
+  rhiEnergyT:(_hass,key,_params,fallback)=>fallback,
   window:{}, Number, String};
 vm.createContext(context);
 const history=vm.runInContext('({'+methods+'})',context);
