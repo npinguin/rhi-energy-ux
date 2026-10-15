@@ -5991,7 +5991,9 @@
         /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
       const plannedTotals = assetTotals.map(item => `<span class="planningFooterAsset">${this.assetVisual(item.asset,{size:'xs',fallbackIcon:this.planningAssetIcon(item.asset)})}<b>${escapeHtml(this.planningAssetName(item.asset))}</b> ${item.plannedEnergy===null?'—':item.plannedEnergy.toFixed(1)+' kWh'}</span>`).join('');
       const summaryItems = vm.horizonId === 'D2'
-        ? [['Need entering day after tomorrow',displayNeed],['Planned day after tomorrow',displayPlanned],['Still after day after tomorrow',displayRemaining]]
+        ? [[rhiEnergyT(this._hass,'planning.d2_need',{},'Need entering day after tomorrow'),displayNeed],
+           [rhiEnergyT(this._hass,'planning.d2_planned',{},'Planned day after tomorrow'),displayPlanned],
+           [rhiEnergyT(this._hass,'planning.d2_remaining',{},'Still after day after tomorrow'),displayRemaining]]
         : vm.horizonId === 'D1'
         ? [['Need entering tomorrow',displayNeed],['Planned tomorrow',displayPlanned],['Still after tomorrow',displayRemaining]]
         : [['Need entering today',displayNeed],['Planned today',displayPlanned],['Still after today',displayRemaining]];
