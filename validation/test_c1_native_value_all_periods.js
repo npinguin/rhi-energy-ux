@@ -3,6 +3,8 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const assert=require('node:assert/strict');
 const ctx={console,Object,Array,String,Number,Boolean,Map,Set,JSON};
+ctx.objectFrom=value=>value && typeof value === 'object' ? value : {};
+ctx.human=value=>String(value);
 vm.createContext(ctx);
 for(const file of [
   'src/runtime/canonical-property-index.js',
@@ -63,6 +65,31 @@ for(const [id,money] of Object.entries({
 }
 assert.equal(ctx.selectEnergyValue({...p,available:true},'year').actual_complete,true);
 
+const app=fs.readFileSync('src/app/energy-card.js','utf8');
+function realCardMethod(start,end) {
+  const from=app.indexOf(start),until=app.indexOf(end,from+start.length);
+  assert.ok(from>=0 && until>from,'Energy Value method must be present');
+  const method=app.slice(from,until);
+  vm.runInContext('globalThis.__energyCardMethod = ({'+method+'})',ctx);
+  return ctx.__energyCardMethod;
+}
+const projection=realCardMethod('    valueProjection(period = \'today\') {','\n    meteringProjection(');
+const periodList=realCardMethod('    valuePeriods() {','\n    meteringRemediations() {');
+const host={canonicalProduct:()=>p,_valuePeriods:null};
+assert.equal(projection.valueProjection.call(host,'year').net_financial_result_eur,-112.4);
+assert.equal(projection.valueProjection.call(host,'hour').net_financial_result_eur,0);
+const items=periodList.valuePeriods.call(host);
+assert.equal(items.length,5);
+assert.equal(items[0].period_id,'hour');
+assert.equal(items[4].period_id,'year');
+assert.equal(items[3].net_financial_result_eur,-20.25);
+assert.equal(items[2].available,true);
+
+// Retained attributes of an unavailable native HA period are stale,
+ // even if they still contain a previously AVAILABLE money proof.
+const stale=product({...states,'sensor.value_year':period('year',-112.4,true,'unavailable')});
+assert.equal(stale.valueAccounting.periods.year,undefined);
+assert.equal(ctx.selectEnergyValue({...stale,available:true},'year').net_financial_result_eur,null);
 // An explicit incomplete native period overrides even a favorable selected
 // metric; old attributes cannot be used to repaint a financial HOLD.
 const incomplete=product({...states,'sensor.value_today':period('today',-1.1,false)});
@@ -93,4 +120,10 @@ assert.equal(legacyProduct.valueAccounting.periods.week.net_financial_result_eur
 assert.equal(ctx.selectEnergyValue({available:true,valueAccounting:{periods:{week:{
   available:false,net_financial_result_eur:123,reason:'bad_coverage'
 }}}},'week').net_financial_result_eur,null);
+
+// Zero must not be synthesized from a selected native metric that contains
+// null/blank/invalid numeric evidence. Independent period proof remains sole owner.
+const bad=product({...states,'sensor.value_hour':period('hour',null)});
+assert.equal(bad.valueAccounting.periods.hour.available,false);
+assert.equal(bad.valueAccounting.periods.hour.net_financial_result_eur,null);
 console.log('PASS C1 financial all native periods, real zero, HOLD, duplicate and legacy fallback');
