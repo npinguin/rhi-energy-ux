@@ -5884,7 +5884,9 @@
     }
     planning(rt) {
       const vm = this.buildPlanningViewModel(rt);
-      const horizonLabel = vm.horizonId === 'D1' ? 'Tomorrow' : 'Today';
+      const horizonLabel = vm.horizonId === 'D2'
+        ? rhiEnergyT(this._hass,'planning.day_after_tomorrow',{},'Day after tomorrow')
+        : vm.horizonId === 'D1' ? 'Tomorrow' : 'Today';
       const assetKey = asset => String(asset.asset_id || asset.id || '');
       const totals = vm.laneTotals;
       const canonicalAssetsById = vm.planningAssetsById || {};
@@ -5903,7 +5905,9 @@
           asset,
           canonical,
           need: asNumber(firstDefined(canonical.energy_need_kwh,canonical.need_kwh,published.energy_need_kwh,asset.energy_to_target_kwh)),
-          plannedEnergy: vm.horizonId === 'D1' ? asNumber(canonical.planned_tomorrow_kwh) : asNumber(canonical.planned_today_kwh),
+          plannedEnergy: vm.horizonId === 'D2' ? asNumber(canonical.planned_day_after_tomorrow_kwh)
+            : vm.horizonId === 'D1' ? asNumber(canonical.planned_tomorrow_kwh)
+            : asNumber(canonical.planned_today_kwh),
           remainingNeed: asNumber(firstDefined(canonical.still_to_plan_kwh,canonical.unresolved_horizon_kwh,published.remaining_need_kwh))
         };
       });
@@ -6005,9 +6009,9 @@
         badgeText:vm.contractSupported ? statusLabel : 'Unavailable',
         badgeTone:vm.contractSupported && vm.complete ? 'ok' : 'attention',
         metrics:[
-          ['◎',vm.horizonId === 'D1' ? 'Need entering tomorrow' : 'Need entering today',fmtKwh(displayNeed,'—'),horizonLabel],
-          ['▣',vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today',fmtKwh(displayPlanned,'—'),horizonLabel],
-          ['◷',vm.horizonId === 'D1' ? 'Still after tomorrow' : 'Still after today',fmtKwh(displayRemaining,'—'),'Horizon-local residual'],
+          ['◎',summaryItems[0][0],fmtKwh(displayNeed,'—'),horizonLabel],
+          ['▣',summaryItems[1][0],fmtKwh(displayPlanned,'—'),horizonLabel],
+          ['◷',summaryItems[2][0],fmtKwh(displayRemaining,'—'),'Horizon-local residual'],
           ['✓','Confidence',this.productStateLabel(confidence,'Limited'),'Planning confidence']
         ]
       };
