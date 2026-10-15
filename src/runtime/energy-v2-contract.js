@@ -251,7 +251,8 @@ function readEnergyCanonicalProduct(gateway) {
   // it only when per-period backend net proof is not yet published; never
   // override explicit unavailable/invalid financial evidence from a period.
   if(period && nativeValue?.available === true &&
-     typeof nativeValue.value === 'number' && Number.isFinite(nativeValue.value) &&
+     ['number','string'].includes(typeof nativeValue.value) &&
+     String(nativeValue.value).trim() !== '' && Number.isFinite(Number(nativeValue.value)) &&
      !(period in financialPeriods && 
        Object.prototype.hasOwnProperty.call(meteringPeriods[period]?.summary?.cost || {}, 'available'))) {
     financialPeriods[period]=Object.freeze({
