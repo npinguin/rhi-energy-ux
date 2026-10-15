@@ -423,18 +423,15 @@
     pricingProjection() { return selectEnergyPricing(this.canonicalProduct()); }
     valueProjection(period = 'today') {
       const requested=String(period || '').toLowerCase();
-      const native=this.nativeMetric('net_financial_result_eur');
-      const selected=String(native.period || '').toLowerCase();
-      const valid=native.available === true && !!selected && selected === requested;
-      const amount=valid ? Number(native.value) : null;
+      const result=selectEnergyValue(this.canonicalProduct(),requested);
+      const amount=result.available === true ? result.net_financial_result_eur : null;
       return Object.freeze({
-        available:valid,
-        period_id:requested,
+        available:result.available === true,period_id:requested,
         value:Object.freeze({net_financial_result_eur:amount}),
         net_financial_result_eur:amount,
-        net_financial_result:valid ? Object.freeze({value:amount,unit:'EUR',status:'AVAILABLE'}) : Object.freeze({}),
-        reason:valid ? '' : (selected && selected !== requested ? 'financial_period_not_published' : native.reason || 'financial_period_unavailable'),
-        source:'rhi_energy.runtime/native_metric'
+        net_financial_result:result.net_financial_result,
+        quality:result.quality,actual_complete:result.actual_complete,
+        reason:result.reason,source:result.source
       });
     }
     meteringProjection(period = 'today') { return selectEnergyMetering(this.canonicalProduct(), period); }
@@ -1039,19 +1036,25 @@
     }
     valuePeriods() {
       if (this._valuePeriods) return this._valuePeriods;
-      const financial=this.nativeMetric('net_financial_result_eur');
-      const id=String(financial.period || '').toLowerCase();
-      const labels={today:'Today',day:'Today',week:'This week',month:'This month',year:'This year'};
-      // Only the backend-selected financial period is currently published.
-      // Unknown periods must not be rendered as selectable financial facts.
-      this._valuePeriods=id ? [Object.freeze({
-        entity_id:financial.entity_id || null,
-        period_id:id,label:labels[id] || human(id),selector_order:1,
-        net_financial_result_eur:financial.available ? Number(financial.value) : null,
-        summary:{cost:{net_financial_result_eur:financial.available ? Number(financial.value) : null},
-          quality:{financial:financial.available ? 'AVAILABLE' : 'UNAVAILABLE'}},
-        reason:financial.reason || ''
-      })] : [];
+      const periods=objectFrom(this.canonicalProduct().valueAccounting?.periods || {});
+      const labels={hour:'This hour',today:'Today',week:'This week',month:'This month',year:'This year'};
+      const order={hour:0,today:1,week:2,month:3,year:4};
+      this._valuePeriods=Object.entries(periods)
+        .filter(([id])=>Object.hasOwn(order,id))
+        .map(([id,raw])=>{
+          const row=objectFrom(raw);
+          const amount=row.available === true && typeof row.net_financial_result_eur === 'number'
+            && Number.isFinite(row.net_financial_result_eur) ? row.net_financial_result_eur : null;
+          return Object.freeze({
+            entity_id:row.entity_id || null,period_id:id,label:labels[id],
+            selector_order:order[id],available:amount !== null,
+            net_financial_result_eur:amount,actual_complete:row.actual_complete === true,
+            summary:{cost:{net_financial_result_eur:amount},
+              quality:{financial:row.quality || 'UNKNOWN'}},
+            reason:row.reason || ''
+          });
+        })
+        .sort((a,b)=>a.selector_order-b.selector_order);
       return this._valuePeriods;
     }
     meteringRemediations() {
