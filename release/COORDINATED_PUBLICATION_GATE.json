@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "iteration_id": "RHI_NEXT_ZERO_DEBT_PRODUCT_CLOSURE",
+  "publication_hold": true,
+  "mode": "MANUAL_COORDINATED_SOURCE_CLOSURE_ONLY",
+  "authority": "npinguin/rhi-foundation#129",
+  "rationale": "Do not publish an intermediate HACS TEST while any mandatory code/product item remains open. Validated source PRs still merge to main. Only an explicit coordinated five-package release after all source and UX code is complete may create test tags.",
+  "approval": {
+    "source_closure_approved": null,
+    "five_package_matrix_verified": null,
+    "foundation_129_approval": null
+  },
+  "release_candidate": null
+}
