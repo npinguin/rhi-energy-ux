@@ -797,7 +797,9 @@
 
     planningIndexRows() {
       if (this._planningOutcomes) return this._planningOutcomes;
-      this._planningOutcomes=['D0','D1'].flatMap(id=>{
+      this._planningOutcomes=['D0','D1',
+        ...(this.nativePlanningHorizon('D2').published === true ? ['D2'] : [])
+      ].flatMap(id=>{
         const native=this.planningProjection(id);
         return native.planningAssets
           .filter(row=>row && String(row.asset_id || '').trim())
