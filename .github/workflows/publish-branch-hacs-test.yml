@@ -24,6 +24,21 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
+      - name: Honor global coordinated source-closure publication hold
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          gate = json.loads(Path("release/COORDINATED_PUBLICATION_GATE.json").read_text(encoding="utf-8"))
+          approval = gate.get("approval") or {}
+          required = ("source_closure_approved", "five_package_matrix_verified", "foundation_129_approval")
+          if (gate.get("publication_hold") is not False
+                  or gate.get("mode") != "MANUAL_COORDINATED_SOURCE_CLOSURE_ONLY"
+                  or os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
+                  or not all(isinstance(approval.get(key), str) and approval[key].startswith("https://github.com/npinguin/") for key in required)):
+              raise SystemExit("BLOCKED: branch/experimental HACS publication forbidden until explicit coordinated manual closure")
+          PY
       - name: Verify requested release identity and authorized source branch
         shell: bash
         run: |
