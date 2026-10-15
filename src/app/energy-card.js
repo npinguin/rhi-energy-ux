@@ -2649,13 +2649,12 @@
       const spec = definitions[kind];
       if (!spec) return '';
       const {key,cls,title,description}=spec;
-      const battery = kind === 'battery';
       const entityId = this.canonicalEnergyHistorySensor(rt,key,cls);
       const period = ['day','week','month'].includes(this.selectedEnergyHistoryPeriodId) ? this.selectedEnergyHistoryPeriodId : 'day';
-      const controls = entityId ? `<div class="scopeSelector energyHistorySelector" aria-label="${escapeHtml(title)} period">${[['day','Today'],['week','Week'],['month','Month']].map(([id,label])=>`<button type="button" class="scopeOption ${period===id?'active':''}" data-energy-history-period="${id}" aria-pressed="${period===id?'true':'false'}">${label}</button>`).join('')}</div>` : '';
+      const controls = entityId ? `<div class="scopeSelector energyHistorySelector" aria-label="${escapeHtml(title)} period">${[['day',rhiEnergyT(this._hass,'common.today',{},'Today')],['week',rhiEnergyT(this._hass,'common.week',{},'Week')],['month',rhiEnergyT(this._hass,'common.month',{},'Month')]].map(([id,label])=>`<button type="button" class="scopeOption ${period===id?'active':''}" data-energy-history-period="${id}" aria-pressed="${period===id?'true':'false'}">${label}</button>`).join('')}</div>` : '';
       const body = entityId
         ? `<div class="rhiUxChartViewport energyHistoryHost" data-energy-history-host data-entity-id="${escapeHtml(entityId)}" data-history-kind="${kind}" data-hours-to-show="${({day:24,week:168,month:720})[period]}"></div>`
-        : '<div class="empty compact"><b>Measured history unavailable</b><span>No unique, available canonical Home Assistant sensor is published for this history. No values are estimated.</span></div>';
+        : `<div class="empty compact"><b>${escapeHtml(rhiEnergyT(this._hass,'history.unavailable',{},'Measured history unavailable'))}</b><span>${escapeHtml(rhiEnergyT(this._hass,'history.unavailable_desc',{},'No unique, available canonical Home Assistant sensor is published for this history. No values are estimated.'))}</span></div>`;
       return `<section class="panel rhiUxChartPanel energyHistoryPanel" id="${escapeHtml(kind)}-history"><div class="rhiUxSectionHead rhiUxChartHeader"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${controls}</div>${body}</section>`;
     }
     async mountEnergyHistoryGraphs() {
