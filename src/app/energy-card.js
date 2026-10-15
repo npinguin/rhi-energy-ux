@@ -2636,7 +2636,7 @@
     async mountEnergyHistoryGraphs() {
       if (!['solar','battery'].includes(this.view)) return;
       const host = this.shadowRoot?.querySelector('[data-energy-history-host]');
-      if (!host || (host.firstElementChild && !host.firstElementChild.hasAttribute('data-rhi-native-flow')) || host.dataset.loading === 'true') return;
+      if (!host || host.firstElementChild || host.dataset.loading === 'true') return;
       const entityId = String(host.dataset.entityId || '');
       const hours = Number(host.dataset.hoursToShow);
       const kind = String(host.dataset.historyKind || '');
@@ -4648,7 +4648,7 @@
     async mountPowerFlowCard() {
       if (this.view !== 'flow' || this.powerFlowDependencyStatus() !== 'ready') return;
       const host = this.shadowRoot?.querySelector('[data-rhi-power-flow-host]');
-      if (!host || host.firstElementChild || host.dataset.loading === 'true') return;
+      if (!host || (host.firstElementChild && !host.firstElementChild.hasAttribute('data-rhi-native-flow')) || host.dataset.loading === 'true') return;
       const config = buildRhiPowerFlowCardConfig(this.runtime());
       if (!config) {
         // The native measurements remain visible when optional third-party
