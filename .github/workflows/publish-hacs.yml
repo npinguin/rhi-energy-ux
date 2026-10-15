@@ -29,11 +29,42 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ env.CANDIDATE_SHA }}
+      - name: Enforce coordinated source-closure publication freeze
+        id: coordinated
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          gate = json.loads(Path("release/COORDINATED_PUBLICATION_GATE.json").read_text(encoding="utf-8"))
+          approval = gate.get("approval") or {}
+          required = ("source_closure_approved", "five_package_matrix_verified", "foundation_129_approval")
+          allowed = (
+              os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+              and gate.get("iteration_id") == "RHI_NEXT_ZERO_DEBT_PRODUCT_CLOSURE"
+              and gate.get("publication_hold") is False
+              and gate.get("mode") == "MANUAL_COORDINATED_SOURCE_CLOSURE_ONLY"
+              and all(
+                  isinstance(approval.get(key), str)
+                  and approval[key].startswith("https://github.com/npinguin/")
+                  for key in required
+              )
+          )
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"allowed={str(allowed).lower()}\n")
+          print("Coordinated HACS publication authorized" if allowed else
+                "HOLD: source and UX engineering PR merges may proceed; no new HACS TEST")
+          PY
       - name: Determine whether this version is publishable
         id: scope
         shell: bash
         run: |
           set -euo pipefail
+          if [ "${{ steps.coordinated.outputs.allowed }}" != "true" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "reason=coordinated_source_closure_hold" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
           if git ls-remote --exit-code --tags "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${TAG}" >/dev/null 2>&1; then
