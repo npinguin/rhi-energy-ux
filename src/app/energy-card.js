@@ -188,7 +188,7 @@
     nativePlanningHorizon(horizonId = 'D0', variant = 'effective') {
       const horizon=String(horizonId || '').toUpperCase();
       if(!['effective','baseline'].includes(variant)) return Object.freeze({published:false,available:false,details:null});
-      if (horizon !== 'D0' && horizon !== 'D1') return Object.freeze({available:false,details:null});
+      if (!['D0','D1','D2'].includes(horizon)) return Object.freeze({available:false,details:null});
       // Baseline and INCOMPLETE horizons may be read as preview only.
       // They never authorize physical action or masquerade as effective plans.
       const contract=variant==='baseline'
@@ -815,7 +815,9 @@
       // Only the two backend-supported native horizons exist. An incomplete
       // horizon remains visible as incomplete rather than vanishing or using
       // a retired aggregate to fill missing totals.
-      return ['D0','D1'].map(id=>this.planningProjection(id).horizon);
+      return ['D0','D1',
+        ...(this.nativePlanningHorizon('D2').published === true ? ['D2'] : [])
+      ].map(id=>this.planningProjection(id).horizon);
     }
     planningHorizon(id = 'D0') {
       return this.planningProjection(id).horizon || null;
@@ -2353,8 +2355,9 @@
           { value:'planning', label:rhiEnergyT(this._hass,'nav.tactical_plan',{},'Today & Tomorrow'), attrs:{'data-tab-target':'planning'} },
           { value:'strategic-planning', label:rhiEnergyT(this._hass,'nav.strategic_plan',{},'Long term'), attrs:{'data-tab-target':'strategic-planning'} }
         ], tab, 'planningViewSelector');
+        const d2Published = rt.nativePlanningHorizon('D2').published === true;
         const horizon = tab === 'planning'
-          ? `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">Today</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">Tomorrow</button></div>`
+          ? `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">${escapeHtml(rhiEnergyT(this._hass,'common.today',{},'Today'))}</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">${escapeHtml(rhiEnergyT(this._hass,'common.tomorrow',{},'Tomorrow'))}</button>${d2Published ? `<button class="scopeOption ${this.selectedPlanningHorizonId==='D2'?'active':''}" data-planning-horizon="D2">${escapeHtml(rhiEnergyT(this._hass,'planning.day_after_tomorrow',{},'Day after tomorrow'))}</button>` : ''}</div>`
           : '';
         return selector + horizon;
       }
@@ -5968,7 +5971,8 @@
 
       const canonicalTotals = vm.horizonId === 'D0'
         ? objectFrom(vm.todayTotals)
-        : objectFrom(vm.tomorrowTotals);
+        : vm.horizonId === 'D1' ? objectFrom(vm.tomorrowTotals)
+        : objectFrom(vm.dayAfterTotals);
       const totalNeed = asNumber(canonicalTotals.flexible_required_kwh);
       const totalPlanned = asNumber(canonicalTotals.flexible_planned_kwh);
       const remainingNeed = asNumber(canonicalTotals.flexible_still_to_plan_kwh);
@@ -5980,7 +5984,9 @@
       const statusLabel = vm.previewOnly ? 'Preview only · No execution' :
         /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
       const plannedTotals = assetTotals.map(item => `<span class="planningFooterAsset">${this.assetVisual(item.asset,{size:'xs',fallbackIcon:this.planningAssetIcon(item.asset)})}<b>${escapeHtml(this.planningAssetName(item.asset))}</b> ${item.plannedEnergy===null?'—':item.plannedEnergy.toFixed(1)+' kWh'}</span>`).join('');
-      const summaryItems = vm.horizonId === 'D1'
+      const summaryItems = vm.horizonId === 'D2'
+        ? [['Need entering day after tomorrow',displayNeed],['Planned day after tomorrow',displayPlanned],['Still after day after tomorrow',displayRemaining]]
+        : vm.horizonId === 'D1'
         ? [['Need entering tomorrow',displayNeed],['Planned tomorrow',displayPlanned],['Still after tomorrow',displayRemaining]]
         : [['Need entering today',displayNeed],['Planned today',displayPlanned],['Still after today',displayRemaining]];
       const summaryTotals = `<div class="planningAggregateTotals">${summaryItems.map(([label,value])=>`<span><small>${label}</small><b>${value===null?'—':value.toFixed(1)+' kWh'}</b></span>`).join('')}</div>`;
