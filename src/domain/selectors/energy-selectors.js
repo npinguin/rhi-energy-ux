@@ -90,15 +90,19 @@ function selectEnergyValue(store, period='today') {
   const id=String(period || accounting.selected_period_id || 'today').toLowerCase();
   const periods=accounting.periods && typeof accounting.periods === 'object' ? accounting.periods : {};
   const row=periods[id] && typeof periods[id] === 'object' ? periods[id] : {};
-  const selectedId=String(accounting.selected_period_id || '').toLowerCase();
-  const netOutcome=accounting.net_financial_result && typeof accounting.net_financial_result === 'object' ? accounting.net_financial_result : {};
+  const raw=row.net_financial_result_eur;
+  const valid=store?.available === true && row.available === true &&
+    typeof raw === 'number' && Number.isFinite(raw);
   return Object.freeze({
-    available:store?.available === true && Object.keys(row).length > 0,
+    available:valid,
     period_id:id,
     value:row,
-    net_financial_result_eur:row.net_financial_result_eur ?? (id === selectedId ? netOutcome.value ?? accounting.net_financial_result_eur ?? null : null),
-    net_financial_result:id === selectedId ? netOutcome : {},
-    source:'RHI_ENERGY_CANONICAL_PROPERTY_V2.value_accounting'
+    net_financial_result_eur:valid ? raw : null,
+    net_financial_result:valid ?
+      Object.freeze({value:raw,period_id:id,actual_complete:row.actual_complete === true}) : {},
+    quality:row.quality || 'UNKNOWN',actual_complete:row.actual_complete === true,
+    reason:valid ? '' : row.reason || 'financial_period_evidence_unavailable',
+    source:'rhi_energy.runtime/native_metering_period'
   });
 }
 
