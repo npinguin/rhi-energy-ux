@@ -152,6 +152,9 @@ function readEnergyCanonicalProduct(gateway) {
   const meteringPeriods={},meteringConflicts=new Set();
   for(const [entityId,state] of Object.entries(hass.states || {})) {
     const a=state?.attributes || {};
+    // HA may retain attributes after a native producer has become unavailable.
+    // Do not revive an invalid period or its old financial value.
+    if(['unavailable','unknown',''].includes(String(state?.state ?? '').trim().toLowerCase())) continue;
     if(a.contract_id !== 'RHI_ENERGY_METERING_PERIOD_V1' ||
        a.canonical_source !== 'rhi_energy.runtime' || a.publisher !== 'rhi_energy') continue;
     const periodId=String(a.period_id || '').toLowerCase();
@@ -230,7 +233,8 @@ function readEnergyCanonicalProduct(gateway) {
   const financialPeriods={};
   for(const [id,row] of Object.entries(meteringPeriods)) {
     const cost=row.summary?.cost || {};
-    const valid=cost.available === true &&
+    const valid=row.availability === 'AVAILABLE' &&
+      cost.available === true && cost.actual_complete === true &&
       typeof cost.net_financial_result_eur === 'number' &&
       Number.isFinite(cost.net_financial_result_eur);
     financialPeriods[id]=Object.freeze({
@@ -247,7 +251,7 @@ function readEnergyCanonicalProduct(gateway) {
   // it only when per-period backend net proof is not yet published; never
   // override explicit unavailable/invalid financial evidence from a period.
   if(period && nativeValue?.available === true &&
-     Number.isFinite(Number(nativeValue.value)) &&
+     typeof nativeValue.value === 'number' && Number.isFinite(nativeValue.value) &&
      !(period in financialPeriods && 
        Object.prototype.hasOwnProperty.call(meteringPeriods[period]?.summary?.cost || {}, 'available'))) {
     financialPeriods[period]=Object.freeze({
@@ -298,7 +302,7 @@ function readEnergyCanonicalProduct(gateway) {
     planning:Object.values(horizons).some(h=>h.status==='AVAILABLE'),
     pricing:pricingRows.length>0,strategy:strategyRows.length>0,
     commands:nativeCommands.length>0,
-    value_accounting:nativeValue.available === true
+    value_accounting:Object.values(financialPeriods).some(row=>row.available === true)
   };
   return Object.freeze({
     envelope,available:envelope.available,publicContractOk:envelope.available,
