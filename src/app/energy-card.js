@@ -2636,7 +2636,7 @@
     async mountEnergyHistoryGraphs() {
       if (!['solar','battery'].includes(this.view)) return;
       const host = this.shadowRoot?.querySelector('[data-energy-history-host]');
-      if (!host || host.firstElementChild || host.dataset.loading === 'true') return;
+      if (!host || (host.firstElementChild && !host.firstElementChild.hasAttribute('data-rhi-native-flow')) || host.dataset.loading === 'true') return;
       const entityId = String(host.dataset.entityId || '');
       const hours = Number(host.dataset.hoursToShow);
       const kind = String(host.dataset.historyKind || '');
@@ -4603,6 +4603,29 @@
     }
     // HACS cannot enforce dashboard-card dependencies at download time.
     // Check the actual browser registration on first render and whenever Flow is opened.
+    nativeFlowEvidence(current, physicalFlow) {
+      // Native fallback consumes already projected, canonical measured values.
+      // Never calculate physical balance, invent a missing direction or sum
+      // the charger's power again with the vehicle's flexible consumption.
+      const labels = [
+        [rhiEnergyT(this._hass,'flow.native_solar',{},'Solar production'), current?.solar?.powerKw],
+        [rhiEnergyT(this._hass,'flow.native_grid_import',{},'Grid import'), current?.grid?.importPowerKw],
+        [rhiEnergyT(this._hass,'flow.native_grid_export',{},'Grid export'), current?.grid?.exportPowerKw],
+        [rhiEnergyT(this._hass,'flow.native_site',{},'Site consumption'), physicalFlow?.siteConsumptionKw],
+        [rhiEnergyT(this._hass,'flow.native_home',{},'Home consumption'), physicalFlow?.homeConsumptionKw],
+        [rhiEnergyT(this._hass,'flow.native_flexible',{},'Flexible loads'), physicalFlow?.flexibleLoadsKw],
+        [rhiEnergyT(this._hass,'flow.native_battery',{},'Battery power'), current?.battery?.valueAvailable === true ? current.battery.displayPowerKw : null]
+      ];
+      const rows = labels.map(([label, raw]) => {
+        const value = asNumber(raw);
+        return `<div class="meteringCleanRow"><div><b>${escapeHtml(label)}</b></div>
+          <strong>${escapeHtml(value === null ? rhiEnergyT(this._hass,'common.not_available',{},'Not available') : fmtKw(value))}</strong></div>`;
+      }).join('');
+      return `<div class="rhiFlowNativeEvidence" data-rhi-native-flow role="group" aria-label="${escapeHtml(rhiEnergyT(this._hass,'flow.native_title',{},'Measured energy flow'))}">
+        <div class="flowHeader"><div><h3>${escapeHtml(rhiEnergyT(this._hass,'flow.native_title',{},'Measured energy flow'))}</h3><p>${escapeHtml(rhiEnergyT(this._hass,'flow.native_desc',{},'Direct measured values; unavailable directions remain unavailable.'))}</p></div></div>
+        <div class="meteringCleanRows">${rows}</div>
+      </div>`;
+    }
     powerFlowDependencyStatus() {
       const tag = 'power-flow-card-plus';
       if (typeof customElements === 'undefined') return 'checking';
@@ -4628,7 +4651,8 @@
       if (!host || host.firstElementChild || host.dataset.loading === 'true') return;
       const config = buildRhiPowerFlowCardConfig(this.runtime());
       if (!config) {
-        host.innerHTML = '<div class="empty compact"><b>Power-flow measurements unavailable</b><span>No unique, available canonical Solar or Grid power sensor can be provided to Power Flow Card Plus.</span></div>';
+        // The native measurements remain visible when optional third-party
+        // card mapping is absent or ambiguous. No synthetic entity IDs.
         return;
       }
       host.dataset.loading='true';
@@ -4640,7 +4664,11 @@
         card.hass = this._hass;
         host.replaceChildren(card);
       } catch (error) {
-        if (host.isConnected) host.innerHTML = '<div class="empty compact"><b>Power Flow Card Plus could not render</b><span>Check that the HACS resource is installed, loaded and compatible with your Home Assistant version. Other Energy functions remain available.</span></div>';
+        if (host.isConnected) {
+          host.dataset.powerFlowError = String(error?.message || 'card_unavailable');
+          // Keep native source-backed Flow rather than replacing it with an
+          // empty failure message when the optional HACS card throws.
+        }
       } finally {
         delete host.dataset.loading;
       }
@@ -4678,7 +4706,7 @@
       return `${this.tabExperienceHeader(rt,'flow',pageVm)}<div class="flowPage">\n        ${this.powerFlowDependencyNotice()}
         <section class="panel rhiPowerFlowPanel">
           <div class="flowHeader"><div><h2>Live power flow</h2><p>Powered by Power Flow Card Plus. Only published, measured sources can animate; missing energy values are not estimated.</p></div></div>
-          <div class="rhiPowerFlowHost rhiUxChartViewport" data-rhi-power-flow-host role="region" aria-label="Interactive energy flow"></div>
+          <div class="rhiPowerFlowHost rhiUxChartViewport" data-rhi-power-flow-host role="region" aria-label="Interactive energy flow">${this.nativeFlowEvidence(current, physicalFlow)}</div>
           <div class="rhiFlowBatteryPresence" aria-label="Home Battery on energy flow">
             <div class="rhiFlowBatteryIdentity"><span class="rhiFlowBatteryIcon" aria-hidden="true">▣</span><div><b>Home Battery</b><small>${escapeHtml(battery.health === 'OK' ? battery.label : 'Measurement unavailable')}</small></div></div>
             <div class="rhiFlowBatteryFacts"><span><small>Power now</small><b>${escapeHtml(battery.valueAvailable ? fmtKw(battery.displayPowerKw) : '—')}</b></span><span><small>State of charge</small><b>${escapeHtml(battery.socPct === null ? '—' : fmtPct(battery.socPct))}</b></span></div>
