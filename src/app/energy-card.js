@@ -2626,46 +2626,67 @@
       return id;
     }
     energyHistorySection(rt, kind) {
+      const definitions = {
+        battery: { key:'battery.soc_pct', cls:'battery_system',
+          title:'Battery state of charge history',
+          description:'Recorded battery state of charge (%), from Home Assistant sensor history.' },
+        solar: { key:'solar.power_kw', cls:'solar_production',
+          title:'Solar production power history',
+          description:'Measured solar power (kW), from Home Assistant sensor history. This is not a produced-energy total.' },
+        grid_import: { key:'grid_import.power_kw', cls:'grid_connection',
+          title:rhiEnergyT(this._hass,'history.grid_import',{},'Grid import history'),
+          description:rhiEnergyT(this._hass,'history.measured_power',{},'Measured power (kW) from Home Assistant history; not a derived energy total.') },
+        grid_export: { key:'grid_export.power_kw', cls:'grid_connection',
+          title:rhiEnergyT(this._hass,'history.grid_export',{},'Grid export history'),
+          description:rhiEnergyT(this._hass,'history.measured_power',{},'Measured power (kW) from Home Assistant history; not a derived energy total.') },
+        home: { key:'home_consumption.power_kw', cls:'home_consumption',
+          title:rhiEnergyT(this._hass,'history.home',{},'Home consumption history'),
+          description:rhiEnergyT(this._hass,'history.measured_power',{},'Measured power (kW) from Home Assistant history; not a derived energy total.') },
+        flexible: { key:'flexible_loads.power_kw', cls:'flexible_loads',
+          title:rhiEnergyT(this._hass,'history.flexible',{},'Flexible load history'),
+          description:rhiEnergyT(this._hass,'history.measured_power',{},'Measured power (kW) from Home Assistant history; not a derived energy total.') }
+      };
+      const spec = definitions[kind];
+      if (!spec) return '';
+      const {key,cls,title,description}=spec;
       const battery = kind === 'battery';
-      const key = battery ? 'battery.soc_pct' : 'solar.power_kw';
-      const cls = battery ? 'battery_system' : 'solar_production';
-      const title = battery ? 'Battery state of charge history' : 'Solar production power history';
-      const description = battery
-        ? 'Recorded battery state of charge (%), from Home Assistant sensor history.'
-        : 'Measured solar power (kW), from Home Assistant sensor history. This is not a produced-energy total.';
       const entityId = this.canonicalEnergyHistorySensor(rt,key,cls);
       const period = ['day','week','month'].includes(this.selectedEnergyHistoryPeriodId) ? this.selectedEnergyHistoryPeriodId : 'day';
       const controls = entityId ? `<div class="scopeSelector energyHistorySelector" aria-label="${escapeHtml(title)} period">${[['day','Today'],['week','Week'],['month','Month']].map(([id,label])=>`<button type="button" class="scopeOption ${period===id?'active':''}" data-energy-history-period="${id}" aria-pressed="${period===id?'true':'false'}">${label}</button>`).join('')}</div>` : '';
       const body = entityId
         ? `<div class="rhiUxChartViewport energyHistoryHost" data-energy-history-host data-entity-id="${escapeHtml(entityId)}" data-history-kind="${kind}" data-hours-to-show="${({day:24,week:168,month:720})[period]}"></div>`
         : '<div class="empty compact"><b>Measured history unavailable</b><span>No unique, available canonical Home Assistant sensor is published for this history. No values are estimated.</span></div>';
-      return `<section class="panel rhiUxChartPanel energyHistoryPanel" id="${battery?'battery-history':'solar-history'}"><div class="rhiUxSectionHead rhiUxChartHeader"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${controls}</div>${body}</section>`;
+      return `<section class="panel rhiUxChartPanel energyHistoryPanel" id="${escapeHtml(kind)}-history"><div class="rhiUxSectionHead rhiUxChartHeader"><div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div>${controls}</div>${body}</section>`;
     }
     async mountEnergyHistoryGraphs() {
-      if (!['solar','battery'].includes(this.view)) return;
-      const host = this.shadowRoot?.querySelector('[data-energy-history-host]');
-      if (!host || host.firstElementChild || host.dataset.loading === 'true') return;
-      const entityId = String(host.dataset.entityId || '');
-      const hours = Number(host.dataset.hoursToShow);
-      const kind = String(host.dataset.historyKind || '');
-      if (!/^sensor\.[a-z0-9_]+$/.test(entityId) || ![24,168,720].includes(hours)) return;
-      host.dataset.loading = 'true';
-      try {
-        if (typeof window.loadCardHelpers !== 'function') throw new Error('Home Assistant card helpers unavailable');
-        const helpers = await window.loadCardHelpers();
-        if (!host.isConnected || this.view !== kind && !(this.view === 'solar' && kind === 'solar')) return;
-        const card = await helpers.createCardElement({
-          type:'history-graph',
-          entities:[entityId],
-          hours_to_show:hours,
-          show_names:false
-        });
-        card.hass = this._hass;
-        if (host.isConnected) host.replaceChildren(card);
-      } catch (_) {
-        if (host.isConnected) host.innerHTML = '<div class="empty compact"><b>History temporarily unavailable</b><span>Home Assistant could not load this sensor history.</span></div>';
-      } finally {
-        delete host.dataset.loading;
+      if (!['solar','battery','flow'].includes(this.view)) return;
+      const hosts = this.shadowRoot?.querySelectorAll
+        ? [...this.shadowRoot.querySelectorAll('[data-energy-history-host]')]
+        : [this.shadowRoot?.querySelector?.('[data-energy-history-host]')];
+      for (const host of hosts) {
+        if (!host || host.firstElementChild || host.dataset.loading === 'true') continue;
+        const entityId = String(host.dataset.entityId || '');
+        const hours = Number(host.dataset.hoursToShow);
+        const kind = String(host.dataset.historyKind || '');
+        const inScope = this.view === kind ||
+          (this.view === 'flow' && ['grid_import','grid_export','home','flexible'].includes(kind));
+        if (!inScope || !/^sensor\.[a-z0-9_]+$/.test(entityId) || ![24,168,720].includes(hours)) continue;
+        host.dataset.loading = 'true';
+        try {
+          if (typeof window.loadCardHelpers !== 'function') throw new Error('Home Assistant card helpers unavailable');
+          const helpers = await window.loadCardHelpers();
+          if (!host.isConnected || this.view !== 'flow' && this.view !== kind) continue;
+          const card = await helpers.createCardElement({
+            type:'history-graph', entities:[entityId],
+            hours_to_show:hours, show_names:false
+          });
+          card.hass = this._hass;
+          if (host.isConnected) host.replaceChildren(card);
+        } catch (_) {
+          if (host.isConnected) host.innerHTML = '<div class="empty compact"><b>History temporarily unavailable</b><span>Home Assistant could not load this sensor history.</span></div>';
+        } finally {
+          delete host.dataset.loading;
+        }
       }
     }
 
@@ -4159,7 +4180,7 @@
       </section>`;
     }
 
-    powerFlowCardStyles() { return `.rhiPowerFlowPanel{min-width:0}.rhiPowerFlowHost{min-height:230px;width:100%;overflow-x:auto}.rhiPowerFlowHost power-flow-card-plus{display:block;width:100%}.rhiFlowMeasurementNote{font-size:11px;color:var(--rhi-color-muted);margin-top:7px}.rhiFlowAllLoads{margin-top:10px}.rhiFlowAllLoads .flowPhysicalConsumerCard{margin-top:5px}`; }
+    powerFlowCardStyles() { return `.rhiFlowHistoryGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:1rem;align-items:stretch}.rhiFlowHistoryGrid>.panel{min-width:0}.rhiPowerFlowPanel{min-width:0}.rhiPowerFlowHost{min-height:230px;width:100%;overflow-x:auto}.rhiPowerFlowHost power-flow-card-plus{display:block;width:100%}.rhiFlowMeasurementNote{font-size:11px;color:var(--rhi-color-muted);margin-top:7px}.rhiFlowAllLoads{margin-top:10px}.rhiFlowAllLoads .flowPhysicalConsumerCard{margin-top:5px}`; }
     flowDependencyStyles() {
       return `.rhiFlowDependencyNotice{border-left:3px solid #c08420;background:#fffbef;padding:10px 14px;margin-bottom:10px}
         .rhiFlowDependencyNotice strong{font-size:12px;color:#713f12}
@@ -4723,6 +4744,9 @@
           </div>
           <p class="rhiFlowMeasurementNote">Only direction-compatible battery sensors are allowed to animate. Charger and vehicle power are never added together.</p>
         </section>
+        <div class="rhiFlowHistoryGrid" aria-label="Measured energy history">
+          ${['grid_import','grid_export','home','flexible'].map(kind => this.energyHistorySection(rt,kind)).join('')}
+        </div>
         <section class="panel rhiFlowAllLoads">
           <div class="flowHeader"><div><h2>Flexible consumers</h2><p>Real consumers only. Need, actual power and requested power are separate; a charger is a connection, not an extra load.</p></div></div>
           <div class="rhiFlowConsumerList">${consumers.map(consumer => this.consumerCard(rt,consumer)).join('') || '<div class="empty compact"><b>No flexible consumers published</b><span>No verified flexible-load consumer is available.</span></div>'}</div>
