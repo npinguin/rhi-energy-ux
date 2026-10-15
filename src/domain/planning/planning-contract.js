@@ -23,8 +23,18 @@
     const normalized=String(horizonId || '').toUpperCase();
     const today=runtime.nativePlanningTotals('D0');
     const tomorrow=runtime.nativePlanningTotals('D1');
-    const supported=normalized==='D0' || normalized==='D1';
-    const selected=supported ? (normalized==='D1' ? tomorrow : today) : {
+    const supported=['D0','D1','D2'].includes(normalized);
+    // D2 has a canonical provider-owned horizon sensor when the native 48h
+    // result crosses into a third calendar day, but no full six-KPI numeric
+    // scalar set is published for that incomplete rolling horizon. Never
+    // populate D2 totals from D0/D1 or client-side bucket arithmetic.
+    const dayAfter=Object.freeze({
+      available:false,
+      missing:['native_d2_scalar_totals_unavailable'],
+      values:{},
+    });
+    const selected=normalized==='D2' ? dayAfter
+      : supported ? (normalized==='D1' ? tomorrow : today) : {
       available:false, missing:['unsupported_planning_horizon'], values:{}
     };
     const nativeHorizon = supported && typeof runtime.nativePlanningHorizon === 'function'
@@ -74,7 +84,8 @@
         effective_horizon:effectiveAvailable,
         metrics_available:selected.available===true})
     });
-    const todayTotals=totals(today),tomorrowTotals=totals(tomorrow);
+    const todayTotals=totals(today),tomorrowTotals=totals(tomorrow),
+      dayAfterTotals=totals(dayAfter);
     return Object.freeze({
       entityId:null,
       contractVersion:'ENERGY_NATIVE_PLANNING',
@@ -103,8 +114,9 @@
         .map(row=>[String(row.asset_id),row]))),
       planningTodayTotals:Object.freeze(todayTotals),
       planningTomorrowTotals:Object.freeze(tomorrowTotals),
+      planningDayAfterTotals:Object.freeze(dayAfterTotals),
       planningCombinedTotals:Object.freeze({}),
-      horizonsById:Object.freeze({D0:todayTotals,D1:tomorrowTotals}),
+      horizonsById:Object.freeze({D0:todayTotals,D1:tomorrowTotals,D2:dayAfterTotals}),
       horizonId:normalized,horizon,summary:nativeSummary,
       // D0/D1 lane totals are backend-owned and must never be reconstructed
       // from flat numeric KPI readbacks.
