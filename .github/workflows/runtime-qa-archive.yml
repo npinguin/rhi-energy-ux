@@ -21,7 +21,7 @@ jobs:
     env:
       SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
       QA_TAG: runtime-qa-20261016-c3
-      QA_COMPONENT: energy-ux-ux
+      QA_COMPONENT: rhi-energy-ux
     steps:
       - name: Checkout the validated exact main commit
         uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
