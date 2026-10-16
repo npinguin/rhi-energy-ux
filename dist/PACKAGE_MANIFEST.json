@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "product": "rhi-energy-ux",
-  "version": "4.3.36-rc.20",
+  "version": "4.3.36-rc.21",
   "source_manifest_schema": 1,
   "hacs_package_root": "dist",
   "hacs_filename": "rhi-energy-ux.js",
@@ -10,7 +10,7 @@
     "energy",
     "heroes"
   ],
-  "runtime_sha256": "10886f12bd5088b0acb8b96a1da0c34f49833d9b0752f104bada6a420056a031",
+  "runtime_sha256": "f8d0b789d108599dd6abf731dd9a2326618dd78d6cfd99731764a629b48f5b3b",
   "files": [
     {
       "path": "assets/energy/battery_system_4_towers.webp",
