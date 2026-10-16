@@ -234,7 +234,7 @@ jobs:
     timeout-minutes: 20
     env:
       SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
-      QA_TAG: runtime-qa-20261016-c3
+      QA_TAG: runtime-qa-20261016-c4
       QA_COMPONENT: rhi-energy-ux
     steps:
       - name: Checkout the validated exact main commit
@@ -287,10 +287,10 @@ jobs:
               "Rollback the entire coherent five-package stack from a verified backup.\n"
               "Coordinate actual acceptance and issues in Foundation #129.\n")
           PY
-          (cd qa-stage && find . -type f | LC_ALL=C sort | sed 's#^\./##' | while IFS= read -r p; do sha256sum "$p"; done > FILE_SHA256SUMS.txt)
+          (cd qa-stage && find . -type f ! -name FILE_SHA256SUMS.txt | LC_ALL=C sort | sed 's#^\./##' | while IFS= read -r p; do sha256sum "$p"; done > FILE_SHA256SUMS.txt)
           (cd qa-stage && sha256sum -c FILE_SHA256SUMS.txt)
-          (cd qa-stage && zip -X -q -r "../energy-ux-runtime-qa-20261016-c3.zip" .)
-          sha256sum energy-ux-runtime-qa-20261016-c3.zip > energy-ux-runtime-qa-20261016-c3.zip.sha256
+          (cd qa-stage && zip -X -q -r "../energy-ux-runtime-qa-20261016-c4.zip" .)
+          sha256sum energy-ux-runtime-qa-20261016-c4.zip > energy-ux-runtime-qa-20261016-c4.zip.sha256
       - name: Publish immutable private QA prerelease only
         shell: bash
         env:
@@ -302,10 +302,10 @@ jobs:
             exit 1
           fi
           gh release create "$QA_TAG" \
-            energy-ux-runtime-qa-20261016-c3.zip \
-            energy-ux-runtime-qa-20261016-c3.zip.sha256 \
+            energy-ux-runtime-qa-20261016-c4.zip \
+            energy-ux-runtime-qa-20261016-c4.zip.sha256 \
             --target "$SOURCE_SHA" --prerelease --latest=false \
-            --title "RHI energy-ux Runtime QA C3 — NOT HACS / NOT STABLE" \
+            --title "RHI energy-ux Runtime QA C4 — NOT HACS / NOT STABLE" \
             --notes "Isolated exact-source Runtime QA archive for manual HA validation. Source: $SOURCE_SHA. No public HACS mirror mutation or production approval. Verify checksum, backup, controls HOLD and coordinated rollback. Foundation #129 remains open."
           test "$(gh release view "$QA_TAG" --json isPrerelease --jq .isPrerelease)" = true
           test "$(gh release view "$QA_TAG" --json assets --jq '.assets | length')" = 2
