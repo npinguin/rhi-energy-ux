@@ -1,3 +1,9 @@
+## 4.3.36-rc.21 — Governed five-package HACS TEST pilot
+
+- Native five-period EUR Value, independent availability, physical source-quality fail closed, canonical Home/Site Flow; no duplicate monetary ownership.
+- Coordinates Foundation F1.8.46, Mobility M0.10.52, Energy E0.15.138 and Mobility UX rc.100.
+- Replace experimental C3/C4 ZIP channel with the single immutable HACS tag; physical qualification still required, stable blocked.
+
 ## 4.3.36-rc.20 — Canonical Battery Flow, Source-Only Candidate
 
 - E0.15.130 native battery_system direction pair is consumed without UX-derived signs or system power inference; both opposed physical battery flows can be shown simultaneously (Power Flow Card Plus `two_way`).
