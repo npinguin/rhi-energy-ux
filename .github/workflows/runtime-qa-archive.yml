@@ -1,0 +1,97 @@
+name: Publish source-pinned Runtime QA archive
+
+on:
+  workflow_run:
+    workflows: ["Validate"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: runtime-qa-20261016-c3
+  cancel-in-progress: false
+
+jobs:
+  runtime-qa:
+    name: Build isolated non-HACS TEST archive
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+      QA_TAG: runtime-qa-20261016-c3
+      QA_COMPONENT: energy-ux-ux
+    steps:
+      - name: Checkout the validated exact main commit
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+      - name: Require exact validated main and new immutable QA tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --tags
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse origin/main)" = "$SOURCE_SHA"
+          test -f "dist/$QA_COMPONENT.js"
+          test -f hacs.json
+          if git show-ref --verify --quiet "refs/tags/$QA_TAG"; then
+            echo "Immutable QA tag already exists. Never overwrite." >&2
+            exit 1
+          fi
+      - name: Stage runtime-only source and SHA256 provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-stage
+          cp -a dist qa-stage/dist
+          cp hacs.json qa-stage/hacs.json
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root=Path("qa-stage")
+          component=os.environ["QA_COMPONENT"]
+          manifest=json.loads(Path("package.json").read_text())
+          files={p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest()
+                 for p in sorted(root.rglob("*")) if p.is_file()}
+          evidence={"kind":"RHI_RUNTIME_QA_ARCHIVE_V1","channel":"MANUAL_INSTALL_ONLY",
+                    "source_repository":os.environ["GITHUB_REPOSITORY"],
+                    "source_sha":os.environ["SOURCE_SHA"],"qa_tag":os.environ["QA_TAG"],
+                    "component":component,"manifest_version":manifest["version"],
+                    "files_sha256":files,"stable_approved":False,
+                    "hacs_mirror_published":False,"runtime_verified":False}
+          (root/"QA_SOURCE_LOCK.json").write_text(json.dumps(evidence,indent=2)+"\n")
+          (root/"QA_INSTALL_README.txt").write_text(
+              "RHI source-pinned runtime QA, NOT a HACS release or stable version.\n"
+              "Back up Home Assistant and record the five previously installed packages.\n"
+              "Keep automatic vehicle/battery commands disabled; HOLD must not execute.\n"
+              "Copy dist assets into HA config/www; register matching /local/ JS resource.\n"
+              "Refresh browser cache and resources; package version is deliberately unchanged.\n"
+              "Verify physical native HA states/quality and browser UX readback.\n"
+              "Rollback the entire coherent five-package stack from a verified backup.\n"
+              "Coordinate actual acceptance and issues in Foundation #129.\n")
+          PY
+          (cd qa-stage && find . -type f | LC_ALL=C sort | sed 's#^\./##' | while IFS= read -r p; do sha256sum "$p"; done > FILE_SHA256SUMS.txt)
+          (cd qa-stage && sha256sum -c FILE_SHA256SUMS.txt)
+          (cd qa-stage && zip -X -q -r "../energy-ux-runtime-qa-20261016-c3.zip" .)
+          sha256sum energy-ux-runtime-qa-20261016-c3.zip > energy-ux-runtime-qa-20261016-c3.zip.sha256
+      - name: Publish immutable private QA prerelease only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$QA_TAG" >/dev/null 2>&1; then
+            echo "QA release already exists; refusing overwrite." >&2
+            exit 1
+          fi
+          gh release create "$QA_TAG" \
+            energy-ux-runtime-qa-20261016-c3.zip \
+            energy-ux-runtime-qa-20261016-c3.zip.sha256 \
+            --target "$SOURCE_SHA" --prerelease --latest=false \
+            --title "RHI energy-ux Runtime QA C3 — NOT HACS / NOT STABLE" \
+            --notes "Isolated exact-source Runtime QA archive for manual HA validation. Source: $SOURCE_SHA. No public HACS mirror mutation or production approval. Verify checksum, backup, controls HOLD and coordinated rollback. Foundation #129 remains open."
+          test "$(gh release view "$QA_TAG" --json isPrerelease --jq .isPrerelease)" = true
+          test "$(gh release view "$QA_TAG" --json assets --jq '.assets | length')" = 2
