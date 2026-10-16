@@ -16,3 +16,11 @@ assert.ok(governance.includes("A normal implementation, defect or governance PR 
   "release governance must document release-neutral engineering validation");
 
 console.log("PASS Energy UX release lifecycle separation");
+
+const rhiGate = JSON.parse(fs.readFileSync("release/COORDINATED_PUBLICATION_GATE.json","utf8"));
+assert.ok(!publish.includes("runtime-qa-") && !publish.includes("Build isolated non-HACS TEST archive")
+  && !publish.includes("QA_SOURCE_LOCK.json"),"parallel QA archive publication forbidden");
+assert.ok(publish.includes("Enforce coordinated source-closure publication freeze"),"HACS authorization missing");
+assert.equal(rhiGate.publication_hold,true,"unauthorised HACS publication");
+assert.equal(rhiGate.mode,"MANUAL_COORDINATED_SOURCE_CLOSURE_ONLY");
+assert.ok(Object.values(rhiGate.approval).every(v=>v===null));
