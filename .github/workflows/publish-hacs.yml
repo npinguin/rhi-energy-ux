@@ -29,7 +29,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ env.CANDIDATE_SHA }}
-      - name: Enforce explicit five-package HACS TEST pilot — stable still blocked
+      - name: Enforce coordinated source-closure publication freeze
         id: coordinated
         shell: bash
         run: |
