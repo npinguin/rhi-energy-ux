@@ -24,3 +24,27 @@ assert.ok(publish.includes("Enforce coordinated source-closure publication freez
 assert.equal(rhiGate.publication_hold,true,"unauthorised HACS publication");
 assert.equal(rhiGate.mode,"MANUAL_COORDINATED_SOURCE_CLOSURE_ONLY");
 assert.ok(Object.values(rhiGate.approval).every(v=>v===null));
+
+// Explicit HACS TEST pilot is the ONLY permitted pre-runtime publication mode.
+const approvalPilot = rhiGate.test_pilot;
+const approvedMatrix = {
+  foundation:"v1.8.46",mobility:"v0.10.52",energy:"v0.15.138",
+  mobility_ux:"v1.0.0-rc.100",energy_ux:"v4.3.36-rc.21"
+};
+if (JSON.stringify(approvalPilot.matrix) !== JSON.stringify(approvedMatrix) ||
+    approvalPilot.status !== "APPROVED_FOR_TEST_PUBLICATION" ||
+    approvalPilot.expected_version !== "4.3.36-rc.21" ||
+    approvalPilot.expected_tag !== "v4.3.36-rc.21" ||
+    approvalPilot.stable_promotion !== "NO_GO" ||
+    approvalPilot.runtime_qualification !== "NOT_EXECUTED" ||
+    approvalPilot.channel !== "COORDINATED_HACS_TEST_ONLY" ||
+    approvalPilot.release_count_limit !== 1 ||
+    approvalPilot.immutable_candidate !== true)
+  throw new Error("HACS pilot must match exact five-package matrix; stable remains blocked");
+for (const token of [
+  "source==main==event.get(\"head_sha\")",
+  "event.get(\"conclusion\")==\"success\"",
+  "event.get(\"head_branch\")==\"main\"",
+  "pilot.get(\"matrix\")==approved_matrix",
+  "pilot.get(\"stable_promotion\")==\"NO_GO\"",
+]) if(!publish.includes(token)) throw new Error("HACS pilot gate must fail closed: "+token);
