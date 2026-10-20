@@ -7570,6 +7570,18 @@ function rhiEnergyVisualPickerStyles() {
         this._flowRenderFailure = String(error?.message || error || 'unknown_flow_error');
         console.error('[RHI Energy UX] Flow detail renderer failed', error);
         const current = this.currentEnergyModel(rt);
+        const consumption = readLiveConsumptionContract(rt.contractGateway());
+        const page = this.buildPageViewModel(rt, 'flow');
+        return this.tabExperienceHeader(rt, 'flow', page) +
+          '<div class="flowPage"><section class="panel rhiFlowRenderWarning" role="alert">' +
+          '<h2>Some flow details are unavailable</h2><p>Measured energy values remain available. ' +
+          'The detail renderer reported an error; check browser diagnostics.</p></section>' +
+          this.nativeFlowEvidence(current, consumption) + '</div>';
+      }
+    }
+    renderFlowContent(rt) {
+      const pageVm = this.buildPageViewModel(rt, 'flow');
+      const current = this.currentEnergyModel(rt);
       const solar = current.solar.powerKw;
       const gridImport = current.grid.importPowerKw;
       const gridExport = current.grid.exportPowerKw;
