@@ -294,7 +294,7 @@
         .filter(state => state?.attributes?.canonical_contract === 'RHI_ENERGY_CANONICAL_PROPERTY_V2'
           && state?.attributes?.publisher_release)
         .map(state => String(state.attributes.publisher_release))
-        .filter(value => /^E\\d+\\.\\d+\\.\\d+$/.test(value)));
+        .filter(value => /^E\d+\.\d+\.\d+$/.test(value)));
       const observed = versions.size === 1 ? [...versions][0] : '';
       return {
         ...diagnostic,
