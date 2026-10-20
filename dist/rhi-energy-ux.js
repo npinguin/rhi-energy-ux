@@ -1952,7 +1952,21 @@ function readEnergyCommandContract(gateway) {
       return rhiUxResolveDomainAssetNavigation(ownerDomain, assetId);
     }
     releaseState() { return this.rawState(RELEASE_ENTITY); }
-    releaseAttrs() { return this.releaseState()?.attributes || {}; }
+    releaseAttrs() {
+      const diagnostic = this.releaseState()?.attributes || {};
+      // The legacy release sensor is disabled by default; release identity
+      // must instead travel on actual canonical Energy property entities.
+      const versions = new Set(Object.values(this.hass?.states || {})
+        .filter(state => state?.attributes?.canonical_contract === 'RHI_ENERGY_CANONICAL_PROPERTY_V2'
+          && state?.attributes?.publisher_release)
+        .map(state => String(state.attributes.publisher_release))
+        .filter(value => /^E\d+\.\d+\.\d+$/.test(value)));
+      const observed = versions.size === 1 ? [...versions][0] : '';
+      return {
+        ...diagnostic,
+        backend_release: observed || (versions.size > 1 ? 'unknown' : String(diagnostic.backend_release || (this.releaseState()?.state?.startsWith('E') ? this.releaseState().state : 'unknown')))
+      };
+    }
     publicUxEntities() { return this.subscriptionEntityIds(); }
     isCanonicalUxInterface(entityId) {
       return !!this.canonicalIndex?.byEntity?.has(entityId) ||
@@ -2046,7 +2060,7 @@ function readEnergyCommandContract(gateway) {
       const release=this.releaseAttrs();
       return {
         uxVersion: UX_VERSION,
-        backendVersion:String(release.backend_release || 'Unknown'),
+        backendVersion:String(release.backend_release === 'unknown' ? 'Unknown' : (release.backend_release || 'Unknown')),
         releaseContractEntity:RELEASE_ENTITY,
         contractVersion:'RHI_ENERGY_CANONICAL_PROPERTY_V2',
         runtimeTrusted:backendStatus.runtimeTrusted,
@@ -7547,8 +7561,15 @@ function rhiEnergyVisualPickerStyles() {
     }
 
     flow(rt) {
-      const pageVm = this.buildPageViewModel(rt, 'flow');
-      const current = this.currentEnergyModel(rt);
+      // The native measured flow must survive faults in optional diagrams,
+      // detailed consumers, relationships or third-party card adapters.
+      this._flowRenderFailure = '';
+      try {
+        return this.renderFlowContent(rt);
+      } catch (error) {
+        this._flowRenderFailure = String(error?.message || error || 'unknown_flow_error');
+        console.error('[RHI Energy UX] Flow detail renderer failed', error);
+        const current = this.currentEnergyModel(rt);
       const solar = current.solar.powerKw;
       const gridImport = current.grid.importPowerKw;
       const gridExport = current.grid.exportPowerKw;
@@ -8948,36 +8969,26 @@ function rhiEnergyVisualPickerStyles() {
       // Hard-gate failures must stay visible, but not as a main screen banner.
       return '';
     }
-    diagnosticSpec(tab) {
-      const label=human(tab || 'overview');
-      return [
-        [RELEASE_ENTITY,'Energy release diagnostics',`${label} product truth through the single canonical Energy contract`]
-      ];
+    diagnosticSpec(_tab) {
+      // Core UI trust is determined by the canonical property index.
+      // A disabled diagnostic release sensor must not create a false issue.
+      return [];
     }
-
     diagnosticEntity(rt, entityId, label, purpose) {
       const raw = rt.rawState(entityId);
       const allowed = rt.isAllowed(entityId);
-      const attrs = raw?.attributes || {};
       const state = String(raw?.state ?? '').trim();
-      const normalized = state.toLowerCase();
-      const unavailable = !raw || ['unknown','unavailable',''].includes(normalized);
-      const working = !!raw && allowed && !unavailable;
-      const reason = firstDefined(attrs.product_reason, attrs.reason, attrs.availability_reason, attrs.message, attrs.last_error, unavailable ? (raw ? `State is ${state || 'empty'}` : 'Entity is not available') : (!allowed ? 'Not listed in public_ux_entities_json' : ''));
-      return { entityId, label, purpose, raw, allowed, state, working, reason: human(reason,'') };
+      const unavailable = !raw || ['unknown','unavailable',''].includes(state.toLowerCase());
+      return { entityId, label, purpose, raw, allowed, state,
+        working: !!raw && allowed && !unavailable,
+        reason: unavailable ? 'Unavailable' : '' };
     }
     releaseIssueModel(rt, tab, footer) {
-      const rows = this.diagnosticSpec(tab).map(([entityId,label,purpose]) => this.diagnosticEntity(rt,entityId,label,purpose));
-      const unavailable = rows.filter(row => !row.working);
       const issues = [];
-      unavailable.forEach(row => issues.push(`${row.label}: ${row.reason || row.state || 'Unavailable'}`));
-      if (!footer.runtimeTrusted && !unavailable.length) issues.unshift('Canonical Energy contract is unavailable or incompatible.');
+      if (!footer.runtimeTrusted) issues.push('Canonical Energy property contract is unavailable or incompatible.');
+      if (this._flowRenderFailure && tab === 'flow') issues.push('Flow detail rendering error: ' + this._flowRenderFailure);
       if (!issues.length) return null;
-      return {
-        severity: footer.runtimeTrusted ? 'warning' : 'error',
-        label: footer.runtimeTrusted ? `${issues.length} issue${issues.length === 1 ? '' : 's'}` : 'Runtime issue',
-        tooltip: issues.join('\n')
-      };
+      return {severity:'error',label:issues.length + ' issue' + (issues.length===1?'':'s'),tooltip:issues.join('\\n')};
     }
     diagnosticsPanel() {
       // Release/diagnostic details stay silent while healthy and live in the compact footer tooltip on issues.
