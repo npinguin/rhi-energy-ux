@@ -1,10 +1,10 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "iteration_id": "RHI_NEXT_ZERO_DEBT_PRODUCT_CLOSURE",
   "publication_hold": true,
-  "mode": "MANUAL_COORDINATED_SOURCE_CLOSURE_ONLY",
+  "mode": "EXPLICIT_USER_REQUEST_HACS_TEST",
   "authority": "npinguin/rhi-foundation#129",
-  "rationale": "Do not publish an intermediate HACS TEST while any mandatory code/product item remains open. Validated source PRs still merge to main. Only an explicit coordinated five-package release after all source and UX code is complete may create test tags.",
+  "rationale": "Installable HACS TEST only with explicit user-requested exact candidate and CI. Stable only with runtime proof AND separate explicit user approval.",
   "approval": {
     "source_closure_approved": null,
     "five_package_matrix_verified": null,
@@ -32,5 +32,26 @@
     "require_workflow_run_success_main": true,
     "immutable_candidate": true,
     "release_count_limit": 1
+  },
+  "test_request": {
+    "status": "NOT_REQUESTED",
+    "request_id": null,
+    "requested_by": null,
+    "request_reference": null,
+    "channel": "HACS_TEST_ONLY",
+    "expected_tag": null,
+    "matrix": null,
+    "stable_promotion": "NO_GO",
+    "runtime_qualification": "NOT_EXECUTED",
+    "immutable_candidate": true,
+    "release_count_limit": 1
+  },
+  "stable_release": {
+    "user_approval_status": "NOT_APPROVED",
+    "approved_by": null,
+    "approved_tag": null,
+    "user_approval_reference": null,
+    "runtime_validation_required": true,
+    "explicit_user_approval_required": true
   }
 }

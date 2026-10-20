@@ -57,3 +57,14 @@ for name, ok in expected.items():
 if failed:
     raise SystemExit("release projection drift; run npm run release:sync: " + ", ".join(failed))
 print("PASS release governance: release/product.json is the single release identity owner")
+
+# A normal source merge must not publish HACS, and runtime PASS must not self-approve stable.
+gate=load("release/COORDINATED_PUBLICATION_GATE.json")
+assert gate["publication_hold"] is True
+assert gate["mode"] == "EXPLICIT_USER_REQUEST_HACS_TEST"
+assert gate["test_request"]["status"] == "NOT_REQUESTED"
+assert gate["stable_release"]["user_approval_status"] == "NOT_APPROVED"
+publish=(ROOT/".github/workflows/publish-hacs.yml").read_text(encoding="utf-8")
+stable=(ROOT/".github/workflows/release.yml").read_text(encoding="utf-8")
+assert "python3 tools/check_hacs_test_request.py" in publish
+assert "python3 tools/check_stable_user_approval.py" in stable
