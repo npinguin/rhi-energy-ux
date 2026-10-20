@@ -20,31 +20,26 @@ console.log("PASS Energy UX release lifecycle separation");
 const rhiGate = JSON.parse(fs.readFileSync("release/COORDINATED_PUBLICATION_GATE.json","utf8"));
 assert.ok(!publish.includes("runtime-qa-") && !publish.includes("Build isolated non-HACS TEST archive")
   && !publish.includes("QA_SOURCE_LOCK.json"),"parallel QA archive publication forbidden");
-assert.ok(publish.includes("Enforce coordinated source-closure publication freeze"),"HACS authorization missing");
-assert.equal(rhiGate.publication_hold,true,"unauthorised HACS publication");
-assert.equal(rhiGate.mode,"MANUAL_COORDINATED_SOURCE_CLOSURE_ONLY");
+assert.ok(publish.includes("Require explicit user-requested HACS TEST and exact-main CI"),"Explicit HACS TEST authorization missing");
+assert.ok(publish.includes("python3 tools/check_hacs_test_request.py"),"Source-validity gate missing");
+assert.equal(rhiGate.publication_hold,true,"default publication hold missing");
+assert.equal(rhiGate.mode,"EXPLICIT_USER_REQUEST_HACS_TEST","obsolete source-closure deadlock");
+assert.equal(rhiGate.test_request.status,"NOT_REQUESTED","governance PR must not cause release");
+assert.equal(rhiGate.stable_release.user_approval_status,"NOT_APPROVED","test is never stable approval");
 assert.ok(Object.values(rhiGate.approval).every(v=>v===null));
 
-// Explicit HACS TEST pilot is the ONLY permitted pre-runtime publication mode.
-const approvalPilot = rhiGate.test_pilot;
-const approvedMatrix = {
-  foundation:"v1.8.46",mobility:"v0.10.52",energy:"v0.15.138",
-  mobility_ux:"v1.0.0-rc.100",energy_ux:"v4.3.36-rc.21"
-};
-if (JSON.stringify(approvalPilot.matrix) !== JSON.stringify(approvedMatrix) ||
-    approvalPilot.status !== "APPROVED_FOR_TEST_PUBLICATION" ||
-    approvalPilot.expected_version !== "4.3.36-rc.21" ||
-    approvalPilot.expected_tag !== "v4.3.36-rc.21" ||
-    approvalPilot.stable_promotion !== "NO_GO" ||
-    approvalPilot.runtime_qualification !== "NOT_EXECUTED" ||
-    approvalPilot.channel !== "COORDINATED_HACS_TEST_ONLY" ||
-    approvalPilot.release_count_limit !== 1 ||
-    approvalPilot.immutable_candidate !== true)
-  throw new Error("HACS pilot must match exact five-package matrix; stable remains blocked");
-for (const token of [
-  "source==main==event.get(\"head_sha\")",
-  "event.get(\"conclusion\")==\"success\"",
-  "event.get(\"head_branch\")==\"main\"",
-  "pilot.get(\"matrix\")==approved_matrix",
-  "pilot.get(\"stable_promotion\")==\"NO_GO\"",
-]) if(!publish.includes(token)) throw new Error("HACS pilot gate must fail closed: "+token);
+// Preserve the published 16 October pilot as immutable history without using its matrix
+// as authorization for future test packages.
+const old=rhiGate.test_pilot;
+assert.equal(old.id,"RHI_HACS_TEST_PILOT_2026_10_16");
+assert.equal(old.stable_promotion,"NO_GO");
+assert.equal(old.immutable_candidate,true);
+const checker=fs.readFileSync("tools/check_hacs_test_request.py","utf8");
+const stableChecker=fs.readFileSync("tools/check_stable_user_approval.py","utf8");
+const stableWorkflow=fs.readFileSync(".github/workflows/release.yml","utf8");
+assert.ok(checker.includes('req.get("status") == "AUTHORIZED_FOR_TEST"'));
+assert.ok(checker.includes('event.get("head_sha") == source_sha == main_sha'));
+assert.ok(checker.includes('event.get("head_branch") == "main"'));
+assert.ok(checker.includes('req.get("release_count_limit") == 1'));
+assert.ok(stableChecker.includes('stable.get("user_approval_status") == "APPROVED"'));
+assert.ok(stableWorkflow.includes("python3 tools/check_stable_user_approval.py"));
