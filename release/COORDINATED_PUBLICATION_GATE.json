@@ -34,13 +34,19 @@
     "release_count_limit": 1
   },
   "test_request": {
-    "status": "NOT_REQUESTED",
-    "request_id": null,
-    "requested_by": null,
-    "request_reference": null,
+    "status": "AUTHORIZED_FOR_TEST",
+    "request_id": "RHI-HACS-TEST-2026-10-20-02",
+    "requested_by": "USER",
+    "request_reference": "https://github.com/npinguin/rhi-foundation/issues/129#issuecomment-6301892188",
     "channel": "HACS_TEST_ONLY",
-    "expected_tag": null,
-    "matrix": null,
+    "expected_tag": "v4.3.36-rc.22",
+    "matrix": {
+      "foundation": "v1.8.47",
+      "mobility": "v0.10.53",
+      "energy": "v0.15.140",
+      "mobility_ux": "v1.0.0-rc.100",
+      "energy_ux": "v4.3.36-rc.22"
+    },
     "stable_promotion": "NO_GO",
     "runtime_qualification": "NOT_EXECUTED",
     "immutable_candidate": true,
