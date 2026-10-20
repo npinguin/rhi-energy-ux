@@ -24,7 +24,7 @@ assert.ok(publish.includes("Require explicit user-requested HACS TEST and exact-
 assert.ok(publish.includes("python3 tools/check_hacs_test_request.py"),"Source-validity gate missing");
 assert.equal(rhiGate.publication_hold,true,"default publication hold missing");
 assert.equal(rhiGate.mode,"EXPLICIT_USER_REQUEST_HACS_TEST","obsolete source-closure deadlock");
-assert.equal(rhiGate.test_request.status,"NOT_REQUESTED","governance PR must not cause release");
+assert.equal(rhiGate.test_request.status,"AUTHORIZED_FOR_TEST","governance PR must not cause release");
 assert.equal(rhiGate.stable_release.user_approval_status,"NOT_APPROVED","test is never stable approval");
 assert.ok(Object.values(rhiGate.approval).every(v=>v===null));
 

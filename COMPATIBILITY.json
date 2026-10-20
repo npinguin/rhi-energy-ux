@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "ux_version": "4.3.36-rc.21",
+  "ux_version": "4.3.36-rc.22",
   "energy_contract": {
     "minimum": "RHI_ENERGY_CANONICAL_PROPERTY_V2",
-    "minimum_backend": "E0.15.138",
+    "minimum_backend": "E0.15.140",
     "tested_backend_releases": [
-      "E0.15.138"
+      "E0.15.140"
     ],
     "required_contracts": [
       "RHI_ENERGY_CANONICAL_OBJECT_V2",
@@ -31,11 +31,11 @@
     "branding_owner": "rhi-ux-core"
   },
   "foundation": {
-    "minimum_release": "F1.8.46",
+    "minimum_release": "F1.8.47",
     "visual_registry_contract": "RHI_VISUAL_ASSET_REGISTRY_V2",
     "minimum_contract_version": "2.0.0"
   },
   "mobility": {
-    "minimum_release_for_cross_domain_visuals": "M0.10.52"
+    "minimum_release_for_cross_domain_visuals": "M0.10.53"
   }
 }

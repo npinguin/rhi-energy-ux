@@ -1,3 +1,9 @@
+## 4.3.36-rc.22 — Energy canonical identity and resilient Flow HACS TEST
+
+- Fix false Backend Unknown and canonical property contract notification when optional Energy release diagnostic is disabled; derive version from domain-owned canonical property metadata (UX #262 + Energy #378).
+- Preserve producer-owned native measured Flow on optional renderer exception and surface the error instead of blanking page (UX #262).
+- Exact five-package HACS TEST: F1.8.47 / M0.10.53 / E0.15.140 / Mobility UX rc.100 / Energy UX rc.22. STABLE NO-GO; target-HA runtime pending.
+
 ## 4.3.36-rc.21 — Governed five-package HACS TEST pilot
 
 - Native five-period EUR Value, independent availability, physical source-quality fail closed, canonical Home/Site Flow; no duplicate monetary ownership.

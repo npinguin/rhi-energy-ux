@@ -62,7 +62,7 @@ print("PASS release governance: release/product.json is the single release ident
 gate=load("release/COORDINATED_PUBLICATION_GATE.json")
 assert gate["publication_hold"] is True
 assert gate["mode"] == "EXPLICIT_USER_REQUEST_HACS_TEST"
-assert gate["test_request"]["status"] == "NOT_REQUESTED"
+assert gate["test_request"]["status"] == "AUTHORIZED_FOR_TEST"
 assert gate["stable_release"]["user_approval_status"] == "NOT_APPROVED"
 publish=(ROOT/".github/workflows/publish-hacs.yml").read_text(encoding="utf-8")
 stable=(ROOT/".github/workflows/release.yml").read_text(encoding="utf-8")
