@@ -32,6 +32,7 @@ const screen={
   currentEnergyModel:()=>({solar:{powerKw:0},grid:{importPowerKw:1.246,exportPowerKw:0},battery:{valueAvailable:false}}),
   buildPageViewModel:()=>({title:'Flow'}),
   tabExperienceHeader:()=>'<header>Flow</header>',
+  nativeFlowDiagram:(_c,physical)=>'<div data-rhi-native-flow-diagram>'+physical.siteConsumptionKw+'</div>',
   nativeFlowEvidence:(_c,physical)=>'<main>'+physical.homeConsumptionKw+'</main>'
 };
 const out=handlers.flow.call(screen,{contractGateway:()=>({})});
