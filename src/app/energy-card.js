@@ -2738,12 +2738,38 @@
       }
     }
 
+    solarTodayMeasurement(rt) {
+      // The native Energy metering-period contract is the primary measured
+      // daily kWh authority. A live solar kW reading is NOT a day total.
+      const periods = rt.meteringPeriods();
+      const matches = periods.filter(period => period.period_id === 'today');
+      if (matches.length === 1) {
+        const period = matches[0];
+        const measured = objectFrom(period.summary?.measured);
+        const quality = String(firstDefined(period.field_quality?.solar_kwh,
+          period.summary?.quality?.field_quality?.solar_kwh, 'UNKNOWN')).toUpperCase();
+        const value = asNumber(measured.solar_kwh);
+        if (value !== null && value >= 0 && ['OK','PARTIAL'].includes(quality)) {
+          return Object.freeze({ value, quality, detail:quality === 'PARTIAL'
+            ? 'Partial measured production today' : 'Measured production today' });
+        }
+      }
+      // Native solar-inverter daily energy is independently valid when
+      // published; never infer kWh from current kW or forecast remaining.
+      const direct = rt.number('solar.energy_today_kwh');
+      if (direct !== null && direct >= 0) {
+        return Object.freeze({ value:direct, quality:'SOURCE', detail:'Inverter measured production today' });
+      }
+      return Object.freeze({ value:null, quality:'UNAVAILABLE',
+        detail:'Day production meter unavailable' });
+    }
     buildPageViewModel(rt, tab) {
       const current = this.currentEnergyModel(rt);
       const solar = current.solar.powerKw;
       const budgetEvidence = rt.canonicalProduct()?.core?.flexible?.fields?.available_power_kw;
       const flexibleLoadBudget = budgetEvidence?.resolved === true ? asNumber(budgetEvidence.value) : null;
-      const solarToday = rt.number('metering.solar_energy_today_kwh') ?? rt.number('solar.energy_today_kwh');
+      const solarTodayMeasurement = this.solarTodayMeasurement(rt);
+      const solarToday = solarTodayMeasurement.value;
       const solarForecast = rt.number('forecast.solar_today_kwh');
       const solarRemaining = rt.number('forecast.solar_remaining_today_kwh');
       const batterySoc = current.battery.socPct;
@@ -2790,7 +2816,7 @@
         overview: { image:hbEnergyHeroAsset('overview'), icon:'✦', eyebrow:rhiEnergyT(this._hass,'hero.energy_overview',{},'Energy overview'), title:rhiEnergyT(this._hass,'hero.site_consumption',{},'Site Consumption'), value:fmtKw(demand,'—'), unit:'current site demand', explanation:`${flowState} · ${fmtKw(solar)} solar · ${fmtKw(current.grid.displayPowerKw)} grid`, tone:'blue', metrics:[['☀','Solar now',fmtKw(solar),solar===null?'Unavailable':solar>0.05?'Producing now':'Not producing'],['▣','Home Battery',fmtPct(batterySoc),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['↗','Solar remaining',fmtKwh(solarRemaining),solarRemaining===null?'Unavailable':'Forecast left today']] },
         outlook: { image:hbEnergyHeroAsset('outlook'), icon:'↗', eyebrow:rhiEnergyT(this._hass,'hero.energy_outlook',{},'Energy outlook'), title:`${contextLabel} outlook`, value:fmtKwh(contextSolar), unit:`solar forecast ${contextLabel.toLowerCase()}`, explanation:human(firstDefined(selectedContext?.summary?.reason, rt.value('energy_intelligence.outlook_reason','Forecast, demand and planning in one view'))), tone:'purple', metrics:[['☀',`${contextLabel} forecast`,fmtKwh(contextSolar),`Expected solar ${contextLabel.toLowerCase()}`],['↗',contextTomorrow?'Expected demand':'Remaining',contextTomorrow?fmtKwh(contextDemandTotal):fmtKwh(contextRemaining),contextTomorrow?'Known demand tomorrow':'Forecast left today'],['⌂','Demand',fmtKwh(contextDemandTotal),'Expected demand'],['✓','Balance',fmtKwh(contextBalanceTotal),'Supply minus demand']] },
         flow: { image:hbEnergyHeroAsset('flow'), icon:'⚡', eyebrow:rhiEnergyT(this._hass,'hero.live_flow',{},'Live energy flow'), title:flowState, value:fmtKw(flowValue), unit:current.grid.direction === 'exporting' ? 'to grid' : current.grid.direction === 'importing' ? 'from grid' : 'grid flow', explanation:`${fmtKw(solar)} solar · ${fmtKw(demand)} demand`, tone:'purple', metrics:[['☀','Solar',fmtKw(solar),'Supplying the home'],['▣','Home Battery',fmtKw(batteryPower),batteryState],['⚡','Grid',fmtKw(flowValue),current.grid.label],['⌂','Demand',fmtKw(demand),'Home consumption']] },
-        solar: { image:hbEnergyHeroAsset('solar-generation'), icon:'☀', eyebrow:rhiEnergyT(this._hass,'nav.solar',{},'Solar'), title:solar===null?rhiEnergyT(this._hass,'hero.solar_unavailable',{},'Solar production unavailable'):solar>0.05?rhiEnergyT(this._hass,'hero.generating',{},'Generating now'):rhiEnergyT(this._hass,'hero.not_generating',{},'Not generating'), value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',fmtKwh(solarToday),'Solar produced'],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
+        solar: { image:hbEnergyHeroAsset('solar-generation'), icon:'☀', eyebrow:rhiEnergyT(this._hass,'nav.solar',{},'Solar'), title:solar===null?rhiEnergyT(this._hass,'hero.solar_unavailable',{},'Solar production unavailable'):solar>0.05?rhiEnergyT(this._hass,'hero.generating',{},'Generating now'):rhiEnergyT(this._hass,'hero.not_generating',{},'Not generating'), value:fmtKw(solar), unit:'current production', explanation:`${fmtKwh(solarToday)} today · ${fmtKwh(solarForecast)} forecast`, tone:'orange', metrics:[['↗','Today so far',solarToday===null?'Unavailable':fmtKwh(solarToday),solarTodayMeasurement.detail],['☀','Forecast today',fmtKwh(solarForecast),'Expected total'],['◷','Remaining today',fmtKwh(solarRemaining),'Forecast left'],['⚡','Available for Flexible Loads',fmtKw(flexibleLoadBudget),'Planning budget unavailable']] },
         battery: { image:hbEnergyHeroAsset('battery'), icon:'▣', eyebrow:rhiEnergyT(this._hass,'nav.battery',{},'Home Battery'), title:batteryState, value:fmtPct(batterySoc), unit:`${fmtKwh(batteryAvailable)} available`, explanation:human(rt.value('battery.reason','Storage ready for the energy plan')), tone:'green', metrics:[['▣','State of charge',fmtPct(batterySoc),'Stored capacity'],['↗','Available',fmtKwh(batteryAvailable),'Usable energy'],['↔','Power now',fmtKw(batteryPower),batteryState],['◉','Reserve',fmtPct(this.batteryReservePct(rt)),'Protected minimum']] },
         consumers: { image:hbEnergyHeroAsset('consumers'), icon:'⌂', eyebrow:'Consumers', title:'Managed assets', value:fmtKw(flexPower), unit:'using managed energy now', explanation:`${this.flexibleAssetDomain(rt).summary().participating_count} participating assets · ${this.flexibleAssetDomain(rt).summary().disabled_count} disabled · ${fmtKwh(flexNeed)} need`, tone:'blue', metrics:[['⚡','Flexible power',fmtKw(flexPower),'Using energy now'],['⌂','Energy need',fmtKwh(flexNeed),'Energy still needed'],['☀','Available for Flexible Loads',flexibleLoadBudget===null?rhiEnergyT(this._hass,'common.not_available',{},'Not available'):fmtKw(flexibleLoadBudget),flexibleLoadBudget===null?'Planning budget not published':'Current planning budget'],['◷','Planning',flexibleLoadBudget===null && flexNeed===null?'Incomplete':this.productStateLabel(rt.value('energy_intelligence.planning_state','observed'), 'Observed'),flexibleLoadBudget===null?'Budget not published':'Planning data available']] },
         gas: { image:hbEnergyHeroAsset('gas'), icon:'🔥', eyebrow:rhiEnergyT(this._hass,'nav.gas',{},'Gas'), title:gas.asset ? rhiEnergyT(this._hass,'gas.consumption',{},'Gas consumption') : rhiEnergyT(this._hass,'gas.not_connected',{},'Gas meter not connected'), value:this.gasVolume(gas.totalM3), unit:rhiEnergyT(this._hass,'gas.total_meter',{},'total meter reading'), explanation:gas.asset ? 'Measured gas use, meter health and 30-day history.' : 'Connect a gas meter to start measured consumption history.', tone:'orange', metrics:[['🔥','Flow now',this.gasFlow(gas.flowM3h),gas.flowM3h===null?'Not measured':'Current measured flow'],['◫','Meter total',this.gasVolume(gas.totalM3),gas.totalM3===null?'Not measured':'Cumulative meter reading'],['↺','History',gas.totalEntityId?({week:'7 days',month:'30 days',quarter:'90 days',year:'365 days'}[this.selectedGasHorizonId] || '30 days'):'Not available',gas.totalEntityId?'Daily measured consumption':gas.asset?'Historical statistics not available':'Connect a gas meter'],['✓','Health',gas.asset?human(gas.health):'Not configured',gas.asset?'Gas meter health':'Authoritative source required']] },
@@ -2988,10 +3014,12 @@
         : `${contributors.length} active contributor${contributors.length===1?'':'s'}`;
       const batteryPresent = rt.experiencePresence().battery === true;
       const batteryChargeRow = batteryPresent && balanceVm.battery.direction === 'into_storage'
-        ? this.overviewEnergyRow({icon:'▣',label:rhiEnergyT(this._hass,'overview.battery_charge',{},'Battery Charge'),subtitle:rhiEnergyT(this._hass,'overview.battery_charging',{},'Charging the home battery'),value:fmtKw(balanceVm.batteryChargeKw,'—'),progress:this.progress(balanceVm.batteryChargeKw)})
-        : batteryPresent && balanceVm.battery.direction === 'unknown'
-          ? this.overviewEnergyRow({icon:'▣',label:rhiEnergyT(this._hass,'overview.battery_flow_unavailable',{},'Battery flow unavailable'),subtitle:rhiEnergyT(this._hass,'overview.battery_flow_reason',{},'Charging or discharging cannot be confirmed'),value:'—',variant:'unavailable'})
-          : '';
+        && balanceVm.batteryChargeKw !== null && balanceVm.batteryChargeKw > 0.05
+        ? `<section class="panel overviewBatteryChargingPanel" data-rhi-battery-charging="separate"
+              aria-label="Home Battery Charging"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">▣</span><div>
+              <h2>Home Battery Charging</h2><p>Storage charging is separate from household consumption.</p></div></div>
+              ${this.overviewEnergyRow({icon:'↓',label:'Charging',subtitle:'Physical battery charging power',value:fmtKw(balanceVm.batteryChargeKw,'—'),progress:this.progress(balanceVm.batteryChargeKw)})}</section>`
+        : '';
       if (balanceVm.grid.direction === 'unknown') sourceRows.push(this.overviewEnergyRow({icon:'⚡',label:rhiEnergyT(this._hass,'overview.grid_flow_unavailable',{},'Grid flow unavailable'),subtitle:rhiEnergyT(this._hass,'overview.grid_flow_reason',{},'Import or export cannot be confirmed'),value:'—',variant:'unavailable'}));
       const gridDirection = balanceVm.grid.label;
       const gridValue = balanceVm.grid.displayPowerKw;
@@ -3016,7 +3044,7 @@
         <div class="overviewCoreGrid">
           <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon orange">☀</span><div><h2>${escapeHtml(rhiEnergyT(this._hass,'section.production_supply',{},'Production & supply'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.production_supply_desc',{},'Energy available to the home now.'))}</p></div></div>${sourceRows.join('') || `<div class="empty compact"><b>Supply unavailable</b><span>Current supply cannot be determined from the available measurements.</span></div>`}</section>
           <section class="panel overviewDecisionPanel overviewHouseHero"><div class="overviewHouseHeroImage"></div><div class="overviewDecisionOverlay"><span class="overviewDecisionLabel">HOME INTELLIGENCE</span><h2>${escapeHtml(recommendation)}</h2><p>${escapeHtml(decisionReason)}</p><div class="overviewDecisionFacts"><div><small>Site Consumption</small><b>${siteConsumptionText}</b></div><div><small>${escapeHtml(rhiEnergyT(this._hass,"solar.grid",{},"Grid"))}</small><b>${escapeHtml(fmtKw(gridValue,'—'))} ${escapeHtml(gridDirection)}</b></div>${rt.experiencePresence().battery === true ? `<div><small>Battery</small><b>${escapeHtml(fmtPct(batterySoc))}</b></div>` : ''}</div></div></section>
-          <section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>${escapeHtml(rhiEnergyT(this._hass,'nav.consumption',{},'Consumption'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.consumption_desc',{},'Site demand and its active components.'))}</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'}) : ''}${contributorRows}${batteryChargeRow}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${balanceVm.grid.direction === 'exporting' && balanceVm.grid.exportPowerKw !== null ? this.overviewEnergyRow({icon:'↗',label:'Grid Export',subtitle:'Exporting to grid',value:fmtKw(balanceVm.grid.exportPowerKw),variant:'boundary'}) : ''}</section>
+          <div class="overviewRightStack"><section class="panel overviewCorePanel"><div class="overviewSectionTitle"><span class="overviewSectionIcon blue">⌂</span><div><h2>${escapeHtml(rhiEnergyT(this._hass,'nav.consumption',{},'Consumption'))}</h2><p>${escapeHtml(rhiEnergyT(this._hass,'section.consumption_desc',{},'Site demand and its active components.'))}</p></div></div>${this.overviewEnergyRow({icon:'⌂',label:'Home Consumption',subtitle:homeConsumptionSubtitle,value:fmtKw(balanceVm.homeConsumptionKw,'—'),progress:this.progress(balanceVm.homeConsumptionKw)})}${rt.experiencePresence().flexible_loads === true ? this.overviewEnergyRow({icon:'⚡',label:'Flexible Loads',subtitle:flexibleLoadsSubtitle,value:fmtKw(balanceVm.flexibleLoadsKw,'—'),variant:'aggregate'}) : ''}${contributorRows}${this.overviewEnergyRow({icon:'',label:'Site Consumption',subtitle:'Total current site demand',value:siteConsumptionText,variant:'total'})}${balanceVm.grid.direction === 'exporting' && balanceVm.grid.exportPowerKw !== null ? this.overviewEnergyRow({icon:'↗',label:'Grid Export',subtitle:'Exporting to grid',value:fmtKw(balanceVm.grid.exportPowerKw),variant:'boundary'}) : ''}</section>${batteryChargeRow}</div>
         </div>
         ${this.overviewExperiencePanel(rt)}`;
     }
@@ -6683,6 +6711,7 @@
 /* R3.94.7 canonical core-tab stylesheet. One selector owner per component. */
 .overviewCoreGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.92fr) minmax(0,1fr);gap:10px;align-items:start}
 .overviewCorePanel{padding:14px;min-height:0}
+.overviewRightStack{display:grid;gap:10px;min-width:0;align-content:start}.overviewBatteryChargingPanel{padding:14px;min-width:0}.overviewBatteryChargingPanel .overviewEnergyRow{margin-bottom:0}.overviewRightStack>.panel{width:100%;box-sizing:border-box}
 .overviewSectionTitle{display:flex;align-items:center;gap:10px;margin-bottom:9px}
 .overviewSectionTitle h2{margin:0;font-size:16px;line-height:1.15;font-weight:570}
 .overviewSectionTitle p{margin:2px 0 0;font-size:10.5px;line-height:1.25;color:var(--muted)}
