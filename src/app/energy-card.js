@@ -4224,7 +4224,7 @@
       </section>`;
     }
 
-    powerFlowCardStyles() { return `.rhiFlowHistoryGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:1rem;align-items:stretch}.rhiFlowHistoryGrid>.panel{min-width:0}.rhiPowerFlowPanel{min-width:0}.rhiPowerFlowHost{min-height:230px;width:100%;overflow-x:auto}.rhiPowerFlowHost power-flow-card-plus{display:block;width:100%}.rhiFlowMeasurementNote{font-size:11px;color:var(--rhi-color-muted);margin-top:7px}.rhiFlowAllLoads{margin-top:10px}.rhiFlowAllLoads .flowPhysicalConsumerCard{margin-top:5px}`; }
+    powerFlowCardStyles() { return `.rhiNativeFlowDiagram{margin:10px 0;padding:13px;border:1px solid #dce5ef;border-radius:13px;background:linear-gradient(145deg,#f8fbff,#f7fcf9)}.rhiNativeFlowStage{display:grid;grid-template-columns:minmax(0,1fr) minmax(145px,.85fr) minmax(0,1fr);gap:13px;align-items:center}.rhiNativeFlowLane{display:grid;gap:8px;align-content:start;min-width:0}.rhiNativeFlowLane h3{font-size:12px;font-weight:650;margin:0 0 3px;color:#334155}.rhiNativeFlowNode{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px;border:1px solid #dce5ef;border-radius:10px;background:#fff}.rhiNativeFlowNode b{display:block;font-size:11px}.rhiNativeFlowNode small{display:block;font-size:9px;color:#64748b}.rhiNativeFlowNode strong{white-space:nowrap;font-size:14px;font-variant-numeric:tabular-nums}.rhiNativeFlowNode.solar{border-left:3px solid #e8ae42}.rhiNativeFlowNode.grid{border-left:3px solid #60a5fa}.rhiNativeFlowNode.battery{border-left:3px solid #34b589}.rhiNativeFlowNode.home{border-left:3px solid #94a3b8}.rhiNativeFlowBus{display:flex;align-items:center;justify-content:center;gap:6px}.rhiNativeFlowBus>span{color:#64748b;font-size:19px}.rhiNativeFlowHub{min-width:0;flex:1;text-align:center;border:1px solid #bad9cf;background:#ebf7f3;padding:13px 8px;border-radius:12px}.rhiNativeFlowHub strong{font-size:19px;display:block;font-variant-numeric:tabular-nums}.rhiNativeFlowHub small{font-size:9px;color:#48675e}.rhiNativeFlowDisclaimer{font-size:10px;color:#64748b;margin:10px 2px 0}.rhiOptionalPowerFlow{margin:12px 0 0;border-top:1px solid #edf1f6;padding-top:10px}.rhiOptionalPowerFlow>summary{cursor:pointer;color:#526685;font-size:11px;font-weight:600}@media(max-width:800px){.rhiNativeFlowStage{grid-template-columns:1fr;gap:9px}.rhiNativeFlowBus{min-height:62px}.rhiNativeFlowBus>span{transform:rotate(90deg)}.rhiNativeFlowHub{flex:0 1 240px}.rhiNativeFlowNode{min-height:36px}}.rhiFlowHistoryGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:1rem;align-items:stretch}.rhiFlowHistoryGrid>.panel{min-width:0}.rhiPowerFlowPanel{min-width:0}.rhiPowerFlowHost{min-height:230px;width:100%;overflow-x:auto}.rhiPowerFlowHost power-flow-card-plus{display:block;width:100%}.rhiFlowMeasurementNote{font-size:11px;color:var(--rhi-color-muted);margin-top:7px}.rhiFlowAllLoads{margin-top:10px}.rhiFlowAllLoads .flowPhysicalConsumerCard{margin-top:5px}`; }
     flowDependencyStyles() {
       return `.rhiFlowDependencyNotice{border-left:3px solid #c08420;background:#fffbef;padding:10px 14px;margin-bottom:10px}
         .rhiFlowDependencyNotice strong{font-size:12px;color:#713f12}
@@ -4676,6 +4676,59 @@
     }
     // HACS cannot enforce dashboard-card dependencies at download time.
     // Check the actual browser registration on first render and whenever Flow is opened.
+    nativeFlowDiagram(current, physicalFlow) {
+      // First-party visual flow: Energy's verified directions/values only.
+      // Edges represent a bus boundary, not inferred per-device allocation.
+      const measured = value => {
+        const n = asNumber(value);
+        return n !== null && n >= 0 ? n : null;
+      };
+      const node = (label, power, tone = '', detail = '') => {
+        const value = measured(power);
+        return `<div class="rhiNativeFlowNode ${escapeHtml(tone)}">
+          <div><b>${escapeHtml(label)}</b>${detail ? `<small>${escapeHtml(detail)}</small>` : ''}</div>
+          <strong>${escapeHtml(value === null ? 'Unavailable' : fmtKw(value))}</strong>
+        </div>`;
+      };
+      const sources = [];
+      const demand = [];
+      const solar = measured(current?.solar?.powerKw);
+      const gridImport = current?.grid?.direction === 'importing'
+        ? measured(current?.grid?.importPowerKw) : null;
+      const gridExport = current?.grid?.direction === 'exporting'
+        ? measured(current?.grid?.exportPowerKw) : null;
+      const battery = current?.battery || {};
+      const discharge = battery.direction === 'out_of_storage'
+        ? measured(battery.dischargePowerKw) : null;
+      const charge = battery.direction === 'into_storage'
+        ? measured(battery.chargePowerKw) : null;
+      if (solar !== null) sources.push(node('Solar production',solar,'solar'));
+      if (gridImport !== null) sources.push(node('Grid import',gridImport,'grid'));
+      if (discharge !== null) sources.push(node('Home Battery discharge',discharge,'battery'));
+      const home = measured(physicalFlow?.homeConsumptionKw);
+      const flexible = measured(physicalFlow?.flexibleLoadsKw);
+      if (home !== null) demand.push(node('Home consumption',home,'home'));
+      if (flexible !== null && flexible > 0.05) demand.push(node('Flexible loads',flexible,'flexible'));
+      if (charge !== null && charge > 0.05) demand.push(node('Home Battery charging',charge,'battery','Separate storage demand'));
+      if (gridExport !== null && gridExport > 0.05) demand.push(node('Grid export',gridExport,'grid'));
+      const site = measured(physicalFlow?.siteConsumptionKw);
+      return `<section class="rhiNativeFlowDiagram" data-rhi-native-flow-diagram
+        aria-label="Measured live energy flow">
+        <div class="rhiNativeFlowStage">
+          <div class="rhiNativeFlowLane"><h3>Supply</h3>
+            ${sources.join('') || '<p class="muted">Supply measurements unavailable</p>'}</div>
+          <div class="rhiNativeFlowBus"><span aria-hidden="true">→</span>
+            <div class="rhiNativeFlowHub"><small>Measured site demand</small>
+              <strong>${escapeHtml(site === null ? 'Unavailable' : fmtKw(site))}</strong>
+              <small>Home energy bus</small></div>
+            <span aria-hidden="true">→</span></div>
+          <div class="rhiNativeFlowLane"><h3>Consumption & export</h3>
+            ${demand.join('') || '<p class="muted">Demand measurements unavailable</p>'}</div>
+        </div>
+        <p class="rhiNativeFlowDisclaimer">Shown power and directions are reported by Energy.
+          No individual source-to-consumer allocation is inferred.</p>
+      </section>`;
+    }
     nativeFlowEvidence(current, physicalFlow) {
       // Native fallback consumes already projected, canonical measured values.
       // Never calculate physical balance, invent a missing direction or sum
@@ -4763,6 +4816,7 @@
           '<div class="flowPage"><section class="panel rhiFlowRenderWarning" role="alert">' +
           '<h2>Some flow details are unavailable</h2><p>Measured energy values remain available. ' +
           'The detail renderer reported an error; check browser diagnostics.</p></section>' +
+          this.nativeFlowDiagram(current, consumption) +
           this.nativeFlowEvidence(current, consumption) + '</div>';
       }
     }
@@ -4795,10 +4849,13 @@
       const connectionPower = physicalFlow.connectionPowerKw;
       const homeBus = rt.asset('home_bus') || { display_name: 'Home Bus' };
       const switchboard = rt.asset('main_switchboard') || { display_name: 'Main Switchboard' };
-      return `${this.tabExperienceHeader(rt,'flow',pageVm)}<div class="flowPage">\n        ${this.powerFlowDependencyNotice()}
-        <section class="panel rhiPowerFlowPanel">
-          <div class="flowHeader"><div><h2>Live power flow</h2><p>Powered by Power Flow Card Plus. Only published, measured sources can animate; missing energy values are not estimated.</p></div></div>
-          <div class="rhiPowerFlowHost rhiUxChartViewport" data-rhi-power-flow-host role="region" aria-label="Interactive energy flow">${this.nativeFlowEvidence(current, physicalFlow)}</div>
+      return `${this.tabExperienceHeader(rt,'flow',pageVm)}<div class="flowPage">\n        <section class="panel rhiPowerFlowPanel">
+          <div class="flowHeader"><div><h2>Live power flow</h2><p>Native measured energy flow. Missing values and directions are never estimated.</p></div></div>
+          ${this.nativeFlowDiagram(current, physicalFlow)}
+          <details class="rhiOptionalPowerFlow"><summary>Optional detailed Power Flow Card Plus</summary>
+            ${this.powerFlowDependencyNotice()}
+            <div class="rhiPowerFlowHost rhiUxChartViewport" data-rhi-power-flow-host role="region" aria-label="Optional external energy flow diagram">${this.nativeFlowEvidence(current, physicalFlow)}</div>
+          </details>
           <div class="rhiFlowBatteryPresence" aria-label="Home Battery on energy flow">
             <div class="rhiFlowBatteryIdentity"><span class="rhiFlowBatteryIcon" aria-hidden="true">▣</span><div><b>Home Battery</b><small>${escapeHtml(battery.health === 'OK' ? battery.label : 'Measurement unavailable')}</small></div></div>
             <div class="rhiFlowBatteryFacts"><span><small>Power now</small><b>${escapeHtml(battery.valueAvailable ? fmtKw(battery.displayPowerKw) : '—')}</b></span><span><small>State of charge</small><b>${escapeHtml(battery.socPct === null ? '—' : fmtPct(battery.socPct))}</b></span></div>
