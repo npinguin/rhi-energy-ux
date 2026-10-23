@@ -6042,7 +6042,7 @@
             : asNumber(canonical.planned_today_kwh),
           // "Still after today" is not "Still after tomorrow". In particular
           // D2 may be a rolling partial EMHASS horizon with NO per-asset
-          // residual; never reuse D1's residual or infer it from buckets.
+          // residual; never reuse a D1 residual or infer it from buckets.
           remainingNeed: vm.horizonId === 'D2'
             ? asNumber(canonical.still_after_day_after_tomorrow_kwh)
             : vm.horizonId === 'D1'
