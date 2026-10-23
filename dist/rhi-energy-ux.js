@@ -8909,7 +8909,14 @@ function rhiEnergyVisualPickerStyles() {
           plannedEnergy: vm.horizonId === 'D2' ? asNumber(canonical.planned_day_after_tomorrow_kwh)
             : vm.horizonId === 'D1' ? asNumber(canonical.planned_tomorrow_kwh)
             : asNumber(canonical.planned_today_kwh),
-          remainingNeed: asNumber(firstDefined(canonical.still_to_plan_kwh,canonical.unresolved_horizon_kwh,published.remaining_need_kwh))
+          // "Still after today" is not "Still after tomorrow". In particular
+          // D2 may be a rolling partial EMHASS horizon with NO per-asset
+          // residual; never reuse a D1 residual or infer it from buckets.
+          remainingNeed: vm.horizonId === 'D2'
+            ? asNumber(canonical.still_after_day_after_tomorrow_kwh)
+            : vm.horizonId === 'D1'
+            ? asNumber(canonical.still_to_plan_kwh)
+            : asNumber(canonical.still_after_today_kwh)
         };
       });
       const hourlyAssetEnergy = assetId => vm.rows.reduce((sum,row) => {
