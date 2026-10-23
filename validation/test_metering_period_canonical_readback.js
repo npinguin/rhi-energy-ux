@@ -11,7 +11,8 @@ function extract(begin, end) {
   return source.slice(a, b);
 }
 const methods = vm.runInNewContext(
-  "({" + extract("syncMeteringPeriodFromRuntime() {", "runtime() {") + "})",
+  "({" + extract("syncMeteringPeriodFromRuntime() {", "runtime() {")
+    .replace("\\n    selectMeteringPeriod(", ",\\n    selectMeteringPeriod(") + "})",
   { Date, rowValue: (row, fallback) => row?.value ?? fallback }
 );
 const setup = ({ published = "today", writable = true, feedback = null } = {}) => {
