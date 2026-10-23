@@ -54,4 +54,38 @@ for(const key of ['planning.day_after_tomorrow','planning.d2_need','planning.d2_
   const matches=lex.match(new RegExp('"'+key.replaceAll('.','\\.')+'"','g'))||[];
   assert.equal(matches.length,3,key+' EN NL FR');
 }
+
+/* Exercise the REAL Energy card mapping, not a copied lookup rule. A rolling
+ * D2 preview must not relabel D1's remaining need as D2 truth; 0 is still 0.
+ */
+const mappingStart=card.indexOf('      const canonicalAssetsById = vm.planningAssetsById || {};');
+const mappingEnd=card.indexOf('      const hourlyAssetEnergy',mappingStart);
+assert.ok(mappingStart>0&&mappingEnd>mappingStart,'real per-asset horizon mapper found');
+const mapAssets=new Function('vm','totals','objectFrom','asNumber','firstDefined','assetKey',
+  card.slice(mappingStart,mappingEnd)+'\nreturn allAssetTotals;');
+const asset={asset_id:'q8.audi',energy_to_target_kwh:12};
+const standard={
+  energy_need_kwh:12,
+  planned_today_kwh:3,planned_tomorrow_kwh:4,
+  still_after_today_kwh:9,still_to_plan_kwh:5,
+};
+const assetVm=(horizon,canonical)=>({
+  horizonId:horizon, assets:[asset],planningAssetsById:{'q8.audi':canonical},
+  planningAssets:[],
+});
+const totalsEmpty={flexibleAssetsById:{}};
+const mapped=horizon=>mapAssets(assetVm(horizon,standard),totalsEmpty,
+  ctx.objectFrom,ctx.asNumber,ctx.firstDefined,x=>String(x.asset_id))[0];
+assert.equal(mapped('D0').plannedEnergy,3);
+assert.equal(mapped('D0').remainingNeed,9);
+assert.equal(mapped('D1').plannedEnergy,4);
+assert.equal(mapped('D1').remainingNeed,5);
+assert.equal(mapped('D2').plannedEnergy,null);
+assert.equal(mapped('D2').remainingNeed,null,'D2 never inherits D1 residual');
+const zeroD2=mapAssets(assetVm('D2',{
+  ...standard,planned_day_after_tomorrow_kwh:0,still_after_day_after_tomorrow_kwh:0,
+}),totalsEmpty,ctx.objectFrom,ctx.asNumber,ctx.firstDefined,x=>String(x.asset_id))[0];
+assert.equal(zeroD2.plannedEnergy,0);
+assert.equal(zeroD2.remainingNeed,0);
+
 console.log('PASS HA D2 native producer consumer: source identity, preview only, true zero, unknown totals, EN/NL/FR');
