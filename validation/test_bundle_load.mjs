@@ -77,7 +77,7 @@ const expected = {
   navSection: 'insights',
   navItem: 'metering',
   view: 'metering',
-  selectedMeteringPeriodId: 'hour',
+  selectedMeteringPeriodId: 'today',
   selectedOutlookHorizonId: 'D1',
   selectedPlanningHorizonId: 'D1',
   selectedMeteringHorizonId: 'D1',
@@ -93,7 +93,8 @@ const expected = {
 for (const [key, value] of Object.entries(expected)) {
   if (recreated[key] !== value) throw new Error(`interaction context not restored for ${key}: ${recreated[key]} !== ${value}`);
 }
-if (!recreated._meteringPeriodHydrated) throw new Error('restored Metering period must not be overwritten by backend hydration');
+if (recreated._meteringPeriodHydrated) throw new Error('Metering period must hydrate from the authoritative Energy backend, not browser session state');
+if ('selectedMeteringPeriodId' in stored) throw new Error('browser session must not claim canonical Metering period ownership');
 if (!recreated.disclosureOpen['metering:details']) throw new Error('disclosure state not restored');
 if (recreated.navSelectionBySection.intelligence !== 'plan') throw new Error('per-section navigation memory not restored');
 

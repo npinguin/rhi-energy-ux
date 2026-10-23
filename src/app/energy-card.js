@@ -1225,9 +1225,10 @@
       this.selectedOutlookHorizonId = interaction.selectedOutlookHorizonId || 'D0';
       this.selectedPlanningHorizonId = interaction.selectedPlanningHorizonId || 'D0';
       this.selectedMeteringHorizonId = interaction.selectedMeteringHorizonId || 'D0';
-      this.selectedMeteringPeriodId = interaction.selectedMeteringPeriodId || 'today';
+      // Metering selection is a persisted Energy setting, never browser-owned intent.
+      this.selectedMeteringPeriodId = 'today';
       this.selectedGasHorizonId = interaction.selectedGasHorizonId || 'month';
-      this._meteringPeriodHydrated = Object.prototype.hasOwnProperty.call(interaction, 'selectedMeteringPeriodId');
+      this._meteringPeriodHydrated = false;
       this.meteringSort = interaction.meteringSort || 'default';
       this.consumerSort = interaction.consumerSort || 'power';
       this.consumerFilter = interaction.consumerFilter || 'all';
@@ -1280,7 +1281,6 @@
           selectedOutlookHorizonId: this.selectedOutlookHorizonId,
           selectedPlanningHorizonId: this.selectedPlanningHorizonId,
           selectedMeteringHorizonId: this.selectedMeteringHorizonId,
-          selectedMeteringPeriodId: this.selectedMeteringPeriodId,
           selectedGasHorizonId: this.selectedGasHorizonId,
           meteringSort: this.meteringSort,
           consumerSort: this.consumerSort,
@@ -1372,18 +1372,27 @@
       if (!row || row.missing) return;
       const value = String(rowValue(row, '') || '').toLowerCase();
       if (!['hour','today','day','week','month','year'].includes(value)) return;
-      if (!this._meteringPeriodHydrated) {
-        this.selectedMeteringPeriodId = value === 'day' ? 'today' : value;
-        this._meteringPeriodHydrated = true;
-      }
+      // Canonical backend readback wins on every accepted revision, including
+      // external options/other-browser changes and rejection of a local write.
+      this.selectedMeteringPeriodId = value === 'day' ? 'today' : value;
+      this._meteringPeriodHydrated = true;
     }
     selectMeteringPeriod(value, source) {
       const normalized = String(value || 'today').toLowerCase();
       const period = normalized === 'day' ? 'today' : normalized;
       if (!['hour','today','week','month','year'].includes(period)) return;
-      this.selectedMeteringPeriodId = period;
-      this._meteringPeriodHydrated = true;
-      this.persistInteractionContext();
+      const runtime = this.runtime();
+      const row = runtime.editableProperty('metering.selected_period') || runtime.row('metering.selected_period');
+      if (!this.isWritableRow(row)) {
+        this.writeFeedback['metering.selected_period'] = {
+          state: 'rejected', reason: 'Canonical metering period writer unavailable',
+          updated: Date.now()
+        };
+        this.render();
+        return;
+      }
+      // Keep showing the last confirmed period until the exact new producer
+      // operation and native property readback agree. No optimistic browser save.
       this.requestPropertyWrite('metering.selected_period', period, { source });
     }
     runtime() { return new EnergyRuntime(this._hass || {}, this._canonicalIndex); }
