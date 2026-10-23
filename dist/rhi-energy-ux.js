@@ -1854,7 +1854,7 @@ function readEnergyCommandContract(gateway) {
     nativePlanningHorizon(horizonId = 'D0', variant = 'effective') {
       const horizon=String(horizonId || '').toUpperCase();
       if(!['effective','baseline'].includes(variant)) return Object.freeze({published:false,available:false,details:null});
-      if (horizon !== 'D0' && horizon !== 'D1') return Object.freeze({available:false,details:null});
+      if (!['D0','D1','D2'].includes(horizon)) return Object.freeze({available:false,details:null});
       // Baseline and INCOMPLETE horizons may be read as preview only.
       // They never authorize physical action or masquerade as effective plans.
       const contract=variant==='baseline'
@@ -2474,7 +2474,9 @@ function readEnergyCommandContract(gateway) {
 
     planningIndexRows() {
       if (this._planningOutcomes) return this._planningOutcomes;
-      this._planningOutcomes=['D0','D1'].flatMap(id=>{
+      this._planningOutcomes=['D0','D1',
+        ...(this.nativePlanningHorizon('D2').published === true ? ['D2'] : [])
+      ].flatMap(id=>{
         const native=this.planningProjection(id);
         return native.planningAssets
           .filter(row=>row && String(row.asset_id || '').trim())
@@ -2492,7 +2494,9 @@ function readEnergyCommandContract(gateway) {
       // Only the two backend-supported native horizons exist. An incomplete
       // horizon remains visible as incomplete rather than vanishing or using
       // a retired aggregate to fill missing totals.
-      return ['D0','D1'].map(id=>this.planningProjection(id).horizon);
+      return ['D0','D1',
+        ...(this.nativePlanningHorizon('D2').published === true ? ['D2'] : [])
+      ].map(id=>this.planningProjection(id).horizon);
     }
     planningHorizon(id = 'D0') {
       return this.planningProjection(id).horizon || null;
@@ -3235,8 +3239,18 @@ class FlexibleAssetDomainModel {
     const normalized=String(horizonId || '').toUpperCase();
     const today=runtime.nativePlanningTotals('D0');
     const tomorrow=runtime.nativePlanningTotals('D1');
-    const supported=normalized==='D0' || normalized==='D1';
-    const selected=supported ? (normalized==='D1' ? tomorrow : today) : {
+    const supported=['D0','D1','D2'].includes(normalized);
+    // D2 has a canonical provider-owned horizon sensor when the native 48h
+    // result crosses into a third calendar day, but no full six-KPI numeric
+    // scalar set is published for that incomplete rolling horizon. Never
+    // populate D2 totals from D0/D1 or client-side bucket arithmetic.
+    const dayAfter=Object.freeze({
+      available:false,
+      missing:['native_d2_scalar_totals_unavailable'],
+      values:{},
+    });
+    const selected=normalized==='D2' ? dayAfter
+      : supported ? (normalized==='D1' ? tomorrow : today) : {
       available:false, missing:['unsupported_planning_horizon'], values:{}
     };
     const nativeHorizon = supported && typeof runtime.nativePlanningHorizon === 'function'
@@ -3286,7 +3300,8 @@ class FlexibleAssetDomainModel {
         effective_horizon:effectiveAvailable,
         metrics_available:selected.available===true})
     });
-    const todayTotals=totals(today),tomorrowTotals=totals(tomorrow);
+    const todayTotals=totals(today),tomorrowTotals=totals(tomorrow),
+      dayAfterTotals=totals(dayAfter);
     return Object.freeze({
       entityId:null,
       contractVersion:'ENERGY_NATIVE_PLANNING',
@@ -3315,8 +3330,9 @@ class FlexibleAssetDomainModel {
         .map(row=>[String(row.asset_id),row]))),
       planningTodayTotals:Object.freeze(todayTotals),
       planningTomorrowTotals:Object.freeze(tomorrowTotals),
+      planningDayAfterTotals:Object.freeze(dayAfterTotals),
       planningCombinedTotals:Object.freeze({}),
-      horizonsById:Object.freeze({D0:todayTotals,D1:tomorrowTotals}),
+      horizonsById:Object.freeze({D0:todayTotals,D1:tomorrowTotals,D2:dayAfterTotals}),
       horizonId:normalized,horizon,summary:nativeSummary,
       // D0/D1 lane totals are backend-owned and must never be reconstructed
       // from flat numeric KPI readbacks.
@@ -3402,6 +3418,7 @@ class FlexibleAssetDomainModel {
       planningAssetsById: contract.planningAssetsById,
       todayTotals: contract.planningTodayTotals,
       tomorrowTotals: contract.planningTomorrowTotals,
+      dayAfterTotals: contract.planningDayAfterTotals,
       combinedTotals: contract.planningCombinedTotals,
       storage,
       rows,
@@ -3712,6 +3729,11 @@ function rhiUxCoreStyles() {
 // Machine identifiers and backend semantic codes remain untranslated.
 const RHI_ENERGY_TRANSLATIONS = Object.freeze({
   en:Object.freeze({
+    "planning.day_after_tomorrow":"Day after tomorrow",
+    "planning.d2_need":"Need entering day after tomorrow",
+    "planning.d2_planned":"Planned day after tomorrow",
+    "planning.d2_remaining":"Still after day after tomorrow",
+
     "history.grid_import":"Grid import history",
     "history.grid_export":"Grid export history",
     "history.home":"Home consumption history",
@@ -3751,6 +3773,11 @@ const RHI_ENERGY_TRANSLATIONS = Object.freeze({
     "reason.intelligence_off":"Energy Intelligence is off","reason.automation_disabled":"Automation is disabled","reason.disabled":"Disabled","reason.not_available":"Not available","reason.not_published":"Information is not available yet.","reason.no_battery_policy":"Battery policy information is not available yet","reason.data_incomplete":"Some details are unavailable","reason.verification_required":"Verification is needed","reason.reset_pending":"Reset in progress","reason.confirmation_needed":"Confirmation needed","reason.waiting":"Waiting","reason.preparing":"Preparing","reason.not_configured":"Setup needed","common.appearance":"Appearance","common.choose_appearance":"Choose appearance","common.selected":"Selected","common.save_appearance":"Save appearance","common.automatic":"Automatic","common.off":"Off","common.advice":"Advice","common.forced":"Forced","common.high":"High","common.normal":"Normal","common.low":"Low","section.production_supply":"Production & supply","section.production_supply_desc":"Energy available to the home now.","section.consumption_desc":"Home use, flexible loads and battery charging. Grid export is separate.","overview.battery_charge":"Battery Charge","overview.battery_discharge":"Battery Discharge","overview.battery_charging":"Charging stationary storage","overview.battery_flow_unavailable":"Battery flow unavailable","overview.battery_flow_reason":"Battery charging or discharging cannot be confirmed.","overview.grid_flow_unavailable":"Grid flow unavailable","overview.grid_flow_reason":"Grid import or export cannot be confirmed.","overview.balance_incomplete":"The current site energy balance is not verified.","overview.home_excludes_storage":"Household consumption excluding Flexible Loads and Battery Charge","section.flexible_loads":"Flexible loads","section.flexible_loads_desc":"Current execution, next action, requested power and operational reason. Hardware configuration is not shown here.","section.other_assets":"Other assets","section.supply":"Supply","section.supply_desc":"Expected usable energy for the selected horizon.","section.demand":"Demand","section.demand_desc":"Expected Home Consumption, Flexible Loads and storage charging.","section.grid_impact":"Grid impact","section.grid_impact_desc":"Expected grid exchange for the selected horizon.","flow.physical":"Physical Energy Flow","flow.physical_desc":"Live measured energy paths only. Disabled and planning-only assets are excluded.","flow.producers":"Producers","flow.consumers":"Consumers","flow.charging_connections":"Charging connections","flow.charging_connections_desc":"Chargers and vehicle assignments currently visible to Energy.","flow.physical_consumers":"Physical consumers","flow.physical_consumers_desc":"Participating loads and their current charging connection; idle assets remain visible.","gas.history":"Gas usage history","gas.meter":"Gas meter","gas.meter_desc":"Current meter state and measured values.","gas.connect":"Connect your gas meter","gas.connect_desc":"Connect a gas meter before consumption history can be shown.","battery.state":"Home Battery state","battery.state_desc":"Combined operational truth for the Home Battery system.","battery.contributors":"Home Battery contributors","battery.contributors_desc":"Physical batteries contributing to the aggregate.","settings.automation":"Automation","settings.automation_desc":"Choose how much Home Intelligence may act for you.","settings.adjust":"What do you want to adjust?","settings.adjust_desc":"Settings are grouped by the part of your energy system you want to influence.","settings.effective":"Effective behavior","settings.participants":"Participating assets","metering.period":"Measurement period","metering.attention":"Metering attention","metering.attention_desc":"Resolve the selected period before relying on its totals.","metering.flexible_loads":"Flexible Loads","value.financial_result":"Financial result","value.pricing_settings":"Pricing settings","value.flexible_pricing":"Pricing of flexible loads","value.consumer_allocation":"Consumer allocation","planning.tactical":"Tactical planning","planning.strategic":"Strategic Planning","planning.not_available":"Strategy not available","planning.solar_generation":"Solar generation","planning.solar_unavailable":"Solar generation details are not available yet","planning.no_renderer":"This navigation target has no dedicated renderer.","appearance.description":"Choose the representative image. The selection is persisted by the owning domain and confirmed by readback.","common.horizon":"Horizon","common.period":"Period","common.status":"Status","common.default":"Default","common.name":"Name","common.this_hour":"This hour","common.week":"Week","common.month":"Month","common.year":"Year","common.highest_value":"Highest value","common.lowest_value":"Lowest value","pricing.export_compensation":"Export compensation","pricing.export_fee":"Export fee","pricing.commodity":"Commodity","pricing.network":"Network","pricing.taxes_levies":"Taxes & levies","pricing.vat":"VAT","hero.energy_overview":"Energy overview","hero.site_consumption":"Site Consumption","hero.energy_outlook":"Energy outlook","hero.live_flow":"Live energy flow","hero.solar_unavailable":"Solar production unavailable","hero.generating":"Generating now","hero.not_generating":"Not generating","hero.settings":"Settings","hero.operational_planning":"Operational Planning","hero.metering":"Metering","hero.home_intelligence":"Home Intelligence","hero.energy_retrospective":"Energy retrospective","hero.energy_value":"Energy value","overview.producing_now":"Producing now","overview.grid_import":"Grid Import","overview.importing":"Importing","overview.flex_contributor":"Flexible Load contributor","automation.mode":"Automation mode","automation.quick_action":"Quick action","automation.control":"Home Intelligence control","connection.not_connected":"Not connected","connection.connect_hint":"Connect to enable planning and charging.","connection.disabled_hint":"This load is disabled and excluded from planning.","connection.connected":"Connected","control.requested_charge_power":"Requested charge power","control.requested_charge_power_desc":"Charging power requested from this asset.","relationship.part_of":"Part of","battery.system":"Battery system","battery.power_now":"Power now","battery.soc":"State of charge","battery.capacity":"Capacity","battery.available_energy":"Available energy","solar.production_now":"Production now","automation.authority":"Automation authority","consumer.managed":"Flexible loads","consumer.managed_desc":"Primary cards show current power and energy need. Details contain additional user information; technical evidence stays in diagnostics.","retro.planning_outcomes":"Planning outcomes","retro.execution_results":"Execution results","retro.measured_energy":"Measured energy","retro.open_period":"Open period review","retro.weekly":"Weekly review","intelligence.current_situation":"Current situation","planning.solar":"Solar","planning.battery_out":"Home Battery out","planning.grid_in":"Grid in","planning.home":"Home","planning.battery_in":"Home Battery in","planning.grid_out":"Grid out","planning.hourly_desc":"Hourly view of expected production, consumption, storage and grid exchange.","common.recommendation":"Recommendation","common.producing":"Producing","common.idle":"Idle","common.month_label":"Month","common.year_label":"Year","common.total":"Total","common.sort":"Sort","common.error":"Error","gas.history_unavailable":"Gas history temporarily unavailable","gas.history_unavailable_desc":"The meter is available, but Home Assistant could not load the Statistics Graph card.","gas.consumption":"Gas consumption","gas.not_connected":"Gas meter not connected","gas.total_meter":"total meter reading","gas.measured_desc":"Measured gas use, meter state and history.","automation.pause_mode":"Pause mode","automation.pause_unavailable":"Pause mode cannot be changed for this asset","strategy.min_start_time":"Min start time","strategy.surplus_start":"Surplus start","strategy.min_stop_time":"Min stop time","strategy.surplus_stop":"Surplus stop","strategy.max_start_attempts":"Max start attempts","strategy.retry_delay":"Retry delay","strategy.settings":"Strategy settings","strategy.settings_desc":"Editable planning properties for flexible-load execution.","planning.ready_by":"Ready by","planning.priority":"Priority","planning.goal":"Goal","planning.target":"Target","planning.deadline":"Deadline","planning.route_grid":"Route / grid","planning.mode_confidence":"Mode / confidence","consumer.not_managed":"Not managed by Home Intelligence","solar.panel":"SOLAR PANEL","solar.panel_available":"Panel available","solar.panel_identity":"Panel identity","solar.optimizer_panel":"OPTIMIZER / PANEL","solar.measurements":"Measurements","solar.measurements_unavailable":"Energy measurements are not available right now; the optimizer remains part of the solar system.","solar.zone_string":"SOLAR ZONE / STRING","solar.production":"SOLAR PRODUCTION","solar.production_title":"Solar Production","solar.production_unavailable":"Production unavailable","solar.home":"Home","solar.grid":"Grid","solar.consumption_now":"Consumption now","asset.other":"Other assets","asset.excluded_planning":"These assets are excluded from operational planning.","asset.not_managed":"These assets are not managed by Home Intelligence.","flow.main_switchboard":"Main Switchboard","flow.physical_bus":"Physical bus","flow.home_bus":"Home Bus","flow.site_consumption":"Site Consumption","metering.reset_baseline":"Reset baseline","metering.reset_unavailable":"Reset is not available right now","metering.no_flexible":"No Flexible Load measurements available","metering.no_flexible_desc":"Measurements appear when Energy publishes a visible period record.","retro.prerequisites":"REVIEW PREREQUISITES","retro.collecting":"Collecting evidence","retro.collecting_desc":"This section appears when Energy Intelligence publishes enough measurable evidence.","value.period_result_desc":"Accumulated measured value for the Metering-selected period. No future value is predicted.","value.net_financial_result":"Net financial result","planning.no_effective":"No effective values available.","planning.no_long_term":"No long-term strategy available","planning.no_long_term_desc":"Long-term strategy details are not available yet."
   }),
   nl:Object.freeze({
+    "planning.day_after_tomorrow":"Overmorgen",
+    "planning.d2_need":"Benodigd bij aanvang overmorgen",
+    "planning.d2_planned":"Gepland overmorgen",
+    "planning.d2_remaining":"Nog te plannen na overmorgen",
+
     "history.grid_import":"Historiek netafname",
     "history.grid_export":"Historiek netinjectie",
     "history.home":"Historiek huishoudelijk verbruik",
@@ -3790,6 +3817,11 @@ const RHI_ENERGY_TRANSLATIONS = Object.freeze({
     "reason.intelligence_off":"Energie-intelligentie staat uit","reason.automation_disabled":"Automatisering is uitgeschakeld","reason.disabled":"Uitgeschakeld","reason.not_available":"Niet beschikbaar","reason.not_published":"Deze informatie is nog niet beschikbaar.","reason.no_battery_policy":"Informatie over het batterijbeleid is nog niet beschikbaar","reason.data_incomplete":"Sommige details zijn niet beschikbaar","reason.verification_required":"Controle is nodig","reason.reset_pending":"Herstel wordt uitgevoerd","reason.confirmation_needed":"Bevestiging nodig","reason.waiting":"Wachten","reason.preparing":"Voorbereiden","reason.not_configured":"Instelling nodig","common.appearance":"Weergave","common.choose_appearance":"Weergave kiezen","common.selected":"Geselecteerd","common.save_appearance":"Weergave opslaan","common.automatic":"Automatisch","common.off":"Uit","common.advice":"Advies","common.forced":"Geforceerd","common.high":"Hoog","common.normal":"Normaal","common.low":"Laag","section.production_supply":"Productie & aanvoer","section.production_supply_desc":"Energie die nu voor de woning beschikbaar is.","section.consumption_desc":"Huishoudelijk verbruik, flexibele verbruikers en batterijladen. Netinjectie staat apart.","overview.battery_charge":"Batterij laden","overview.battery_discharge":"Batterij ontladen","overview.battery_charging":"De thuisbatterij wordt geladen","overview.battery_flow_unavailable":"Batterijstroom niet beschikbaar","overview.battery_flow_reason":"Laden of ontladen van de batterij kan niet worden bevestigd.","overview.grid_flow_unavailable":"Netstroom niet beschikbaar","overview.grid_flow_reason":"Netafname of netinjectie kan niet worden bevestigd.","overview.balance_incomplete":"De actuele energiebalans van de woning is niet bevestigd.","overview.home_excludes_storage":"Huishoudelijk verbruik zonder flexibele verbruikers en batterijladen","section.flexible_loads":"Flexibele verbruikers","section.flexible_loads_desc":"Huidige uitvoering, volgende actie, gevraagd vermogen en operationele reden. Hardwareconfiguratie wordt hier niet getoond.","section.other_assets":"Andere assets","section.supply":"Aanvoer","section.supply_desc":"Verwachte bruikbare energie voor de gekozen horizon.","section.demand":"Vraag","section.demand_desc":"Verwacht woningverbruik, flexibele verbruikers en batterijladen.","section.grid_impact":"Netimpact","section.grid_impact_desc":"Verwachte netuitwisseling voor de gekozen horizon.","flow.physical":"Fysieke energiestroom","flow.physical_desc":"Alleen live gemeten energiestromen. Uitgeschakelde en enkel geplande assets zijn uitgesloten.","flow.producers":"Producenten","flow.consumers":"Verbruikers","flow.charging_connections":"Laadverbindingen","flow.charging_connections_desc":"Laadpunten en voertuigtoewijzingen die momenteel zichtbaar zijn voor Energy.","flow.physical_consumers":"Fysieke verbruikers","flow.physical_consumers_desc":"Deelnemende verbruikers en hun huidige laadverbinding; inactieve assets blijven zichtbaar.","gas.history":"Historiek gasverbruik","gas.meter":"Gasmeter","gas.meter_desc":"Huidige meterstatus en gemeten waarden.","gas.connect":"Verbind je gasmeter","gas.connect_desc":"Verbind een gasmeter voordat verbruikshistoriek kan worden getoond.","battery.state":"Status thuisbatterij","battery.state_desc":"Gecombineerde operationele waarheid voor het thuisbatterijsysteem.","battery.contributors":"Onderdelen thuisbatterij","battery.contributors_desc":"Fysieke batterijen die bijdragen aan het totaal.","settings.automation":"Automatisering","settings.automation_desc":"Kies hoeveel Home Intelligence voor jou mag uitvoeren.","settings.adjust":"Wat wil je aanpassen?","settings.adjust_desc":"Instellingen zijn gegroepeerd volgens het deel van je energiesysteem dat je wilt beïnvloeden.","settings.effective":"Effectief gedrag","settings.participants":"Deelnemende assets","metering.period":"Meetperiode","metering.attention":"Aandacht voor metingen","metering.attention_desc":"Los problemen voor de gekozen periode op voordat je op de totalen vertrouwt.","metering.flexible_loads":"Flexibele verbruikers","value.financial_result":"Financieel resultaat","value.pricing_settings":"Prijsinstellingen","value.flexible_pricing":"Prijs van flexibele verbruikers","value.consumer_allocation":"Verdeling over verbruikers","planning.tactical":"Tactische planning","planning.strategic":"Strategische planning","planning.not_available":"Strategie niet beschikbaar","planning.solar_generation":"Zonneproductie","planning.solar_unavailable":"Details over zonneproductie zijn nog niet beschikbaar","planning.no_renderer":"Voor dit navigatiedoel is nog geen aparte weergave beschikbaar.","appearance.description":"Kies de representatieve afbeelding. De keuze wordt door het owning domain opgeslagen en via readback bevestigd.","common.horizon":"Horizon","common.period":"Periode","common.status":"Status","common.default":"Standaard","common.name":"Naam","common.this_hour":"Dit uur","common.week":"Week","common.month":"Maand","common.year":"Jaar","common.highest_value":"Hoogste waarde","common.lowest_value":"Laagste waarde","pricing.export_compensation":"Injectievergoeding","pricing.export_fee":"Injectiekost","pricing.commodity":"Energieprijs","pricing.network":"Netkosten","pricing.taxes_levies":"Belastingen & heffingen","pricing.vat":"BTW","hero.energy_overview":"Energieoverzicht","hero.site_consumption":"Woningverbruik","hero.energy_outlook":"Energievooruitzicht","hero.live_flow":"Live energiestroom","hero.solar_unavailable":"Zonneproductie niet beschikbaar","hero.generating":"Produceert nu","hero.not_generating":"Produceert niet","hero.settings":"Instellingen","hero.operational_planning":"Operationele planning","hero.metering":"Metingen","hero.home_intelligence":"Home Intelligence","hero.energy_retrospective":"Energieterugblik","hero.energy_value":"Energiewaarde","overview.producing_now":"Produceert nu","overview.grid_import":"Netafname","overview.importing":"Afname","overview.flex_contributor":"Bijdrage flexibele verbruiker","automation.mode":"Automatiseringsmodus","automation.quick_action":"Snelle actie","automation.control":"Home Intelligence-bediening","connection.not_connected":"Niet verbonden","connection.connect_hint":"Verbind om planning en laden mogelijk te maken.","connection.disabled_hint":"Deze verbruiker is uitgeschakeld en uitgesloten van planning.","connection.connected":"Verbonden","control.requested_charge_power":"Gevraagd laadvermogen","control.requested_charge_power_desc":"Laadvermogen dat voor deze asset wordt gevraagd.","relationship.part_of":"Onderdeel van","battery.system":"Batterijsysteem","battery.power_now":"Vermogen nu","battery.soc":"Laadniveau","battery.capacity":"Capaciteit","battery.available_energy":"Beschikbare energie","solar.production_now":"Productie nu","automation.authority":"Automatiseringsbevoegdheid","consumer.managed":"Flexibele verbruikers","consumer.managed_desc":"Primaire kaarten tonen huidig vermogen en energiebehoefte. Details bevatten extra gebruikersinformatie; technische evidence blijft in diagnose.","retro.planning_outcomes":"Planningsresultaten","retro.execution_results":"Uitvoeringsresultaten","retro.measured_energy":"Gemeten energie","retro.open_period":"Open periode-evaluatie","retro.weekly":"Wekelijkse evaluatie","intelligence.current_situation":"Huidige situatie","planning.solar":"Zonne-energie","planning.battery_out":"Thuisbatterij uit","planning.grid_in":"Netafname","planning.home":"Woning","planning.battery_in":"Thuisbatterij in","planning.grid_out":"Netinjectie","planning.hourly_desc":"Uurweergave van verwachte productie, verbruik, opslag en netuitwisseling.","common.recommendation":"Aanbeveling","common.producing":"Produceert","common.idle":"Inactief","common.month_label":"Maand","common.year_label":"Jaar","common.total":"Totaal","common.sort":"Sorteren","common.error":"Fout","gas.history_unavailable":"Gashistoriek tijdelijk niet beschikbaar","gas.history_unavailable_desc":"De meter is beschikbaar, maar Home Assistant kon de Statistics Graph-kaart niet laden.","gas.consumption":"Gasverbruik","gas.not_connected":"Gasmeter niet verbonden","gas.total_meter":"totale meterstand","gas.measured_desc":"Gemeten gasverbruik, meterstatus en historiek.","automation.pause_mode":"Pauzemodus","automation.pause_unavailable":"De pauzemodus kan voor deze asset niet worden gewijzigd","strategy.min_start_time":"Minimale starttijd","strategy.surplus_start":"Startoverschot","strategy.min_stop_time":"Minimale stoptijd","strategy.surplus_stop":"Stopoverschot","strategy.max_start_attempts":"Maximale startpogingen","strategy.retry_delay":"Wachttijd voor nieuwe poging","strategy.settings":"Strategie-instellingen","strategy.settings_desc":"Wijzigbare planningsinstellingen voor uitvoering van flexibele verbruikers.","planning.ready_by":"Klaar tegen","planning.priority":"Prioriteit","planning.goal":"Doel","planning.target":"Streefwaarde","planning.deadline":"Deadline","planning.route_grid":"Route / net","planning.mode_confidence":"Modus / betrouwbaarheid","consumer.not_managed":"Niet beheerd door Home Intelligence","solar.panel":"ZONNEPANEEL","solar.panel_available":"Paneel beschikbaar","solar.panel_identity":"Paneelidentiteit","solar.optimizer_panel":"OPTIMIZER / PANEEL","solar.measurements":"Metingen","solar.measurements_unavailable":"Energiemetingen zijn momenteel niet beschikbaar; de optimizer blijft onderdeel van het zonnesysteem.","solar.zone_string":"ZONNEZONE / STRING","solar.production":"ZONNEPRODUCTIE","solar.production_title":"Zonneproductie","solar.production_unavailable":"Productie niet beschikbaar","solar.home":"Woning","solar.grid":"Net","solar.consumption_now":"Verbruik nu","asset.other":"Andere assets","asset.excluded_planning":"Deze assets zijn uitgesloten van operationele planning.","asset.not_managed":"Deze assets worden niet beheerd door Home Intelligence.","flow.main_switchboard":"Hoofdverdeelkast","flow.physical_bus":"Fysieke bus","flow.home_bus":"Woningbus","flow.site_consumption":"Woningverbruik","metering.reset_baseline":"Baseline herstellen","metering.reset_unavailable":"Herstellen is momenteel niet beschikbaar","metering.no_flexible":"Geen metingen voor flexibele verbruikers beschikbaar","metering.no_flexible_desc":"Metingen verschijnen zodra Energy een zichtbare perioderegistratie publiceert.","retro.prerequisites":"VOORWAARDEN VOOR EVALUATIE","retro.collecting":"Bewijs verzamelen","retro.collecting_desc":"Dit onderdeel verschijnt zodra Energy Intelligence voldoende meetbaar bewijs publiceert.","value.period_result_desc":"Opgebouwde gemeten waarde voor de in Metering gekozen periode. Er wordt geen toekomstige waarde voorspeld.","value.net_financial_result":"Netto financieel resultaat","planning.no_effective":"Geen effectieve waarden beschikbaar.","planning.no_long_term":"Geen langetermijnstrategie beschikbaar","planning.no_long_term_desc":"Details over de langetermijnstrategie zijn nog niet beschikbaar."
   }),
   fr:Object.freeze({
+    "planning.day_after_tomorrow":"Après-demain",
+    "planning.d2_need":"Besoin au début d'après-demain",
+    "planning.d2_planned":"Planifié après-demain",
+    "planning.d2_remaining":"Reste à planifier après après-demain",
+
     "history.grid_import":"Historique de l'import réseau",
     "history.grid_export":"Historique de l'injection réseau",
     "history.home":"Historique de consommation domestique",
@@ -5220,8 +5252,9 @@ function rhiEnergyVisualPickerStyles() {
           { value:'planning', label:rhiEnergyT(this._hass,'nav.tactical_plan',{},'Today & Tomorrow'), attrs:{'data-tab-target':'planning'} },
           { value:'strategic-planning', label:rhiEnergyT(this._hass,'nav.strategic_plan',{},'Long term'), attrs:{'data-tab-target':'strategic-planning'} }
         ], tab, 'planningViewSelector');
+        const d2Published = rt.nativePlanningHorizon('D2').published === true;
         const horizon = tab === 'planning'
-          ? `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">Today</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">Tomorrow</button></div>`
+          ? `<div class="scopeSelector"><button class="scopeOption ${this.selectedPlanningHorizonId==='D0'?'active':''}" data-planning-horizon="D0">${escapeHtml(rhiEnergyT(this._hass,'common.today',{},'Today'))}</button><button class="scopeOption ${this.selectedPlanningHorizonId==='D1'?'active':''}" data-planning-horizon="D1">${escapeHtml(rhiEnergyT(this._hass,'common.tomorrow',{},'Tomorrow'))}</button>${d2Published ? `<button class="scopeOption ${this.selectedPlanningHorizonId==='D2'?'active':''}" data-planning-horizon="D2">${escapeHtml(rhiEnergyT(this._hass,'planning.day_after_tomorrow',{},'Day after tomorrow'))}</button>` : ''}</div>`
           : '';
         return selector + horizon;
       }
@@ -8852,7 +8885,9 @@ function rhiEnergyVisualPickerStyles() {
     }
     planning(rt) {
       const vm = this.buildPlanningViewModel(rt);
-      const horizonLabel = vm.horizonId === 'D1' ? 'Tomorrow' : 'Today';
+      const horizonLabel = vm.horizonId === 'D2'
+        ? rhiEnergyT(this._hass,'planning.day_after_tomorrow',{},'Day after tomorrow')
+        : vm.horizonId === 'D1' ? 'Tomorrow' : 'Today';
       const assetKey = asset => String(asset.asset_id || asset.id || '');
       const totals = vm.laneTotals;
       const canonicalAssetsById = vm.planningAssetsById || {};
@@ -8871,7 +8906,9 @@ function rhiEnergyVisualPickerStyles() {
           asset,
           canonical,
           need: asNumber(firstDefined(canonical.energy_need_kwh,canonical.need_kwh,published.energy_need_kwh,asset.energy_to_target_kwh)),
-          plannedEnergy: vm.horizonId === 'D1' ? asNumber(canonical.planned_tomorrow_kwh) : asNumber(canonical.planned_today_kwh),
+          plannedEnergy: vm.horizonId === 'D2' ? asNumber(canonical.planned_day_after_tomorrow_kwh)
+            : vm.horizonId === 'D1' ? asNumber(canonical.planned_tomorrow_kwh)
+            : asNumber(canonical.planned_today_kwh),
           remainingNeed: asNumber(firstDefined(canonical.still_to_plan_kwh,canonical.unresolved_horizon_kwh,published.remaining_need_kwh))
         };
       });
@@ -8939,7 +8976,8 @@ function rhiEnergyVisualPickerStyles() {
 
       const canonicalTotals = vm.horizonId === 'D0'
         ? objectFrom(vm.todayTotals)
-        : objectFrom(vm.tomorrowTotals);
+        : vm.horizonId === 'D1' ? objectFrom(vm.tomorrowTotals)
+        : objectFrom(vm.dayAfterTotals);
       const totalNeed = asNumber(canonicalTotals.flexible_required_kwh);
       const totalPlanned = asNumber(canonicalTotals.flexible_planned_kwh);
       const remainingNeed = asNumber(canonicalTotals.flexible_still_to_plan_kwh);
@@ -8951,7 +8989,11 @@ function rhiEnergyVisualPickerStyles() {
       const statusLabel = vm.previewOnly ? 'Preview only · No execution' :
         /at.?risk/i.test(planStatus) ? 'At risk' : this.productStateLabel(planStatus, vm.complete?'Forecast plan':'Plan unavailable');
       const plannedTotals = assetTotals.map(item => `<span class="planningFooterAsset">${this.assetVisual(item.asset,{size:'xs',fallbackIcon:this.planningAssetIcon(item.asset)})}<b>${escapeHtml(this.planningAssetName(item.asset))}</b> ${item.plannedEnergy===null?'—':item.plannedEnergy.toFixed(1)+' kWh'}</span>`).join('');
-      const summaryItems = vm.horizonId === 'D1'
+      const summaryItems = vm.horizonId === 'D2'
+        ? [[rhiEnergyT(this._hass,'planning.d2_need',{},'Need entering day after tomorrow'),displayNeed],
+           [rhiEnergyT(this._hass,'planning.d2_planned',{},'Planned day after tomorrow'),displayPlanned],
+           [rhiEnergyT(this._hass,'planning.d2_remaining',{},'Still after day after tomorrow'),displayRemaining]]
+        : vm.horizonId === 'D1'
         ? [['Need entering tomorrow',displayNeed],['Planned tomorrow',displayPlanned],['Still after tomorrow',displayRemaining]]
         : [['Need entering today',displayNeed],['Planned today',displayPlanned],['Still after today',displayRemaining]];
       const summaryTotals = `<div class="planningAggregateTotals">${summaryItems.map(([label,value])=>`<span><small>${label}</small><b>${value===null?'—':value.toFixed(1)+' kWh'}</b></span>`).join('')}</div>`;
@@ -8970,9 +9012,9 @@ function rhiEnergyVisualPickerStyles() {
         badgeText:vm.contractSupported ? statusLabel : 'Unavailable',
         badgeTone:vm.contractSupported && vm.complete ? 'ok' : 'attention',
         metrics:[
-          ['◎',vm.horizonId === 'D1' ? 'Need entering tomorrow' : 'Need entering today',fmtKwh(displayNeed,'—'),horizonLabel],
-          ['▣',vm.horizonId === 'D1' ? 'Planned tomorrow' : 'Planned today',fmtKwh(displayPlanned,'—'),horizonLabel],
-          ['◷',vm.horizonId === 'D1' ? 'Still after tomorrow' : 'Still after today',fmtKwh(displayRemaining,'—'),'Horizon-local residual'],
+          ['◎',summaryItems[0][0],fmtKwh(displayNeed,'—'),horizonLabel],
+          ['▣',summaryItems[1][0],fmtKwh(displayPlanned,'—'),horizonLabel],
+          ['◷',summaryItems[2][0],fmtKwh(displayRemaining,'—'),'Horizon-local residual'],
           ['✓','Confidence',this.productStateLabel(confidence,'Limited'),'Planning confidence']
         ]
       };
