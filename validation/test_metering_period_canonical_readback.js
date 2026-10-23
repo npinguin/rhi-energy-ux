@@ -12,7 +12,7 @@ function extract(begin, end) {
 }
 const methods = vm.runInNewContext(
   "({" + extract("syncMeteringPeriodFromRuntime() {", "runtime() {")
-    .replace("\\n    selectMeteringPeriod(", ",\\n    selectMeteringPeriod(") + "})",
+    .replace("    selectMeteringPeriod(", ",    selectMeteringPeriod(") + "})",
   { Date, rowValue: (row, fallback) => row?.value ?? fallback }
 );
 const setup = ({ published = "today", writable = true, feedback = null } = {}) => {
