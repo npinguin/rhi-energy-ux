@@ -138,7 +138,12 @@ const runtime={
 };
 const d0Contract=readPlanningContract(runtime,'D0');
 const d1Contract=readPlanningContract(runtime,'D1');
-const unsupportedHorizon=readPlanningContract(runtime,'D2');
+const unsupportedHorizon=readPlanningContract(runtime,'D3');
+const d2WithoutSource=readPlanningContract(runtime,'D2');
+assert.equal(d2WithoutSource.available,false);
+assert.equal(d2WithoutSource.previewOnly,false);
+assert.equal(d2WithoutSource.horizon.status,'UNAVAILABLE');
+assert.ok(d2WithoutSource.horizon.quality.missing.includes('native_d2_scalar_totals_unavailable'));
 assert.equal(unsupportedHorizon.available,false);
 assert.equal(unsupportedHorizon.horizon.status,'UNAVAILABLE');
 assert.ok(unsupportedHorizon.horizon.quality.missing.includes('unsupported_planning_horizon'));
