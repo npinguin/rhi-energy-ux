@@ -24,7 +24,16 @@ assert.ok(publish.includes("Require explicit user-requested HACS TEST and exact-
 assert.ok(publish.includes("python3 tools/check_hacs_test_request.py"),"Source-validity gate missing");
 assert.equal(rhiGate.publication_hold,true,"default publication hold missing");
 assert.equal(rhiGate.mode,"EXPLICIT_USER_REQUEST_HACS_TEST","obsolete source-closure deadlock");
-assert.equal(rhiGate.test_request.status,"AUTHORIZED_FOR_TEST","governance PR must not cause release");
+assert.ok(["STAGED_PENDING_FIVE_MAIN_VALIDATIONS","AUTHORIZED_FOR_TEST"].includes(rhiGate.test_request.status),
+  "user-requested test must be explicitly staged or finally authorized, never implicit");
+if(rhiGate.test_request.status==="STAGED_PENDING_FIVE_MAIN_VALIDATIONS"){
+  assert.equal(rhiGate.test_request.request_id,"RHI-HACS-TEST-2026-10-24-01");
+  assert.equal(rhiGate.test_request.expected_tag,"v4.3.36-rc.23");
+  assert.equal(rhiGate.test_request.runtime_qualification,"NOT_EXECUTED");
+  assert.equal(rhiGate.test_request.stable_promotion,"NO_GO");
+  assert.deepEqual(Object.keys(rhiGate.test_request.matrix).sort(),
+    ["foundation","mobility","energy","mobility_ux","energy_ux"].sort());
+}
 assert.equal(rhiGate.stable_release.user_approval_status,"NOT_APPROVED","test is never stable approval");
 assert.ok(Object.values(rhiGate.approval).every(v=>v===null));
 
