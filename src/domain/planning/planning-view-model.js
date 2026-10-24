@@ -15,6 +15,7 @@
       planningAssetsById: contract.planningAssetsById,
       todayTotals: contract.planningTodayTotals,
       tomorrowTotals: contract.planningTomorrowTotals,
+      dayAfterTotals: contract.planningDayAfterTotals,
       combinedTotals: contract.planningCombinedTotals,
       storage,
       rows,
