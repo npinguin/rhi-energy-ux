@@ -34,7 +34,7 @@
     "release_count_limit": 1
   },
   "test_request": {
-    "status": "STAGED_PENDING_FIVE_MAIN_VALIDATIONS",
+    "status": "AUTHORIZED_FOR_TEST",
     "request_id": "RHI-HACS-TEST-2026-10-24-01",
     "requested_by": "USER",
     "request_reference": "https://github.com/npinguin/rhi-foundation/issues/129#issuecomment-6385576869",
