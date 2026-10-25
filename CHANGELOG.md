@@ -1,3 +1,10 @@
+## 4.3.36-rc.23 — User-requested coordinated runtime HACS TEST 20261024
+
+- Source code 3/12 verified; nine themes code-wise still open; 0/12 installed runtime verified; no STABLE approval.
+- Native Energy D2 consumer fields and unknown/zero totals via Energy UX #266; Energy backend #384/#388 exact D0/D1 planning and DST timeline provenance.
+- Coordinated TEST matrix: Foundation F1.8.48, Mobility M0.10.54, Energy E0.15.141, Mobility UX rc.101, Energy UX rc.23. Enforce source/package/HA runtime/rollback checks before publication; see Foundation #129.
+- Verify real source/edit/readback, five locales/screen shapes, restart and recovery across Wessels, Molas/Huawei and independent Sonnen/SMA.
+
 ## 4.3.36-rc.22 — Energy canonical identity and resilient Flow HACS TEST
 
 - Fix false Backend Unknown and canonical property contract notification when optional Energy release diagnostic is disabled; derive version from domain-owned canonical property metadata (UX #262 + Energy #378).
