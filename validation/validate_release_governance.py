@@ -62,7 +62,17 @@ print("PASS release governance: release/product.json is the single release ident
 gate=load("release/COORDINATED_PUBLICATION_GATE.json")
 assert gate["publication_hold"] is True
 assert gate["mode"] == "EXPLICIT_USER_REQUEST_HACS_TEST"
-assert gate["test_request"]["status"] == "AUTHORIZED_FOR_TEST"
+# An installable TEST can be assembled while CI is running without granting
+# the publisher permission to publish unvalidated or incomplete package sets.
+status = gate["test_request"]["status"]
+assert status in {"STAGED_PENDING_FIVE_MAIN_VALIDATIONS", "AUTHORIZED_FOR_TEST"}
+if status == "STAGED_PENDING_FIVE_MAIN_VALIDATIONS":
+    import runpy
+    admitted = runpy.run_path(str(ROOT / "tools/check_hacs_test_request.py"))["authorized"]
+    sha = "a" * 40
+    sample = {"conclusion": "success", "head_branch": "main", "head_sha": sha}
+    assert admitted(gate, version, "rhi-energy-ux", sample, sha, sha) is False
+
 assert gate["stable_release"]["user_approval_status"] == "NOT_APPROVED"
 publish=(ROOT/".github/workflows/publish-hacs.yml").read_text(encoding="utf-8")
 stable=(ROOT/".github/workflows/release.yml").read_text(encoding="utf-8")

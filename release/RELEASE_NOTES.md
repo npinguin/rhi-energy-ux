@@ -1,16 +1,12 @@
-# v4.3.36-rc.22 — Energy canonical identity and resilient Flow HACS TEST
+# v4.3.36-rc.23 — User-requested Energy UX HACS runtime TEST (24 October 2026)
 
-**HACS TEST only — NOT stable approved.** [Explicit user request](https://github.com/npinguin/rhi-foundation/issues/129#issuecomment-6301892188).
+**TEST only, STABLE NO-GO.** Explicit five-package authorization: https://github.com/npinguin/rhi-foundation/issues/129#issuecomment-6385576869. Code-wise 3/12 source themes accepted, 9/12 incomplete; 0/12 physical runtime acceptance.
 
-## Fixes since v4.3.36-rc.21
-- **Energy UX #262:** [Fix false `Backend Unknown` and contract warning](https://github.com/npinguin/rhi-energy-ux/pull/262) caused by expecting the optional, disabled Energy diagnostic release sensor. The UX now obtains backend identity from canonical property attributes and detects inconsistent publisher release versions instead of silently trusting an arbitrary entity.
-- **Energy UX #262:** [Render Flow with measured fallback](https://github.com/npinguin/rhi-energy-ux/pull/262) when the detail renderer throws; log the exception and preserve producer-owned measurements rather than blanking the whole page. The original browser exception requires additional HA runtime observation and the interactive Flow is not yet acceptance-qualified.
-- **Energy backend #378:** [Publish `publisher_release` on canonical properties](https://github.com/npinguin/rhi-energy/pull/378), even when `sensor.rhi_energy_release` remains disabled by default.
-- Regression coverage `validation/test_live_backend_identity_and_flow_fallback.js` and Energy `tests/regression/test_canonical_release_identity_runtime.py`.
+## New since immutable rc.22
 
-## Immutable five-package TEST matrix
-**Foundation F1.8.47** (`v1.8.47`), **Mobility M0.10.53** (`v0.10.53`), **Energy E0.15.140** (`v0.15.140`), **Mobility UX v1.0.0-rc.100** (unchanged) and **Energy UX v4.3.36-rc.22**.
+- [Energy UX #266](https://github.com/npinguin/rhi-energy-ux/pull/266): actual producer-owned D2 advisory planning, correct per-participant Need/Planned/Still-to-plan, no D0/D1 scalar reuse, unknown rather than invented 0, EN/NL/FR, release and HACS package fidelity.
+- Preserve native measured Flow, price and strategy editor readback, signed/unknown EUR and always-on backend/package version from current Energy source authority. UX cannot authorize commands or synthesize financial/horizon data.
 
-Update Energy and Energy UX, preserving previous immutable Energy **E0.15.139** and Energy UX **v4.3.36-rc.21** as the coordinated rollback pair. Confirm HA restart, accurate footer, no false V2 contract warning and interactive Flow or clearly diagnosed measured fallback. Never infer directional physical flow from unknown measurements and do not actuate chargers automatically.
+**Five-tag TEST:** Foundation F1.8.48, Mobility M0.10.54, Energy E0.15.141, Mobility UX v1.0.0-rc.101, Energy UX v4.3.36-rc.23. Validate live Wessels, Molas/Huawei and independent Sonnen/SMA HA producer/consumer parity, D0/D1/D2, price settings/strategy edits, mobile/tablet/desktop, EN/NL/FR, source outages/recovery/restart, and five-package rollback. Missing physical readback or contradicted source quality is a test failure, not evidence of completion.
 
-Wessels target HA Flow exception diagnosis, desktop/iPad render, three-home readback, restart/recovery and rollback **NOT_EXECUTED**. Twelve product acceptance umbrellas OPEN, zero accepted debt policy. **STABLE NO-GO until full physical runtime qualification and separate explicit user approval.**
+Exact HACS plugin uses immutable tag `dist/` and no release attached asset; STABLE production approval requires later separate authorization.
