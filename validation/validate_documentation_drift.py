@@ -36,6 +36,16 @@ for token in ("app/", "runtime/", "domain/", "assets/", "dist/PACKAGE_MANIFEST.j
     if token not in source_gov:
         failures.append(f"SOURCE_PACKAGE_GOVERNANCE missing {token}")
 
+# Living handover points to current machine authorities, not historical RCs.
+for token in ("package.json", "release/product.json", "release/QUALIFICATION.json"):
+    if token not in handover:
+        failures.append(f"ENGINEER_HANDOVER missing release authority: {token}")
+import re
+if re.search(r"\b(?:v?\d+\.\d+\.\d+-rc\.\d+|E\d+\.\d+\.\d+)\b", handover):
+    failures.append("ENGINEER_HANDOVER contains frozen candidate/backend version")
+if "This is not yet a canonical-only release." in architecture:
+    failures.append("ARCHITECTURE contains superseded migration status")
+
 if failures:
     raise SystemExit("\n".join(failures))
 print("PASS documentation drift: normative Energy paths, package model and migration sequence are current")
