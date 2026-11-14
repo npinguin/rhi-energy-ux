@@ -16,11 +16,11 @@ Energy domain model and canonical runtime
 
 Backend owns identity, parentage, measured facts, period ownership, presentation family/surface, availability, quality, provenance, editing descriptors, command applicability, financial and planning semantics. UX owns selection, literal metadata grouping, formatting, rendering and permitted interaction. Never infer a physical relationship from an entity name, manufacture a zero, calculate planning totals, or apply optimistic write values as actual readback.
 
-### Current implementation status (2026-10-11)
+### Current implementation boundary
 
-The canonical property index and native metric readers are implemented. Per-asset parent/HA source identity is preserved; Home Consumption uses `home_consumption_power_kw`; native D0/D1 totals use `planning_today_*` and `planning_tomorrow_*`; `net_financial_result_eur` is accepted only for the exact backend-selected period. Missing, duplicate, stale and invalid values fail closed. The UI now uses these native readers in additional product paths.
+The canonical property index and native metric readers preserve per-asset parent/source identity. Home Consumption uses `home_consumption_power_kw`; native D0/D1 totals use `planning_today_*` and `planning_tomorrow_*`; `net_financial_result_eur` is accepted only for the exact backend-selected period. Missing, duplicate, stale and invalid values fail closed.
 
-**This is not yet a canonical-only release.** `src/runtime/public-interface-registry.js`, `src/runtime/energy-contract-gateway.js`, `src/runtime/energy-v2-contract.js` and remaining `src/app/energy-card.js`/selector paths still consume the retired Public V2 aggregate. These must be removed as complete vertical changes, with parity tests and no replacement snapshot. The strict audit remains authoritative over the older zero-debt check.
+The native gateway and `readEnergyCanonicalProduct` consume exact canonical property/object/metric publications, not the retired aggregate. The strict `npm run check:canonical-only` audit scans bundled source and remains mandatory. Historical migration evidence is not a current branch or release instruction. Runtime parity and target-HA qualification remain separate gates.
 
 ### Native scope and backend gaps
 
