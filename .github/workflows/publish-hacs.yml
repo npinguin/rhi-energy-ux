@@ -35,6 +35,8 @@ jobs:
       - name: Determine whether this version is publishable
         id: scope
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [ "${{ steps.coordinated.outputs.allowed }}" != "true" ]; then
@@ -44,7 +46,22 @@ jobs:
           fi
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}"
-          if git ls-remote --exit-code --tags "https://github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${TAG}" >/dev/null 2>&1; then
+          git fetch --tags
+          if git rev-parse -q --verify "refs/tags/${TAG}^{commit}" >/dev/null; then
+            PUBLISHED=$(mktemp -d)
+            trap 'rm -rf "$PUBLISHED"' EXIT
+            git archive "refs/tags/${TAG}" dist hacs.json package.json | tar -x -C "$PUBLISHED"
+            if ! diff -qr "$PUBLISHED/dist" dist ||
+               ! cmp "$PUBLISHED/hacs.json" hacs.json ||
+               ! cmp "$PUBLISHED/package.json" package.json; then
+              echo "::error::Immutable HACS package drift: ${TAG} already exists with DIFFERENT bytes. New package requires a NEW candidate version."
+              exit 1
+            fi
+            TAG_SHA=$(git rev-list -n 1 "refs/tags/${TAG}")
+            RELEASE_SHA=$(gh release view "${TAG}" --json targetCommitish --jq '.targetCommitish')
+            test "$RELEASE_SHA" = "$TAG_SHA"
+            test "$(gh release view "${TAG}" --json isPrerelease --jq '.isPrerelease')" = false
+            test "$(gh release view "${TAG}" --json assets --jq '.assets | length')" = 0
             echo "publish=false" >> "$GITHUB_OUTPUT"
             echo "reason=version_already_published" >> "$GITHUB_OUTPUT"
           else
