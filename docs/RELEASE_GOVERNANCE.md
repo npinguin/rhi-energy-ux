@@ -75,9 +75,10 @@ Published HACS package bytes are immutable.
 Published candidate bytes remain immutable, but that rule is enforced at candidate publication,
 not during ordinary engineering validation.
 
-If the current package version already has an immutable tag, Publish HACS skips publication for
-that merge. This allows engineering work to validate and merge without fake version churn. A new
-version is created only when an engineer intentionally prepares the next candidate.
+If the current package version already has an immutable tag, Publish HACS skips publication only
+after verifying the tagged package bytes and release metadata. Drift fails closed; ordinary engineering
+validation remains release-neutral. A new version is created only when an engineer intentionally
+prepares the next candidate.
 
 ## Build budget
 
