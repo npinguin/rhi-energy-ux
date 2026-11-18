@@ -10,6 +10,24 @@ assert.ok(!validate.includes("Protect immutable published package"), "engineerin
 assert.ok(!pkg.scripts.validate.includes("test:release"), "functional/technical validate must not depend on release bookkeeping");
 assert.ok(pkg.scripts["release:check"].includes("test:release"), "explicit release boundary command missing");
 assert.ok(publish.includes("version_already_published"), "publication must skip already-published engineering versions");
+const scope = publish.split("      - name: Determine whether this version is publishable")[1].split("\n  verify:")[0];
+const skip = scope.indexOf("reason=version_already_published");
+assert.ok(skip > 0, "published-version skip must remain available");
+for (const check of [
+  'git fetch --tags',
+  'git archive "refs/tags/${TAG}" dist hacs.json package.json',
+  'diff -qr "$PUBLISHED/dist" dist',
+  'cmp "$PUBLISHED/hacs.json" hacs.json',
+  'cmp "$PUBLISHED/package.json" package.json',
+  'test "$RELEASE_SHA" = "$TAG_SHA"',
+  "'.isPrerelease'",
+  "'.assets | length'"
+]) {
+  const position = scope.indexOf(check);
+  assert.ok(position >= 0 && position < skip, "published-version skip must follow verification: " + check);
+}
+assert.ok(scope.includes("Immutable HACS package drift:") && scope.includes("exit 1"),
+  "different bytes under an existing version must fail closed");
 assert.ok(publish.includes("npm run release:check"), "publication boundary must own release metadata validation");
 assert.ok(publish.includes("needs.scope.outputs.publish == 'true'"), "publication must be gated by candidate scope");
 assert.ok(governance.includes("A normal implementation, defect or governance PR is release-neutral."),
